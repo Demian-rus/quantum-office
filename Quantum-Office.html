@@ -63,6 +63,14 @@
 .sheet-status{font-size:10px;gap:12px}
 @media(max-width:1050px){.compact-shell{gap:5px;padding:0 6px}.compact-shell .logo{min-width:35px}.compact-shell .logo>span:last-child{display:none}.compact-shell .module{padding:0 7px;font-size:10px}.compact-shell .shell-save{display:none}.compact-shell #book-name{max-width:160px}.compact-shell .shell-action span{display:none}}
 @media(max-width:730px){.global-bar.compact-shell{height:39px;min-height:39px;display:flex;flex-wrap:nowrap;align-content:center;gap:3px;padding:0 4px}.compact-shell .logo{min-width:25px;height:30px;flex:0 0 25px}.compact-shell .modules{height:39px;width:auto;min-width:0;order:initial;flex:1;overflow-x:auto}.compact-shell .module{font-size:10px;padding:0 6px}.compact-shell .shell-document{display:none}.compact-shell .global-right{height:30px}.ribbon-tabs{padding:0 3px;overflow-x:auto}.ribbon-tabs button{padding:0 7px}.ribbon-controls{height:73px;min-height:73px;padding:3px}.ribbon-group{height:67px;padding:2px 6px 0}.sheet-footer{height:32px}}
+
+/* Resize grips are narrow and only visible on hover; no large ribbon controls. */
+.colhead,.rowhead{position:absolute;overflow:visible}
+.grid-resizer{position:absolute;z-index:8;display:block;touch-action:none;background:transparent}
+.col-resizer{right:-4px;top:0;bottom:0;width:9px;cursor:col-resize}
+.row-resizer{bottom:-4px;left:0;right:0;height:9px;cursor:row-resize}
+.grid-resizer:hover{background:#2f947755}
+.is-resizing,.is-resizing *{user-select:none!important;cursor:col-resize!important}
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -225,9 +233,31 @@ function csvDecode(input) {
 const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const stamp=()=>new Date().toISOString();
 const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-function newSheet(name='Лист 1') {return {id:uid(),name,cells:{}};}
+function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{}};}
 function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
+const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
+function columnWidth(sheet,index){return sheet.columnWidths?.[index]??DIMENSIONS.defaultColumn;}
+function rowHeight(sheet,index){return sheet.rowHeights?.[index]??DIMENSIONS.defaultRow;}
+function setColumnWidth(sheet,index,value){
+ if(!Number.isInteger(index)||index<0||index>=LIMITS.columns||!Number.isInteger(value)||value<DIMENSIONS.minColumn||value>DIMENSIONS.maxColumn)throw Error('Недопустимая ширина столбца');
+ sheet.columnWidths??={};if(value===DIMENSIONS.defaultColumn)delete sheet.columnWidths[index];else sheet.columnWidths[index]=value;
+}
+function setRowHeight(sheet,index,value){
+ if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
+ sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
+}
+function gridGeometry(sheet){
+ const x=[54],y=[31];
+ for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+columnWidth(sheet,col));
+ for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+rowHeight(sheet,row));
+ return {x,y};
+}
+function firstVisibleIndex(positions,coordinate){
+ let lo=0,hi=positions.length-1;
+ while(lo<hi){const mid=(lo+hi)>>1;if(positions[mid+1]<=coordinate)lo=mid+1;else hi=mid;}
+ return Math.min(lo,positions.length-2);
+}
 function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
 function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);sheet.cells[key]={value:prev.value,style:{...prev.style,...patch}};}
@@ -360,7 +390,13 @@ function exportCSV(sheet){let maxR=0,maxC=0;for(const key of Object.keys(sheet.c
 }
 function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
- let total=0;const ids=new Set();for(const sheet of book.sheets){if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
+ let total=0;const ids=new Set();for(const sheet of book.sheets){
+  for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
+   const map=sheet?.[key];if(map===undefined)continue;
+   if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
+   for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||!Number.isInteger(value)||value<sizeMin||value>sizeMax)throw Error('Некорректный размер строки или столбца');
+  }
+if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
     if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format'].includes(k))||
        ['bold','italic'].some(k=>k in style&&typeof style[k]!=='boolean')||
@@ -411,6 +447,7 @@ function planAutoSum(sheet,from,to){
  }
  return entries;
 }
+{cellName,parseCell};
 
 
 
@@ -459,6 +496,16 @@ async function importXLSX(data,filename='Таблица'){
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
+  for(const col of elements(element(xml,'cols'),'col')){
+   const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
+   if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min||!Number.isFinite(width)||width<=0)continue;
+   const px=Math.round(width*7+5);if(px<48||px>520)continue;
+   for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+  }
+  for(const row of elements(element(xml,'sheetData'),'row')){
+   const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
+   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
+  }
   for(const row of elements(element(xml,'sheetData'),'row'))for(const c of elements(row,'c')){const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
    if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
    const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
@@ -493,7 +540,9 @@ async function exportXLSX(book){validateWorkbook(book);const zip=new JSZip();con
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}"><sheetData>${Array.from(byRows).sort((a,b)=>a[0]-b[0]).map(([r,cc])=>`<row r="${r}">${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
+  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1)]);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData></worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
@@ -518,6 +567,7 @@ let workspace;try{workspace=loadWorkspace();}catch{workspace=newWorkspace();}
 let page='home', activeRibbon='home', activeCell='A1', rangeEnd='A1', editing=null,mouseSelecting=false;
 let scrollLeft=0,scrollTop=0, saveHandle=null,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
 let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
+let resizeDrag=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
@@ -545,14 +595,14 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
 function setSelection(a,b=a){activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
 function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:activeCell);if(!p)return;const r=Math.min(Math.max(p.row+dr,0),LIMITS.rows-1),c=Math.min(Math.max(p.col+dc,0),LIMITS.columns-1);const target=cellName(r,c);setSelection(extend?activeCell:target,target);ensureVisible(r,c);}
-function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if(!view)return;const left=rowW+c*cellW,top=headerH+r*cellH;
+function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if(!view||!sheet())return;const {x,y}=gridGeometry(sheet()),left=x[c],top=y[r],width=x[c+1]-left,height=y[r+1]-top;
  if(left<view.scrollLeft+rowW)view.scrollLeft=Math.max(0,left-rowW);
- else if(left+cellW>view.scrollLeft+view.clientWidth)view.scrollLeft=left+cellW-view.clientWidth;
+ else if(left+width>view.scrollLeft+view.clientWidth)view.scrollLeft=left+width-view.clientWidth;
  if(top<view.scrollTop+headerH)view.scrollTop=Math.max(0,top-headerH);
- else if(top+cellH>view.scrollTop+view.clientHeight)view.scrollTop=top+cellH-view.clientHeight;}
+ else if(top+height>view.scrollTop+view.clientHeight)view.scrollTop=top+height-view.clientHeight;}
 function commitEditor(cancel=false){if(!editing)return;const {node,ref,initial}=editing;const value=cancel?initial:node.value;editing=null;node.remove();if(!cancel&&value!==initial){transact(()=>setCell(sheet(),ref,value));}drawGrid();const formula=document.getElementById('formula-input');if(formula)formula.value=getCell(sheet(),ref).value;}
 function editCell(seed=null){if(!sheet())return;commitEditor();const ref=activeCell,p=parseCell(ref),canvas=document.getElementById('grid-canvas');if(!canvas||!p)return;ensureVisible(p.row,p.col);
- const node=document.createElement('input');node.className='cell-editor';node.style.left=`${rowW+p.col*cellW+1}px`;node.style.top=`${headerH+p.row*cellH+1}px`;node.style.width=`${Math.max(cellW-2,160)}px`;node.style.height=`${cellH-2}px`;node.value=seed===null?getCell(sheet(),ref).value:seed;canvas.append(node);
+ const node=document.createElement('input');node.className='cell-editor';const {x,y}=gridGeometry(sheet());node.style.left=`${x[p.col]+1}px`;node.style.top=`${y[p.row]+1}px`;node.style.width=`${Math.max(x[p.col+1]-x[p.col]-2,160)}px`;node.style.height=`${y[p.row+1]-y[p.row]-2}px`;node.value=seed===null?getCell(sheet(),ref).value:seed;canvas.append(node);
  editing={node,ref,initial:getCell(sheet(),ref).value};node.focus();if(seed===null)node.select();
  node.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();commitEditor();moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();commitEditor();moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
  node.addEventListener('blur',()=>{if(editing?.node===node)commitEditor();});}
@@ -586,6 +636,11 @@ function topbar(){
 }
 function homepage(){const cards=workspace.books.map(b=>`<article class="file-card"><button class="file-open" data-action="open" data-id="${esc(b.id)}"><span class="file-emoji">▦</span><span class="file-card-name">${esc(b.name)}</span><small>${b.sheets.length} ${b.sheets.length===1?'лист':'листа'} · ${niceDate(b.updated)}</small></button><div class="file-card-actions"><button data-action="clone" data-id="${esc(b.id)}">Дублировать</button><button data-action="delete" data-id="${esc(b.id)}">Удалить</button></div></article>`).join('');return `<main class="home-main"><div class="home-top"><div class="eyebrow">ЕДИНОЕ ПРОСТРАНСТВО ДЛЯ РАБОТЫ</div><h1>Ваш офис.<br><span>Ваши правила.</span></h1><p>Все инструменты в одной программе. Начинаем с таблиц — и строим полноценный офис последовательно.</p></div><div class="home-section"><div class="section-label"><span>01 / СОЗДАТЬ</span><span class="muted">Выберите рабочий инструмент</span></div><div class="tool-cards"><button class="tool-card live" data-action="new"><span class="tool-icon green">▦</span><span class="tool-tag">В РАЗРАБОТКЕ</span><strong>Таблицы</strong><small>Ячейки, формулы, несколько листов, расчёты</small><span class="tool-arrow">↗</span></button><button class="tool-card" data-action="route" data-target="writer"><span class="tool-icon violet">▤</span><span class="tool-tag muted">СЛЕДУЮЩИЙ ЭТАП</span><strong>Тексты</strong><small>Документы, стили, вёрстка и печать</small><span class="tool-arrow">↗</span></button><button class="tool-card" data-action="route" data-target="slides"><span class="tool-icon orange">▣</span><span class="tool-tag muted">ЗАПЛАНИРОВАНО</span><strong>Презентации</strong><small>Слайды, блоки, выступления</small><span class="tool-arrow">↗</span></button></div></div><div class="home-section"><div class="section-label"><span>02 / ВАШИ ФАЙЛЫ</span><div><button class="inline-action" data-action="example">+ Открыть демонстрацию</button><button class="inline-action" data-action="import">↑ Импорт файла</button></div></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Пока нет таблиц</strong><p>Создайте чистую книгу или откройте пример с формулами.</p></div>'}</div></div><div class="home-footnote"><span>Данные сохраняются в памяти браузера. Для переноса между устройствами используйте .qbook и резервные копии.</span><span>Quantum Office · первая рабочая стадия</span></div></main>`;}
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
+function changeSize(kind){commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
+ try{if(!Number.isInteger(value))throw Error('Введите целое число');transact(()=>{if(kind==='col')setColumnWidth(sheet(),p.col,value);else setRowHeight(sheet(),p.row,value);});drawGrid();status(`Размер изменён: ${value} пикселей`);}catch(err){status(err.message,true);}}
+function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const map=rawMap(sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,map));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
+ transact(()=>setColumnWidth(sheet(),c,width));drawGrid();status(`Столбец ${cellName(0,c).replace(/\d+$/,'')}: ${width} пикселей`);}
+function resetRowHeight(index=null){const p=parseCell(activeCell);if(!p)return;transact(()=>setRowHeight(sheet(),index??p.row,DIMENSIONS.defaultRow));drawGrid();}
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
  const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all']);
@@ -608,7 +663,7 @@ function ribbon(){
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  if(activeRibbon==='insert')contents=group('Листы',button('sheet-add','Новый лист','+')+button('sheet-rename','Переименовать','✎'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
- if(activeRibbon==='view')contents=group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
+ if(activeRibbon==='view')contents=group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('backup','Архив','▤')+button('import','Открыть','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}</div><div class="ribbon-controls">${contents}</div>${finder}</div>`;
@@ -617,18 +672,18 @@ function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">$
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid();},{passive:true});drawGrid();updateSelectionStats();}}
 function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
- canvas.style.width=`${rowW+LIMITS.columns*cellW}px`;canvas.style.height=`${headerH+LIMITS.rows*cellH}px`;
- const firstR=Math.max(0,Math.floor(view.scrollTop/cellH)-2),lastR=Math.min(LIMITS.rows-1,Math.ceil((view.scrollTop+view.clientHeight)/cellH)+2);
- const firstC=Math.max(0,Math.floor(view.scrollLeft/cellW)-2),lastC=Math.min(LIMITS.columns-1,Math.ceil((view.scrollLeft+view.clientWidth)/cellW)+2);
+ const {x,y}=gridGeometry(sheet());canvas.style.width=`${x.at(-1)}px`;canvas.style.height=`${y.at(-1)}px`;
+ const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop)-2),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight)+2);
+ const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-2),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+2);
  const rect=rectangle(activeCell,rangeEnd),raw=rawMap(sheet());let html='';
  for(let r=firstR;r<=lastR;r++)for(let c=firstC;c<=lastC;c++){
  const ref=cellName(r,c),item=getCell(sheet(),ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=item.style||{};
- const val=displayedValue(sheet(),ref,raw);const align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
+ const val=displayedValue(sheet(),ref,raw),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
  const appearance=`${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}text-align:${align};`;
- html+=`<div class="grid-cell ${selected?'is-selected':''} ${active?'is-active':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${headerH+r*cellH}px;left:${rowW+c*cellW}px;width:${cellW}px;height:${cellH}px;${appearance}" title="${esc(ref)}">${esc(val)}</div>`;
+ html+=`<div class="grid-cell ${selected?'is-selected':''} ${active?'is-active':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${y[r]}px;left:${x[c]}px;width:${x[c+1]-x[c]}px;height:${y[r+1]-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}</div>`;
  }
- for(let r=firstR;r<=lastR;r++)html+=`<div class="rowhead" style="top:${headerH+r*cellH}px;left:${scrollLeft}px;width:${rowW}px;height:${cellH}px">${r+1}</div>`;
- for(let c=firstC;c<=lastC;c++)html+=`<div class="colhead" style="top:${scrollTop}px;left:${rowW+c*cellW}px;width:${cellW}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}</div>`;
+ for(let r=firstR;r<=lastR;r++)html+=`<div class="rowhead" style="top:${y[r]}px;left:${scrollLeft}px;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
+ for(let c=firstC;c<=lastC;c++)html+=`<div class="colhead" style="top:${scrollTop}px;left:${x[c]}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
  html+=`<div class="corner" style="top:${scrollTop}px;left:${scrollLeft}px;width:${rowW}px;height:${headerH}px">▦</div>`;
  canvas.innerHTML=html;
 }
@@ -638,7 +693,8 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: частичная совместимость, сохраните оригинал отдельно');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
  case 'ribbon':activeRibbon=target.dataset.target;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':showFind=false;render();break;case 'find-next':nextMatch();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-right':fillSelected('right');break;
- case 'bold':applyStyle({bold:!getCell(sheet(),activeCell).style?.bold});break;case 'italic':applyStyle({italic:!getCell(sheet(),activeCell).style?.italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
+ case 'column-width':changeSize('col');break;case 'column-fit':autoFitColumn();break;case 'row-height':changeSize('row');break;case 'row-reset':resetRowHeight();break;
+  case 'bold':applyStyle({bold:!getCell(sheet(),activeCell).style?.bold});break;case 'italic':applyStyle({italic:!getCell(sheet(),activeCell).style?.italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
  case 'formula-fn':{const p=parseCell(activeCell);const from=p.row>0?cellName(0,p.col):cellName(1,p.col),to=p.row>0?cellName(p.row-1,p.col):cellName(9,p.col);const field=document.querySelector('#formula-input');if(field){field.value=`=${fn}(${from}:${to})`;field.focus();status('Проверьте диапазон, затем нажмите Enter');}break;}
  case 'copy':await copySelection();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
@@ -646,6 +702,15 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
 app.addEventListener('change',e=>{const t=e.target;if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applyStyle({color:t.value});}else if(t.id==='fill-color'){applyStyle({bg:t.value});}else if(t.id==='formula-input'){transact(()=>setCell(sheet(),activeCell,t.value));drawGrid();}});
 app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
+app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
+ const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});
+window.addEventListener('pointermove',e=>{if(!resizeDrag||!sheet()||sheet().id!==resizeDrag.sheetId)return;const d=resizeDrag;const offset=(d.axis==='col'?e.clientX:e.clientY)-d.start;const min=d.axis==='col'?DIMENSIONS.minColumn:DIMENSIONS.minRow,max=d.axis==='col'?DIMENSIONS.maxColumn:DIMENSIONS.maxRow;const next=Math.min(max,Math.max(min,Math.round(d.original+offset)));
+ if(d.value===next)return;d.value=next;if(d.axis==='col')setColumnWidth(sheet(),d.index,next);else setRowHeight(sheet(),d.index,next);drawGrid();});
+window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(!sheet()||sheet().id!==d.sheetId)return;
+ if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);
+ if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
+window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
+app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
 app.addEventListener('mousedown',e=>{const cell=e.target.closest('.grid-cell');if(cell){e.preventDefault();const ref=cell.dataset.ref;setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
 app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
