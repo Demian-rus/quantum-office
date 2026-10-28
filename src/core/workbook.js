@@ -154,3 +154,38 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
  for(let r=1;r<6;r++)for(let c=1;c<4;c++)setStyle(s,cellName(r,c),{format:'currency'});
  const s2=newSheet('Заметки');setCell(s2,'A1','Эта книга — демонстрация возможностей Quantum Sheets.');setCell(s2,'A3','Изменяйте цифры в столбцах B и C: формулы пересчитаются.');b.sheets.push(s2);return b;}
 export {cellName,parseCell};
+
+/** Clears style without deleting values/formulas or creating empty cells. */
+export function clearFormatting(sheet,from,to){
+ const refs=refsBetween(from,to);if(refs.length>10000)throw Error('Максимальный диапазон: 10 000 ячеек');
+ let count=0;
+ for(const ref of refs){const entry=sheet.cells[ref];if(!entry||!Object.keys(entry.style||{}).length)continue;count++;entry.style={};if(!entry.value)delete sheet.cells[ref];}
+ return count;
+}
+/** Plan autosum operations before any mutation, protecting occupied destinations. */
+export function planAutoSum(sheet,from,to){
+ const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
+ const entries=[];
+ if(rect.r1!==rect.r2||rect.c1!==rect.c2){
+   if(rect.r2>=LIMITS.rows-1)throw Error('Нет строки под выделением');
+   if(rect.c2-rect.c1>=50)throw Error('Слишком много столбцов для автосуммы');
+   for(let c=rect.c1;c<=rect.c2;c++){
+     const target=cellName(rect.r2+1,c);
+     if(getCell(sheet,target).value)throw Error(`Ячейка ${target} занята — автосумма отменена`);
+     entries.push({ref:target,value:`=SUM(${cellName(rect.r1,c)}:${cellName(rect.r2,c)})`});
+   }
+ }else{
+   const r=rect.r1,c=rect.c1,ref=cellName(r,c);
+   if(getCell(sheet,ref).value)throw Error('Выберите пустую ячейку для автосуммы');
+   let begin=r;
+   while(begin>0&&getCell(sheet,cellName(begin-1,c)).value)begin--;
+   if(begin<r)entries.push({ref,value:`=SUM(${cellName(begin,c)}:${cellName(r-1,c)})`});
+   else{
+     let left=c;
+     while(left>0&&getCell(sheet,cellName(r,left-1)).value)left--;
+     if(left<c)entries.push({ref,value:`=SUM(${cellName(r,left)}:${cellName(r,c-1)})`});
+   }
+   if(!entries.length)throw Error('Рядом нет заполненных ячеек для автосуммы');
+ }
+ return entries;
+}

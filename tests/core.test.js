@@ -44,7 +44,7 @@ test('fill rejects underflow before modifying any target',()=>{
 test('invalid fill selections leave data untouched',()=>{const s=currentSheet(newWorkbook());setCell(s,'A1','x');assert.throws(()=>fillSelection(s,'A1','A1','down'));assert.equal(getCell(s,'A1').value,'x');});
 
 // Ribbon functionality: stable row sorting, literal find and all-or-nothing replace.
-import {sortSelectedRows,findCells,replaceAllText} from '../src/core/workbook.js';
+import {sortSelectedRows,findCells,replaceAllText,clearFormatting,planAutoSum} from '../src/core/workbook.js';
 test('sort range preserves row relationships and cell styles',()=>{
  const s=currentSheet(newWorkbook());
  [['груша','3'],['яблоко','1'],['банан','2']].forEach((row,r)=>row.forEach((v,c)=>setCell(s,String.fromCharCode(65+c)+(r+1),v)));
@@ -84,4 +84,39 @@ test('replace rejects empty and oversized output without mutation',()=>{
  assert.throws(()=>replaceAllText(s,'','X'));
  assert.throws(()=>replaceAllText(s,'a','X'.repeat(7000)),/лимит/);
  assert.equal(getCell(s,'A1').value,'a'.repeat(8));
+});
+
+
+// Compact-ribbon commands must be real, safe workbook operations.
+test('autosum plans formulas below an occupied range without mutating inputs', () => {
+  const book=newWorkbook('Счёт'),s=currentSheet(book);
+  setCell(s,'A1','2');setCell(s,'A2','4');setCell(s,'B1','3');setCell(s,'B2','5');
+  const plan=planAutoSum(s,'A1','B2');
+  assert.deepEqual(plan,[{ref:'A3',value:'=SUM(A1:A2)'},{ref:'B3',value:'=SUM(B1:B2)'}]);
+  assert.equal(getCell(s,'A3').value,'');
+  for(const item of plan)setCell(s,item.ref,item.value);
+  assert.equal(resultOf(s,'A3'),6);assert.equal(resultOf(s,'B3'),8);
+});
+test('autosum rejects occupied destinations atomically',()=>{
+  const s=currentSheet(newWorkbook());setCell(s,'A1','2');setCell(s,'B1','3');setCell(s,'B2','existing');
+  const before=JSON.stringify(s.cells);
+  assert.throws(()=>planAutoSum(s,'A1','B1'),/занята/);
+  assert.equal(JSON.stringify(s.cells),before);
+});
+test('autosum single empty cell uses contiguous cells above or to the left',()=>{
+  const s=currentSheet(newWorkbook());setCell(s,'A1','3');setCell(s,'A2','4');
+  assert.deepEqual(planAutoSum(s,'A3','A3'),[{ref:'A3',value:'=SUM(A1:A2)'}]);
+  setCell(s,'C5','8');setCell(s,'D5','7');
+  assert.deepEqual(planAutoSum(s,'E5','E5'),[{ref:'E5',value:'=SUM(C5:D5)'}]);
+  assert.throws(()=>planAutoSum(s,'F9','F9'),/нет заполненных/);
+});
+test('reset formatting preserves formula and content without creating blank cells',()=>{
+  const s=currentSheet(newWorkbook());setCell(s,'A1','=1+2');setStyle(s,'A1',{bold:true,bg:'#fefefe'});
+  setStyle(s,'B1',{italic:true});
+  assert.equal(clearFormatting(s,'A1','C1'),2);
+  assert.equal(getCell(s,'A1').value,'=1+2');
+  assert.deepEqual(getCell(s,'A1').style,{});
+  assert.equal(Object.hasOwn(s.cells,'B1'),false);
+  assert.equal(Object.hasOwn(s.cells,'C1'),false);
+  assert.equal(clearFormatting(s,'A1','C1'),0);
 });
