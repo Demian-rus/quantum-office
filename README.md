@@ -72,3 +72,11 @@ See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and 
 - Поиск и сортировка ограничены возможностями MVP и пока не затрагивают другие листы.
 
 Проверки: `npm test`, `python tests/ui_smoke.py`, `python tests/ribbon_browser.py`, `python tests/xlsx_browser.py`.
+
+### Sheets: compact ribbon and AutoSum
+
+The spreadsheet application uses a compact, two-row command ribbon with one 40px application bar.
+Tooltips and accessible names remain available for icon-only actions. The toolbar is independently horizontally scrollable on narrow screens; the grid occupies the remaining height.
+New commands: **AutoSum** (sum a contiguous range above a blank cell, or selected columns in the next empty row; Alt+=), and **Clear formatting** without deleting values/formulas. Occupied sum targets are rejected atomically.
+
+Run `python tests/compact_browser.py` for pixel bounds, operation behavior, undo, and navigation checks.
