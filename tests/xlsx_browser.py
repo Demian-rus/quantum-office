@@ -1,9 +1,9 @@
 from pathlib import Path
+from shutil import which
 from tempfile import TemporaryDirectory
 from playwright.sync_api import sync_playwright
 from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment
-from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font, PatternFill
 
 root=Path(__file__).resolve().parents[1]
 with TemporaryDirectory() as tmp:
@@ -18,7 +18,7 @@ with TemporaryDirectory() as tmp:
     with ZipFile(target) as z: assert z.getinfo('xl/worksheets/sheet1.xml').compress_type==ZIP_DEFLATED
 
     with sync_playwright() as p:
-        browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
+        browser=p.chromium.launch(**({'executable_path':which('chromium')} if which('chromium') else {}),headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
         context=browser.new_context(accept_downloads=True,viewport={'width':1400,'height':900})
         page=context.new_page();errors=[]
         page.on('pageerror',lambda e:errors.append(str(e)))
@@ -46,7 +46,6 @@ with TemporaryDirectory() as tmp:
         assert exported['Метки']['A2'].value=='  пробелы  '
         # Reject invalid XLSX without altering workspace
         bad=Path(tmp)/'bad.xlsx';bad.write_bytes(b'not a zip')
-        page.get_by_role('button',name='Открыть').first.click() if False else None
         page.locator('#file-picker').set_input_files(str(bad))
         page.wait_for_timeout(500)
         assert page.locator('.sheet-tab').count()==2
