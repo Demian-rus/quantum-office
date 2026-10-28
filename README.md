@@ -117,3 +117,7 @@ Use **Вставка → Вставить строку / Удалить стро
 - Ctrl+C on a merged anchor captures its entire rectangle, including relative formulas, styles and merge geometry. Ctrl+V pastes to an unmerged area and Ctrl+Z reverts the paste.
 - Partial merges and overlapping destinations are rejected without altering the workbook. Cutting, sorting and autofill of merged ranges remain unsupported to protect data.
 - Tests: `node --test tests/merged_clipboard.test.js`, `python tests/merged_clipboard_browser.py`.
+
+### TASK 023 — merge-aware row/column editing
+
+Insert before/inside a merged range to shift/expand it. Delete a non-anchor interior band to shrink it; deleting the anchor band is blocked. A one-cell remnant becomes an ordinary cell. Atomic validation preserves data and undo. Tests: `npm test`, `python tests/merged_structure_browser.py`.

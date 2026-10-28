@@ -13,9 +13,9 @@ test('merge preserves anchor and rejects nonempty covered cells atomically',()=>
  assert.throws(()=>mergeCells(s,'C2','D3'),/пересекается/);
  assert.equal(unmergeCells(s,'C2'),true);assert.equal(unmergeCells(s,'A1'),false);
 });
-test('merge rejected across frozen panes or filters and structural edits blocked',()=>{
+test('merge rejected across frozen panes but structural insertion preserves merge',()=>{
  const s=sample();setFreeze(s,1,0);assert.throws(()=>mergeCells(s,'A1','A2'),/закреплённую/);
- setFreeze(s,0,0);mergeCells(s,'A1','B2');assert.throws(()=>changeSheetStructure(s,'row','insert',0),/снимите объединения/);
+ setFreeze(s,0,0);mergeCells(s,'A1','B2');changeSheetStructure(s,'row','insert',0);assert.deepEqual(s.merges,[{from:'A2',to:'B3'}]);
 });
 test('rectangle border presets do not draw internal borders',()=>{
  const s=sample();applyBorderPreset(s,'B2','D4','outline');
