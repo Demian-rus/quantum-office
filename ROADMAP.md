@@ -101,4 +101,4 @@ One issue → one measurable change → tests and independent evidence. Do not d
 - Fixed separate header overlays that remain stationary during vertical scrolling.
 - Click column letters to select entire column; row numbers entire row; top-left triangle all sheet. Current engine limit 2000×100, large bulk edits are bounded to protect memory.
 - No separate sheet rename icon: double-click tab to rename, `+` to create.
-- Next critical visual parity: merged cells, borders and text wrap, then lossless XLSX round-trip for supported formatting.
+- Next critical visual parity: real merged cells, individual border sides/styles, and more text layout options. Basic all-edge thin borders and text wrap have been added in TASK 020; full Excel styling still remains incomplete.

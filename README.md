@@ -31,7 +31,7 @@ No account, license server, external script, or network connection is required f
 - Workspace backup and restore `.qbackup`, local autosave and previous snapshot recovery
 - Small example workbook and automated tests
 
-**Not implemented yet:** XLSX import/export, graphs, advanced formulas, filtering/sorting, large-data performance benchmarks, Excel-format fidelity, macros, native installation and signed updates. Legacy v0.2 prototype files are not automatically migrated; `.qbook` and `.qbackup` formats in this version are new.
+**Still not implemented:** charts, merged cells, most advanced formulas, large-workbook performance benchmarks, complete XLSX fidelity, macros, native Windows/macOS installers and signed updates. XLSX, filtering and sorting are partially supported. Browser storage alone is not durable.
 
 ## Developer commands
 
@@ -49,7 +49,7 @@ The Tauri 2 scaffold in `src-tauri/` is for future desktop builds. Desktop insta
 
 ## GitHub publication
 
-This archive is a local Git project, not a published GitHub repository. A GitHub user with repository-creation rights must create `Demian-rus/quantum-office` once; details in [GITHUB_SETUP.md](GITHUB_SETUP.md). The `.github/workflows/` folder provides automatic CI and a GitHub Pages preview after the repository and Pages have been configured.
+Main repository: https://github.com/Demian-rus/quantum-office. The project is in active development; this is not a released office suite. The `.github/workflows/` folder provides automatic CI and a GitHub Pages preview after the repository and Pages have been configured.
 
 See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/UPDATES.md](docs/UPDATES.md).
 
@@ -92,7 +92,15 @@ Use **Вставка → Вставить строку / Удалить стро
 ### TASK 019 — каталоги шаблонов, график и заголовки
 
 - Под тремя плитками главного экрана есть кнопки каталогов шаблонов каждого редактора. Для текста и презентаций карточки честно помечены как будущие.
-- Шаблон «Недельное расписание занятий» повторяет основные секции предоставленной пользователем таблицы: цветные блоки дней, ученики, предметы, время, план занятий, результаты, примечания, проведение и оплата; листы «График», «Бухгалтерия», «Партнёрка». **Объединённые ячейки и сложные границы пока не реализованы.**
+- Шаблон «Недельное расписание занятий» повторяет основные секции предоставленной пользователем таблицы: цветные блоки дней, ученики, предметы, время, план занятий, результаты, примечания, проведение и оплата; листы «График», «Бухгалтерия», «Партнёрка». **Объединённые ячейки и сложные границы пока не реализованы:** доступны только простые одинаковые тонкие границы каждой ячейки и перенос текста.
 - Заголовки строк/столбцов выводятся в неподвижных отдельных слоях поверх таблицы. Буква выделяет столбец, цифра строку, треугольник — весь текущий лист (в пределах 2 000 × 100). Выделение всего листа не означает, что безопасно можно изменять или копировать все 200 000 ячеек одновременно: массовые операции ограничены.
 - Удалена кнопка переименования листа, осталось переименование двойным щелчком; **+** создаёт новый лист.
 - Для регрессии: `npm test`, `npm run build`, `python tests/templates_headers_browser.py`, `python tests/launcher_browser.py`, `python tests/ui_smoke.py`.
+
+
+### TASK 020 — fixed color selection and basic cell styling
+
+- Selecting a cell, then choosing foreground/background color, now applies to **that selected cell/range**, even when the operating system color picker fires its change event after another cell receives focus. A stale selection from another workbook/sheet is rejected.
+- Main ribbon offers **All borders**, **Remove borders**, **Wrap text**. Borders are four thin edges only, not individually configurable. Wrapped text can expand row height up to the current 160px limit.
+- `.qbook` preserves these styles. XLSX export writes standard `borderId` / `wrapText`; import recognizes four matching thin edges only. Unsupported Excel styles remain lossy on import/export.
+- Tests: `npm test`, `python tests/color_border_browser.py`, `python tests/color_border_xlsx_browser.py`.
