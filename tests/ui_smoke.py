@@ -12,12 +12,12 @@ def run():
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.set_content(Path(__file__).parents[1].joinpath("dist/index.html").read_text(),wait_until="load")
         assert page.locator('h1').count()==1
-        page.screenshot(path='/mnt/data/quantum-office-foundation/tests/home.png',full_page=True)
+        page.screenshot(path=str(Path(__file__).resolve().parent / 'home.png'),full_page=True)
         page.get_by_role('button',name='Открыть демонстрацию').click()
         assert page.locator('.grid-cell[data-ref="A1"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').inner_text().strip()!=''
-        page.screenshot(path='/mnt/data/quantum-office-foundation/tests/sheets.png',full_page=True)
+        page.screenshot(path=str(Path(__file__).resolve().parent / 'sheets.png'),full_page=True)
         # Formula-aware fill: relative reference changes and absolute anchor stays put.
         def select_ref(value):
             page.locator('#name-box').fill(value)
