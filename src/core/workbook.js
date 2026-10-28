@@ -56,10 +56,5 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
  for(let c=0;c<4;c++){setStyle(s,cellName(0,c),{bold:true,bg:'#dceafe',color:'#1d457e'});setStyle(s,cellName(5,c),{bold:true,bg:'#edf5e8',color:'#27693b'});}
  for(let r=1;r<6;r++)for(let c=1;c<4;c++)setStyle(s,cellName(r,c),{format:'currency'});
  const s2=newSheet('Заметки');setCell(s2,'A1','Эта книга — демонстрация возможностей Quantum Sheets.');setCell(s2,'A3','Изменяйте цифры в столбцах B и C: формулы пересчитаются.');b.sheets.push(s2);return b;}
-{cellName,parseCell};
 
-
-
-const STORE_KEY='quantum-office.workspace.v3';
-const PREVIOUS_KEY='quantum-office.workspace.v3.previous';
 export {cellName, parseCell};
