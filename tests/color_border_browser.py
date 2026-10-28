@@ -3,41 +3,42 @@ from shutil import which
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
 with sync_playwright() as p:
- browser=p.chromium.launch(**({'executable_path':which('chromium')} if which('chromium') else {}),headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
+ browser=p.chromium.launch(executable_path=which('chromium') or None,headless=True,args=['--no-sandbox','--disable-dev-shm-usage'])
  page=browser.new_page(viewport={'width':1366,'height':768})
- errors=[]
- page.on('pageerror',lambda err:errors.append(str(err)))
+ errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.set_content((root/'dist/index.html').read_text(),wait_until='load')
- page.get_by_role('button',name='Таблицы',exact=True).first.click() if page.get_by_role('button',name='Таблицы',exact=True).count() else page.locator('[data-action=new]').first.click()
+ page.locator('[data-action=new]').first.click()
  def select(ref):
-  box=page.locator('#name-box');box.fill(ref);box.press('Enter')
- def write(ref,value):
-  select(ref);f=page.locator('#formula-input');f.fill(value);f.press('Enter')
- write('B2','Значение')
+  el=page.locator('#name-box');el.fill(ref);el.press('Enter')
+ def write(ref,val):
+  select(ref);el=page.locator('#formula-input');el.fill(val);el.press('Enter')
+ write('B2','Занятия')
  select('B2')
- page.locator('#fill-color').dispatch_event('pointerdown',{'button':0})
- # Simulate the native picker committing only after selection moved.
- select('C3')
- page.locator('#fill-color').evaluate("e=>{e.value='#ffcc00';e.dispatchEvent(new Event('change',{bubbles:true}));}")
- assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.backgroundColor')=='rgb(255, 204, 0)'
- assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(255, 204, 0)' # still visible while selected/after focus changes
- assert page.locator('.grid-cell[data-ref="C3"]').evaluate('e=>e.style.backgroundColor')!='rgb(255, 204, 0)'
- # Fresh choice on active cell applies to the selected cell, without next click.
- select('B2');page.locator('#text-color').dispatch_event('pointerdown',{'button':0})
- page.locator('#text-color').evaluate("e=>{e.value='#e02030';e.dispatchEvent(new Event('change',{bubbles:true}));}")
- assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.color')=='rgb(224, 32, 48)'
- # Selected cells must display their own fill immediately, not wait for the next click.
+ page.get_by_role('button',name='Заливка ячеек').click()
+ assert page.get_by_role('dialog',name='Заливка').is_visible()
+ assert page.locator('[data-action=palette-pick]').count()>=24
+ page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
+ assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>getComputedStyle(el).backgroundColor')=='rgb(250, 204, 21)'
  select('B2')
- assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(255, 204, 0)'
- page.get_by_role('button',name='Все границы').click()
- assert 'inset' in page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.boxShadow')
- page.get_by_role('button',name='Перенос текста').click()
- assert 'is-wrapped' in page.locator('.grid-cell[data-ref="B2"]').get_attribute('class')
- page.get_by_role('button',name='Убрать границы').click()
- assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.boxShadow') == ''
- assert page.locator('.grid-cell[data-ref="B2"]').inner_text()=='Значение'
- page.keyboard.press('Control+z')
- assert 'inset' in page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.boxShadow')
+ page.get_by_role('button',name='Цвет текста').click()
+ page.locator('#palette-custom-color').evaluate("e=>{e.value='#aabbcc';e.dispatchEvent(new Event('change',{bubbles:true}));}")
+ assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>el.style.color')=='rgb(170, 187, 204)'
+ select('B2:D4');page.get_by_role('button',name='Границы').click()
+ assert page.get_by_role('menuitem',name='Внешние границы').is_visible()
+ page.get_by_role('menuitem',name='Внешние границы').click()
+ assert 'border-top' in page.locator('.grid-cell[data-ref=B2]').get_attribute('style')
+ assert 'border-top' not in page.locator('.grid-cell[data-ref=C3]').get_attribute('style')
+ write('B2','Главный текст')
+ select('B2:D4')
+ page.get_by_role('button',name='Объединить ячейки').click()
+ assert page.locator('.grid-cell[data-ref=B2].is-merged').count()==1
+ assert page.locator('.grid-cell[data-ref=C2]').count()==0
+ assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>el.getBoundingClientRect().width')>200
+ select('B2');page.get_by_role('button',name='Разъединить').click()
+ assert page.locator('.grid-cell[data-ref=C2]').count()==1
+ page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
+ assert page.locator('.grid-cell[data-ref=B2].is-merged').count()==1
  assert not errors,errors
- print('PASS color picker keeps initial selection; borders, wrap and undo')
+ page.screenshot(path=str(root/'tests/task21-formatting.png'))
+ print('PASS presets/custom colors, outer border, merge/unmerge, undo')
  browser.close()

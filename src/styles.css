@@ -171,3 +171,25 @@
 
 /* Explicit text wrapping, without changing the compact ribbon height. */
 .grid-cell.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;align-items:flex-start;padding-top:4px;line-height:17px;text-overflow:clip;}
+
+/* TASK 021 — dense Excel-like formatting menus. Popovers never alter grid geometry. */
+.ribbon{position:relative;z-index:20;overflow:visible}
+.format-popover{position:absolute;z-index:210;top:calc(100% - 3px);left:116px;min-width:218px;background:#fff;border:1px solid #cedbd3;border-radius:8px;padding:10px;box-shadow:0 13px 32px #0b223733;color:#243b32;font-size:12px}
+.popup-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:12px}
+.popup-header button{background:transparent;color:#6b7783;font-size:20px;line-height:1;width:24px;height:24px;border-radius:4px}
+.palette-grid{display:grid;grid-template-columns:repeat(8,22px);gap:4px}
+.palette-swatch{width:22px;height:22px;border:1px solid #aab4be;border-radius:3px;outline-offset:1px}
+.palette-swatch:hover,.palette-swatch:focus-visible{outline:2px solid #2a9565}
+.palette-custom{display:flex;align-items:center;gap:9px;margin-top:11px;padding-top:9px;border-top:1px solid #e4e9ed}
+.palette-custom label{font-weight:650;white-space:nowrap}.palette-custom input{height:28px;width:38px;cursor:pointer;padding:0;border:0;background:none}
+.palette-custom button{margin-left:auto;background:#f1f5f3;border-radius:4px;padding:5px;font-size:11px}
+.border-popover{left:365px;width:230px;padding:6px}
+.border-choice{display:flex;align-items:center;gap:10px;width:100%;height:32px;background:transparent;text-align:left;padding:4px 9px;border-radius:4px;font-size:12px;color:#243f30}
+.border-choice:hover{background:#e6f3eb}
+.border-glyph{display:flex;width:23px;height:23px;align-items:center;justify-content:center;color:#267650}
+.border-glyph svg{width:17px;height:17px}
+.grid-cell.is-merged{z-index:5;overflow:hidden;display:flex;align-items:center}
+.grid-cell.is-merged.is-selected{z-index:6}
+.grid-cell.is-merged.frozen-row,.grid-cell.is-merged.frozen-col{z-index:12}
+@media(max-width:660px){.format-popover{left:8px;max-width:calc(100vw - 24px)}.border-popover{left:8px}}
+.ribbon{z-index:1000}

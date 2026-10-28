@@ -1,6 +1,6 @@
 /** In-app clipboard: the system clipboard can be unavailable for file:// previews.
  * Preserve raw formulas and cell styles without using eval or a web service. */
-import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV} from './workbook.js';
+import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt} from './workbook.js';
 
 export function copyCells(sheet,start,end){
  const rect=rectangle(start,end);if(!rect)throw Error('Недопустимый диапазон');
@@ -23,6 +23,7 @@ export function pasteCells(sheet,target,clip){
   if(!Array.isArray(clip.cells[r])||clip.cells[r].length!==clip.cols)throw Error('Повреждённые данные буфера');
   for(let c=0;c<clip.cols;c++){
    const item=clip.cells[r][c];if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
+   const destination=cellName(at.row+r,at.col+c);if(mergeAt(sheet,destination))throw Error('Вставка в объединённый диапазон пока не поддерживается');
    const value=translateFormula(item.value,at.row-from.row,at.col-from.col);
    changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style)}]);
   }

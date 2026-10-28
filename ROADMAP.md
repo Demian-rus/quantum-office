@@ -102,3 +102,8 @@ One issue → one measurable change → tests and independent evidence. Do not d
 - Click column letters to select entire column; row numbers entire row; top-left triangle all sheet. Current engine limit 2000×100, large bulk edits are bounded to protect memory.
 - No separate sheet rename icon: double-click tab to rename, `+` to create.
 - Next critical visual parity: real merged cells, individual border sides/styles, and more text layout options. Basic all-edge thin borders and text wrap have been added in TASK 020; full Excel styling still remains incomplete.
+
+### TASK 021 — implementation status
+
+- Done in alpha: in-app color palettes (preset + custom), distinct toolbar icon paths, side-specific border menu, actual merged-cell model/display, `.qbook` and partial XLSX merged-cell/border roundtrip, safe rejection of overlapping/data-losing merges.
+- NEXT: improved merge-aware keyboard selection, clipboard/paste/fill behavior, structural edits around merged regions, full number/date styles, broad OOXML fidelity, performance profiling, robust native desktop saving/reopening and signed updates. No full Excel compatibility claim yet.
