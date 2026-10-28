@@ -32,9 +32,9 @@ with TemporaryDirectory() as tmp:
         page.locator('#name-box').fill('B3');page.locator('#name-box').press('Enter');assert page.locator('#formula-input').input_value()=='=B2*2'
         page.locator('.sheet-tab').last.click()
         assert page.locator('.grid-cell[data-ref="A1"]').inner_text()=='Тест фразы с кириллицей'
-        page.get_by_role('button',name='Данные').click()
+        page.get_by_role('tab',name='Данные').click()
         with page.expect_download() as event:
-            page.get_by_role('button',name='Экспорт XLSX').click()
+            page.locator('[data-action=xlsx]').click()
         download=event.value
         export_target=Path(tmp)/download.suggested_filename;download.save_as(export_target)
         exported=load_workbook(export_target)
