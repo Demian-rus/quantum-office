@@ -1,5 +1,7 @@
 # Quantum Office — roadmap and acceptance gates
 
+**IMPORTANT:** read [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) first for current owner decisions, UI direction, limitations, and handoff. The historical checkboxes below are not an authoritative live status page.
+
 ## Product architecture (fixed decision)
 
 - ONE application and installer for Windows and macOS.
@@ -9,7 +11,7 @@
 - Offline-first, no Microsoft activation, subscriptions or external API required for editing local files.
 - Not a visual clone of Microsoft Office. Interface and workflows can be redesigned, but data compatibility must be verified rather than assumed.
 
-## 001 — Application shell and Sheets vertical slice (bootstrap in GitHub)
+## 001 — Application shell and Sheets vertical slice (implemented locally; GitHub pending)
 
 - [x] Initial launcher, editor routing and full-workspace Sheets UI
 - [x] Basic workbook model and sheet management
@@ -18,8 +20,7 @@
 - [x] Native Quantum file format, CSV exchange, workspace backup
 - [x] Zero-dependency offline HTML preview
 - [x] Unit tests, Chromium smoke (current environment)
-- [x] Publish isolated repository with CI/Pages workflow files
-- [ ] Verify first successful CI and Pages deployment
+- [ ] Publish isolated repository + CI and Pages deployment
 - [ ] Verify persistence in ordinary Windows and macOS browsers
 - [ ] Independent QA with real user scenarios
 

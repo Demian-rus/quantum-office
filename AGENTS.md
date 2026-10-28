@@ -1,3 +1,5 @@
+**REQUIRED FIRST READ: `docs/PROJECT_CONTEXT.md` — product decisions, owner UX feedback, current limitations, future plan and handoff.**
+
 # Quantum Office engineering rules
 
 1. One app, common shell, separate *editor workspaces*; first priority Quantum Sheets. Preserve the launcher and top-level switching.
