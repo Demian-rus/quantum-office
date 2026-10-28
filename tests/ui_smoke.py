@@ -18,6 +18,27 @@ def run():
         page.get_by_role("button", name="Открыть демонстрацию").click()
         assert page.locator('.grid-cell[data-ref="A1"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').inner_text().strip()
+        # Fill formulas: absolute anchors stay fixed while relative row coordinates move.
+        def select_ref(value):
+            page.locator('#name-box').fill(value)
+            page.locator('#name-box').press('Enter')
+        select_ref('G1')
+        page.locator('#formula-input').fill('=B2+$C$2')
+        page.locator('#formula-input').press('Enter')
+        select_ref('G1:G3')
+        page.get_by_role('button',name='Правка').click()
+        page.get_by_role('button',name='Заполнить вниз').click()
+        select_ref('G2')
+        assert page.locator('#formula-input').input_value()=='=B3+$C$2'
+        page.locator('#grid-scroll').focus()
+        page.keyboard.press('Control+z')
+        select_ref('G2')
+        assert page.locator('#formula-input').input_value()==''
+        select_ref('G1:G3')
+        page.locator('#grid-scroll').focus()
+        page.keyboard.press('Control+d')
+        select_ref('G3')
+        assert page.locator('#formula-input').input_value()=='=B4+$C$2'
         page.locator('.grid-cell[data-ref="A8"]').dblclick()
         page.locator(".cell-editor").fill("Проверка текста")
         page.locator(".cell-editor").press("Enter")
