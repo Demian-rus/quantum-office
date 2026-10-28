@@ -20,3 +20,4 @@ jobs:
       - run: python tests/xlsx_browser.py
       - run: python tests/ribbon_browser.py
       - run: python tests/compact_browser.py
+      - run: python tests/dimensions_browser.py

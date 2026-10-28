@@ -1,6 +1,6 @@
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 import '../vendor/jszip.min.js';
-import { newWorkbook,newSheet,setCell,setStyle,validateWorkbook,LIMITS } from './workbook.js';
+import { newWorkbook,newSheet,setCell,setStyle,validateWorkbook,LIMITS,setColumnWidth,setRowHeight } from './workbook.js';
 const JSZip = globalThis.JSZip;
 const encoder=new TextEncoder();
 const xmlEscape=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
@@ -30,6 +30,16 @@ export async function importXLSX(data,filename='Таблица'){
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
+  for(const col of elements(element(xml,'cols'),'col')){
+   const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
+   if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min||!Number.isFinite(width)||width<=0)continue;
+   const px=Math.round(width*7+5);if(px<48||px>520)continue;
+   for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+  }
+  for(const row of elements(element(xml,'sheetData'),'row')){
+   const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
+   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
+  }
   for(const row of elements(element(xml,'sheetData'),'row'))for(const c of elements(row,'c')){const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
    if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
    const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
@@ -64,7 +74,9 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}"><sheetData>${Array.from(byRows).sort((a,b)=>a[0]-b[0]).map(([r,cc])=>`<row r="${r}">${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
+  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1)]);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData></worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
