@@ -87,3 +87,11 @@
 .filter-popup select{border:1px solid #bdcfc5;border-radius:4px;padding:6px;max-width:100%;background:#fff;color:#24384a}
 .filter-popup button{padding:5px 8px;color:#235b3d;border:1px solid #d4e5d9;background:#f1f8f3;border-radius:4px}
 .filter-popup small{color:#708194;line-height:1.4}
+
+/* Multi-value filtering: compact dropdown; ribbon dimensions are unchanged. */
+.filter-popup .filter-bulk{display:flex;align-items:center;gap:4px}
+.filter-popup .filter-choices{display:flex;flex-direction:column;gap:1px;max-height:220px;overflow:auto;border:1px solid #e0e7e2;background:#fcfefd;border-radius:4px;padding:4px}
+.filter-popup .filter-choices label{display:flex;align-items:center;flex-direction:row;gap:7px;min-height:25px;padding:2px 5px;cursor:pointer}
+.filter-popup .filter-choices label:hover{background:#eaf4ed}
+.filter-popup .filter-choices input{accent-color:#218056;flex:none;margin:0}
+.filter-popup .filter-choices span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

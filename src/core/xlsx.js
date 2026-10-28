@@ -39,7 +39,7 @@ export async function importXLSX(data,filename='Таблица'){
    }
    const auto=element(xml,'autoFilter');if(auto){const range=auto.getAttribute('ref')?.split(':');if(range?.length===2){try{setAutoFilter(sheet,range[0],range[1]);const rect=filterRange(sheet);for(const col of elements(auto,'filterColumn')){
     const index=rect.c1+Number(col.getAttribute('colId'));
-    const opts=elements(element(col,'filters'),'filter');if(opts.length===1)setFilterValue(sheet,index,opts[0].getAttribute('val')||'');
+    const opts=elements(element(col,'filters'),'filter');if(opts.length>=1&&opts.length<=200)setFilterValue(sheet,index,opts.length===1?(opts[0].getAttribute('val')||''):opts.map(n=>n.getAttribute('val')||''));
    }}catch{sheet.autoFilter=null;}}}
   for(const col of elements(element(xml,'cols'),'col')){
    const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
@@ -88,7 +88,7 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
   const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
   const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
-  const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters><filter val="${xmlEscape(val)}"/></filters></filterColumn>`).join('')}</autoFilter>`:'';
+  const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
   const hiddenRows=filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[];
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...hiddenRows]);
   const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.includes(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}</worksheet>`;

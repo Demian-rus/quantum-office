@@ -23,3 +23,4 @@ jobs:
       - run: python tests/dimensions_browser.py
       - run: python tests/filter_freeze_browser.py
       - run: python tests/xlsx_filter_freeze_browser.py
+      - run: python tests/xlsx_multi_filter_browser.py

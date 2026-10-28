@@ -14,12 +14,16 @@ with sync_playwright() as p:
   assert pg.locator('.filter-head').count()==4,pg.locator('.filter-head').count()
   pg.locator('.filter-head[data-col="0"]').click()
   assert pg.locator('.filter-popup').is_visible()
-  values=pg.locator('#filter-value option').all_text_contents()
-  assert 'Транспорт' in values,values
-  pg.locator('#filter-value').select_option(label='Транспорт')
+  choices=pg.locator('.filter-choices label').all_text_contents()
+  assert 'Транспорт' in choices,choices
+  pg.get_by_role('button',name='Снять все').click()
+  assert pg.locator('.filter-choices input:checked').count()==0
+  pg.locator('.filter-choices label',has_text='Транспорт').locator('input').check()
+  pg.locator('.filter-choices label',has_text='Оборудование').locator('input').check()
   pg.get_by_role('button',name='Применить').click()
   assert pg.locator('.rowhead').get_by_text('4',exact=True).count()==1
-  assert pg.locator('.rowhead').get_by_text('2',exact=True).count()==0
+  assert pg.locator('.rowhead').get_by_text('2',exact=True).count()==1
+  assert pg.locator('.rowhead').get_by_text('3',exact=True).count()==0
   # A selected range containing hidden rows must not be cleared.
   pg.locator('#name-box').fill('A1:B6');pg.locator('#name-box').press('Enter')
   pg.get_by_role('tab',name='Правка').click()
