@@ -15,7 +15,7 @@ export function parseCell(ref) {
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
 
-export function tokenise(str) {
+function tokenise(str) {
   const text = str.toUpperCase().replace(/\s+/g, '');
   const regex = /(?:\d+(?:\.\d+)?|\.[0-9]+)|\$?[A-Z]+\$?[1-9]\d*|[A-Z]+|[()+\-*/,:]/gy;
   const tokens = [];
@@ -31,7 +31,7 @@ export function tokenise(str) {
   return tokens;
 }
 
-export function rangeRefs(start, end) {
+function rangeRefs(start, end) {
   const a = parseCell(start), b = parseCell(end);
   if (!a || !b) throw new Error('Invalid range');
   const count = (Math.abs(a.row-b.row)+1) * (Math.abs(a.col-b.col)+1);
@@ -46,6 +46,7 @@ export function evaluateCell(ref, cells, visiting = new Set()) {
   if (visiting.has(ref)) return '#CYCLE!';
   const raw = String(cells[ref] ?? '');
   if (!raw.startsWith('=')) return raw;
+  if (raw.includes('#REF!')) return '#REF!';
   const next = new Set(visiting); next.add(ref);
   let tokens;
   try { tokens = tokenise(raw.slice(1)); } catch { return '#ERROR!'; }

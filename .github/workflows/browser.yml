@@ -21,3 +21,4 @@ jobs:
       - run: python tests/filter_freeze_browser.py
       - run: python tests/xlsx_filter_freeze_browser.py
       - run: python tests/clipboard_browser.py
+      - run: python tests/structure_browser.py

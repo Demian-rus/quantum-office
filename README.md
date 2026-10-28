@@ -73,3 +73,7 @@ See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and 
 - In-app copy/paste preserves raw formulas, relative/absolute references, and cell styles; it is atomic on out-of-range errors. External plain-text paste remains data-only.
 - Top bar/ribbon are not selectable page text. Tool icons are compact inline SVG, while controls retain accessible names and keyboard-visible focus.
 - Run `node --test tests/clipboard.test.js` and `python tests/clipboard_browser.py` in addition to existing smoke.
+
+### Quantum Sheets: inserting/deleting rows and columns (TASK 017)
+
+Use **Вставка → Вставить строку / Удалить строку / Вставить столбец / Удалить столбец**. Operations affect one entire row or column at the active cell, carry cell styles and row/column sizes, and rebase supported A1 references (including `$` anchors). Deleting referenced cells produces visible `#REF!`. Undo via Ctrl+Z. For now disable AutoFilter before structural edits; editing is rejected if insertion would truncate the populated final row or column or produce an out-of-bounds formula. Complex XLSX formula semantics remain partial; preserve originals separately.
