@@ -76,3 +76,11 @@
 ## Workflow rules
 
 One issue → one measurable change → tests and independent evidence. Do not declare "full Office" ready until all major editor functions pass real acceptance scenarios. Do not quietly downgrade or discard unsupported file features. Keep the production branch green. Do not overwrite the user's data to improve a demo.
+
+
+#### TASK 017 — basic structure editing
+
+- [x] Insert/delete one full row or column through compact ribbon.
+- [x] Atomic out-of-bounds checks, cell/dimension shifts, local A1 formula rebasing, undo and browser tests.
+- [ ] Add multi-row/column operations, Excel range-aware AST and cross-sheet reference tracking.
+- [ ] Add structured tables, merged-cell coordination, and advanced XLSX fidelity before claiming parity.

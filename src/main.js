@@ -2,6 +2,7 @@ import { newWorkbook,newSheet,currentSheet,getCell,setCell,setStyle,refsBetween,
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
+import {changeSheetStructure} from './core/structure.js';
 const app=document.getElementById('app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const niceDate=s=>{try{return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(s));}catch{return '—'}};
@@ -60,6 +61,19 @@ function clearSelectedFormat(){commitEditor();if(refuseHiddenSelection())return;
 function autoSum(){commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
 function fillSelected(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
 function updateSelectionStats(){const node=document.querySelector('#selection-stats');if(!node||!sheet())return;const rect=rectangle(activeCell,rangeEnd);if(!rect)return;const n=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);if(n>10000){node.textContent=`Выделено: ${n} ячеек`;return;}const raw=rawMap(sheet());let count=0,sum=0;for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){const value=resultOf(sheet(),cellName(r,c),raw);const number=Number(value);if(value!==''&&Number.isFinite(number)){count++;sum+=number;}}node.textContent=count?`Чисел: ${count} · Сумма: ${Number(sum.toFixed(8))} · Среднее: ${Number((sum/count).toFixed(8))}`:`Выделено: ${n}`;}
+function structuralAction(axis,mode){
+ commitEditor();if(!sheet())return;
+ const pos=parseCell(activeCell);if(!pos)return;
+ const index=axis==='row'?pos.row:pos.col;
+ try{
+  const draft=structuredClone(sheet());
+  changeSheetStructure(draft,axis,mode,index); // Validate before adding undo history.
+  transact(()=>changeSheetStructure(sheet(),axis,mode,index));
+  const next=mode==='delete'?Math.min(index,axis==='row'?LIMITS.rows-2:LIMITS.columns-2):index;
+  const dest=axis==='row'?cellName(next,pos.col):cellName(pos.row,next);
+  filterColumn=null;internalClipboard=null;setSelection(dest);render();status(`${mode==='insert'?'Вставлен':'Удалён'} ${axis==='row'?'ряд':'столбец'} ${index+1}`);
+ }catch(err){status(err.message||'Операция отклонена',true);}
+}
 function applyStyle(patch){if(refuseHiddenSelection())return;const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();}
 function sortRange(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
  const count=sortSelectedRows(candidate,activeCell,rangeEnd,direction);
@@ -129,12 +143,16 @@ const icons={
  columns:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M11 4v16M8 12l-3 0m14 0h-3"/>',
  rows:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 12h18"/>',
  home:'<path d="m3 10 9-7 9 7v10h-6v-7H9v7H3z"/>',
- refresh:'<path d="M20 7v5h-5M4 17v-5h5M5 9a8 8 0 0 1 14-3l1 1M4 17l1 1a8 8 0 0 0 14-3"/>'
+ refresh:'<path d="M20 7v5h-5M4 17v-5h5M5 9a8 8 0 0 1 14-3l1 1M4 17l1 1a8 8 0 0 0 14-3"/>',
+ insertRow:'<path d="M3 5h18M3 18h18M3 12h18M12 8v8m-4-4h8"/>',
+ deleteRow:'<path d="M3 5h18M3 18h18M3 12h18M8 8l8 8m0-8-8 8"/>',
+ insertColumn:'<path d="M5 3v18M18 3v18M12 3v18M8 12h8m-4-4v8"/>',
+ deleteColumn:'<path d="M5 3v18M18 3v18M12 3v18M8 8l8 8m0-8-8 8"/>'
 };
 function toolIcon(action,original,extra=''){
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):
- ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'download','xlsx':'download','save':'save','backup':'save','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freeze','freeze-col':'freeze','freeze-at':'freeze','freeze-clear':'eraser','column-width':'columns','column-fit':'columns','row-height':'rows','row-reset':'refresh','goto':'home'})[action];
+ ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'download','xlsx':'download','save':'save','backup':'save','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freeze','freeze-col':'freeze','freeze-at':'freeze','freeze-clear':'eraser','column-width':'columns','column-fit':'columns','row-height':'rows','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn'})[action];
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
@@ -158,7 +176,7 @@ function ribbon(){
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
- if(activeRibbon==='insert')contents=group('Листы',button('sheet-add','Новый лист','+')+button('sheet-rename','Переименовать','✎'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
+ if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить строку','+')+button('delete-row','Удалить строку','×')+button('insert-col','Вставить столбец','+')+button('delete-col','Удалить столбец','×'))+group('Листы',button('sheet-add','Новый лист','+')+button('sheet-rename','Переименовать','✎'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
  if(activeRibbon==='view')contents=group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('backup','Архив','▤')+button('import','Открыть','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
@@ -209,6 +227,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   case 'bold':applyStyle({bold:!getCell(sheet(),activeCell).style?.bold});break;case 'italic':applyStyle({italic:!getCell(sheet(),activeCell).style?.italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
  case 'formula-fn':{const p=parseCell(activeCell);const from=p.row>0?cellName(0,p.col):cellName(1,p.col),to=p.row>0?cellName(p.row-1,p.col):cellName(9,p.col);const field=document.querySelector('#formula-input');if(field){field.value=`=${fn}(${from}:${to})`;field.focus();status('Проверьте диапазон, затем нажмите Enter');}break;}
  case 'copy':await copySelection();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
+ case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
