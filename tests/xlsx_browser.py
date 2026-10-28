@@ -34,7 +34,7 @@ with TemporaryDirectory() as tmp:
         assert page.locator('.grid-cell[data-ref="A1"]').inner_text()=='Тест фразы с кириллицей'
         page.get_by_role('tab',name='Данные').click()
         with page.expect_download() as event:
-            page.locator('[data-action=xlsx]').click()
+            page.get_by_role('button',name='XLSX').click()
         download=event.value
         export_target=Path(tmp)/download.suggested_filename;download.save_as(export_target)
         exported=load_workbook(export_target)

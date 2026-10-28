@@ -12,12 +12,12 @@ def run():
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.set_content(Path(__file__).parents[1].joinpath("dist/index.html").read_text(),wait_until="load")
         assert page.locator('h1').count()==1
-        page.screenshot(path=str(Path(__file__).resolve().parent / 'home.png'),full_page=True)
+        page.screenshot(path=str(Path(__file__).parent/'home.png'),full_page=True)
         page.get_by_role('button',name='Открыть демонстрацию').click()
         assert page.locator('.grid-cell[data-ref="A1"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').inner_text().strip()!=''
-        page.screenshot(path=str(Path(__file__).resolve().parent / 'sheets.png'),full_page=True)
+        page.screenshot(path=str(Path(__file__).parent/'sheets.png'),full_page=True)
         # Formula-aware fill: relative reference changes and absolute anchor stays put.
         def select_ref(value):
             page.locator('#name-box').fill(value)
@@ -27,7 +27,7 @@ def run():
         page.locator('#formula-input').press('Enter')
         select_ref('G1:G3')
         page.get_by_role('tab',name='Правка').click()
-        page.locator('[data-action=fill-down]').click()
+        page.get_by_role('button',name='Заполнить вниз').click()
         assert page.locator('.grid-cell[data-ref="G2"]').inner_text().strip()!=''
         select_ref('G2')
         assert page.locator('#formula-input').input_value()=='=B3+$C$2'
