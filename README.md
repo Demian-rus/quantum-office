@@ -104,3 +104,11 @@ Use **Вставка → Вставить строку / Удалить стро
 - Main ribbon offers **All borders**, **Remove borders**, **Wrap text**. Borders are four thin edges only, not individually configurable. Wrapped text can expand row height up to the current 160px limit.
 - `.qbook` preserves these styles. XLSX export writes standard `borderId` / `wrapText`; import recognizes four matching thin edges only. Unsupported Excel styles remain lossy on import/export.
 - Tests: `npm test`, `python tests/color_border_browser.py`, `python tests/color_border_xlsx_browser.py`.
+
+### TASK 021: colors, borders and merged cells (alpha)
+
+- **Home → text/fill color:** small palette with preset swatches plus a custom color field, operating on the selection captured when the palette opens.
+- **Home → Borders:** outer outline, all borders, top, bottom, left, right, and clear. The outline command draws only the outer edge of a rectangle; internal cells remain borderless. Basic thin-line OOXML border export/import is supported.
+- **Home → Merge / Unmerge:** true merged cells preserved in `.qbook`, and OOXML `mergeCells` is exported/imported in `.xlsx` within alpha limits. Merging refuses non-empty subordinate cells, overlapping regions, and ranges crossing frozen panes or containing hidden rows/columns. Unmerge does not destroy data.
+- **Limitations:** merge-aware fill/copy/paste and structural row/column edits are not yet supported. Clipboard paste into a merged area is blocked. Complex Excel merges, thick/dashed styles, rich-text runs and advanced formatting are not lossless. Preserve original XLSX and save a `.qbook` backup.
+- Regression commands: `npm test`, `npm run build`, `python tests/formatting21_browser.py`, `python tests/merge_xlsx_browser.py` plus older smoke scenarios. Desktop installers are still unverified.

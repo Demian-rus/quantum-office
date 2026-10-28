@@ -28,6 +28,7 @@ export function changeSheetStructure(sheet,axis,mode,index){
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
  if(!Number.isInteger(index)||index<0||index>=limit)throw Error('Строка или столбец вне таблицы');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
+ if(sheet.merges?.length)throw Error('Сначала снимите объединения перед вставкой или удалением строк и столбцов');
  const cells={};
  for(const [ref,cell] of Object.entries(sheet.cells)){
   const pos=parseCell(ref);if(!pos||pos.row>=LIMITS.rows||pos.col>=LIMITS.columns)throw Error('Недопустимый адрес ячейки');

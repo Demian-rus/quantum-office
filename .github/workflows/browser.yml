@@ -26,3 +26,5 @@ jobs:
       - run: python tests/templates_headers_browser.py
       - run: python tests/color_border_browser.py
       - run: python tests/color_border_xlsx_browser.py
+      - run: python tests/formatting21_browser.py
+      - run: python tests/merge_xlsx_browser.py

@@ -2,7 +2,7 @@ import { cellName,parseCell,colLabel,evaluateCell,csvEncode,csvDecode } from './
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -77,6 +77,44 @@ export function firstVisibleIndex(positions,coordinate){
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
 export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);const style={...prev.style,...patch};for(const [name,value] of Object.entries(patch))if(value===undefined)delete style[name];if(!prev.value&&!Object.keys(style).length)delete sheet.cells[key];else sheet.cells[key]={value:prev.value,style};}
+/** Merge geometry is independent of styling. Covered cells never silently lose content. */
+export function mergeAt(sheet,ref){const p=parseCell(ref);if(!p)return null;return (sheet.merges||[]).find(m=>{const v=rectangle(m.from,m.to);return p.row>=v.r1&&p.row<=v.r2&&p.col>=v.c1&&p.col<=v.c2;})||null;}
+export function mergeCells(sheet,a,b){
+ const r=rectangle(a,b);if(!r||r.r2>=LIMITS.rows||r.c2>=LIMITS.columns||!validRef(a)||!validRef(b))throw Error('Недопустимое объединение');
+ if(r.r1===r.r2&&r.c1===r.c2)throw Error('Выделите минимум две ячейки');
+ if((r.r2-r.r1+1)*(r.c2-r.c1+1)>2000)throw Error('Объединение ограничено 2000 ячеек');
+ if(sheet.autoFilter)throw Error('Выключите автофильтр перед объединением');
+ const frozen=sheet.freeze||{rows:0,cols:0};
+ if(r.r1<frozen.rows&&r.r2>=frozen.rows||r.c1<frozen.cols&&r.c2>=frozen.cols)throw Error('Объединение пересекает закреплённую область');
+ for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++){
+  if(!rowVisible(sheet,row)||!columnVisible(sheet,col))throw Error('Нельзя объединять скрытые строки и столбцы');
+  const ref=cellName(row,col);
+  if(mergeAt(sheet,ref))throw Error('Диапазон пересекается с другим объединением');
+  if((row!==r.r1||col!==r.c1)&&getCell(sheet,ref).value!=='')throw Error('Сначала освободите другие ячейки: их данные нельзя удалять при объединении');
+ }
+ sheet.merges??=[];const m={from:cellName(r.r1,r.c1),to:cellName(r.r2,r.c2)};sheet.merges.push(m);return m;
+}
+export function unmergeCells(sheet,ref){const item=mergeAt(sheet,ref);if(!item)return false;sheet.merges=sheet.merges.filter(m=>m!==item);return true;}
+/** Border presets apply to the selected *rectangle*, not every cell separately. */
+export function applyBorderPreset(sheet,a,b,preset){
+ if(!['outline','all','none','bottom','top','left','right'].includes(preset))throw Error('Неизвестный вариант границ');
+ const r=rectangle(a,b);if(!r||!validRef(a)||!validRef(b))throw Error('Недопустимый диапазон');
+ if((r.r2-r.r1+1)*(r.c2-r.c1+1)>10000)throw Error('Слишком большой диапазон');
+ for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++){
+  const ref=cellName(row,col),previous=getCell(sheet,ref).style||{};
+  let borders={...(previous.borders|| (previous.border==='thin'?{top:true,bottom:true,left:true,right:true}:{}))};
+  if(preset==='none')borders={};
+  else if(preset==='all')borders={top:true,bottom:true,left:true,right:true};
+  else if(preset==='outline'){
+   borders={...borders,top:row===r.r1||undefined,bottom:row===r.r2||undefined,left:col===r.c1||undefined,right:col===r.c2||undefined};
+  } else if(preset==='bottom')borders.bottom=row===r.r2||undefined;
+  else if(preset==='top')borders.top=row===r.r1||undefined;
+  else if(preset==='left')borders.left=col===r.c1||undefined;
+  else if(preset==='right')borders.right=col===r.c2||undefined;
+  borders=Object.fromEntries(Object.entries(borders).filter(([,v])=>v===true));
+  setStyle(sheet,ref,{border:undefined,borders:Object.keys(borders).length?borders:undefined});
+ }
+}
 export function validRef(ref){const p=parseCell(String(ref));return !!p&&p.row<LIMITS.rows&&p.col<LIMITS.columns;}
 export function refsBetween(a,b){const p=parseCell(a),q=parseCell(b);if(!p||!q)return [];const refs=[];for(let r=Math.min(p.row,q.row);r<=Math.max(p.row,q.row);r++)for(let c=Math.min(p.col,q.col);c<=Math.max(p.col,q.col);c++)if(r<LIMITS.rows&&c<LIMITS.columns)refs.push(cellName(r,c));return refs;}
 export function rectangle(a,b){const p=parseCell(a),q=parseCell(b);return p&&q?{r1:Math.min(p.row,q.row),r2:Math.max(p.row,q.row),c1:Math.min(p.col,q.col),c2:Math.max(p.col,q.col)}:null;}
@@ -132,6 +170,7 @@ export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!va
  const rows=String(text).replace(/\r\n?/g,'\n').replace(/\n$/,'').split('\n').map(line=>line.split('\t'));
  const maxR=Math.min(LIMITS.rows-at.row,rows.length),maxC=Math.min(LIMITS.columns-at.col,Math.max(...rows.map(r=>r.length)));
  if(maxR*maxC>20000)throw Error('Вставка ограничена 20 000 ячеек');
+ for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)if(mergeAt(sheet,cellName(at.row+r,at.col+c)))throw Error('Вставка в объединённый диапазон пока не поддерживается');
  for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)setCell(sheet,cellName(at.row+r,at.col+c),rows[r][c]);
  return {rows:maxR,cols:maxC,end:cellName(at.row+maxR-1,at.col+maxC-1)};
 }
@@ -225,12 +264,25 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
     if(!f||!rect||!validRef(f.from)||!validRef(f.to)||rect.r2<=rect.r1||!f.rules||typeof f.rules!=='object'||Array.isArray(f.rules))throw Error('Повреждён автофильтр');
     if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!(typeof val==='string'&&val.length<=50000||Array.isArray(val)&&val.length>0&&val.length<=200&&val.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(val).size===val.length)))throw Error('Некорректные условия фильтра');
    }
+ if(sheet.merges!==undefined){
+   if(!Array.isArray(sheet.merges)||sheet.merges.length>500)throw Error('Некорректные объединения');
+   const occupancy=new Set();for(const m of sheet.merges){
+    if(!m||typeof m.from!=='string'||typeof m.to!=='string'||!validRef(m.from)||!validRef(m.to))throw Error('Недопустимое объединение');
+    const r=rectangle(m.from,m.to),canonical=cellName(r.r1,r.c1)===m.from&&cellName(r.r2,r.c2)===m.to;
+    if(!canonical||r.r1===r.r2&&r.c1===r.c2||(r.r2-r.r1+1)*(r.c2-r.c1+1)>2000)throw Error('Повреждённое объединение');
+    for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++){
+      const ref=cellName(row,col);if(occupancy.has(ref))throw Error('Пересекающиеся объединения');occupancy.add(ref);
+      if((row!==r.r1||col!==r.c1)&&sheet.cells?.[ref]?.value)throw Error('Данные внутри объединения без верхней левой ячейки');
+    }
+   }
+  }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','wrap'].includes(k))||
+    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','wrap'].includes(k))||
        ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
        ('border' in style&&!['thin'].includes(style.border))||
+       ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
        ('format' in style&&!['general','currency','percent','integer'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
