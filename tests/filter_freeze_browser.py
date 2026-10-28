@@ -7,7 +7,7 @@ with sync_playwright() as p:
   pg=b.new_page(viewport={'width':1366,'height':768})
   errors=[];pg.on('pageerror',lambda e:errors.append(str(e)))
   pg.set_content((root/'dist/index.html').read_text(),wait_until='load')
-  pg.get_by_role('button',name='Открыть демонстрацию').click()
+  pg.get_by_role('button',name='Открыть пример таблицы').click()
   pg.locator('#name-box').fill('A1:D6');pg.locator('#name-box').press('Enter')
   pg.get_by_role('tab',name='Данные').click()
   pg.get_by_role('button',name='Автофильтр').click()

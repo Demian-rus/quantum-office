@@ -280,14 +280,55 @@ export function planAutoSum(sheet,from,to){
 export {cellName,parseCell};
 
 /** Starter weekly timetable; no external personal data. */
+/** A practical weekly teaching schedule adapted to the user's spreadsheet structure.
+ * Day sections use colored cell bands; merged regions are intentionally not
+ * claimed until merging and OOXML round-trip are fully implemented. */
 export function createScheduleTemplate(){
- const book=newWorkbook('Расписание занятий'),s=currentSheet(book);s.name='Неделя';
- const days=['Время','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
- days.forEach((name,col)=>{const ref=cellName(0,col);setCell(s,ref,name);setStyle(s,ref,{bold:true,bg:'#dbeee4',color:'#15583a',align:'center'});});
- for(let slot=0;slot<=24;slot++){const minutes=9*60+slot*30;const ref=cellName(slot+1,0);setCell(s,ref,`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`);setStyle(s,ref,{bold:true,bg:'#f0f5fa',color:'#526275',align:'center'});}
- setColumnWidth(s,0,88);for(let c=1;c<8;c++)setColumnWidth(s,c,166);
- for(let row=0;row<=25;row++)setRowHeight(s,row,row===0?36:30);
- setFreeze(s,1,1);
- const info=newSheet('Ученики');['Ученик','Предмет','Контакт','Заметки'].forEach((name,col)=>{const ref=cellName(0,col);setCell(info,ref,name);setStyle(info,ref,{bold:true,bg:'#dbeee4',color:'#15583a'});setColumnWidth(info,col,col===3?270:185);});
- book.sheets.push(info);return validateWorkbook(book);
+ const book=newWorkbook('График занятий');const s=currentSheet(book);s.name='График';
+ const heading=['Дни недели','Ученики','Класс / предмет','Время занятий','План занятий','Результаты','Примечание','Проведено','Стоимость','Оплачено'];
+ const widths=[73,148,170,123,360,145,220,108,107,105];
+ widths.forEach((w,c)=>setColumnWidth(s,c,w));
+ // Green upper bands and clear, editable column labels. No invented pupil data.
+ for(let c=0;c<heading.length;c++){
+  const ref=cellName(0,c),ref2=cellName(1,c);
+  setCell(s,ref,c===0?'НЕДЕЛЬНЫЙ ГРАФИК':c===4?'ПЛАН ЗАНЯТИЙ':c===8?'ОПЛАТА':'');
+  setStyle(s,ref,{bg:'#00c837',color:'#153d25',bold:true,align:'center'});
+  setCell(s,ref2,heading[c]);setStyle(s,ref2,{bold:true,bg:'#f1f5f3',color:'#173f2b',align:'center'});
+  setCell(s,cellName(2,c),'');setStyle(s,cellName(2,c),{bg:'#00c837'});
+ }
+ setRowHeight(s,0,26);setRowHeight(s,1,39);setRowHeight(s,2,22);
+ const days=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+ days.forEach((day,k)=>{
+  for(let j=0;j<5;j++){
+   const r=3+k*5+j;
+   setRowHeight(s,r,29);
+   const dayRef=cellName(r,0);if(j===0)setCell(s,dayRef,day);
+   setStyle(s,dayRef,{bg:'#ffca19',bold:true,color:'#252b25',align:'center'});
+   setStyle(s,cellName(r,1),{bg:'#e0e3e5'});
+   // Visible day-boundary bands are not baked into user-entered data.
+  }
+ });
+ setFreeze(s,3,2);
+ // Small weekly overview as in the reference sheet, to the right.
+ const right=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+ right.forEach((d,i)=>{const c=11+i;setColumnWidth(s,c,78);setCell(s,cellName(1,c),d);setStyle(s,cellName(1,c),{bold:true,align:'center',bg:'#e8f5eb'});});
+ const finance=newSheet('Бухгалтерия');const financeCols=['Дата','Ученик','Предмет','Занятие','Стоимость','Оплачено','Долг','Примечание'];
+ financeCols.forEach((title,c)=>{setColumnWidth(finance,c,[120,175,170,150,115,115,120,255][c]);setCell(finance,cellName(0,c),title);setStyle(finance,cellName(0,c),{bold:true,bg:'#e2f2e7',color:'#165438'});});
+ setFreeze(finance,1,0);
+ const partner=newSheet('Партнёрка');['Контакт','Организация','Условия','Статус','Комментарий'].forEach((title,c)=>{setColumnWidth(partner,c,[175,195,260,140,290][c]);setCell(partner,cellName(0,c),title);setStyle(partner,cellName(0,c),{bold:true,bg:'#e2f2e7',color:'#165438'});});
+ book.sheets.push(finance,partner);return validateWorkbook(book);
+}
+/** Blank education register, useful when lessons are not organized by week. */
+export function createJournalTemplate(){
+ const b=newWorkbook('Журнал учеников'),s=currentSheet(b);s.name='Ученики';
+ const heads=['Ученик','Класс','Предмет','Формат','Контакт','Стоимость','Примечание'];
+ heads.forEach((t,c)=>{setCell(s,cellName(0,c),t);setColumnWidth(s,c,[180,90,160,130,190,120,300][c]);setStyle(s,cellName(0,c),{bold:true,bg:'#d6eee0',color:'#155a3d'});});
+ setFreeze(s,1,1);return validateWorkbook(b);
+}
+/** Basic bookkeeping starter; formulas on a separate totals row. */
+export function createBudgetTemplate(){
+ const b=newWorkbook('Доходы и расходы'),s=currentSheet(b);s.name='Учёт';
+ const heads=['Дата','Категория','Описание','Доход','Расход','Баланс'];
+ heads.forEach((t,c)=>{setCell(s,cellName(0,c),t);setColumnWidth(s,c,[130,160,290,140,140,145][c]);setStyle(s,cellName(0,c),{bold:true,bg:'#d6eee0',color:'#155a3d'});});
+ setCell(s,'F2','=D2-E2');setFreeze(s,1,0);return validateWorkbook(b);
 }

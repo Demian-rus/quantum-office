@@ -87,3 +87,12 @@ Use **Вставка → Вставить строку / Удалить стро
 - Weekly schedule starter: seven weekday columns, 30-minute slots from 09:00 to 21:00, and a separate blank `Ученики` sheet. This is a starter sheet, **not** a synchronized calendar.
 - Local browser auto-save is **only a draft cache**; explicitly save `.qbook` to disk and export `.qbackup` regularly. Do not trust a local HTML file + browser storage for irreplaceable work. Do not edit complex XLSX without preserving originals.
 - Tests: `npm test`, `npm run build`, `python tests/launcher_browser.py` and existing Chromium XLSX/clipboard/structure/filter smoke.
+
+
+### TASK 019 — каталоги шаблонов, график и заголовки
+
+- Под тремя плитками главного экрана есть кнопки каталогов шаблонов каждого редактора. Для текста и презентаций карточки честно помечены как будущие.
+- Шаблон «Недельное расписание занятий» повторяет основные секции предоставленной пользователем таблицы: цветные блоки дней, ученики, предметы, время, план занятий, результаты, примечания, проведение и оплата; листы «График», «Бухгалтерия», «Партнёрка». **Объединённые ячейки и сложные границы пока не реализованы.**
+- Заголовки строк/столбцов выводятся в неподвижных отдельных слоях поверх таблицы. Буква выделяет столбец, цифра строку, треугольник — весь текущий лист (в пределах 2 000 × 100). Выделение всего листа не означает, что безопасно можно изменять или копировать все 200 000 ячеек одновременно: массовые операции ограничены.
+- Удалена кнопка переименования листа, осталось переименование двойным щелчком; **+** создаёт новый лист.
+- Для регрессии: `npm test`, `npm run build`, `python tests/templates_headers_browser.py`, `python tests/launcher_browser.py`, `python tests/ui_smoke.py`.

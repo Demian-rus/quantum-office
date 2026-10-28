@@ -23,3 +23,4 @@ jobs:
       - run: python tests/clipboard_browser.py
       - run: python tests/structure_browser.py
       - run: python tests/launcher_browser.py
+      - run: python tests/templates_headers_browser.py

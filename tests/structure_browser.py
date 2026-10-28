@@ -7,7 +7,7 @@ with sync_playwright() as p:
     page=browser.new_page(viewport={'width':1366,'height':768})
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     page.set_content((root/'dist/index.html').read_text(encoding='utf-8'))
-    page.get_by_role('button',name='Открыть демонстрацию').click()
+    page.get_by_role('button',name='Открыть пример таблицы').click()
     page.locator('.sheet-menu').click() # blank sheet
     def write(ref,text):
         page.locator('#name-box').fill(ref);page.locator('#name-box').press('Enter')
