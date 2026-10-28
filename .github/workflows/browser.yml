@@ -21,3 +21,5 @@ jobs:
       - run: python tests/ribbon_browser.py
       - run: python tests/compact_browser.py
       - run: python tests/dimensions_browser.py
+      - run: python tests/filter_freeze_browser.py
+      - run: python tests/xlsx_filter_freeze_browser.py

@@ -1,9 +1,8 @@
-import { cellName, parseCell, colLabel, evaluateCell, csvEncode, csvDecode } from './formulas.js';
-
-const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const stamp=()=>new Date().toISOString();
+import { cellName,parseCell,colLabel,evaluateCell,csvEncode,csvDecode } from './formulas.js';
+export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+export const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{}};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},freeze:{rows:0,cols:0},autoFilter:null};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -17,10 +16,34 @@ export function setRowHeight(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
  sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
 }
+/** Filters never move or delete source cells. Only row visibility is changed. */
+export function filterRange(sheet){const value=sheet.autoFilter;return value?rectangle(value.from,value.to):null;}
+export function filterRowVisible(sheet,row){
+ const rect=filterRange(sheet),rules=sheet.autoFilter?.rules||{};
+ if(!rect||row<=rect.r1||row>rect.r2)return true;
+ return Object.entries(rules).every(([col,needle])=>getCell(sheet,cellName(row,Number(col))).value===needle);
+}
+export function setFreeze(sheet,rows,cols){
+ if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<0||rows>10||cols<0||cols>10)throw Error('Закрепить можно не более 10 строк и столбцов');
+ sheet.freeze={rows,cols};
+}
+export function setAutoFilter(sheet,from,to){
+ const rect=rectangle(from,to);
+ if(!rect||rect.r2<=rect.r1||rect.r2>=LIMITS.rows||rect.c2>=LIMITS.columns)throw Error('Выделите диапазон с заголовком и хотя бы одной строкой');
+ sheet.autoFilter={from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2),rules:{}};
+}
+export function setFilterValue(sheet,col,value){
+ const rect=filterRange(sheet);
+ if(!rect||!Number.isInteger(col)||col<rect.c1||col>rect.c2)throw Error('Столбец не входит в фильтр');
+ if(value!==null&&(typeof value!=='string'||value.length>50000))throw Error('Недопустимое значение фильтра');
+ const rules={...(sheet.autoFilter.rules||{})};
+ if(value===null)delete rules[col];else rules[col]=value;
+ sheet.autoFilter={...sheet.autoFilter,rules};
+}
 export function gridGeometry(sheet){
  const x=[54],y=[31];
  for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+columnWidth(sheet,col));
- for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+rowHeight(sheet,row));
+ for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+(filterRowVisible(sheet,row)?rowHeight(sheet,row):0));
  return {x,y};
 }
 export function firstVisibleIndex(positions,coordinate){
@@ -166,7 +189,15 @@ export function validateWorkbook(book){
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
    for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||!Number.isInteger(value)||value<sizeMin||value>sizeMax)throw Error('Некорректный размер строки или столбца');
   }
-if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
+if(sheet.freeze!==undefined){
+    const f=sheet.freeze;if(!f||!Number.isInteger(f.rows)||!Number.isInteger(f.cols)||f.rows<0||f.cols<0||f.rows>10||f.cols>10)throw Error('Повреждено закрепление областей');
+   }
+   if(sheet.autoFilter!==undefined&&sheet.autoFilter!==null){
+    const f=sheet.autoFilter,rect=rectangle(f?.from,f?.to);
+    if(!f||!rect||!validRef(f.from)||!validRef(f.to)||rect.r2<=rect.r1||!f.rules||typeof f.rules!=='object'||Array.isArray(f.rules))throw Error('Повреждён автофильтр');
+    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||typeof val!=='string'||val.length>50000))throw Error('Некорректные условия фильтра');
+   }
+ if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
     if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format'].includes(k))||
        ['bold','italic'].some(k=>k in style&&typeof style[k]!=='boolean')||
@@ -181,7 +212,7 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
  for(let c=0;c<4;c++){setStyle(s,cellName(0,c),{bold:true,bg:'#dceafe',color:'#1d457e'});setStyle(s,cellName(5,c),{bold:true,bg:'#edf5e8',color:'#27693b'});}
  for(let r=1;r<6;r++)for(let c=1;c<4;c++)setStyle(s,cellName(r,c),{format:'currency'});
  const s2=newSheet('Заметки');setCell(s2,'A1','Эта книга — демонстрация возможностей Quantum Sheets.');setCell(s2,'A3','Изменяйте цифры в столбцах B и C: формулы пересчитаются.');b.sheets.push(s2);return b;}
-{cellName,parseCell};
+
 
 /** Clears style without deleting values/formulas or creating empty cells. */
 export function clearFormatting(sheet,from,to){
@@ -217,5 +248,5 @@ export function planAutoSum(sheet,from,to){
  }
  return entries;
 }
-{cellName,parseCell};
+
 export {cellName,parseCell};
