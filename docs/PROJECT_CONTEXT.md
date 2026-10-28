@@ -111,3 +111,13 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - Keyboard navigation skips the covered cells of the currently selected merge.
 - Ctrl+X, sort and fill on merged ranges remain blocked; insert/delete with merges remains blocked by the earlier safety policy.
 - Run 66 Node tests and merged clipboard Chromium scenario. Do not claim browser localStorage is durable file storage.
+
+
+## TASK 023 — structural edits with merged cells
+
+- Inserting **before** a merged range shifts its anchor and rectangle; inserting **inside** it expands the rectangle while keeping the upper-left value.
+- Deleting rows/columns above or before an area shifts it; deleting a **non-anchor** band inside shrinks it. If only one cell remains, the merge disappears but the anchor content stays.
+- Deleting the row/column that contains the **upper-left anchor** is deliberately refused, rather than silently losing its content. Unmerge first.
+- Existing bounds (2,000 × 100 cells, 2,000 cells/merge) remain enforced before mutation; active filters still block structural edits. Undo is one step.
+- Verified with dedicated Node tests, a Chromium ribbon/undo workflow and independent XLSX inspection via openpyxl.
+- This is bounded support; cross-sheet references, multi-row structural actions and all Excel merged-editing semantics are not yet complete.

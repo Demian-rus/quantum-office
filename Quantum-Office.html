@@ -833,7 +833,28 @@ function changeSheetStructure(sheet,axis,mode,index){
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
  if(!Number.isInteger(index)||index<0||index>=limit)throw Error('Строка или столбец вне таблицы');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
- if(sheet.merges?.length)throw Error('Сначала снимите объединения перед вставкой или удалением строк и столбцов');
+ // Validate the projected geometry before mutating any cell. Insertions may
+ // shift or expand a merge; non-anchor deletions may shrink it.
+ const newMerges=[];
+ for(const merge of sheet.merges||[]){
+  const a=parseCell(merge.from),b=parseCell(merge.to);
+  if(!a||!b)throw Error('Повреждённое объединение');
+  const start=axis==='row'?a.row:a.col,end=axis==='row'?b.row:b.col;
+  let nextStart=start,nextEnd=end;
+  if(mode==='insert'){
+   if(index<=start){nextStart++;nextEnd++;}
+   else if(index<=end){nextEnd++;}
+  }else if(index<start){nextStart--;nextEnd--;}
+  else if(index<=end){
+   if(index===start)throw Error('Удаление строки или столбца с началом объединения запрещено: сначала разъедините ячейки');
+   nextEnd--;
+  }
+  if(nextEnd>=limit)throw Error('Объединение выйдет за пределы листа');
+  const r1=axis==='row'?nextStart:a.row,c1=axis==='col'?nextStart:a.col;
+  const r2=axis==='row'?nextEnd:b.row,c2=axis==='col'?nextEnd:b.col;
+  if((r2-r1+1)*(c2-c1+1)>2000)throw Error('Объединение превысит лимит 2000 ячеек');
+  if(r1!==r2||c1!==c2)newMerges.push({from:cellName(r1,c1),to:cellName(r2,c2)});
+ }
  const cells={};
  for(const [ref,cell] of Object.entries(sheet.cells)){
   const pos=parseCell(ref);if(!pos||pos.row>=LIMITS.rows||pos.col>=LIMITS.columns)throw Error('Недопустимый адрес ячейки');
@@ -868,7 +889,7 @@ function changeSheetStructure(sheet,axis,mode,index){
  if(mode==='delete'&&index<freeze[frozenKey])freeze[frozenKey]--;
  if(freeze[frozenKey]>10)throw Error('Нельзя увеличить закреплённую область более 10 строк или столбцов');
  // Existing data and schema remain unchanged if even one step above failed.
- sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;
+ sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
  return {axis,mode,index,changed:Object.keys(cells).length};
 }
 
