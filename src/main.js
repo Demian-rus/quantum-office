@@ -46,6 +46,15 @@ function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:act
  if(dr){while(r>=0&&r<LIMITS.rows&&!rowVisible(sheet(),r))r+=Math.sign(dr);r=Math.min(Math.max(r,0),LIMITS.rows-1);}
  if(dc){while(c>=0&&c<LIMITS.columns&&!columnVisible(sheet(),c))c+=Math.sign(dc);c=Math.min(Math.max(c,0),LIMITS.columns-1);}
  if(!rowVisible(sheet(),r)||!columnVisible(sheet(),c))return;
+ const sourceMerge=mergeAt(sheet(),activeCell);
+ if(!extend&&sourceMerge){const bounds=rectangle(sourceMerge.from,sourceMerge.to),next=cellName(r,c);
+  if(mergeAt(sheet(),next)===sourceMerge){
+   if(dr>0)r=Math.min(LIMITS.rows-1,bounds.r2+1);
+   else if(dr<0)r=Math.max(0,bounds.r1-1);
+   else if(dc>0)c=Math.min(LIMITS.columns-1,bounds.c2+1);
+   else if(dc<0)c=Math.max(0,bounds.c1-1);
+  }
+ }
  const target=cellName(r,c);setSelection(extend?activeCell:target,target);ensureVisible(r,c);}
 function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if(!view||!sheet())return;const {x,y}=gridGeometry(sheet()),left=x[c],top=y[r],width=x[c+1]-left,height=y[r+1]-top;
  if(c>=(sheet().freeze?.cols||0)&&left<view.scrollLeft+x[sheet().freeze?.cols||0])view.scrollLeft=Math.max(0,left-x[sheet().freeze?.cols||0]);
@@ -450,7 +459,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t
  if(e.altKey&&(e.key==='='||e.code==='Equal')){e.preventDefault();autoSum();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='c'||e.code==='KeyC')){e.preventDefault();copySelection();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='v'||e.code==='KeyV')&&internalClipboard){e.preventDefault();pasteIntoCells(null,internalClipboard);return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();copySelection().then(ok=>{if(ok)clearSelected();});return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();const clip=captureSelection();if(clip?.merges?.length){status('Перемещение объединённых ячеек через Ctrl+X пока не поддерживается. Используйте копирование',true);return;}if(clip)copySelection().then(ok=>{if(ok)clearSelected();});return;}
  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();clearSelected();return;}
  if(e.key==='F2'){e.preventDefault();editCell();return;}
  const steps={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],Tab:[0,e.shiftKey?-1:1],Enter:[e.shiftKey?-1:1,0]};
