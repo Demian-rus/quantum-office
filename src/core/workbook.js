@@ -3,9 +3,31 @@ import { cellName, parseCell, colLabel, evaluateCell, csvEncode, csvDecode } fro
 const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{}};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{}};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
+export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
+export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??DIMENSIONS.defaultColumn;}
+export function rowHeight(sheet,index){return sheet.rowHeights?.[index]??DIMENSIONS.defaultRow;}
+export function setColumnWidth(sheet,index,value){
+ if(!Number.isInteger(index)||index<0||index>=LIMITS.columns||!Number.isInteger(value)||value<DIMENSIONS.minColumn||value>DIMENSIONS.maxColumn)throw Error('Недопустимая ширина столбца');
+ sheet.columnWidths??={};if(value===DIMENSIONS.defaultColumn)delete sheet.columnWidths[index];else sheet.columnWidths[index]=value;
+}
+export function setRowHeight(sheet,index,value){
+ if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
+ sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
+}
+export function gridGeometry(sheet){
+ const x=[54],y=[31];
+ for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+columnWidth(sheet,col));
+ for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+rowHeight(sheet,row));
+ return {x,y};
+}
+export function firstVisibleIndex(positions,coordinate){
+ let lo=0,hi=positions.length-1;
+ while(lo<hi){const mid=(lo+hi)>>1;if(positions[mid+1]<=coordinate)lo=mid+1;else hi=mid;}
+ return Math.min(lo,positions.length-2);
+}
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
 export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);sheet.cells[key]={value:prev.value,style:{...prev.style,...patch}};}
@@ -138,7 +160,13 @@ export function exportCSV(sheet){let maxR=0,maxC=0;for(const key of Object.keys(
 }
 export function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
- let total=0;const ids=new Set();for(const sheet of book.sheets){if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
+ let total=0;const ids=new Set();for(const sheet of book.sheets){
+  for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
+   const map=sheet?.[key];if(map===undefined)continue;
+   if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
+   for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||!Number.isInteger(value)||value<sizeMin||value>sizeMax)throw Error('Некорректный размер строки или столбца');
+  }
+if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
     if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format'].includes(k))||
        ['bold','italic'].some(k=>k in style&&typeof style[k]!=='boolean')||
@@ -153,7 +181,7 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
  for(let c=0;c<4;c++){setStyle(s,cellName(0,c),{bold:true,bg:'#dceafe',color:'#1d457e'});setStyle(s,cellName(5,c),{bold:true,bg:'#edf5e8',color:'#27693b'});}
  for(let r=1;r<6;r++)for(let c=1;c<4;c++)setStyle(s,cellName(r,c),{format:'currency'});
  const s2=newSheet('Заметки');setCell(s2,'A1','Эта книга — демонстрация возможностей Quantum Sheets.');setCell(s2,'A3','Изменяйте цифры в столбцах B и C: формулы пересчитаются.');b.sheets.push(s2);return b;}
-export {cellName,parseCell};
+{cellName,parseCell};
 
 /** Clears style without deleting values/formulas or creating empty cells. */
 export function clearFormatting(sheet,from,to){
@@ -189,3 +217,5 @@ export function planAutoSum(sheet,from,to){
  }
  return entries;
 }
+{cellName,parseCell};
+export {cellName,parseCell};
