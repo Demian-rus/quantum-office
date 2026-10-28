@@ -50,3 +50,6 @@ The Tauri 2 scaffold in `src-tauri/` is for future desktop builds. Desktop insta
 Source repository: https://github.com/Demian-rus/quantum-office . CI checks changes automatically. Browser preview is published by GitHub Pages once **Settings → Pages → Source: GitHub Actions** is enabled; URL: https://demian-rus.github.io/quantum-office/ . Do not assume deployment is live until the Pages workflow succeeds.
 
 See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/UPDATES.md](docs/UPDATES.md).
+### Sheets: заполнение диапазона
+
+Выделите прямоугольный диапазон через Shift+стрелки или мышью. В «Правка» нажмите «Заполнить вниз» (`Ctrl+D`) или «Заполнить вправо» (`Ctrl+R`). Значения и стили берутся из верхней строки/левого столбца выделения; относительные ссылки в формулах сдвигаются, абсолютные `$A$1` сохраняются. Одно действие — один шаг отмены. При выходе ссылки за границы листа операция отклоняется целиком.
