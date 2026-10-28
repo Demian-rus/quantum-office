@@ -1,5 +1,7 @@
 name: Chromium smoke
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 jobs:
   browser:
     runs-on: ubuntu-latest
@@ -12,6 +14,7 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm run build
-      - run: python -m pip install playwright
+      - run: python -m pip install playwright openpyxl
       - run: python -m playwright install --with-deps chromium
       - run: python tests/ui_smoke.py
+      - run: python tests/xlsx_browser.py
