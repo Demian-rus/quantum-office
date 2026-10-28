@@ -11,6 +11,7 @@ const cellH=29,cellW=116,rowW=54,headerH=31;
 let workspace;try{workspace=loadWorkspace();}catch{workspace=newWorkspace();}
 let templateKind='sheet';
 let page='home', activeRibbon='home', activeCell='A1', rangeEnd='A1', editing=null,mouseSelecting=false;
+let pendingColorSelection=null;
 let scrollLeft=0,scrollTop=0, saveHandle=null,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
 let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
 let resizeDrag=null, filterColumn=null;
@@ -97,7 +98,30 @@ function visibilityAction(axis,show){
   render();status(`Скрыт ${axis==='row'?'ряд':'столбец'} ${index+1}`);
  }catch(err){status(err.message||'Не удалось скрыть',true);}
 }
-function applyStyle(patch){if(refuseHiddenSelection())return;const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();}
+function applyStyle(patch,selection=null){
+ const a=selection?.start||activeCell,b=selection?.end||rangeEnd;
+ // A color picker may dispatch change only after focus moved to another cell.
+ // Do not ever apply a stale snapshot to a different document or worksheet.
+ if(selection&&(selection.bookId!==book()?.id||selection.sheetId!==sheet()?.id)){status('Исходный лист изменился — выберите цвет заново',true);return;}
+ const rect=rectangle(a,b);if(!rect||!sheet())return;
+ for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r)){status('Выделение содержит скрытые строки',true);return;}
+ const refs=refsBetween(a,b);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
+ transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
+}
+function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd};}
+function applySelectedColor(kind,value){const captured=pendingColorSelection;pendingColorSelection=null;applyStyle({[kind]:value},captured);}
+function setCellBorders(mode){applyStyle({border:mode==='all'?'thin':undefined});}
+function toggleWrap(){const next=!getCell(sheet(),activeCell).style?.wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
+ const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
+ transact(()=>{for(const ref of refs)setStyle(sheet(),ref,{wrap:next});
+  // Expand rows only when needed; never shrink a user-defined custom height.
+  if(next){for(let r=rect.r1;r<=rect.r2;r++){let need=rowHeight(sheet(),r);for(let c=rect.c1;c<=rect.c2;c++){
+    const content=displayedValue(sheet(),cellName(r,c)),charsPerLine=Math.max(5,Math.floor((columnWidth(sheet(),c)-16)/7));
+    const count=String(content).split('\n').reduce((n,line)=>n+Math.max(1,Math.ceil(line.length/charsPerLine)),0);
+    need=Math.max(need,Math.min(DIMENSIONS.maxRow,Math.max(DIMENSIONS.minRow,count*17+8)));
+   } if(need>rowHeight(sheet(),r))setRowHeight(sheet(),r,need);}}
+ });drawGrid();}
+
 function sortRange(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
  const count=sortSelectedRows(candidate,activeCell,rangeEnd,direction);
  transact(()=>{sheet().cells=candidate.cells;});drawGrid();updateSelectionStats();status(`Отсортировано ${count} строк по первому столбцу выделения`);
@@ -216,12 +240,15 @@ const icons={
  insertRow:'<path d="M3 5h18M3 18h18M3 12h18M12 8v8m-4-4h8"/>',
  deleteRow:'<path d="M3 5h18M3 18h18M3 12h18M8 8l8 8m0-8-8 8"/>',
  insertColumn:'<path d="M5 3v18M18 3v18M12 3v18M8 12h8m-4-4v8"/>',
- deleteColumn:'<path d="M5 3v18M18 3v18M12 3v18M8 8l8 8m0-8-8 8"/>'
+ deleteColumn:'<path d="M5 3v18M18 3v18M12 3v18M8 8l8 8m0-8-8 8"/>',
+ borderAll:'<rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/>',
+ borderNone:'<rect x="3" y="3" width="18" height="18" stroke-dasharray="2 3"/>',
+ wrap:'<path d="M3 5h18M3 9h11M3 13h14M3 17h10M16 17l4-4m0 0v8"/>'
 };
 function toolIcon(action,original,extra=''){
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):
- ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'download','xlsx':'download','save':'save','backup':'save','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freeze','freeze-col':'freeze','freeze-at':'freeze','freeze-clear':'eraser','column-width':'columns','column-fit':'columns','row-height':'rows','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','hide-row':'rows','show-rows':'rows','hide-col':'columns','show-cols':'columns'})[action];
+ ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'download','xlsx':'download','save':'save','backup':'save','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freeze','freeze-col':'freeze','freeze-at':'freeze','freeze-clear':'eraser','column-width':'columns','column-fit':'columns','row-height':'rows','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','wrap':'wrap','hide-row':'rows','show-rows':'rows','hide-col':'columns','show-cols':'columns'})[action];
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
@@ -237,7 +264,7 @@ function ribbon(){
  group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"'))+
  group('Вычисления',button('autosum','Автосумма','Σ'))+
- group('Оформление',button('clear-format','Сбросить формат','⟲'));
+ group('Оформление',button('border-all','Все границы','□')+button('border-none','Убрать границы','□')+button('wrap','Перенос текста','↵')+button('clear-format','Сбросить формат','⟲'));
  if(activeRibbon==='edit')contents=
  group('История',button('undo','Отменить','↶')+button('redo','Повторить','↷'))+
  group('Ячейки',button('copy','Копировать','▢')+button('clear','Очистить содержимое','⌫')+button('clear-format','Сбросить формат','⟲'))+
@@ -266,10 +293,10 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
   if(!rowVisible(s,r)||!columnVisible(s,c))continue;
   const ref=cellName(r,c),item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=item.style||{};
   const val=displayedValue(s,ref,raw),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}text-align:${align};`;
+  const appearance=`${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.border==='thin'?'box-shadow:inset 0 0 0 1px #526d5c;':''}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
-  html+=`<div class="grid-cell ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${y[r]+(pinnedR?scrollTop:0)}px;left:${x[c]+(pinnedC?scrollLeft:0)}px;width:${x[c+1]-x[c]}px;height:${y[r+1]-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
+  html+=`<div class="grid-cell ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${y[r]+(pinnedR?scrollTop:0)}px;left:${x[c]+(pinnedC?scrollLeft:0)}px;width:${x[c+1]-x[c]}px;height:${y[r+1]-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
  }
  const rowOverlay=document.getElementById('grid-row-overlay'),colOverlay=document.getElementById('grid-col-overlay');
  let rowHtml='',colHtml='';
@@ -299,15 +326,18 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'freeze-at':{const pos=parseCell(activeCell);updateFreeze(pos.row,pos.col);break;}
  case 'freeze-clear':updateFreeze(0,0);break;
  case 'column-width':changeSize('col');break;case 'column-fit':autoFitColumn();break;case 'row-height':changeSize('row');break;case 'row-reset':resetRowHeight();break;
-  case 'bold':applyStyle({bold:!getCell(sheet(),activeCell).style?.bold});break;case 'italic':applyStyle({italic:!getCell(sheet(),activeCell).style?.italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
+  case 'border-all':setCellBorders('all');break;case 'border-none':setCellBorders('none');break;case 'wrap':toggleWrap();break;
+ case 'bold':applyStyle({bold:!getCell(sheet(),activeCell).style?.bold});break;case 'italic':applyStyle({italic:!getCell(sheet(),activeCell).style?.italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
  case 'formula-fn':{const p=parseCell(activeCell);const from=p.row>0?cellName(0,p.col):cellName(1,p.col),to=p.row>0?cellName(p.row-1,p.col):cellName(9,p.col);const field=document.querySelector('#formula-input');if(field){field.value=`=${fn}(${from}:${to})`;field.focus();status('Проверьте диапазон, затем нажмите Enter');}break;}
  case 'copy':await copySelection();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
  case 'hide-row':visibilityAction('row',false);break;case 'show-rows':visibilityAction('row',true);break;case 'hide-col':visibilityAction('col',false);break;case 'show-cols':visibilityAction('col',true);break;
  case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
+app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))recordColorSelection();},true);
+app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
-app.addEventListener('change',e=>{const t=e.target;if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applyStyle({color:t.value});}else if(t.id==='fill-color'){applyStyle({bg:t.value});}else if(t.id==='formula-input'){transact(()=>setCell(sheet(),activeCell,t.value));drawGrid();}});
+app.addEventListener('change',e=>{const t=e.target;if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='formula-input'){transact(()=>setCell(sheet(),activeCell,t.value));drawGrid();}});
 app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});

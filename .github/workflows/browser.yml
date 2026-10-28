@@ -24,3 +24,5 @@ jobs:
       - run: python tests/structure_browser.py
       - run: python tests/launcher_browser.py
       - run: python tests/templates_headers_browser.py
+      - run: python tests/color_border_browser.py
+      - run: python tests/color_border_xlsx_browser.py

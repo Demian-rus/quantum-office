@@ -167,3 +167,6 @@
 .template-card strong{font-size:15px}.template-card small{font-size:11px;color:#8190a0;line-height:1.5}
 .template-card-arrow,.template-card-muted{font-size:11px;color:#25734d;font-weight:700;margin-top:auto}
 @media(max-width:590px){.launcher-template-actions{grid-template-columns:1fr;gap:7px}.launcher-secondary{flex-wrap:wrap;justify-content:flex-start}}
+
+/* Explicit text wrapping, without changing the compact ribbon height. */
+.grid-cell.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;align-items:flex-start;padding-top:4px;line-height:17px;text-overflow:clip;}

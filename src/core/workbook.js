@@ -76,7 +76,7 @@ export function firstVisibleIndex(positions,coordinate){
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
-export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);sheet.cells[key]={value:prev.value,style:{...prev.style,...patch}};}
+export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);const style={...prev.style,...patch};for(const [name,value] of Object.entries(patch))if(value===undefined)delete style[name];if(!prev.value&&!Object.keys(style).length)delete sheet.cells[key];else sheet.cells[key]={value:prev.value,style};}
 export function validRef(ref){const p=parseCell(String(ref));return !!p&&p.row<LIMITS.rows&&p.col<LIMITS.columns;}
 export function refsBetween(a,b){const p=parseCell(a),q=parseCell(b);if(!p||!q)return [];const refs=[];for(let r=Math.min(p.row,q.row);r<=Math.max(p.row,q.row);r++)for(let c=Math.min(p.col,q.col);c<=Math.max(p.col,q.col);c++)if(r<LIMITS.rows&&c<LIMITS.columns)refs.push(cellName(r,c));return refs;}
 export function rectangle(a,b){const p=parseCell(a),q=parseCell(b);return p&&q?{r1:Math.min(p.row,q.row),r2:Math.max(p.row,q.row),c1:Math.min(p.col,q.col),c2:Math.max(p.col,q.col)}:null;}
@@ -227,9 +227,10 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
    }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format'].includes(k))||
-       ['bold','italic'].some(k=>k in style&&typeof style[k]!=='boolean')||
+    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','wrap'].includes(k))||
+       ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
+       ('border' in style&&!['thin'].includes(style.border))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
        ('format' in style&&!['general','currency','percent','integer'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
