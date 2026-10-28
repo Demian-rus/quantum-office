@@ -77,3 +77,13 @@ See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and 
 ### Quantum Sheets: inserting/deleting rows and columns (TASK 017)
 
 Use **Вставка → Вставить строку / Удалить строку / Вставить столбец / Удалить столбец**. Operations affect one entire row or column at the active cell, carry cell styles and row/column sizes, and rebase supported A1 references (including `$` anchors). Deleting referenced cells produces visible `#REF!`. Undo via Ctrl+Z. For now disable AutoFilter before structural edits; editing is rejected if insertion would truncate the populated final row or column or produce an out-of-bounds formula. Complex XLSX formula semantics remain partial; preserve originals separately.
+
+
+### TASK 018–019 — hide/show, launcher and weekly schedule
+
+- **Вид:** hide selected row or column and show all explicitly hidden rows/columns. No contents deleted. Keyboard navigation skips explicit hidden cells. Supports `.qbook` and the limited XLSX `hidden` attributes. AutoFilter hiding is separate.
+- Main screen: three graphic tiles (Sheets, Writer, Slides) without slogans. Only Sheets is working; other modules are future work. Inline SVG icons are native UI assets, no external network dependencies.
+- Tabs: `+` creates a *new* sheet; a double-click on the tab or the pencil action renames it inline. Renaming never changes its ID or data; empty, duplicate and invalid Excel-style sheet names are rejected.
+- Weekly schedule starter: seven weekday columns, 30-minute slots from 09:00 to 21:00, and a separate blank `Ученики` sheet. This is a starter sheet, **not** a synchronized calendar.
+- Local browser auto-save is **only a draft cache**; explicitly save `.qbook` to disk and export `.qbackup` regularly. Do not trust a local HTML file + browser storage for irreplaceable work. Do not edit complex XLSX without preserving originals.
+- Tests: `npm test`, `npm run build`, `python tests/launcher_browser.py` and existing Chromium XLSX/clipboard/structure/filter smoke.

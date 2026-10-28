@@ -11,7 +11,8 @@ def run():
         errors=[]
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.set_content(Path(__file__).parents[1].joinpath("dist/index.html").read_text(),wait_until="load")
-        assert page.locator('h1').count()==1
+        assert page.locator('.launcher-tile').count()==3
+        assert page.get_by_text('Ваш офис.').count()==0
         page.screenshot(path=str(Path(__file__).parent/'home.png'),full_page=True)
         page.get_by_role('button',name='Открыть демонстрацию').click()
         assert page.locator('.grid-cell[data-ref="A1"]').count()==1
