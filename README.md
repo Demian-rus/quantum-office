@@ -12,7 +12,7 @@ An independent, local-first office suite being developed for Windows and macOS. 
 4. Use **Сохранить файл** to download `.qbook` (or the native save dialog, if supported). Use **⇩** in the header to export a complete `.qbackup` archive.
 5. Re-import via **Открыть / Импорт**.
 
-No account, license server, external script, or network connection is required for the standalone HTML.
+No account, license server, external script, or network connection is required for the standalone HTML. JSZip 3.10.1 is bundled locally under its MIT license (see `src/vendor/JSZIP-LICENSE.md`).
 
 **Important:** browser-local autosave is a convenience, not durable file storage. In private mode, under `file://`, after clearing browser data, or after changing preview origins/URLs, saved drafts may be unavailable. Export `.qbook` and `.qbackup` regularly. The eventual desktop app will have explicit native file operations and an app-data store independent of updates.
 
@@ -29,7 +29,7 @@ No account, license server, external script, or network connection is required f
 - Workspace backup and restore `.qbackup`, local autosave and previous snapshot recovery
 - Small example workbook and automated tests
 
-**Not implemented yet:** XLSX import/export, graphs, advanced formulas, filtering/sorting, large-data performance benchmarks, Excel-format fidelity, macros, native installation and signed updates. Legacy v0.2 prototype files are not automatically migrated; `.qbook` and `.qbackup` formats in this version are new.
+**Not implemented yet:** full XLSX fidelity, graphs, advanced formulas, filtering, advanced sorting with formula relocation, large-data performance benchmarks, Excel-format fidelity, macros, native installation and signed updates. Legacy v0.2 prototype files are not automatically migrated; `.qbook` and `.qbackup` formats in this version are new.
 
 ## Developer commands
 
@@ -47,10 +47,28 @@ The Tauri 2 scaffold in `src-tauri/` is for future desktop builds. Desktop insta
 
 ## GitHub publication
 
-This archive is a local Git project, not a published GitHub repository. A GitHub user with repository-creation rights must create `Demian-rus/quantum-office` once; details in [GITHUB_SETUP.md](GITHUB_SETUP.md). The `.github/workflows/` folder provides automatic CI and a GitHub Pages preview after the repository and Pages have been configured.
+Source code is maintained in [Demian-rus/quantum-office](https://github.com/Demian-rus/quantum-office). Automated CI runs on each pull request. GitHub Pages requires repository Pages source configured for GitHub Actions.
 
 See [ROADMAP.md](ROADMAP.md), [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and [docs/UPDATES.md](docs/UPDATES.md).
 
 ### Sheets: заполнение диапазона
 
 Выделите прямоугольный диапазон через Shift+стрелки или мышью. В «Правка» нажмите «Заполнить вниз» (`Ctrl+D`) или «Заполнить вправо» (`Ctrl+R`). Значения и стили берутся из верхней строки/левого столбца выделения; относительные ссылки в формулах сдвигаются, абсолютные `$A$1` сохраняются. Одно действие — один шаг отмены. При выходе ссылки за границы листа операция отклоняется целиком.
+
+### XLSX compatibility (early, intentionally limited)
+
+- **Open** `.xlsx` workbooks from Excel / LibreOffice, including multiple sheets, compressed XLSX archives, plain and shared strings, numeric cells, simple formulas, and basic cell styling.
+- **Export** a new `.xlsx` with sheets, numbers, text, formulas, bold/italic, colors and basic number formats. It can be opened in Microsoft Excel and LibreOffice.
+- Complex Excel features **are not supported**: charts, pivot tables, embedded media, VBA/macros, conditional formatting, named ranges, external links, rich text, images, merged cells, validation, sheet protection, advanced formulas, complex formatting, date types and shared-formula expansion. Importing then exporting such a file **will lose unsupported content**. Keep the original, use `.qbook` for ongoing editing, and export XLSX as a compatibility copy.
+- The parser rejects malformed ZIP/XML, unsupported shared formula structures, over-limit workbooks and overly large archives instead of importing partial data silently. Maximum 15 MB compressed, 30 MB uncompressed, 25 sheets and 50,000 cells. Imported styles and formulas may render differently than Excel; check the results.
+- Verify with `npm test`, `npm run build`, and `python tests/xlsx_browser.py` (requires Playwright, Chromium and openpyxl).
+
+### Sheets: обновлённая панель, поиск и сортировка
+
+- Группы команд теперь имеют чёткие названия снизу, читаемые подписи, единые размеры и более крупные области нажатия.
+- **Правка → Найти / заменить** (`Ctrl+F`): поиск по значениям и текстам формул на текущем листе; «Заменить все» меняет обычный текст, но не формулы. Замена и сортировка — один шаг отмены (`Ctrl+Z`).
+- **Данные → А → Я / Я → А**: сортировка выделенного прямоугольного диапазона по его первому столбцу, с переносом всего содержимого строк и оформления. Выделение должно включать минимум две строки. Заголовок не определяется автоматически: выделяйте только строки данных, если не хотите его сортировать.
+- Сортировка не применяется к диапазону с формулами, пока не будет реализован корректный пересчёт ссылок при перемещении строк. Она отклоняется *до* изменения книги. Не пытайтесь заменить этим полноценную Excel-сортировку со сложными ссылками.
+- Поиск и сортировка ограничены возможностями MVP и пока не затрагивают другие листы.
+
+Проверки: `npm test`, `python tests/ui_smoke.py`, `python tests/ribbon_browser.py`, `python tests/xlsx_browser.py`.
