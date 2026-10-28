@@ -1,5 +1,5 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,cellName,parseCell} from './workbook.js';
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,cellName,parseCell} from './workbook.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -43,9 +43,9 @@ export async function importXLSX(data,filename='Таблица'){
    }}catch{sheet.autoFilter=null;}}}
   for(const col of elements(element(xml,'cols'),'col')){
    const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
-   if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min||!Number.isFinite(width)||width<=0)continue;
-   const px=Math.round(width*7+5);if(px<48||px>520)continue;
-   for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+   if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min)continue;
+   const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=48&&px<=520)for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+   if(col.getAttribute('hidden')==='1')for(let c=min-1;c<max;c++)setHidden(sheet,'col',c,true);
   }
   for(const row of elements(element(xml,'sheetData'),'row')){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
@@ -62,6 +62,10 @@ export async function importXLSX(data,filename='Таблица'){
    else raw=value;
    if(raw)setCell(sheet,ref,raw);
    const style=fmt[Number(c.getAttribute('s')||0)]||{};if(Object.keys(style).length)setStyle(sheet,ref,style);
+  }
+  for(const row of elements(element(xml,'sheetData'),'row')){
+   const index=Number(row.getAttribute('r'));
+   if(row.getAttribute('hidden')==='1'&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&filterRowVisible(sheet,index-1))setHidden(sheet,'row',index-1,true);
   }
   book.sheets.push(sheet);
  }
@@ -85,13 +89,14 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
+  const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{})]);
+  const cols=[...colIndexes].sort((a,b)=>Number(a)-Number(b)).map(index=>{const pixels=s.columnWidths?.[index];return `<col min="${Number(index)+1}" max="${Number(index)+1}"${pixels?` width="${((pixels-5)/7).toFixed(2)}" customWidth="1"`:''}${s.hiddenColumns?.[index]?' hidden="1"':''}/>`;}).join('');
   const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
-  const hiddenRows=filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[];
+  const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.includes(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}</worksheet>`;
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });

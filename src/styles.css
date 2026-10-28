@@ -109,3 +109,30 @@
    Keyboard focus remains visible for accessibility. */
 .ribbon-tabs button:focus:not(:focus-visible),.tool-btn:focus:not(:focus-visible),
 .module:focus:not(:focus-visible){outline:none;box-shadow:none}
+
+/* Minimal application launcher: no marketing headings, three tools only. */
+.office-launcher{background:#f5f7fa;padding:clamp(22px,4.5vw,56px) clamp(22px,6vw,110px);}
+.launcher-tools{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;}
+.launcher-tile{min-height:220px;padding:24px 21px 21px;border:1px solid #dce4ea;background:white;border-radius:15px;text-align:left;display:flex;flex-direction:column;align-items:flex-start;gap:8px;box-shadow:0 2px 9px #142a3510;transition:transform .12s,border-color .12s,box-shadow .12s;color:#263449;}
+.launcher-tile:hover{transform:translateY(-2px);box-shadow:0 11px 28px #142a3520;border-color:#96bfad;}
+.launcher-tile:focus-visible{outline:3px solid #318d61;outline-offset:3px;}
+.launcher-art{width:72px;height:74px;display:grid;place-items:center;margin-bottom:8px;}
+.launcher-art svg{width:72px;height:72px;}
+.launcher-name{font-weight:760;font-size:21px;letter-spacing:-.02em;}
+.launcher-description{font-size:12px;color:#788698;}
+.launcher-state{font-size:10px;color:#8190a1;margin-top:auto;}
+.launcher-state.available{color:#207a50;}
+.launcher-quick{width:min(1120px,100%);margin:24px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;}
+.launcher-quick-action{background:#fff;display:flex;align-items:center;gap:12px;border:1px solid #e0e7ed;border-radius:9px;padding:13px 15px;text-align:left;color:#33455b;min-width:0;}
+.launcher-quick-action:hover{background:#edf5f0;border-color:#a8cfb8;}
+.launcher-quick-action svg{width:30px;height:30px;flex:none;}.launcher-quick-action .quick-glyph{font-size:24px;line-height:30px;color:#328660;width:30px;text-align:center;}
+.launcher-quick-action span:last-child{display:flex;flex-direction:column;gap:3px;min-width:0;}
+.launcher-quick-action strong{font-size:12px;font-weight:720;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.launcher-quick-action small{font-size:10px;color:#8391a1;}
+.launcher-files{width:min(1120px,100%);margin:38px auto 0;}
+.launcher-files-top{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:#55677c;margin-bottom:13px;}
+.launcher-files-top button{background:none;color:#2b8056;font-size:11px;}
+.launcher-note{width:min(1120px,100%);margin:25px auto;color:#8e9ba9;font-size:10px;}
+.sheet-tab-editor{background:white;color:#174e3a;outline:2px solid #288959;border:0;border-radius:3px;min-width:85px;max-width:170px;width:130px;height:27px;padding:2px 7px;font-size:11px;}
+@media(max-width:850px){.launcher-tools,.launcher-quick{gap:9px;}.launcher-tile{min-height:190px;padding:17px}.launcher-name{font-size:17px}.launcher-quick-action{padding:10px;gap:8px}}
+@media(max-width:590px){.launcher-tools{grid-template-columns:1fr;gap:9px}.launcher-tile{min-height:100px;display:grid;grid-template-columns:60px 1fr;gap:4px 10px;align-items:center}.launcher-art{grid-row:span 3;margin:0;width:60px;height:60px}.launcher-art svg{height:60px;width:60px}.launcher-quick{grid-template-columns:1fr;gap:7px}.launcher-files{margin-top:22px}}

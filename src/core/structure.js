@@ -48,12 +48,20 @@ export function changeSheetStructure(sheet,axis,mode,index){
   if(next>=limit)throw Error('Последняя строка или столбец имеет пользовательский размер');
   shiftedDimensions[next]=v;
  }
+ const hiddenKey=axis==='row'?'hiddenRows':'hiddenColumns';
+ const hidden={};for(const indexText of Object.keys(sheet[hiddenKey]||{})){
+  const old=Number(indexText);
+  if(mode==='delete'&&old===index)continue;
+  const next=mode==='insert'&&old>=index?old+1:mode==='delete'&&old>index?old-1:old;
+  if(next>=limit)throw Error('Последняя строка или столбец скрыта: сначала отобразите её');
+  hidden[next]=true;
+ }
  const freeze={...(sheet.freeze||{rows:0,cols:0})};
  const frozenKey=axis==='row'?'rows':'cols';
  if(mode==='insert'&&index<freeze[frozenKey])freeze[frozenKey]++;
  if(mode==='delete'&&index<freeze[frozenKey])freeze[frozenKey]--;
  if(freeze[frozenKey]>10)throw Error('Нельзя увеличить закреплённую область более 10 строк или столбцов');
  // Existing data and schema remain unchanged if even one step above failed.
- sheet.cells=cells;sheet[key]=shiftedDimensions;sheet.freeze=freeze;
+ sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;
  return {axis,mode,index,changed:Object.keys(cells).length};
 }

@@ -2,7 +2,7 @@ import { cellName,parseCell,colLabel,evaluateCell,csvEncode,csvDecode } from './
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},freeze:{rows:0,cols:0},autoFilter:null};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -15,6 +15,23 @@ export function setColumnWidth(sheet,index,value){
 export function setRowHeight(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
  sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
+}
+/** Explicit visibility is separate from filtering. The data and formulas remain intact. */
+export function rowVisible(sheet,row){return !sheet.hiddenRows?.[row]&&filterRowVisible(sheet,row);}
+export function columnVisible(sheet,col){return !sheet.hiddenColumns?.[col];}
+export function setHidden(sheet,axis,index,hidden){
+ const limit=axis==='row'?LIMITS.rows:axis==='col'?LIMITS.columns:0;
+ if(!limit||!Number.isInteger(index)||index<0||index>=limit||typeof hidden!=='boolean')throw Error('Недопустимая строка или столбец');
+ const key=axis==='row'?'hiddenRows':'hiddenColumns';sheet[key]??={};
+ if(hidden){
+  if(Object.keys(sheet[key]).length>=limit-1&&!sheet[key][index])throw Error('Нельзя скрыть все строки или столбцы');
+  sheet[key][index]=true;
+ }else delete sheet[key][index];
+}
+export function showAllHidden(sheet,axis){
+ const key=axis==='row'?'hiddenRows':axis==='col'?'hiddenColumns':null;
+ if(!key)throw Error('Неизвестная ось');
+ const count=Object.keys(sheet[key]||{}).length;sheet[key]={};return count;
 }
 /** Filters never move or delete source cells. Only row visibility is changed. */
 export function filterRange(sheet){const value=sheet.autoFilter;return value?rectangle(value.from,value.to):null;}
@@ -48,8 +65,8 @@ export function setFilterValue(sheet,col,value){
 }
 export function gridGeometry(sheet){
  const x=[54],y=[31];
- for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+columnWidth(sheet,col));
- for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+(filterRowVisible(sheet,row)?rowHeight(sheet,row):0));
+ for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+(columnVisible(sheet,col)?columnWidth(sheet,col):0));
+ for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+(rowVisible(sheet,row)?rowHeight(sheet,row):0));
  return {x,y};
 }
 export function firstVisibleIndex(positions,coordinate){
@@ -195,7 +212,12 @@ export function validateWorkbook(book){
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
    for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||!Number.isInteger(value)||value<sizeMin||value>sizeMax)throw Error('Некорректный размер строки или столбца');
   }
-if(sheet.freeze!==undefined){
+for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.columns]]){
+    const map=sheet?.[key];if(map===undefined)continue;
+    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>=max)throw Error('Повреждена видимость строк или столбцов');
+    for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||value!==true)throw Error('Повреждён скрытый индекс');
+   }
+   if(sheet.freeze!==undefined){
     const f=sheet.freeze;if(!f||!Number.isInteger(f.rows)||!Number.isInteger(f.cols)||f.rows<0||f.cols<0||f.rows>10||f.cols>10)throw Error('Повреждено закрепление областей');
    }
    if(sheet.autoFilter!==undefined&&sheet.autoFilter!==null){
@@ -256,3 +278,16 @@ export function planAutoSum(sheet,from,to){
 }
 
 export {cellName,parseCell};
+
+/** Starter weekly timetable; no external personal data. */
+export function createScheduleTemplate(){
+ const book=newWorkbook('Расписание занятий'),s=currentSheet(book);s.name='Неделя';
+ const days=['Время','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'];
+ days.forEach((name,col)=>{const ref=cellName(0,col);setCell(s,ref,name);setStyle(s,ref,{bold:true,bg:'#dbeee4',color:'#15583a',align:'center'});});
+ for(let slot=0;slot<=24;slot++){const minutes=9*60+slot*30;const ref=cellName(slot+1,0);setCell(s,ref,`${String(Math.floor(minutes/60)).padStart(2,'0')}:${String(minutes%60).padStart(2,'0')}`);setStyle(s,ref,{bold:true,bg:'#f0f5fa',color:'#526275',align:'center'});}
+ setColumnWidth(s,0,88);for(let c=1;c<8;c++)setColumnWidth(s,c,166);
+ for(let row=0;row<=25;row++)setRowHeight(s,row,row===0?36:30);
+ setFreeze(s,1,1);
+ const info=newSheet('Ученики');['Ученик','Предмет','Контакт','Заметки'].forEach((name,col)=>{const ref=cellName(0,col);setCell(info,ref,name);setStyle(info,ref,{bold:true,bg:'#dbeee4',color:'#15583a'});setColumnWidth(info,col,col===3?270:185);});
+ book.sheets.push(info);return validateWorkbook(book);
+}

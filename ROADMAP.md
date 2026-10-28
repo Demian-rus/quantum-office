@@ -84,3 +84,12 @@ One issue → one measurable change → tests and independent evidence. Do not d
 - [x] Atomic out-of-bounds checks, cell/dimension shifts, local A1 formula rebasing, undo and browser tests.
 - [ ] Add multi-row/column operations, Excel range-aware AST and cross-sheet reference tracking.
 - [ ] Add structured tables, merged-cell coordination, and advanced XLSX fidelity before claiming parity.
+
+
+#### TASK 018–019 — visibility and first-run UX
+
+- [x] Explicit hide/show rows and columns without deleting data; preserve separate AutoFilter rules.
+- [x] Compact launcher: three cards with editable SVG icons, no marketing headlines.
+- [x] Clarify new sheet versus rename; double-click inline sheet-name editor.
+- [x] First editable template: weekly lesson schedule + pupils sheet.
+- [ ] Native durable file saving, robust crash recovery, advanced Excel schedule templates, date-aware weekly recurring sessions, printing and reminders.
