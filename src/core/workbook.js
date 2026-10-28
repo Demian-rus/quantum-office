@@ -67,6 +67,67 @@ export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!va
  for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)setCell(sheet,cellName(at.row+r,at.col+c),rows[r][c]);
  return {rows:maxR,cols:maxC,end:cellName(at.row+maxR-1,at.col+maxC-1)};
 }
+/** Sorts whole selected rows, keeping each cell style with its value. Formula cells are
+ * rejected until reference-rewriting semantics for row moves are implemented. */
+export function sortSelectedRows(sheet,start,end,direction='asc'){
+ const rect=rectangle(start,end);
+ if(!rect||rect.r1===rect.r2)throw Error('Выделите минимум две строки');
+ const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
+ if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
+ if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
+ const rows=[];
+ for(let r=rect.r1;r<=rect.r2;r++){
+  const cells=[];
+  for(let c=rect.c1;c<=rect.c2;c++){
+   const cell=getCell(sheet,cellName(r,c));
+   if(cell.value.startsWith('='))throw Error('Сортировка диапазона с формулами пока не поддерживается');
+   cells.push(structuredClone(cell));
+  }
+  rows.push(cells);
+ }
+ const collator=new Intl.Collator('ru-RU',{numeric:true,sensitivity:'base'});
+ const sorted=rows.map((row,index)=>({row,index})).sort((a,b)=>{
+  const av=a.row[0].value.trim(),bv=b.row[0].value.trim();
+  if(!av||!bv)return av? -1:bv? 1:a.index-b.index;
+  const an=Number(av.replace(',','.')),bn=Number(bv.replace(',','.'));
+  const result=Number.isFinite(an)&&Number.isFinite(bn)?Math.sign(an-bn):collator.compare(av,bv);
+  return (direction==='desc'?-result:result)||a.index-b.index;
+ });
+ for(let i=0;i<sorted.length;i++)for(let j=0;j<sorted[i].row.length;j++){
+  const ref=cellName(rect.r1+i,rect.c1+j),cell=sorted[i].row[j];
+  if(cell.value||Object.keys(cell.style).length)sheet.cells[ref]=cell;
+  else delete sheet.cells[ref];
+ }
+ return sorted.length;
+}
+
+/** Finds text in input values and formulas. Returns addresses in row-major order. */
+export function findCells(sheet,query){
+ const text=String(query??'').trim();if(!text)return [];
+ const needle=text.toLocaleLowerCase('ru-RU');
+ return Object.keys(sheet.cells).filter(ref=>validRef(ref)&&
+   getCell(sheet,ref).value.toLocaleLowerCase('ru-RU').includes(needle))
+  .sort((a,b)=>{const x=parseCell(a),y=parseCell(b);return x.row-y.row||x.col-y.col;});
+}
+
+/** Replaces literal text without executing input as a regular expression.
+ * Formulas are left unchanged; model mutations are bounded and all-or-nothing. */
+export function replaceAllText(sheet,search,replacement){
+ const needle=String(search??'');const value=String(replacement??'');
+ if(!needle)throw Error('Введите текст для поиска');
+ if(needle.length>1000||value.length>10000)throw Error('Слишком длинный текст');
+ const matches=[];const escaped=needle.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ const re=new RegExp(escaped,'giu');
+ for(const [ref,cell] of Object.entries(sheet.cells)){
+  if(!validRef(ref)||cell.value.startsWith('='))continue;
+  const next=cell.value.replace(re,()=>value);
+  if(next!==cell.value){if(next.length>50000)throw Error('Результат превышает лимит ячейки');matches.push([ref,next]);}
+ }
+ if(matches.length>10000)throw Error('Слишком много совпадений');
+ for(const [ref,next] of matches)setCell(sheet,ref,next);
+ return matches.length;
+}
+
 export function importCSV(text,name='Импорт CSV'){
  const grid=csvDecode(String(text).replace(/^\uFEFF/,''));const book=newWorkbook(name);const sheet=currentSheet(book);if(grid.length>LIMITS.rows)throw Error('Слишком много строк');
  for(let r=0;r<grid.length;r++){if(grid[r].length>LIMITS.columns)throw Error('Слишком много столбцов');for(let c=0;c<grid[r].length;c++){if(grid[r][c])setCell(sheet,cellName(r,c),grid[r][c]);}}
