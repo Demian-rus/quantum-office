@@ -18,3 +18,4 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: python tests/ui_smoke.py
       - run: python tests/xlsx_browser.py
+      - run: python tests/ribbon_browser.py
