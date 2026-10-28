@@ -1,4 +1,6 @@
 import { validateWorkbook } from './workbook.js';
+export const STORE_KEY='quantum-office.workspace.v3';
+export const PREVIOUS_KEY='quantum-office.workspace.v3.previous';
 const blank=()=>({version:3,books:[],active:null});
 export function validateWorkspace(data){if(!data||data.version!==3||!Array.isArray(data.books)||data.books.length>300)throw Error('Некорректный архив Quantum Office');const seen=new Set();for(const book of data.books){validateWorkbook(book);if(seen.has(book.id))throw Error('Повторяющийся документ');seen.add(book.id);}return data;}
 export function loadWorkspace(storage=globalThis.localStorage){for(const key of [STORE_KEY,PREVIOUS_KEY]){try{const raw=storage.getItem(key);if(raw)return validateWorkspace(JSON.parse(raw));}catch{continue;}}return blank();}
