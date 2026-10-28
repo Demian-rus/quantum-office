@@ -1,6 +1,6 @@
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 import '../vendor/jszip.min.js';
-import { newWorkbook,newSheet,setCell,setStyle,validateWorkbook,LIMITS } from './workbook.js';
+import { newWorkbook,newSheet,setCell,setStyle,validateWorkbook,LIMITS,setColumnWidth,setRowHeight } from './workbook.js';
 const JSZip = globalThis.JSZip;
 const encoder=new TextEncoder();
 const xmlEscape=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
@@ -18,7 +18,7 @@ function zipPath(target){const path=String(target||'').replace(/^\//,'').replace
 function required(zip,path){const file=zip.file(path);if(!file)throw Error('В XLSX отсутствует '+path);return file;}
 async function readXML(zip,path){const f=required(zip,path);if((f._data?.uncompressedSize||0)>10_000_000)throw Error('Слишком большой XML внутри XLSX');return parseXML(await f.async('string'));}
 /** Reading supports shared and inline strings, numeric values and formulas. Unsupported parts are deliberately not retained. */
-export async function importXLSX(data,filename='Таблица'){
+async function importXLSX(data,filename='Таблица'){
  if((data?.byteLength??data?.size??0)>15_000_000)throw Error('XLSX больше 15 МБ не поддерживается');
  const zip=await JSZip.loadAsync(data,{checkCRC32:true,createFolders:false});
  const all=Object.values(zip.files).filter(f=>!f.dir);if(all.length>500||all.reduce((n,f)=>n+(f._data?.uncompressedSize||0),0)>30_000_000)throw Error('Слишком большой или подозрительный XLSX');
@@ -30,6 +30,16 @@ export async function importXLSX(data,filename='Таблица'){
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
+  for(const col of elements(element(xml,'cols'),'col')){
+   const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
+   if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min||!Number.isFinite(width)||width<=0)continue;
+   const px=Math.round(width*7+5);if(px<48||px>520)continue;
+   for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+  }
+  for(const row of elements(element(xml,'sheetData'),'row')){
+   const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
+   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
+  }
   for(const row of elements(element(xml,'sheetData'),'row'))for(const c of elements(row,'c')){const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
    if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
    const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
@@ -53,7 +63,7 @@ function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,nu
  return {fi,fillId,format:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align};});
  let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="11"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills><borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="0" xfId="0"${c.align?' applyAlignment="1"':''}>${c.align?`<alignment horizontal="${c.align}"/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
 }
-export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZip();const styles=styleCatalog(book);
+async function exportXLSX(book){validateWorkbook(book);const zip=new JSZip();const styles=styleCatalog(book);
  const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
@@ -64,7 +74,9 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}"><sheetData>${Array.from(byRows).sort((a,b)=>a[0]-b[0]).map(([r,cc])=>`<row r="${r}">${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`).join('')}</sheetData></worksheet>`;
+  const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
+  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1)]);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData></worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
