@@ -80,3 +80,12 @@ Tooltips and accessible names remain available for icon-only actions. The toolba
 New commands: **AutoSum** (sum a contiguous range above a blank cell, or selected columns in the next empty row; Alt+=), and **Clear formatting** without deleting values/formulas. Occupied sum targets are rejected atomically.
 
 Run `python tests/compact_browser.py` for pixel bounds, operation behavior, undo, and navigation checks.
+
+### Sheets: размеры строк и столбцов
+
+- Потяните границу заголовка столбца/строки, чтобы изменить размер прямо в таблице. Двойной щелчок по границе столбца запускает автоподбор ширины, по границе строки — возврат стандартной высоты.
+- Во вкладке **Вид** доступны компактные команды **Ширина столбца**, **Автоподбор ширины**, **Высота строки** и **Стандартная высота**. Размеры ограничены безопасными диапазонами (48–520 и 22–160 пикселей).
+- Размеры хранятся отдельно для каждого листа, сохраняются в .qbook/.qbackup и экспортируются в XLSX (колонки `<cols>`, строки `ht`). Открытие XLSX с пользовательскими размерами поддерживает эти поля при попадании в указанные пределы.
+- Перетаскивание размера — один шаг Ctrl+Z. Сетка использует реальные размеры при прокрутке, позиционировании и редактировании, а не просто изменение CSS.
+- Пока не реализованы скрытые строки/столбцы и закрепление областей; импорт файлов с такими возможностями остаётся частичным.
+- Проверки: `npm test`, `npm run build`, `python tests/dimensions_browser.py`.
