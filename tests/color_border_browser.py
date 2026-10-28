@@ -20,11 +20,15 @@ with sync_playwright() as p:
  select('C3')
  page.locator('#fill-color').evaluate("e=>{e.value='#ffcc00';e.dispatchEvent(new Event('change',{bubbles:true}));}")
  assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.backgroundColor')=='rgb(255, 204, 0)'
+ assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(255, 204, 0)' # still visible while selected/after focus changes
  assert page.locator('.grid-cell[data-ref="C3"]').evaluate('e=>e.style.backgroundColor')!='rgb(255, 204, 0)'
  # Fresh choice on active cell applies to the selected cell, without next click.
  select('B2');page.locator('#text-color').dispatch_event('pointerdown',{'button':0})
  page.locator('#text-color').evaluate("e=>{e.value='#e02030';e.dispatchEvent(new Event('change',{bubbles:true}));}")
  assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.color')=='rgb(224, 32, 48)'
+ # Selected cells must display their own fill immediately, not wait for the next click.
+ select('B2')
+ assert page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>getComputedStyle(e).backgroundColor')=='rgb(255, 204, 0)'
  page.get_by_role('button',name='Все границы').click()
  assert 'inset' in page.locator('.grid-cell[data-ref="B2"]').evaluate('e=>e.style.boxShadow')
  page.get_by_role('button',name='Перенос текста').click()
