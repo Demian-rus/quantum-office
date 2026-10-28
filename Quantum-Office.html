@@ -492,6 +492,7 @@ function fillSelection(sheet, from, to, direction){
  if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
  const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(total>10000)throw Error('Выделено больше 10 000 ячеек');
+ if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Заполнение объединённых ячеек пока не поддерживается');
  const changes=[];
  for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
    if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
@@ -536,6 +537,7 @@ function sortSelectedRows(sheet,start,end,direction='asc'){
  const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
  if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
+ if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
  const rows=[];
  for(let r=rect.r1;r<=rect.r2;r++){
   const cells=[];
@@ -745,10 +747,18 @@ function createBudgetTemplate(){
  * Preserve raw formulas and cell styles without using eval or a web service. */
 
 function copyCells(sheet,start,end){
- const rect=rectangle(start,end);if(!rect)throw Error('Недопустимый диапазон');
+ let rect=rectangle(start,end);if(!rect||!validRef(start)||!validRef(end))throw Error('Недопустимый диапазон');
+ if(start===end){const merged=mergeAt(sheet,start);if(merged)rect=rectangle(merged.from,merged.to);}
  const rows=rect.r2-rect.r1+1,cols=rect.c2-rect.c1+1;
  if(rows*cols>20000)throw Error('Копирование ограничено 20 000 ячейками');
- return {start:cellName(rect.r1,rect.c1),rows,cols,text:valuesTSV(sheet,start,end),
+ const merges=[];
+ for(const merge of sheet.merges||[]){
+  const m=rectangle(merge.from,merge.to);
+  if(m.r1>rect.r2||m.r2<rect.r1||m.c1>rect.c2||m.c2<rect.c1)continue;
+  if(m.r1<rect.r1||m.r2>rect.r2||m.c1<rect.c1||m.c2>rect.c2)throw Error('Объединённая ячейка попала в выделение частично. Выделите её целиком');
+  merges.push({r1:m.r1-rect.r1,c1:m.c1-rect.c1,r2:m.r2-rect.r1,c2:m.c2-rect.c1});
+ }
+ return {start:cellName(rect.r1,rect.c1),rows,cols,text:valuesTSV(sheet,cellName(rect.r1,rect.c1),cellName(rect.r2,rect.c2)),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
    return {value:item.value,style:structuredClone(item.style||{})};
@@ -757,20 +767,39 @@ function copyCells(sheet,start,end){
 
 function pasteCells(sheet,target,clip){
  const at=parseCell(target),from=parseCell(clip?.start);
- if(!at||!from||!Number.isInteger(clip.rows)||!Number.isInteger(clip.cols)||!Array.isArray(clip.cells))throw Error('Повреждённые данные буфера');
+ if(!at||!from||!validRef(target)||!Number.isInteger(clip.rows)||!Number.isInteger(clip.cols)||!Array.isArray(clip.cells))throw Error('Повреждённые данные буфера');
  if(clip.rows<1||clip.cols<1||clip.rows*clip.cols>20000)throw Error('Слишком большой диапазон');
  if(at.row+clip.rows>LIMITS.rows||at.col+clip.cols>LIMITS.columns)throw Error('Вставка выходит за пределы листа');
+ const t={r1:at.row,c1:at.col,r2:at.row+clip.rows-1,c2:at.col+clip.cols-1};
+ for(const m of sheet.merges||[]){
+  const x=rectangle(m.from,m.to);
+  if(t.r1<=x.r2&&t.r2>=x.r1&&t.c1<=x.c2&&t.c2>=x.c1)throw Error('Вставка поверх объединённой ячейки запрещена. Сначала разъедините ячейки назначения');
+ }
+ const merges=clip.merges??[];
+ if(!Array.isArray(merges)||merges.length>500)throw Error('Повреждённые данные объединений');
+ const seen=new Set();
+ for(const m of merges){
+  if(!m||![m.r1,m.c1,m.r2,m.c2].every(Number.isInteger)||m.r1<0||m.c1<0||m.r2>=clip.rows||m.c2>=clip.cols||m.r1>m.r2||m.c1>m.c2||(m.r1===m.r2&&m.c1===m.c2))throw Error('Повреждённые данные объединений');
+  for(let r=m.r1;r<=m.r2;r++)for(let c=m.c1;c<=m.c2;c++){const k=r+':'+c;if(seen.has(k))throw Error('Пересекающиеся объединения в буфере');seen.add(k);}
+ }
  const changes=[];
  for(let r=0;r<clip.rows;r++){
   if(!Array.isArray(clip.cells[r])||clip.cells[r].length!==clip.cols)throw Error('Повреждённые данные буфера');
   for(let c=0;c<clip.cols;c++){
-   const item=clip.cells[r][c];if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
-   const destination=cellName(at.row+r,at.col+c);if(mergeAt(sheet,destination))throw Error('Вставка в объединённый диапазон пока не поддерживается');
+   const item=clip.cells[r][c];
+   if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
    const value=translateFormula(item.value,at.row-from.row,at.col-from.col);
    changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style)}]);
   }
  }
- for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)sheet.cells[ref]=item;else delete sheet.cells[ref];}
+ if(merges.length){
+  const trial=structuredClone(sheet);
+  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)trial.cells[ref]=item;else delete trial.cells[ref];}
+  for(const m of merges)mergeCells(trial,cellName(at.row+m.r1,at.col+m.c1),cellName(at.row+m.r2,at.col+m.c2));
+  sheet.cells=trial.cells;sheet.merges=trial.merges;
+ }else{
+  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)sheet.cells[ref]=item;else delete sheet.cells[ref];}
+ }
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
 }
 
@@ -1023,6 +1052,15 @@ function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:act
  if(dr){while(r>=0&&r<LIMITS.rows&&!rowVisible(sheet(),r))r+=Math.sign(dr);r=Math.min(Math.max(r,0),LIMITS.rows-1);}
  if(dc){while(c>=0&&c<LIMITS.columns&&!columnVisible(sheet(),c))c+=Math.sign(dc);c=Math.min(Math.max(c,0),LIMITS.columns-1);}
  if(!rowVisible(sheet(),r)||!columnVisible(sheet(),c))return;
+ const sourceMerge=mergeAt(sheet(),activeCell);
+ if(!extend&&sourceMerge){const bounds=rectangle(sourceMerge.from,sourceMerge.to),next=cellName(r,c);
+  if(mergeAt(sheet(),next)===sourceMerge){
+   if(dr>0)r=Math.min(LIMITS.rows-1,bounds.r2+1);
+   else if(dr<0)r=Math.max(0,bounds.r1-1);
+   else if(dc>0)c=Math.min(LIMITS.columns-1,bounds.c2+1);
+   else if(dc<0)c=Math.max(0,bounds.c1-1);
+  }
+ }
  const target=cellName(r,c);setSelection(extend?activeCell:target,target);ensureVisible(r,c);}
 function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if(!view||!sheet())return;const {x,y}=gridGeometry(sheet()),left=x[c],top=y[r],width=x[c+1]-left,height=y[r+1]-top;
  if(c>=(sheet().freeze?.cols||0)&&left<view.scrollLeft+x[sheet().freeze?.cols||0])view.scrollLeft=Math.max(0,left-x[sheet().freeze?.cols||0]);
@@ -1427,7 +1465,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t
  if(e.altKey&&(e.key==='='||e.code==='Equal')){e.preventDefault();autoSum();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='c'||e.code==='KeyC')){e.preventDefault();copySelection();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='v'||e.code==='KeyV')&&internalClipboard){e.preventDefault();pasteIntoCells(null,internalClipboard);return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();copySelection().then(ok=>{if(ok)clearSelected();});return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();const clip=captureSelection();if(clip?.merges?.length){status('Перемещение объединённых ячеек через Ctrl+X пока не поддерживается. Используйте копирование',true);return;}if(clip)copySelection().then(ok=>{if(ok)clearSelected();});return;}
  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();clearSelected();return;}
  if(e.key==='F2'){e.preventDefault();editCell();return;}
  const steps={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],Tab:[0,e.shiftKey?-1:1],Enter:[e.shiftKey?-1:1,0]};

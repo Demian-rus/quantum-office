@@ -138,6 +138,7 @@ export function fillSelection(sheet, from, to, direction){
  if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
  const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(total>10000)throw Error('Выделено больше 10 000 ячеек');
+ if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Заполнение объединённых ячеек пока не поддерживается');
  const changes=[];
  for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
    if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
@@ -182,6 +183,7 @@ export function sortSelectedRows(sheet,start,end,direction='asc'){
  const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
  if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
+ if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
  const rows=[];
  for(let r=rect.r1;r<=rect.r2;r++){
   const cells=[];

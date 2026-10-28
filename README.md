@@ -112,3 +112,8 @@ Use **Вставка → Вставить строку / Удалить стро
 - **Home → Merge / Unmerge:** true merged cells preserved in `.qbook`, and OOXML `mergeCells` is exported/imported in `.xlsx` within alpha limits. Merging refuses non-empty subordinate cells, overlapping regions, and ranges crossing frozen panes or containing hidden rows/columns. Unmerge does not destroy data.
 - **Limitations:** merge-aware fill/copy/paste and structural row/column edits are not yet supported. Clipboard paste into a merged area is blocked. Complex Excel merges, thick/dashed styles, rich-text runs and advanced formatting are not lossless. Preserve original XLSX and save a `.qbook` backup.
 - Regression commands: `npm test`, `npm run build`, `python tests/formatting21_browser.py`, `python tests/merge_xlsx_browser.py` plus older smoke scenarios. Desktop installers are still unverified.
+
+### TASK 022 — merged-cell copy and paste
+- Ctrl+C on a merged anchor captures its entire rectangle, including relative formulas, styles and merge geometry. Ctrl+V pastes to an unmerged area and Ctrl+Z reverts the paste.
+- Partial merges and overlapping destinations are rejected without altering the workbook. Cutting, sorting and autofill of merged ranges remain unsupported to protect data.
+- Tests: `node --test tests/merged_clipboard.test.js`, `python tests/merged_clipboard_browser.py`.

@@ -28,3 +28,4 @@ jobs:
       - run: python tests/color_border_xlsx_browser.py
       - run: python tests/formatting21_browser.py
       - run: python tests/merge_xlsx_browser.py
+      - run: python tests/merged_clipboard_browser.py

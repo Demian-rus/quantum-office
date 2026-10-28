@@ -104,3 +104,10 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - Distinct compact SVG icons for color, merged ranges, border options and common navigation/visibility tools, without external fonts or network dependencies. Dialogs stay above fixed grid headers.
 - User data policy remains: browser preview is not durable desktop storage; export `.qbook` and a separate backup for real work; XLSX complex features remain only partially supported.
 - Acceptance: Node tests for overlap/data preservation/borders; Chromium dialog interactions, merge/unmerge and undo; XLSX roundtrip with `openpyxl`; all existing browser regressions; never claim full Excel equivalence.
+
+## TASK 022 — safe merged clipboard
+- Copying a single merged anchor copies the complete merged range. Multiple fully contained merges copy with their geometry; partial intersections refuse.
+- Paste into free area preserves formulas/styles and new merges in a single undoable action. Collision, bounds, formula and freeze incompatibility are prevalidated before mutation.
+- Keyboard navigation skips the covered cells of the currently selected merge.
+- Ctrl+X, sort and fill on merged ranges remain blocked; insert/delete with merges remains blocked by the earlier safety policy.
+- Run 66 Node tests and merged clipboard Chromium scenario. Do not claim browser localStorage is durable file storage.
