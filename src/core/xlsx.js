@@ -1,22 +1,24 @@
-/** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 import '../vendor/jszip.min.js';
-import { newWorkbook,newSheet,setCell,setStyle,validateWorkbook,LIMITS,setColumnWidth,setRowHeight } from './workbook.js';
-const JSZip = globalThis.JSZip;
-const encoder=new TextEncoder();
-const xmlEscape=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
-const element=(parent,tag)=>Array.from(parent?.children||[]).find(n=>n.localName===tag)||null;
-const elements=(parent,tag)=>Array.from(parent?.children||[]).filter(n=>n.localName===tag);
-const text=(node,tag)=>element(node,tag)?.textContent||'';
-function parseXML(xml){if(typeof DOMParser==='undefined')throw Error('Для чтения XLSX требуется браузер с XML-парсером');const doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.getElementsByTagName('parsererror').length)throw Error('Некорректный XML в XLSX');return doc.documentElement;}
-function rgba(xml){const v=xml?.getAttribute('rgb');return v&&/^(?:[0-9A-F]{2})?[0-9A-F]{6}$/i.test(v)?'#'+v.slice(-6).toLowerCase():undefined;}
-function stylesFromXML(root){if(!root)return [{}];const fonts=elements(element(root,'fonts'),'font').map(node=>({bold:!!element(node,'b'),italic:!!element(node,'i'),color:rgba(element(node,'color'))}));const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?rgba(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(bg)style.bg=bg;if(['left','right','center'].includes(align))style.align=align;if([9,10].includes(id)||/%/.test(fmt))style.format='percent';else if([5,6,7,8,44].includes(id)||/[₽€$£]/.test(fmt))style.format='currency';else if([1,3].includes(id)||fmt==='0')style.format='integer';return style;});}
-function safeName(name){return String(name||'Лист').replace(/[\\/\[\]*?:]/g,'_').slice(0,31)||'Лист';}
-const base='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
-const relNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships';
-function zipPath(target){const path=String(target||'').replace(/^\//,'').replace(/^xl\//,'');const pieces=path.split('/');if(!path||pieces.some(p=>p==='..'||p==='.'||!p))throw Error('Небезопасный путь в XLSX');return 'xl/'+path;}
-function required(zip,path){const file=zip.file(path);if(!file)throw Error('В XLSX отсутствует '+path);return file;}
-async function readXML(zip,path){const f=required(zip,path);if((f._data?.uncompressedSize||0)>10_000_000)throw Error('Слишком большой XML внутри XLSX');return parseXML(await f.async('string'));}
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,cellName,parseCell} from './workbook.js';
+/** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
+
+
+export const JSZip = globalThis.JSZip;
+export const encoder=new TextEncoder();
+export const xmlEscape=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+export const element=(parent,tag)=>Array.from(parent?.children||[]).find(n=>n.localName===tag)||null;
+export const elements=(parent,tag)=>Array.from(parent?.children||[]).filter(n=>n.localName===tag);
+export const text=(node,tag)=>element(node,tag)?.textContent||'';
+export function parseXML(xml){if(typeof DOMParser==='undefined')throw Error('Для чтения XLSX требуется браузер с XML-парсером');const doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.getElementsByTagName('parsererror').length)throw Error('Некорректный XML в XLSX');return doc.documentElement;}
+export function rgba(xml){const v=xml?.getAttribute('rgb');return v&&/^(?:[0-9A-F]{2})?[0-9A-F]{6}$/i.test(v)?'#'+v.slice(-6).toLowerCase():undefined;}
+export function stylesFromXML(root){if(!root)return [{}];const fonts=elements(element(root,'fonts'),'font').map(node=>({bold:!!element(node,'b'),italic:!!element(node,'i'),color:rgba(element(node,'color'))}));const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?rgba(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(bg)style.bg=bg;if(['left','right','center'].includes(align))style.align=align;if([9,10].includes(id)||/%/.test(fmt))style.format='percent';else if([5,6,7,8,44].includes(id)||/[₽€$£]/.test(fmt))style.format='currency';else if([1,3].includes(id)||fmt==='0')style.format='integer';return style;});}
+export function safeName(name){return String(name||'Лист').replace(/[\\/\[\]*?:]/g,'_').slice(0,31)||'Лист';}
+export const base='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+export const relNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+export const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships';
+export function zipPath(target){const path=String(target||'').replace(/^\//,'').replace(/^xl\//,'');const pieces=path.split('/');if(!path||pieces.some(p=>p==='..'||p==='.'||!p))throw Error('Небезопасный путь в XLSX');return 'xl/'+path;}
+export function required(zip,path){const file=zip.file(path);if(!file)throw Error('В XLSX отсутствует '+path);return file;}
+export async function readXML(zip,path){const f=required(zip,path);if((f._data?.uncompressedSize||0)>10_000_000)throw Error('Слишком большой XML внутри XLSX');return parseXML(await f.async('string'));}
 /** Reading supports shared and inline strings, numeric values and formulas. Unsupported parts are deliberately not retained. */
 export async function importXLSX(data,filename='Таблица'){
  if((data?.byteLength??data?.size??0)>15_000_000)throw Error('XLSX больше 15 МБ не поддерживается');
@@ -30,6 +32,15 @@ export async function importXLSX(data,filename='Таблица'){
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
+   const pane=element(element(xml,'sheetViews')?.getElementsByTagNameNS('*','sheetView')?.[0]||null,'pane');
+   if(pane?.getAttribute('state')==='frozen'){
+    const rows=Number(pane.getAttribute('ySplit')||0),cols=Number(pane.getAttribute('xSplit')||0);
+    if(Number.isInteger(rows)&&Number.isInteger(cols)&&rows<=10&&cols<=10&&rows>=0&&cols>=0)setFreeze(sheet,rows,cols);
+   }
+   const auto=element(xml,'autoFilter');if(auto){const range=auto.getAttribute('ref')?.split(':');if(range?.length===2){try{setAutoFilter(sheet,range[0],range[1]);const rect=filterRange(sheet);for(const col of elements(auto,'filterColumn')){
+    const index=rect.c1+Number(col.getAttribute('colId'));
+    const opts=elements(element(col,'filters'),'filter');if(opts.length===1)setFilterValue(sheet,index,opts[0].getAttribute('val')||'');
+   }}catch{sheet.autoFilter=null;}}}
   for(const col of elements(element(xml,'cols'),'col')){
    const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
    if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min||!Number.isFinite(width)||width<=0)continue;
@@ -56,8 +67,8 @@ export async function importXLSX(data,filename='Таблица'){
  }
  book.activeSheetId=book.sheets[0].id;return validateWorkbook(book);
 }
-function styleCatalog(book){const unique=[{}],lookup=new Map([['{}',0]]);for(const sheet of book.sheets)for(const c of Object.values(sheet.cells)){const s=c.style||{},key=JSON.stringify(Object.keys(s).sort().reduce((x,k)=>(x[k]=s[k],x),{}));if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}}return {unique,lookup,getId:s=>lookup.get(JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{})))||0};}
-function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map();const cells=styles.unique.map(s=>{
+export function styleCatalog(book){const unique=[{}],lookup=new Map([['{}',0]]);for(const sheet of book.sheets)for(const c of Object.values(sheet.cells)){const s=c.style||{},key=JSON.stringify(Object.keys(s).sort().reduce((x,k)=>(x[k]=s[k],x),{}));if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}}return {unique,lookup,getId:s=>lookup.get(JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{})))||0};}
+export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map();const cells=styles.unique.map(s=>{
  const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
  let fillId=0;if(s.bg){if(!fillIds.has(s.bg)){fillIds.set(s.bg,fills.length);fills.push(s.bg);}fillId=fillIds.get(s.bg);}
  return {fi,fillId,format:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align};});
@@ -75,8 +86,12 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
    if(tag)byRows.get(row).push([ref,tag]);
   }
   const cols=Object.entries(s.columnWidths||{}).sort((a,b)=>Number(a[0])-Number(b[0])).map(([index,pixels])=>`<col min="${Number(index)+1}" max="${Number(index)+1}" width="${((pixels-5)/7).toFixed(2)}" customWidth="1"/>`).join('');
-  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1)]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData></worksheet>`;
+  const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
+  const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
+  const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters><filter val="${xmlEscape(val)}"/></filters></filterColumn>`).join('')}</autoFilter>`:'';
+  const hiddenRows=filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[];
+  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...hiddenRows]);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.includes(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
