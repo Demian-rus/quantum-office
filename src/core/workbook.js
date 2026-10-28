@@ -21,7 +21,10 @@ export function filterRange(sheet){const value=sheet.autoFilter;return value?rec
 export function filterRowVisible(sheet,row){
  const rect=filterRange(sheet),rules=sheet.autoFilter?.rules||{};
  if(!rect||row<=rect.r1||row>rect.r2)return true;
- return Object.entries(rules).every(([col,needle])=>getCell(sheet,cellName(row,Number(col))).value===needle);
+ return Object.entries(rules).every(([col,needles])=>{
+   const value=getCell(sheet,cellName(row,Number(col))).value;
+   return Array.isArray(needles)?needles.includes(value):value===needles;
+  });
 }
 export function setFreeze(sheet,rows,cols){
  if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<0||rows>10||cols<0||cols>10)throw Error('Закрепить можно не более 10 строк и столбцов');
@@ -35,7 +38,10 @@ export function setAutoFilter(sheet,from,to){
 export function setFilterValue(sheet,col,value){
  const rect=filterRange(sheet);
  if(!rect||!Number.isInteger(col)||col<rect.c1||col>rect.c2)throw Error('Столбец не входит в фильтр');
- if(value!==null&&(typeof value!=='string'||value.length>50000))throw Error('Недопустимое значение фильтра');
+ if(value!==null){
+   const validString=v=>typeof v==='string'&&v.length<=50000;
+   if(!(validString(value)||(Array.isArray(value)&&value.length>0&&value.length<=200&&value.every(validString)&&new Set(value).size===value.length)))throw Error('Недопустимое значение фильтра');
+  }
  const rules={...(sheet.autoFilter.rules||{})};
  if(value===null)delete rules[col];else rules[col]=value;
  sheet.autoFilter={...sheet.autoFilter,rules};
@@ -195,7 +201,7 @@ if(sheet.freeze!==undefined){
    if(sheet.autoFilter!==undefined&&sheet.autoFilter!==null){
     const f=sheet.autoFilter,rect=rectangle(f?.from,f?.to);
     if(!f||!rect||!validRef(f.from)||!validRef(f.to)||rect.r2<=rect.r1||!f.rules||typeof f.rules!=='object'||Array.isArray(f.rules))throw Error('Повреждён автофильтр');
-    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||typeof val!=='string'||val.length>50000))throw Error('Некорректные условия фильтра');
+    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!(typeof val==='string'&&val.length<=50000||Array.isArray(val)&&val.length>0&&val.length<=200&&val.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(val).size===val.length)))throw Error('Некорректные условия фильтра');
    }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
