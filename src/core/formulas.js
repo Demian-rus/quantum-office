@@ -17,7 +17,7 @@ export function parseCell(ref) {
 
 export function tokenise(str) {
   const text = str.toUpperCase().replace(/\s+/g, '');
-  const regex = /(?:\d+(?:\.\d+)?|\.[0-9]+)|[A-Z]+[1-9]\d*|[A-Z]+|[()+\-*/,:]/gy;
+  const regex = /(?:\d+(?:\.\d+)?|\.[0-9]+)|\$?[A-Z]+\$?[1-9]\d*|[A-Z]+|[()+\-*/,:]/gy;
   const tokens = [];
   let offset = 0;
   while (offset < text.length) {
@@ -83,15 +83,15 @@ export function evaluateCell(ref, cells, visiting = new Set()) {
     const token = tokens[i++];
     if (!token) throw new Error('#ERROR!');
     if (/^(?:\d|\.)/.test(token)) return Number(token);
-    if (/^[A-Z]+[1-9]\d*$/.test(token)) return numeric(token);
+    if (/^\$?[A-Z]+\$?[1-9]\d*$/.test(token)) return numeric(token.replaceAll('$',''));
     if (/^[A-Z]+$/.test(token)) {
       if (!['SUM','AVERAGE','MIN','MAX','COUNT'].includes(token) || !eat('(')) throw new Error('#NAME?');
       const vals = [];
       if (!eat(')')) {
         do {
-          if (/^[A-Z]+[1-9]\d*$/.test(peek()||'') && tokens[i+1] === ':') {
-            const first=tokens[i++]; i++;
-            const last=tokens[i++];
+          if (/^\$?[A-Z]+\$?[1-9]\d*$/.test(peek()||'') && tokens[i+1] === ':') {
+            const first=tokens[i++].replaceAll('$',''); i++;
+            const last=(tokens[i++]||'').replaceAll('$','');
             for (const r of rangeRefs(first,last)) vals.push(numeric(r));
           } else vals.push(expression());
         } while (eat(','));
