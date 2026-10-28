@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {newWorkbook,newSheet,currentSheet,setCell,setStyle,getCell,resultOf,refsBetween,pasteTSV,valuesTSV,importCSV,exportCSV,createExample,validateWorkbook,displayedValue} from '../src/core/workbook.js';
+import {saveWorkspace,loadWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from '../src/core/store.js';
+test('multiple sheets',()=>{const b=newWorkbook();const s=newSheet('Second');b.sheets.push(s);b.activeSheetId=s.id;assert.equal(currentSheet(b).name,'Second');validateWorkbook(b);});
+test('formula recomputation',()=>{const s=currentSheet(newWorkbook());setCell(s,'A1','10');setCell(s,'A2','5');setCell(s,'B1','=SUM(A1:A2)');assert.equal(resultOf(s,'B1'),15);setCell(s,'A2','9');assert.equal(resultOf(s,'B1'),19);});
+test('cycle and division errors',()=>{const s=currentSheet(newWorkbook());setCell(s,'A1','=B1');setCell(s,'B1','=A1');setCell(s,'C1','=1/0');assert.equal(resultOf(s,'A1'),'#CYCLE!');assert.equal(resultOf(s,'C1'),'#DIV/0!');});
+test('style and formatting',()=>{const s=currentSheet(newWorkbook());setCell(s,'B3','=5+2');setStyle(s,'B3',{bold:true,format:'currency'});assert.equal(getCell(s,'B3').style.bold,true);assert.match(displayedValue(s,'B3'),/7/);});
+test('TSV and cell ranges',()=>{const s=currentSheet(newWorkbook());const info=pasteTSV(s,'B3','имя\tдоля\nСаша\t32');assert.equal(info.end,'C4');assert.deepEqual(refsBetween('B3','C4'),['B3','C3','B4','C4']);assert.equal(valuesTSV(s,'B3','C4'),'имя\tдоля\nСаша\t32');});
+test('CSV quotes and newlines',()=>{const b=importCSV('Название,Цена\r\n"Папка, синяя",99\r\n"Строка\nдве",17');assert.equal(currentSheet(b).cells.A3.value,'Строка\nдве');assert.equal(importCSV(exportCSV(currentSheet(b))).sheets[0].cells.A2.value,'Папка, синяя');});
+test('demo totals',()=>{const b=createExample();validateWorkbook(b);assert.equal(resultOf(b.sheets[0],'B6'),90000);assert.equal(resultOf(b.sheets[0],'C6'),79300);});
+test('book format roundtrip',()=>{const b=createExample();assert.equal(decodeBook(encodeBook(b)).sheets[0].cells.D6.value,'=B6-C6');});
+test('previous snapshot recovery',()=>{const map=new Map(),storage={getItem:k=>map.get(k)||null,setItem:(k,v)=>map.set(k,v)};const w={version:3,active:null,books:[newWorkbook('One')]};saveWorkspace(w,storage);w.books[0].name='Two';saveWorkspace(w,storage);map.set('quantum-office.workspace.v3','CORRUPT');assert.equal(loadWorkspace(storage).books[0].name,'One');});
+test('workspace roundtrip',()=>{const w={version:3,books:[createExample()],active:null};assert.equal(decodeWorkspace(encodeWorkspace(w)).books.length,1);});
+test('reject invalid reference',()=>{const b=newWorkbook();b.sheets[0].cells.A0={value:'oops',style:{}};assert.throws(()=>validateWorkbook(b));});
+test('never eval formulas as JS',()=>{const s=currentSheet(newWorkbook());setCell(s,'A1','=process.exit(1)');assert.equal(resultOf(s,'A1'),'#ERROR!');});
+test('unsafe styles rejected',()=>{const b=newWorkbook();b.sheets[0].cells.A1={value:'123',style:{bg:'red" onmouseover="alert(1)'}};assert.throws(()=>validateWorkbook(b));});
