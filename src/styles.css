@@ -136,3 +136,34 @@
 .sheet-tab-editor{background:white;color:#174e3a;outline:2px solid #288959;border:0;border-radius:3px;min-width:85px;max-width:170px;width:130px;height:27px;padding:2px 7px;font-size:11px;}
 @media(max-width:850px){.launcher-tools,.launcher-quick{gap:9px;}.launcher-tile{min-height:190px;padding:17px}.launcher-name{font-size:17px}.launcher-quick-action{padding:10px;gap:8px}}
 @media(max-width:590px){.launcher-tools{grid-template-columns:1fr;gap:9px}.launcher-tile{min-height:100px;display:grid;grid-template-columns:60px 1fr;gap:4px 10px;align-items:center}.launcher-art{grid-row:span 3;margin:0;width:60px;height:60px}.launcher-art svg{height:60px;width:60px}.launcher-quick{grid-template-columns:1fr;gap:7px}.launcher-files{margin-top:22px}}
+
+/* TASK 019 — stable, viewport-anchored table headers. Never scroll the header DOM with cells. */
+.grid-frame{position:relative;display:flex;flex:1;min-height:90px;min-width:0;overflow:hidden}
+.grid-frame>.grid-scroll{flex:1;min-height:0;height:100%;width:100%}
+.grid-col-overlay{position:absolute;top:0;left:54px;right:0;height:31px;overflow:hidden;z-index:40;background:#f2f5f9;pointer-events:auto}
+.grid-row-overlay{position:absolute;top:31px;bottom:0;left:0;width:54px;overflow:hidden;z-index:39;background:#f2f5f9;pointer-events:auto}
+.grid-col-overlay .colhead,.grid-row-overlay .rowhead{cursor:pointer;z-index:1;white-space:nowrap;user-select:none}
+.grid-col-overlay .colhead:hover,.grid-row-overlay .rowhead:hover{background:#d9ecdf;color:#216846}
+.grid-col-overlay .header-selected,.grid-row-overlay .header-selected{background:#d5ebdf;color:#17613e}
+.grid-corner-fixed{position:absolute;top:0;left:0;width:54px;height:31px;background:#e7edef;border-right:1px solid #cbd9d0;border-bottom:1px solid #cbd9d0;z-index:43;cursor:pointer}
+.grid-corner-fixed:after{content:'';position:absolute;bottom:7px;right:8px;width:0;height:0;border-style:solid;border-width:0 0 10px 10px;border-color:transparent transparent #648577 transparent}
+.grid-corner-fixed:hover{background:#d9ebdd}
+.grid-col-overlay .colhead.frozen-col,.grid-row-overlay .rowhead.frozen-row{z-index:2;background:#e4ede8}
+.grid-col-overlay .grid-resizer,.grid-row-overlay .grid-resizer{z-index:4}
+/* Home module template entries are deliberate separate actions beneath three editor tiles. */
+.launcher-template-actions{width:min(1120px,100%);margin:11px auto 0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.launcher-template-actions button{border:1px solid #d9e7e0;background:#eef7f2;color:#226446;text-align:left;min-height:41px;padding:10px 15px;border-radius:9px;font-size:12px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.launcher-template-actions button:hover{background:#dcf0e3;border-color:#8bc6a4}
+.launcher-secondary{width:min(1120px,100%);margin:15px auto 0;display:flex;justify-content:flex-end;gap:10px}
+.launcher-secondary button{font-size:11px;color:#336f50;background:transparent;padding:7px 10px;border-radius:5px}
+.launcher-secondary button:hover{background:#e7efe9}
+.templates-page{flex:1;min-height:0;overflow:auto;background:#f5f7fa;padding:40px clamp(20px,6vw,95px)}
+.templates-heading{max-width:1150px;margin:0 auto 28px}.templates-back{background:transparent;color:#268258;font-size:12px;margin-bottom:25px;font-weight:700}
+.templates-heading h1{font-size:27px;margin:0 0 7px;color:#1a2d40}.templates-heading p{font-size:12px;color:#77879a;margin:0}
+.templates-grid{max-width:1150px;margin:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
+.template-card{display:flex;flex-direction:column;text-align:left;gap:10px;padding:18px;min-height:170px;background:white;border:1px solid #e0e7eb;border-radius:12px;color:#24364a}
+.template-card:hover:not(:disabled){border-color:#84c7a0;box-shadow:0 5px 15px #233b4220}
+.template-card:disabled{opacity:.63;cursor:not-allowed}.template-card-art{background:#e8f5ed;color:#27845b;width:42px;height:42px;display:grid;place-items:center;border-radius:8px;font-size:23px}
+.template-card strong{font-size:15px}.template-card small{font-size:11px;color:#8190a0;line-height:1.5}
+.template-card-arrow,.template-card-muted{font-size:11px;color:#25734d;font-weight:700;margin-top:auto}
+@media(max-width:590px){.launcher-template-actions{grid-template-columns:1fr;gap:7px}.launcher-secondary{flex-wrap:wrap;justify-content:flex-start}}

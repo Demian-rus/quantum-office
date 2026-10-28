@@ -8,7 +8,7 @@ with sync_playwright() as playwright:
     errors=[]
     page.on('pageerror',lambda error: errors.append(str(error)))
     page.set_content((root/'dist/index.html').read_text(encoding='utf-8'),wait_until='load')
-    page.get_by_role('button',name='Открыть демонстрацию').click()
+    page.get_by_role('button',name='Открыть пример таблицы').click()
     def select(ref):
         page.locator('#name-box').fill(ref)
         page.locator('#name-box').press('Enter')

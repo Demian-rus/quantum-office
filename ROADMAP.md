@@ -93,3 +93,12 @@ One issue → one measurable change → tests and independent evidence. Do not d
 - [x] Clarify new sheet versus rename; double-click inline sheet-name editor.
 - [x] First editable template: weekly lesson schedule + pupils sheet.
 - [ ] Native durable file saving, robust crash recovery, advanced Excel schedule templates, date-aware weekly recurring sessions, printing and reminders.
+
+## TASK 019 — Template navigation and Excel-style selection (2026-10-28)
+
+- Template catalogs for Sheets, Writer, Slides under each launcher tile; Writer and Slides must stay clearly disabled until implemented.
+- User-reference weekly schedule template with day bands and payment columns; extra finance and partnership sheets. Do not invent pupil data.
+- Fixed separate header overlays that remain stationary during vertical scrolling.
+- Click column letters to select entire column; row numbers entire row; top-left triangle all sheet. Current engine limit 2000×100, large bulk edits are bounded to protect memory.
+- No separate sheet rename icon: double-click tab to rename, `+` to create.
+- Next critical visual parity: merged cells, borders and text wrap, then lossless XLSX round-trip for supported formatting.

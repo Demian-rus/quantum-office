@@ -14,7 +14,7 @@ def run():
         assert page.locator('.launcher-tile').count()==3
         assert page.get_by_text('Ваш офис.').count()==0
         page.screenshot(path=str(Path(__file__).parent/'home.png'),full_page=True)
-        page.get_by_role('button',name='Открыть демонстрацию').click()
+        page.get_by_role('button',name='Открыть пример таблицы').click()
         assert page.locator('.grid-cell[data-ref="A1"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').count()==1
         assert page.locator('.grid-cell[data-ref="B6"]').inner_text().strip()!=''
