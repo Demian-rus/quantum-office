@@ -6,32 +6,60 @@
 @media(max-width:730px){.global-bar{height:100px;flex-wrap:wrap;gap:0;align-content:space-between;padding:9px 13px 0}.logo{min-width:0;flex:1;height:37px}.logo small{display:none}.logo-mark{width:32px;height:32px;font-size:22px}.global-right{height:37px}.modules{height:46px;width:100%;order:3;flex:none;overflow-x:auto}.modules .module{font-size:11px;padding:0 12px}.home-main{padding:22px}.home-top h1{font-size:39px}.tool-cards,.files-grid{grid-template-columns:1fr}.tool-card{min-height:147px}.tool-icon{margin-bottom:6px}.work-top{height:69px;padding:0 12px}.work-title input{width:38vw;font-size:13px}.work-actions button{padding:9px;font-size:10px}.ribbon-tabs{padding:0 4px;overflow-x:auto}.ribbon-tabs button{padding:0 10px}.ribbon-controls{min-height:62px}.sheet-footer{padding:0 5px}.sheet-status span:nth-child(2){display:none}.home-footnote{flex-direction:column}.file-card{min-height:0}}
 @media print{.global-bar,.work-top,.ribbon,.formula-line,.sheet-footer{display:none!important}.grid-scroll{overflow:visible!important}}
 
-/* Quantum Sheets command ribbon: a clear hierarchy, readable touch targets,
-   no 8px floating labels or misleading empty groups. */
-.ribbon{background:#fff;box-shadow:0 2px 5px #18314c0b}
-.ribbon-tabs{height:43px;gap:4px;padding:0 20px;background:#f8fafc}
-.ribbon-tabs button{font-size:13px;font-weight:650;padding:0 15px;color:#627185;transition:color .14s,background .14s}
-.ribbon-tabs button:hover{background:#edf3f6;color:#1c5941}
-.ribbon-tabs button.chosen{color:#176c4c;font-weight:780;background:white}
-.ribbon-tabs button.chosen:after{height:3px;left:11px;right:11px;border-radius:3px;background:#279464}
-.ribbon-controls{min-height:105px;padding:11px 16px 8px;gap:0;align-items:stretch;scrollbar-width:thin}
-.ribbon-group{height:auto;min-height:83px;padding:0 14px 0 12px;gap:0;display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;margin-right:0;border-right:1px solid #e3eaf0}
-.ribbon-group:first-child{padding-left:0}
-.ribbon-group:last-of-type{border-right:0}
-.ribbon-group-content{display:flex;align-items:center;gap:7px;flex:1}
-.ribbon-group .group-name{position:static;display:block;text-align:center;letter-spacing:0;font-size:10px;font-weight:700;color:#8591a1;padding:4px 0 0}
-.ribbon-group button.tool-btn{min-width:57px;height:64px;display:flex;flex-direction:column;justify-content:center;gap:4px;align-items:center;padding:6px 10px;border:1px solid transparent;background:transparent;border-radius:9px;color:#273e57;font-size:11px;font-weight:630}
-.ribbon-group button.tool-btn:hover{background:#eef7f2;border-color:#d2e8d8;color:#17643d}
-.tool-symbol{height:26px;display:flex;align-items:center;justify-content:center;min-width:26px;border-radius:6px;font-size:20px;font-weight:700;color:#1e6c4b}
-.tool-symbol b,.tool-symbol i{font-size:19px}
-.ribbon-color{min-width:62px;height:64px;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:3px;color:#273e57;font-size:11px;font-weight:630;cursor:pointer}
-.ribbon-color:hover{background:#eef7f2;border-radius:9px}
-.ribbon-color input{width:32px;height:32px;padding:2px;border:1px solid #dce5ec;border-radius:7px;background:white;cursor:pointer}
-.ribbon-help{font-size:12px;color:#7a8797;align-self:center;white-space:nowrap;margin:0 14px}
-.find-bar{display:flex;align-items:center;gap:10px;background:#f2f8f5;padding:9px 19px;border-top:1px solid #d8e9e1;flex-wrap:wrap}
-.find-bar label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:650;color:#385b4e}
-.find-bar input{min-width:140px;width:190px;padding:9px 10px;background:#fff;border:1px solid #c8dad1;border-radius:7px;font-size:12px}
-.find-bar button{padding:9px 12px;background:#fff;color:#21684c;border:1px solid #c8dad1;border-radius:7px;font-size:12px;font-weight:700}
-.find-bar button:hover{background:#e0eee5}
-.find-bar button:last-child{font-size:19px;padding:4px 10px}
-@media(max-width:730px){.ribbon-tabs{padding:0 6px}.ribbon-controls{padding:9px;min-height:99px}.ribbon-group{padding:0 8px;min-height:81px}.ribbon-group button.tool-btn{min-width:52px;padding:6px;font-size:10px}.find-bar{padding:8px;gap:7px}.find-bar input{width:130px;min-width:110px}}
+
+/* Sheets compact ribbon 2026-10-28: screen space belongs to the grid.
+   Tool labels remain accessible via aria-label/title; groups use two tight rows. */
+.compact-shell{height:40px;min-height:40px;padding:0 10px;gap:12px}
+.compact-shell .logo{min-width:151px;gap:7px;font-size:10px;letter-spacing:.025em;white-space:nowrap}
+.compact-shell .logo-mark{width:25px;height:25px;font-size:17px;border-radius:6px}
+.compact-shell .modules{gap:0;flex:0 0 auto;min-width:0}
+.compact-shell .module{font-size:11px;padding:0 10px;font-weight:630}
+.compact-shell .shell-document{display:flex;align-items:center;min-width:110px;flex:1;gap:7px;justify-content:center;overflow:hidden}
+.compact-shell #book-name{min-width:0;max-width:210px;flex:1;background:transparent;border:1px solid transparent;padding:3px 5px;border-radius:4px;color:#fff;font-size:11px;font-weight:670;text-overflow:ellipsis;text-align:right}
+.compact-shell #book-name:hover,.compact-shell #book-name:focus{border-color:#587263;background:#1b3040;outline:0}
+.compact-shell .shell-save{font-size:9px;color:#92c3ac;white-space:nowrap}
+.compact-shell .global-right{display:flex;align-items:center;gap:5px;flex:0 0 auto}
+.compact-shell .shell-action{background:transparent;color:#d9e6dd;font-size:11px;padding:5px 7px;border-radius:4px;white-space:nowrap}
+.compact-shell .shell-action.primary{background:#2c835e;color:white}
+.compact-shell .shell-action:hover{background:#346f55}
+.compact-shell .icon-button{width:27px;height:27px;border-radius:4px}
+.ribbon{background:#fafbfc;border-bottom:1px solid #d5dce3;box-shadow:0 1px 2px #1d2d4011}
+.ribbon-tabs{height:29px;display:flex;gap:1px;border-bottom:1px solid #e0e6eb;padding:0 8px;background:#f9fafb}
+.ribbon-tabs button{padding:0 10px;font-size:11px;color:#627183;font-weight:600;line-height:29px;border-radius:0}
+.ribbon-tabs button:hover{background:#e9f0ed;color:#23553e}
+.ribbon-tabs button.chosen{color:#176840;background:#fff;font-weight:730}
+.ribbon-tabs button.chosen:after{height:2px;left:8px;right:8px;background:#2c875b;bottom:0}
+.ribbon-controls{min-height:73px;height:73px;display:flex;align-items:stretch;gap:0;padding:3px 6px 2px;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin}
+.ribbon-group{height:68px;min-height:0;padding:2px 9px 0;display:flex;flex-direction:column;justify-content:space-between;align-items:stretch;gap:0;flex:none;margin:0;border-right:1px solid #dde3e7}
+.ribbon-group:first-child{padding-left:3px}
+.ribbon-group-content{height:48px;flex:1;min-height:0;display:grid;grid-template-rows:repeat(2,23px);grid-auto-flow:column;grid-auto-columns:max-content;align-content:center;align-items:center;column-gap:3px;row-gap:1px}
+.ribbon-group .group-name{position:static;text-align:center;padding:2px 2px 0;color:#7e8997;letter-spacing:0;font-size:9px;font-weight:600;line-height:13px}
+.ribbon-group button.tool-btn{min-width:26px;max-width:155px;height:23px;padding:1px 5px;display:inline-flex;flex-direction:row;align-items:center;justify-content:center;gap:4px;border-radius:3px;border:1px solid transparent;background:transparent;color:#364354;font-weight:560;font-size:10px}
+.ribbon-group button.tool-btn:hover{background:#e7f0e9;border-color:#bfd9c7;color:#155f3f}
+.ribbon-group button.tool-btn:active{background:#d6e6db}
+.ribbon-group button.tool-btn .tool-symbol{width:20px;min-width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:15px;line-height:1;color:#2c6c4d;background:none;border:0}
+.ribbon-group button.tool-btn .tool-symbol b,.ribbon-group button.tool-btn .tool-symbol i{font-size:13px}
+.ribbon-group button.tool-btn .tool-label{display:none;white-space:nowrap}
+.ribbon-group button.tool-btn.is-labeled .tool-label{display:inline;font-size:10px}
+.ribbon-color{width:30px;height:23px;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:0;border-radius:3px;cursor:pointer;position:relative}
+.ribbon-color:hover{background:#e9f2ed}
+.ribbon-color span{font-size:12px;font-weight:800;line-height:14px}
+.ribbon-color input{height:5px;width:22px;border:0;padding:0;background:transparent;cursor:pointer;display:block;border-radius:0}
+.ribbon-color input::-webkit-color-swatch-wrapper{padding:0}
+.ribbon-color input::-webkit-color-swatch{border:0;border-radius:0}
+.ribbon-help{font-size:10px;color:#798696;align-self:center;margin:0 12px;white-space:nowrap}
+.find-bar{display:flex;align-items:center;gap:6px;background:#eef6f1;padding:5px 10px;border-top:1px solid #d8e9de;flex-wrap:wrap}
+.find-bar label{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:#345b48}
+.find-bar input{height:27px;min-width:110px;width:175px;padding:4px 7px;background:white;border:1px solid #bed3c5;border-radius:4px;font-size:11px}
+.find-bar button{height:27px;padding:3px 8px;background:#fff;color:#1c6747;border:1px solid #bdd3c4;border-radius:4px;font-size:10px}
+.find-bar button:hover{background:#e1eee5}
+.find-bar button:last-child{font-size:17px;padding:0 8px}
+.formula-line{height:30px}
+.formula-line #name-box{width:92px;font-size:11px}
+.formula-line .fx-symbol{font-size:14px;padding:0 9px}
+.formula-line #formula-input{font-size:11px}
+.sheet-footer{height:32px}
+.sheet-tab,.sheet-menu,.sheet-options{font-size:10px;padding:0 10px}
+.sheet-status{font-size:10px;gap:12px}
+@media(max-width:1050px){.compact-shell{gap:5px;padding:0 6px}.compact-shell .logo{min-width:35px}.compact-shell .logo>span:last-child{display:none}.compact-shell .module{padding:0 7px;font-size:10px}.compact-shell .shell-save{display:none}.compact-shell #book-name{max-width:160px}.compact-shell .shell-action span{display:none}}
+@media(max-width:730px){.global-bar.compact-shell{height:39px;min-height:39px;display:flex;flex-wrap:nowrap;align-content:center;gap:3px;padding:0 4px}.compact-shell .logo{min-width:25px;height:30px;flex:0 0 25px}.compact-shell .modules{height:39px;width:auto;min-width:0;order:initial;flex:1;overflow-x:auto}.compact-shell .module{font-size:10px;padding:0 6px}.compact-shell .shell-document{display:none}.compact-shell .global-right{height:30px}.ribbon-tabs{padding:0 3px;overflow-x:auto}.ribbon-tabs button{padding:0 7px}.ribbon-controls{height:73px;min-height:73px;padding:3px}.ribbon-group{height:67px;padding:2px 6px 0}.sheet-footer{height:32px}}
