@@ -1,4 +1,5 @@
-import { cellName, parseCell, evaluateCell, csvEncode, csvDecode } from './formulas.js';
+import { cellName, parseCell, colLabel, evaluateCell, csvEncode, csvDecode } from './formulas.js';
+
 const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
@@ -11,6 +12,41 @@ export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Нед�
 export function validRef(ref){const p=parseCell(String(ref));return !!p&&p.row<LIMITS.rows&&p.col<LIMITS.columns;}
 export function refsBetween(a,b){const p=parseCell(a),q=parseCell(b);if(!p||!q)return [];const refs=[];for(let r=Math.min(p.row,q.row);r<=Math.max(p.row,q.row);r++)for(let c=Math.min(p.col,q.col);c<=Math.max(p.col,q.col);c++)if(r<LIMITS.rows&&c<LIMITS.columns)refs.push(cellName(r,c));return refs;}
 export function rectangle(a,b){const p=parseCell(a),q=parseCell(b);return p&&q?{r1:Math.min(p.row,q.row),r2:Math.max(p.row,q.row),c1:Math.min(p.col,q.col),c2:Math.max(p.col,q.col)}:null;}
+/** Translate A1 references on fill; $ locks a row/column. No eval or external libraries. */
+export function translateFormula(source, rowDelta, colDelta){
+ if(typeof source!=='string'||!source.startsWith('='))return source;
+ if(!Number.isInteger(rowDelta)||!Number.isInteger(colDelta))throw Error('Некорректный сдвиг');
+ return '='+source.slice(1).replace(/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi,(full,lockCol,letters,lockRow,digits)=>{
+   const p=parseCell(letters+digits);
+   if(!p||p.row>=LIMITS.rows||p.col>=LIMITS.columns)throw Error('Формула ссылается на ячейку вне таблицы');
+   const row=p.row+(lockRow?0:rowDelta),col=p.col+(lockCol?0:colDelta);
+   if(row<0||col<0||row>=LIMITS.rows||col>=LIMITS.columns)throw Error('Ссылка формулы выходит за пределы таблицы');
+   return `${lockCol}${colLabel(col)}${lockRow}${row+1}`;
+ });
+}
+/** Atomic fill plan: snapshot source values/styles first, validate, then mutate. */
+export function fillSelection(sheet, from, to, direction){
+ if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
+ const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
+ if(direction==='down'&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
+ if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
+ const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
+ if(total>10000)throw Error('Выделено больше 10 000 ячеек');
+ const changes=[];
+ for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
+   if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
+   const originR=direction==='down'?rect.r1:r,originC=direction==='right'?rect.c1:c;
+   const original=getCell(sheet,cellName(originR,originC));
+   changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),structuredClone(original.style||{})]);
+ }
+ // Do not corrupt existing data if even one translated reference is out of bounds.
+ for(const [ref,value,style] of changes){
+   if(value||Object.keys(style).length)sheet.cells[ref]={value,style};
+   else delete sheet.cells[ref];
+ }
+ return changes.length;
+}
+
 export function rawMap(sheet){return Object.fromEntries(Object.entries(sheet.cells).map(([k,v])=>[k,v.value]));}
 export function resultOf(sheet,ref,map=rawMap(sheet)){return evaluateCell(ref,map);}
 export function displayedValue(sheet,ref,map=rawMap(sheet)){
@@ -56,5 +92,4 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
  for(let c=0;c<4;c++){setStyle(s,cellName(0,c),{bold:true,bg:'#dceafe',color:'#1d457e'});setStyle(s,cellName(5,c),{bold:true,bg:'#edf5e8',color:'#27693b'});}
  for(let r=1;r<6;r++)for(let c=1;c<4;c++)setStyle(s,cellName(r,c),{format:'currency'});
  const s2=newSheet('Заметки');setCell(s2,'A1','Эта книга — демонстрация возможностей Quantum Sheets.');setCell(s2,'A3','Изменяйте цифры в столбцах B и C: формулы пересчитаются.');b.sheets.push(s2);return b;}
-
-export {cellName, parseCell};
+export {cellName,parseCell};
