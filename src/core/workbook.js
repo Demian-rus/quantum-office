@@ -85,6 +85,22 @@ export function firstVisibleIndex(positions,coordinate){
  return Math.min(lo,positions.length-2);
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
+/** Supported real Excel edge styles; stored only on existing styled cells/axis defaults. */
+export const XLSX_BORDER_LINES=new Set(['hair','thin','medium','thick','double','dotted','dashed','dashDot','dashDotDot','mediumDashed','mediumDashDot','mediumDashDotDot','slantDashDot']);
+const BORDER_SIDES=['top','bottom','left','right'];
+export function resolveBorderSide(style,side){
+ if(!BORDER_SIDES.includes(side)||!style)return null;
+ const active=style.borders?.[side]||(style.border==='thin'&&style.borders===undefined);
+ if(!active)return null;
+ const details=style.borderEdges?.[side];
+ return {line:details?.line||'thin',color:details?.color||style.borderColor||'#526d5c'};
+}
+const validBorderEdges=edges=>edges&&typeof edges==='object'&&!Array.isArray(edges)&&
+ Object.entries(edges).every(([side,info])=>BORDER_SIDES.includes(side)&&info&&
+ typeof info==='object'&&!Array.isArray(info)&&Object.keys(info).length>=1&&
+ Object.keys(info).every(k=>['line','color'].includes(k))&&
+ XLSX_BORDER_LINES.has(info.line)&&
+ (info.color===undefined||typeof info.color==='string'&&/^#[0-9a-fA-F]{6}$/.test(info.color)));
 
 /** Column-level inheritance excludes the explicit style of its first cell.
  * Excel column styles must not accidentally propagate A1's custom fill to A2. */
@@ -280,7 +296,7 @@ export function applyBorderPreset(sheet,a,b,preset){
    const style=item.style||{};
    if(!style.border&&!style.borders)continue;
    removed++;
-   const next={...style};delete next.border;delete next.borders;
+   const next={...style};delete next.border;delete next.borders;delete next.borderEdges;delete next.borderColor;
    if(!item.value&&!Object.keys(next).length)delete sheet.cells[ref];
    else sheet.cells[ref]={...item,style:next};
   }
@@ -314,7 +330,7 @@ export function applyBorderPreset(sheet,a,b,preset){
   const border={...(previous.borders||(previous.border==='thin'?{top:true,bottom:true,left:true,right:true}:{}))};
   if(preset==='none')for(const side of sides)delete border[side];
   else for(const side of sides)border[side]=true;
-  setStyle(sheet,ref,{border:undefined,borders:Object.keys(border).length?border:undefined});
+  setStyle(sheet,ref,{border:undefined,borders:Object.keys(border).length?border:undefined,borderEdges:undefined,borderColor:undefined});
  }
 }
 export function validRef(ref){const p=parseCell(String(ref));return !!p&&p.row<LIMITS.rows&&p.col<LIMITS.columns;}
@@ -512,7 +528,8 @@ export function validateWorkbook(book){
   const validAxisStyle=style=>style&&typeof style==='object'&&!Array.isArray(style)&&
    Object.entries(style).every(([key,value])=>{
     if(key==='borderColor')return typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value);
-    if(key==='borders')return value&&typeof value==='object'&&!Array.isArray(value)&&
+    if(key==='borderEdges')return validBorderEdges(value);
+     if(key==='borders')return value&&typeof value==='object'&&!Array.isArray(value)&&
       Object.entries(value).every(([edge,on])=>['left','right','top','bottom'].includes(edge)&&on===true);
     return validSparseStyle({[key]:value},true);
    });
@@ -555,12 +572,13 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
   }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderColor','fontSize','wrap'].includes(k))||
+    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderEdges','borderColor','fontSize','wrap'].includes(k))||
        ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color','borderColor'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
        ('fontSize' in style&&(!Number.isFinite(style.fontSize)||style.fontSize<6||style.fontSize>72))||
         ('border' in style&&!['thin'].includes(style.border))||
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
+        ('borderEdges' in style&&!validBorderEdges(style.borderEdges))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
        ('format' in style&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
