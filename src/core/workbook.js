@@ -3,7 +3,7 @@ import {formatTemporal,parseTemporalInput} from './dates.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -85,6 +85,20 @@ export function setTypedCell(sheet,ref,input){
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
  else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'date'});
  else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'time'});
+}
+/** Full-sheet alignment is one property, not 200,000 styled cells.
+ * Existing per-cell alignments are reset so this action truly affects all cells.
+ * Empty style-only entries may be removed without losing any content. */
+export function setWholeSheetAlignment(sheet,align){
+ if(!['left','center','right'].includes(align))throw Error('Недопустимое выравнивание всего листа');
+ sheet.defaultAlign=align;
+ for(const [ref,item] of Object.entries(sheet.cells)){
+  if(item.style?.align!==undefined){
+   const style={...item.style};delete style.align;
+   if(!item.value&&!Object.keys(style).length)delete sheet.cells[ref];
+   else sheet.cells[ref]={...item,style};
+  }
+ }
 }
 export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);const style={...prev.style,...patch};for(const [name,value] of Object.entries(patch))if(value===undefined)delete style[name];if(!prev.value&&!Object.keys(style).length)delete sheet.cells[key];else sheet.cells[key]={value:prev.value,style};}
 /** Merge geometry is independent of styling. Covered cells never silently lose content. */
@@ -309,6 +323,7 @@ export function validateWorkbook(book){
  let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
+  if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
