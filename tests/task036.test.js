@@ -108,3 +108,20 @@ test('invalid sparse formats are rejected, including oversized or malformed colu
  s.columnStyles={};s.defaultStyle={italic:'true'};
  assert.throws(()=>validateWorkbook(b),/оформление листа/);
 });
+
+test('no fill on one column masks whole-sheet fill without changing other columns',async()=>{
+ const b=newWorkbook(),s=currentSheet(b);
+ setBulkColumnStyle(s,'A1','CV100000',{bg:'#aabbcc'});
+ setBulkColumnStyle(s,'B1','B100000',{bg:undefined});
+ assert.equal(getEffectiveStyle(s,'A20000').bg,'#aabbcc');
+ assert.equal(getEffectiveStyle(s,'B20000').bg,undefined);
+ assert.equal(getEffectiveStyle(s,'C20000').bg,'#aabbcc');
+ assert.deepEqual(s.columnStyles['1'],{bg:null});
+ validateWorkbook(b);
+ const reopened=decodeBook(encodeBook(b));
+ assert.equal(getEffectiveStyle(reopened.sheets[0],'B20000').bg,undefined);
+ const zip=await globalThis.JSZip.loadAsync(await exportXLSX(b),{checkCRC32:true});
+ const xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
+ assert.match(xml,/<col min="1" max="1"[^>]*style="\d+"/);
+ assert.match(xml,/<col min="2" max="2"\/>/);
+});
