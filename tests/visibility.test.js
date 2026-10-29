@@ -31,8 +31,8 @@ test('structural edits shift hidden flags without mutating data',()=>{
  const s=currentSheet(newWorkbook());setHidden(s,'row',3,true);setHidden(s,'col',2,true);
  changeSheetStructure(s,'row','insert',1);assert.deepEqual(s.hiddenRows,{4:true});
  changeSheetStructure(s,'col','delete',1);assert.deepEqual(s.hiddenColumns,{1:true});
- setHidden(s,'row',1999,true);const snapshot=structuredClone(s);
- assert.throws(()=>changeSheetStructure(s,'row','insert',1999),/Последняя строка или столбец скрыта/);
+ setHidden(s,'row',99999,true);const snapshot=structuredClone(s);
+ assert.throws(()=>changeSheetStructure(s,'row','insert',99999),/Последняя строка или столбец скрыта/);
  assert.deepEqual(s,snapshot);
 });
 test('XLSX export records explicit hidden row/col and keeps values intact',async()=>{
