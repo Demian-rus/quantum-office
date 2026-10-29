@@ -112,7 +112,7 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  const full=area.c1===0&&area.c2===LIMITS.columns-1;
  const next={...(sheet.defaultStyle||{})},columns={...(sheet.columnStyles||{})};
  if(full){
-  if(prop==='align')sheet.defaultAlign=value??null;
+  if(prop==='align'){sheet.defaultAlign=value??null;delete next.align;}
   else if(value===undefined)delete next[prop];else next[prop]=value;
   for(const key of Object.keys(columns)){
    const style={...columns[key]};delete style[prop];
