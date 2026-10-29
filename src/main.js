@@ -4,6 +4,7 @@ import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
+import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
 const app=document.getElementById('app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const niceDate=s=>{try{return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(s));}catch{return '—'}};
@@ -15,16 +16,20 @@ const recalculator=createWorkbookRecalculator();
 let templateKind='sheet';
 let page='home', activeRibbon='home', activeCell='A1', rangeEnd='A1', editing=null,mouseSelecting=false;
 let pendingColorSelection=null, activePalette=null, borderMenuOpen=false;
-let scrollLeft=0,scrollTop=0, saveHandle=null,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
+let scrollLeft=0,scrollTop=0,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
+const directFiles=new Map(),dirtyFiles=new Set(),savingBooks=new Set();
 let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
 let resizeDrag=null, filterColumn=null;
 let internalClipboard=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
-function persist(){try{saveWorkspace(workspace);storeWarning=false;const n=document.querySelector('#storage-indicator');if(n)n.textContent='● Автосохранено локально';}catch(e){storeWarning=true;const n=document.querySelector('#storage-indicator');if(n)n.textContent='⚠ Сохраните файл вручную';status('Память браузера недоступна: экспортируйте .qbook или архив',true);}}
+function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
+ n.textContent=storeWarning?'⚠ Черновик не записан':b&&directFiles.has(b.id)?dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске':'● Черновик в браузере';
+}
+function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
 function snapshot(){const b=book();if(!b)return;const a=undoStacks.get(b.id)||[];a.push(structuredClone(b));if(a.length>50)a.shift();undoStacks.set(b.id,a);redoStacks.set(b.id,[]);}
-function changed(){if(book())book().updated=dateNow();persist();}
+function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}persist();}
 function transact(callback){const active=book();if(!active)return;snapshot();try{callback();for(const part of active.sheets)invalidateGridGeometry(part);recalculator.reconcile(active,undoStacks.get(active.id).at(-1));}catch(error){recalculator.reset();throw error;}changed();}
 function replaceBook(fromHistory,toHistory,verb){
  const b=book();if(!b)return false;
@@ -33,7 +38,7 @@ function replaceBook(fromHistory,toHistory,verb){
  const replacement=stack.pop();fromHistory.set(b.id,stack);
  const other=toHistory.get(b.id)||[];other.push(structuredClone(b));toHistory.set(b.id,other);
  workspace.books[workspace.books.findIndex(x=>x.id===b.id)]=replacement;
- recalculator.reset();persist();render();
+ recalculator.reset();dirtyFiles.add(b.id);persist();render();
  document.getElementById('grid-scroll')?.focus({preventScroll:true});
  status(verb==='undo'?'Действие отменено':'Действие повторено');
  return true;
@@ -41,10 +46,10 @@ function replaceBook(fromHistory,toHistory,verb){
 function undo(){return replaceBook(undoStacks,redoStacks,'undo');}
 function redo(){return replaceBook(redoStacks,undoStacks,'redo');}
 function route(target){commitEditor();if(target==='home'){page='home';render();return;}if(target==='sheet'){page='sheet';if(!book()){if(!workspace.books.length){createBook();return;}workspace.active=workspace.books[0].id;}render();return;}page=target;render();}
-function createBook(example=false){const b=example==='schedule'?createScheduleTemplate():example==='journal'?createJournalTemplate():example==='budget'?createBudgetTemplate():example?createExample():newWorkbook();workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;saveHandle=null;persist();render();}
-function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;saveHandle=null;persist();render();}
-function removeBook(id){saveHandle=null;const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
-function cloneBook(id){saveHandle=null;const orig=workspace.books.find(x=>x.id===id);if(!orig)return;const copy=structuredClone(orig), fresh=newWorkbook();copy.id=fresh.id;copy.name=`${copy.name} — копия`;copy.created=copy.updated=dateNow();workspace.books.unshift(copy);workspace.active=copy.id;persist();page='sheet';render();}
+function createBook(example=false){const b=example==='schedule'?createScheduleTemplate():example==='journal'?createJournalTemplate():example==='budget'?createBudgetTemplate():example?createExample():newWorkbook();workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
+function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
+function removeBook(id){const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;directFiles.delete(id);dirtyFiles.delete(id);workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
+function cloneBook(id){const orig=workspace.books.find(x=>x.id===id);if(!orig)return;const copy=structuredClone(orig), fresh=newWorkbook();copy.id=fresh.id;copy.name=`${copy.name} — копия`;copy.created=copy.updated=dateNow();workspace.books.unshift(copy);workspace.active=copy.id;persist();page='sheet';render();}
 /** Rename a library card without opening its workbook or changing cell data. */
 function renameBookInline(id,button){
  const item=workspace.books.find(b=>b.id===id),card=button.closest('.file-card');
@@ -59,7 +64,7 @@ function renameBookInline(id,button){
  form.addEventListener('submit',e=>{
   e.preventDefault();const title=input.value.trim();
   if(!title){status('Название книги не может быть пустым',true);input.focus();return;}
-  if(title!==item.name){item.name=title;item.updated=dateNow();persist();}
+  if(title!==item.name){item.name=title;item.updated=dateNow();dirtyFiles.add(item.id);persist();}
   render();
  });
  form.append(input,ok,cancel);card.querySelector('.file-card-actions').before(form);
