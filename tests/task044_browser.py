@@ -16,8 +16,9 @@ with sync_playwright() as p:
  def check(ref):
   return page.evaluate('(ref)=>getCell(sheet(),ref).value',ref)
  select('B2:C3')
- page.keyboard.type('Урок')
+ page.keyboard.press('KeyA')
  assert page.locator('.cell-editor').is_visible()
+ page.locator('.cell-editor').fill('Урок')
  page.locator('.cell-editor').press('Control+Enter')
  page.wait_for_function("getCell(sheet(),'C3').value==='Урок'")
  for ref in ('B2','C2','B3','C3'):assert check(ref)=='Урок',ref
@@ -62,7 +63,8 @@ with sync_playwright() as p:
  # Ctrl+Enter must fail on merged selections without touching contents.
  page.evaluate("""()=>{mergeCells(sheet(),'D10','E10');setSelection('C10','E10');}""")
  before=page.evaluate("JSON.stringify(sheet().cells)")
- page.keyboard.type('Запрещено')
+ page.keyboard.press('KeyA')
+ page.locator('.cell-editor').fill('Запрещено')
  page.locator('.cell-editor').press('Control+Enter')
  assert page.evaluate('JSON.stringify(sheet().cells)')==before
  assert 'объединённые' in page.locator('#toast').inner_text()
