@@ -59,6 +59,7 @@ with sync_playwright() as p:
  x=left.bounding_box()['x']
  page.locator('#grid-scroll').evaluate('(el)=>{el.scrollLeft=700;el.dispatchEvent(new Event("scroll"));}')
  assert abs(left.bounding_box()['x']-x)<1.1,('frozen corner shifted',x,left.bounding_box()['x'])
+ assert page.evaluate('document.elementFromPoint(90,225)?.dataset?.ref')=='A1','Pinned A1 header is covered by scrolling merged title'
  assert not errors,errors
  print('PASS TASK032: stable frozen header identity and geometry, 200k alignment, Undo/Redo and horizontal freeze')
  browser.close()
