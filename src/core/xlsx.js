@@ -119,7 +119,7 @@ export async function importXLSX(data,filename='Таблица'){
    if(compact&&(!Number.isInteger(rowIndex)||rowIndex<1||rowIndex>LIMITS.rows||rowIndex<=previousRow))
     throw Error('XLSX содержит некорректный порядок строк');
    for(const c of elements(row,'c')){
-    const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\\d*)$/i.test(ref))continue;
+    const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
     const p=parseCell(ref);if(!p||p.row>=LIMITS.rows||p.col>=LIMITS.columns)continue;
     const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
     if(type==='d')throw Error('Неподдерживаемый ISO тип даты в XLSX: импорт отменён без потери данных');
