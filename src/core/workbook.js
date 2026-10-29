@@ -148,6 +148,11 @@ export function setTypedCell(sheet,ref,input){
 export function setWholeSheetAlignment(sheet,align){
  if(!['left','center','right'].includes(align))throw Error('Недопустимое выравнивание всего листа');
  sheet.defaultAlign=align;
+ if(sheet.defaultStyle?.align!==undefined){const next={...sheet.defaultStyle};delete next.align;sheet.defaultStyle=next;}
+ if(sheet.columnStyles)for(const col of Object.keys(sheet.columnStyles)){
+  const style={...sheet.columnStyles[col]};delete style.align;
+  if(Object.keys(style).length)sheet.columnStyles[col]=style;else delete sheet.columnStyles[col];
+ }
  for(const [ref,item] of Object.entries(sheet.cells)){
   if(item.style?.align!==undefined){
    const style={...item.style};delete style.align;
