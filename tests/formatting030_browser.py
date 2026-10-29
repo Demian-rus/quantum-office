@@ -39,6 +39,8 @@ with sync_playwright() as p:
   }""")
   offsets.append(measured)
  assert offsets[0]+0.05<offsets[1] and offsets[1]+0.05<offsets[2],offsets
+ assert page.get_by_role('button',name='Границы').locator('.tool-label').is_visible()
+ assert page.get_by_role('button',name='Объединить ячейки').locator('.tool-label').is_visible()
  # Outer borders on normal unmerged cells must not trigger the merge command.
  select('B2:D4')
  page.get_by_role('button',name='Границы').click()
