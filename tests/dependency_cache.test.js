@@ -33,7 +33,7 @@ test('lazy IF dependency edges change with condition; IFERROR/cycles are not cac
  assert.equal(resultOf(s,'A1',raw,ctx),'100');
  assert.ok(!ctx.calculation.dependencies.get('ГРАФИК!A1').has('ГРАФИК!D1'));
  assert.equal(updateCalculationValue(ctx,'График','D1','300'),1);
- assert.equal(resultOf(s,'A1',raw,ctx),100);
+ assert.equal(resultOf(s,'A1',raw,ctx),'100');
  assert.equal(updateCalculationValue(ctx,'График','B1','0'),2);
  assert.equal(resultOf(s,'A1',raw,ctx),'300');
  assert.ok(ctx.calculation.dependencies.get('ГРАФИК!A1').has('ГРАФИК!D1'));
