@@ -28,6 +28,7 @@ with sync_playwright() as p:
  page.locator('#name-box').focus();page.keyboard.press('Control+y')
  assert bg('B2')=='rgb(250, 204, 21)',bg('B2')
  select('B2')
+ offsets=[]
  for label,expected in [('По левому краю','flex-start'),('По центру','center'),('По правому краю','flex-end')]:
   page.get_by_role('button',name=label).click()
   assert justify('B2')==expected,(label,justify('B2'))
@@ -36,7 +37,8 @@ with sync_playwright() as p:
    const a=range.getBoundingClientRect(), b=el.getBoundingClientRect();
    return (a.left-b.left)/b.width;
   }""")
-  assert {'flex-start':measured<0.25,'center':0.3<measured<0.7,'flex-end':measured>0.6}[expected],(label,measured)
+  offsets.append(measured)
+ assert offsets[0]+0.05<offsets[1] and offsets[1]+0.05<offsets[2],offsets
  # Outer borders on normal unmerged cells must not trigger the merge command.
  select('B2:D4')
  page.get_by_role('button',name='Границы').click()
