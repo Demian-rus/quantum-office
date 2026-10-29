@@ -24,7 +24,7 @@ test('TASK048: prevent cut, malformed TSV and accidental formulas without edits'
  const clip=copyCells(s,'A1','A1',b),before=JSON.stringify(s.cells);
  assert.throws(()=>pasteValuesCells(s,'B1',{...clip,mode:'cut'},b),/скопируйте/);
  assert.throws(()=>pasteValuesCells(s,'B1',{...clip,text:'one\ntwo'},b),/переносы строк/);
- assert.throws(()=>pasteValuesCells(s,'B1',{...clip,text:'=A1'},b),/изменения типа/);
+ assert.throws(()=>pasteValuesCells(s,'B1',{...clip,text:'=A1',values:[['=A1']]},b),/изменения типа/);
  assert.equal(JSON.stringify(s.cells),before);
 });
 test('TASK048: merges, hidden cells and out-of-bounds are rejected before mutation',()=>{
