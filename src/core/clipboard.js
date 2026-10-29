@@ -1,6 +1,6 @@
 /** In-app clipboard: preserves formulas, styles and complete merged regions.
  * All edits are prevalidated before mutating a sheet; no eval or network. */
-import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt,mergeCells,validRef} from './workbook.js';
+import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt,mergeCells,validRef,getEffectiveStyle} from './workbook.js';
 
 const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
 const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -22,8 +22,7 @@ export function copyCells(sheet,start,end,book=null){
  return {start:first,rows,cols,text:valuesTSV(sheet,first,last,book),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
-   const effective={...(item.style||{})};
-   if(sheet.defaultAlign&&!effective.align)effective.align=sheet.defaultAlign;
+   const effective=getEffectiveStyle(sheet,cellName(rect.r1+r,rect.c1+c));
    return {value:item.value,style:structuredClone(effective)};
   }))};
 }
