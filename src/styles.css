@@ -254,4 +254,4 @@
 .grid-frozen-rows .grid-cell{z-index:1}
 .grid-frozen-cols .grid-cell{z-index:1}
 
-.grid-frozen-rows .grid-cell.frozen-col{z-index:5}
+.grid-frozen-rows .grid-cell.frozen-col{z-index:30}
