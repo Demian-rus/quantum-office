@@ -90,8 +90,11 @@ export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]
 export function getEffectiveStyle(sheet,ref){
  const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
- return {...(sheet.defaultStyle||{}),...(column||{}),...own,
-  align:own.align??column?.align??sheet.defaultStyle?.align??sheet.defaultAlign??undefined};
+ const style={...(sheet.defaultStyle||{}),...(column||{}),...own};
+ const align=own.align??column?.align??sheet.defaultStyle?.align??sheet.defaultAlign;
+ if(align!==undefined&&align!==null)style.align=align;
+ else delete style.align;
+ return style;
 }
 const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
 /** Format full-height columns or entire sheet in O(saved cells + 100 columns).
