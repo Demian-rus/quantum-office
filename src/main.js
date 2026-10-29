@@ -220,7 +220,14 @@ function bordersPopup(){if(!borderMenuOpen)return '';
  const items=[['outline','Внешние границы','borderOutline'],['all','Все границы','borderAll'],['bottom','Нижняя граница','borderBottom'],['top','Верхняя граница','borderTop'],['left','Левая граница','borderLeft'],['right','Правая граница','borderRight'],['none','Без границ','borderNone']];
  return `<div class="format-popover border-popover" role="menu" aria-label="Варианты границ"><div class="popup-header"><strong>Границы выделения</strong><button data-action="popup-close" aria-label="Закрыть">×</button></div><div class="border-hint">Рамка вокруг диапазона не объединяет ячейки</div>${items.map(([id,label,icon])=>`<button class="border-choice" role="menuitem" data-action="border-mode" data-value="${id}"><span class="border-glyph">${toolIcon(id==='none'?'border-none':id==='all'?'border-all':'border-'+id,'')}</span>${label}</button>`).join('')}</div>`;
 }
-function toggleWrap(){const next=!getCell(sheet(),activeCell).style?.wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
+function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
+ if(rect.r1===0&&rect.r2===LIMITS.rows-1){
+  try{
+   transact(()=>setBulkColumnStyle(sheet(),activeCell,rangeEnd,{wrap:next}));drawGrid();
+   status('Перенос текста применён ко всем строкам выбранных столбцов. Высоту при необходимости настройте отдельно.');
+  }catch(err){status(err.message,true);}
+  return;
+ }
  const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
  const {raw,ctx}=recalculator.view(book(),sheet());
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,{wrap:next});
