@@ -322,3 +322,30 @@
 .cf-rule button{background:#fff3f3;border-radius:5px;color:#a94646;font-size:17px;cursor:pointer;padding:2px 8px}
 .cf-note{border-top:1px solid #e8eef0;color:#8a9aa5;font-size:10px;line-height:1.45;padding:11px 14px}
 @media(max-width:650px){.cf-panel{right:8px;top:150px;max-height:calc(100% - 168px)}}
+
+/* TASK052: compact offline validation rules, no grid-width change */
+#validation-choice-slot:empty{display:none}
+.validation-cell-control{height:33px;display:flex;align-items:center;gap:6px;padding:0 8px;border-right:1px solid #dae5ee;color:#4b796a;font-size:10px;font-weight:700}
+.validation-cell-control select{width:clamp(90px,12vw,185px);height:27px;border:1px solid #a8cbb7;border-radius:5px;background:#eef7f2;color:#22563e;padding:2px 5px;font-size:11px}
+.validation-panel{position:absolute;right:16px;top:164px;z-index:1150;width:min(405px,calc(100vw - 32px));max-height:calc(100% - 183px);overflow:auto;border:1px solid #b8ccd8;border-radius:12px;background:#fff;box-shadow:0 14px 44px rgba(20,45,67,.24);color:#2c4254;font:12px "Segoe UI",Arial,sans-serif}
+.validation-panel [hidden]{display:none!important}
+.validation-panel-head{display:flex;align-items:center;gap:12px;padding:0 13px;height:43px;border-bottom:1px solid #dae6e0;background:#f1f7f4}
+.validation-panel-head strong{font-size:14px}.validation-panel-head span{margin-left:auto;color:#81929d;font-size:11px}
+.validation-panel-head button{cursor:pointer;color:#647989;background:transparent;font-size:23px;padding:3px 8px}
+.validation-form{display:grid;gap:10px;padding:14px;border-bottom:1px solid #edf0f2}
+.validation-form small{font-size:10px;color:#718696}
+.validation-form label{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:8px;font-size:11px;color:#5a7081;font-weight:650}
+.validation-form select,.validation-form input,.validation-form textarea{min-width:0;width:100%;border:1px solid #c7d7e0;border-radius:6px;background:#fff;color:#253c52;padding:7px 9px;font:12px "Segoe UI",Arial,sans-serif}
+.validation-form textarea{resize:vertical;min-height:54px}
+#validation-number-row{display:grid;gap:10px}
+.validation-add{cursor:pointer;border:1px solid #1c7352;background:#277b57;color:#fff;font-size:11px;font-weight:750;padding:10px;border-radius:6px}
+.validation-rules{padding:11px 14px;max-height:205px;overflow:auto}
+.validation-rules h4{margin:2px 0 9px;font-size:11px;color:#697e90}
+.validation-rules p{font-size:11px;color:#798b9b}
+.validation-rule{display:flex;align-items:center;gap:10px;border-bottom:1px solid #e9eff2;padding:9px 0}
+.validation-rule div{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.validation-rule strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px}
+.validation-rule small{color:#8295a1;font-size:10px}
+.validation-rule button{cursor:pointer;color:#ad4a4a;background:#fff0f0;font-size:17px;border-radius:5px;padding:2px 8px}
+.validation-note{padding:10px 14px;color:#8397a2;font-size:10px;line-height:1.55;border-top:1px solid #e9eff2}
+@media(max-width:650px){.validation-panel{right:8px;top:151px;max-height:calc(100% - 169px)}}
