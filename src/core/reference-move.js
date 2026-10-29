@@ -38,7 +38,7 @@ export function rebaseMovedFormula(value,formulaSheetName,sourceSheetName,source
   if(!inside(refRect,sourceRect))
    throw Error('Формула содержит диапазон, частично пересекающий перемещение. Сохранены исходные данные.');
   const colon=b?':'+shifted(b,rowDelta,colDelta):'';
-  const prefix=sheet===undefined?'':whole.slice(0,whole.indexOf(a));
+  const prefix=sheet===undefined?'':whole.slice(0,whole.length-a.length-(b?b.length+1:0));
   altered=true;
   return prefix+shifted(a,rowDelta,colDelta)+colon;
  });
