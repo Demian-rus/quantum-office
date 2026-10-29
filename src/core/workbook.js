@@ -4,7 +4,7 @@ export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{}};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -85,6 +85,68 @@ export function firstVisibleIndex(positions,coordinate){
  return Math.min(lo,positions.length-2);
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
+
+/** Column-level inheritance excludes the explicit style of its first cell.
+ * Excel column styles must not accidentally propagate A1's custom fill to A2. */
+export function getColumnBaseStyle(sheet,col){
+ const style={...(sheet.defaultStyle||{}),...(sheet.columnStyles?.[col]||{})};
+ if(style.align===undefined&&sheet.defaultAlign!=null)style.align=sheet.defaultAlign;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
+ return style;
+}
+/** Layered style resolution, without allocation for empty virtual rows. */
+export function getEffectiveStyle(sheet,ref){
+ const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
+ const column=pos?sheet.columnStyles?.[pos.col]:null;
+ const style={...(sheet.defaultStyle||{}),...(column||{}),...own};
+ const align=Object.hasOwn(own,'align')?own.align:Object.hasOwn(column||{},'align')?column.align:sheet.defaultStyle?.align??sheet.defaultAlign;
+ if(align!==undefined&&align!==null)style.align=align;
+ else delete style.align;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
+ return style;
+}
+const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
+/** Format full-height columns or entire sheet in O(saved cells + 100 columns).
+ * Per-cell overrides for the changed property are cleared, other styles kept. */
+export function setBulkColumnStyle(sheet,from,to,patch){
+ const area=rectangle(from,to);
+ if(!area||!validRef(from)||!validRef(to)||area.r1!==0||area.r2!==LIMITS.rows-1)throw Error('Выделите целые столбцы');
+ const pairs=Object.entries(patch||{});
+ if(pairs.length!==1||!bulkStyleProps.has(pairs[0][0]))throw Error('Недопустимое массовое оформление');
+ const [prop,value]=pairs[0];
+ if(prop==='align'&&value!==undefined&&!['left','center','right'].includes(value))throw Error('Недопустимое выравнивание');
+ if(['bg','color'].includes(prop)&&value!==undefined&&!/^#[0-9a-fA-F]{6}$/.test(value))throw Error('Недопустимый цвет');
+ if(['bold','italic','wrap'].includes(prop)&&value!==undefined&&typeof value!=='boolean')throw Error('Недопустимое оформление');
+ if(prop==='format'&&value!==undefined&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(value))throw Error('Недопустимый числовой формат');
+ const full=area.c1===0&&area.c2===LIMITS.columns-1;
+ const next={...(sheet.defaultStyle||{})},columns={...(sheet.columnStyles||{})};
+ if(full){
+  if(prop==='align'){sheet.defaultAlign=value??null;delete next.align;}
+  else if(value===undefined)delete next[prop];else next[prop]=value;
+  for(const key of Object.keys(columns)){
+   const style={...columns[key]};delete style[prop];
+   if(Object.keys(style).length)columns[key]=style;else delete columns[key];
+  }
+ }else{
+  for(let col=area.c1;col<=area.c2;col++){
+   const key=String(col),style={...(columns[key]||{})};
+   if(value===undefined){
+    if(prop in (sheet.defaultStyle||{})||(prop==='align'&&sheet.defaultAlign!=null))style[prop]=null;
+    else delete style[prop];
+   }else style[prop]=value;
+   if(Object.keys(style).length)columns[key]=style;else delete columns[key];
+  }
+ }
+ for(const [ref,cell] of Object.entries(sheet.cells)){
+  const pos=parseCell(ref);
+  if(!pos||pos.col<area.c1||pos.col>area.c2||!(prop in (cell.style||{})))continue;
+  const style={...cell.style};delete style[prop];
+  if(!cell.value&&!Object.keys(style).length)delete sheet.cells[ref];
+  else sheet.cells[ref]={...cell,style};
+ }
+ sheet.defaultStyle=next;sheet.columnStyles=columns;
+}
+
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
 /** Convert explicit calendar/time input to serial values only for direct user entry.
  * All file import, clipboard and formula editing outside the UI preserve their raw values. */
@@ -92,8 +154,8 @@ export function setTypedCell(sheet,ref,input){
  const parsed=typeof input==='string'&&!input.startsWith('=')?parseTemporalInput(input):null;
  setCell(sheet,ref,parsed?parsed.value:input);
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
- else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'date'});
- else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'time'});
+ else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'date'});
+ else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'time'});
 }
 /** Full-sheet alignment is one property, not 200,000 styled cells.
  * Existing per-cell alignments are reset so this action truly affects all cells.
@@ -101,6 +163,11 @@ export function setTypedCell(sheet,ref,input){
 export function setWholeSheetAlignment(sheet,align){
  if(!['left','center','right'].includes(align))throw Error('Недопустимое выравнивание всего листа');
  sheet.defaultAlign=align;
+ if(sheet.defaultStyle?.align!==undefined){const next={...sheet.defaultStyle};delete next.align;sheet.defaultStyle=next;}
+ if(sheet.columnStyles)for(const col of Object.keys(sheet.columnStyles)){
+  const style={...sheet.columnStyles[col]};delete style.align;
+  if(Object.keys(style).length)sheet.columnStyles[col]=style;else delete sheet.columnStyles[col];
+ }
  for(const [ref,item] of Object.entries(sheet.cells)){
   if(item.style?.align!==undefined){
    const style={...item.style};delete style.align;
@@ -274,17 +341,17 @@ export function formulaContext(book,sheet,map=rawMap(sheet)){
 }
 export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evaluateCell(ref,map,new Set(),context);}
 export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
-  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
-  if(['date','time','datetime','duration'].includes(cell.style?.format)&& (typeof result==='number'||typeof result==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(result)))return formatTemporal(Number(result),cell.style.format);
+  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context),fmt=getEffectiveStyle(sheet,ref).format;if(result===''||result==null)return '';
+  if(['date','time','datetime','duration'].includes(fmt)&& (typeof result==='number'||typeof result==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(result)))return formatTemporal(Number(result),fmt);
   // Directly entered numeric cells are stored as strings. Number formatting must
   // still apply without changing their raw values, clipboard or formula semantics.
-  const fmt=cell.style?.format,typedNumeric=['currency','percent','integer'].includes(fmt)&&typeof result==='string'&&/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(result);
+  const typedNumeric=['currency','percent','integer'].includes(fmt)&&typeof result==='string'&&/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(result);
   if(typeof result!=='number'&&!typedNumeric)return String(result);
   const n=Number.isFinite(Number(result))?Number(result):0;
-  if(['date','time','datetime','duration'].includes(cell.style?.format))return formatTemporal(n,cell.style.format);
-  if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
-  if(cell.style?.format==='percent')return new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:2}).format(n);
-  if(cell.style?.format==='integer')return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n);
+  if(['date','time','datetime','duration'].includes(fmt))return formatTemporal(n,fmt);
+  if(fmt==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
+  if(fmt==='percent')return new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:2}).format(n);
+  if(fmt==='integer')return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n);
   return String(n);
 }
 export function valuesTSV(sheet,a,b,book=null){const rect=rectangle(a,b);if(!rect)return '';
@@ -375,6 +442,21 @@ export function validateWorkbook(book){
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
+  const validSparseStyle=(style,allowNull=false)=>style&&typeof style==='object'&&!Array.isArray(style)&&
+   Object.keys(style).every(k=>bulkStyleProps.has(k))&&Object.entries(style).every(([k,v])=>{
+    if(v===null)return allowNull;
+    if(k==='align')return ['left','center','right'].includes(v);
+    if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
+    if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
+    return typeof v==='boolean';
+   });
+  if(sheet.defaultStyle!==undefined&&!validSparseStyle(sheet.defaultStyle))throw Error('Повреждено оформление листа');
+  if(sheet.columnStyles!==undefined){
+   const styles=sheet.columnStyles;
+   if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>LIMITS.columns||
+     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style,true)))
+    throw Error('Повреждено оформление столбцов');
+  }
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
@@ -430,7 +512,9 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
 export function clearFormatting(sheet,from,to,inspectOnly=false){
  const {area,entries}=sparseSelection(sheet,from,to);
  const all=area.r1===0&&area.c1===0&&area.r2===LIMITS.rows-1&&area.c2===LIMITS.columns-1;
- let count=all&&sheet.defaultAlign!=null?1:0;
+ let count=all&&(sheet.defaultAlign!=null||Object.keys(sheet.defaultStyle||{}).length>0)?1:0;
+ const columns=area.r1===0&&area.r2===LIMITS.rows-1?Object.keys(sheet.columnStyles||{}).filter(c=>+c>=area.c1&&+c<=area.c2):[];
+ count+=columns.length;
  for(const [ref,entry] of entries){
   if(!Object.keys(entry.style||{}).length)continue;
   count++;
@@ -439,7 +523,10 @@ export function clearFormatting(sheet,from,to,inspectOnly=false){
    else delete sheet.cells[ref];
   }
  }
- if(!inspectOnly&&all)sheet.defaultAlign=null;
+ if(!inspectOnly){
+  if(all){sheet.defaultAlign=null;sheet.defaultStyle={};}
+  if(columns.length){const next={...(sheet.columnStyles||{})};for(const c of columns)delete next[c];sheet.columnStyles=next;}
+ }
  return count;
 }
 /** Plan autosum operations before any mutation, protecting occupied destinations. */
