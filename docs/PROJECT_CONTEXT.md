@@ -364,3 +364,11 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - The values-only path rejects deferred Ctrl+X cut, any target merge, hidden destination rows/columns, out-of-bounds targets and workbook cell-cap overflow before mutating the sheet. It is one Undo/Redo transaction, and persists to QBOOK.
 - Safety limitation of TSV snapshot: embedded tab/newline results and literal result strings beginning with '=' are refused rather than silently reinterpreted as formulas. Proper typed literal results require a future typed clipboard model. This operation is not the full Excel Paste Special menu.
 - Node and Chromium regression tests, including physical keyboard, formula result, formatting, undo/redo and rejection; preserve offline HTML+ZIP.
+
+
+## TASK 049 — structured Paste Values clipboard (2026-10-29)
+
+- After TASK048, the in-app Ctrl+Shift+V incorrectly rejected formula results and text containing embedded tab/newline characters because its one-dimensional TSV split cannot distinguish separators inside cell content. This task adds a two-dimensional `clip.values` computed snapshot at copy time; the text TSV remains unchanged for external apps and the normal Ctrl+V still copies source formulas/styles.
+- Paste Values checks snapshot dimensions, string value types, text consistency, hidden rows/columns, merges, cell limits and no-cut mode before any writes. Existing destination formatting survives; source edits after copying do not change paste results; a single Undo/Redo and native QBOOK roundtrip remain.
+- Intentional limitation: raw strings starting with `=` are formulas in the current cell schema. Literal results starting with `=` are rejected rather than becoming unintended calculations. Typed cell metadata requires a separate future task with XLSX, QBOOK and editor validation.
+- `tests/task049.test.js` covers snapshot exactness, cross-sheet formulas, malformed clips, ordinary Ctrl+V, QBOOK and refusal of `=` literals. `tests/task049_browser.py` uses physical Ctrl+C and Ctrl+Shift+V in Chromium, Undo/Redo, serialized QBOOK and failure atomicity. Do not merge without Verify and full Chromium smoke on final HEAD. Keep standalone HTML and ZIP current.

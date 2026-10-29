@@ -1537,11 +1537,17 @@ function copyCells(sheet,start,end,book=null){
   if(!inside(region,rect))throw Error('Объединённая ячейка попала в выделение частично. Выделите её целиком');
   merges.push({r1:region.r1-rect.r1,c1:region.c1-rect.c1,r2:region.r2-rect.r1,c2:region.c2-rect.c1});
  }
- const first=cellName(rect.r1,rect.c1),last=cellName(rect.r2,rect.c2);
- return {start:first,rows,cols,text:valuesTSV(sheet,first,last,book),merges,
+ const first=cellName(rect.r1,rect.c1);
+ // In-app Paste Values uses a rectangular snapshot, not an ambiguous TSV string.
+ // Preserve the plain-text TSV for system clipboard interoperability.
+ const raw=Object.fromEntries(Object.entries(sheet.cells).map(([ref,item])=>[ref,item.value]));
+ const context=formulaContext(book,sheet,raw);
+ const values=Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>
+  String(resultOf(sheet,cellName(rect.r1+r,rect.c1+c),raw,context))));
+ return {start:first,rows,cols,values,text:values.map(row=>row.join('\t')).join('\n'),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
-   const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
-   const effective=getEffectiveStyle(sheet,cellName(rect.r1+r,rect.c1+c));
+   const ref=cellName(rect.r1+r,rect.c1+c),item=getCell(sheet,ref);
+   const effective=getEffectiveStyle(sheet,ref);
    return {value:item.value,style:structuredClone(effective)};
   }))};
 }
@@ -1592,14 +1598,16 @@ function pasteValuesCells(sheet,target,clip,book=null){
  if(!at||!validRef(target)||!clip||clip.mode==='cut'||
     !Number.isInteger(clip.rows)||!Number.isInteger(clip.cols)||
     clip.rows<1||clip.cols<1||clip.rows*clip.cols>20000||
-    typeof clip.text!=='string'||!Array.isArray(clip.cells))
+    typeof clip.text!=='string'||!Array.isArray(clip.values)||!Array.isArray(clip.cells))
   throw Error(clip?.mode==='cut'?'Для вставки значений сначала скопируйте ячейки Ctrl+C':'Недопустимый буфер для вставки значений');
  if(at.row+clip.rows>LIMITS.rows||at.col+clip.cols>LIMITS.columns)
   throw Error('Вставка значений выходит за пределы листа');
- const parsed=clip.text.split('\n').map(line=>line.split('\t'));
- if(parsed.length!==clip.rows||parsed.some(row=>row.length!==clip.cols)||
-    clip.cells.length!==clip.rows||clip.cells.some(row=>!Array.isArray(row)||row.length!==clip.cols))
-  throw Error('Значения содержат переносы строк или табуляции: безопасная вставка невозможна');
+ const parsed=clip.values;
+ if(parsed.length!==clip.rows||parsed.some(row=>!Array.isArray(row)||row.length!==clip.cols||
+    row.some(value=>typeof value!=='string'))||
+    clip.cells.length!==clip.rows||clip.cells.some(row=>!Array.isArray(row)||row.length!==clip.cols)||
+    clip.text!==parsed.map(row=>row.join('\t')).join('\n'))
+  throw Error('Буфер повреждён: текст или переносы строк не совпадают со снимком');
  const endRow=at.row+clip.rows-1,endCol=at.col+clip.cols-1;
  for(let row=at.row;row<=endRow;row++)
   if(sheet.hiddenRows?.[row]||sheet.autoFilter?.hiddenRows?.[row])throw Error('Сначала отобразите скрытые строки назначения');
