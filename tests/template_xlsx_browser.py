@@ -23,7 +23,8 @@ with sync_playwright() as p:
  assert wb['График']['B2'].value=='Ученики'
  assert wb['График']['A4'].fill.fgColor.rgb[-6:]=='FFCA19'
  assert wb['График'].freeze_panes=='C4',wb['График'].freeze_panes
- assert len(wb['График'].merged_cells.ranges)==0
+ assert 'A4:A8' in {str(x) for x in wb['График'].merged_cells.ranges}
+ assert 'C1:J1' in {str(x) for x in wb['График'].merged_cells.ranges}
  output.unlink()
  browser.close()
  print('PASS schedule template XLSX export/import readability and explicit no-merge limitation')
