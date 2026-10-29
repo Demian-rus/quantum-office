@@ -44,13 +44,13 @@ with sync_playwright() as p:
  page.locator('[data-action=save]').first.click()
  page.wait_for_function('fakeDrive.a.closed===1')
  assert page.evaluate('decodeBook(fakeDrive.a.raw).sheets[0].cells.A1.value')=='Книга A'
- assert 'проверен на диске' in state()['marker']
+ page.wait_for_function("document.querySelector('#storage-indicator')?.textContent?.includes('Файл проверен на диске')")
  write('A1','Версия A2')
  assert 'не сохранено на диск' in state()['marker']
  page.locator('[data-action=save]').first.click()
  page.wait_for_function('fakeDrive.a.closed===2')
  assert page.evaluate('decodeBook(fakeDrive.a.raw).sheets[0].cells.A1.value')=='Версия A2'
- assert 'проверен на диске' in state()['marker']
+ page.wait_for_function("document.querySelector('#storage-indicator')?.textContent?.includes('Файл проверен на диске')")
  # Switching books must never reuse A's handle.
  page.get_by_role('button',name='Обзор').click()
  page.locator('[data-action=new]').first.click()
@@ -65,7 +65,7 @@ with sync_playwright() as p:
  page.evaluate("fakeDrive.b.raw=encodeBook(newWorkbook('Внешний файл'))")
  write('B2','Меняю')
  page.locator('[data-action=save]').first.click()
- assert 'изменён' in page.locator('#toast').inner_text()
+ page.wait_for_function("(needle)=>document.querySelector('#toast')?.textContent?.includes(needle)",arg='изменён')
  assert page.evaluate('fakeDrive.b.closed')==1
  assert page.evaluate('decodeBook(fakeDrive.b.raw).name')=='Внешний файл'
  page.get_by_role('tab',name='Файл').click()
@@ -86,7 +86,7 @@ with sync_playwright() as p:
  page.evaluate('fakeDrive.a.fail=true')
  write('C3','Нельзя потерять')
  page.locator('[data-action=save]').first.click()
- assert 'simulated disk fault' in page.locator('#toast').inner_text()
+ page.wait_for_function("(needle)=>document.querySelector('#toast')?.textContent?.includes(needle)",arg='simulated disk fault')
  assert page.evaluate('fakeDrive.a.closed')==3
  assert 'не сохранено на диск' in state()['marker']
  page.evaluate('fakeDrive.a.fail=false')
