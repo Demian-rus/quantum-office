@@ -1472,8 +1472,8 @@ function createBudgetTemplate(){
  * This function preserves sheet qualifiers, case, $ anchors and string literals.
  */
 
-const CUT_REF_RE=/(?<![A-Za-z0-9_.$])(?:(?:'((?:[^']|'')+)'|([A-Za-z_А-ЯЁ][A-Za-z0-9_.А-ЯЁ]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![A-Za-z0-9_.])/gi;
-const CUT_TOKEN_RE=new RegExp('"(?:[^"]|"")*"|'+CUT_REF_RE.source,'gi');
+const CUT_REF_RE=/(?<![\p{L}\p{N}_.$])(?:(?:'((?:[^']|'')+)'|([\p{L}_][\p{L}\p{N}_.]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![\p{L}\p{N}_.])/giu;
+const CUT_TOKEN_RE=new RegExp('"(?:[^"]|"")*"|'+CUT_REF_RE.source,'giu');
 const cutRefOverlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 const cutRefInside=(a,b)=>a.r1>=b.r1&&a.r2<=b.r2&&a.c1>=b.c1&&a.c2<=b.c2;
 const cutRefKey=name=>String(name).toLocaleUpperCase('ru-RU');
@@ -1495,12 +1495,16 @@ const cutRefShifted=(reference,dr,dc)=>{
 function rebaseMovedFormula(value,formulaSheetName,sourceSheetName,sourceRect,rowDelta,colDelta){
  if(typeof value!=='string'||!value.startsWith('='))return value;
  let altered=false;
- const changed=value.replace(CUT_TOKEN_RE,(whole,quoted,unquoted,a,b)=>{
+ const changed=value.replace(CUT_TOKEN_RE,(whole,quoted,unquoted,a,b,offset)=>{
   if(whole.startsWith('"'))return whole;
   const sheet=quoted!==undefined?quoted.replaceAll("''","'"):unquoted;
   if(cutRefKey(sheet||formulaSheetName)!==cutRefKey(sourceSheetName))return whole;
   const refRect=cutRefRect(a,b||a);
   if(!refRect||!cutRefOverlaps(refRect,sourceRect))return whole;
+  // External OOXML references can prepend [Book.xlsx] to a local sheet name.
+  // Unknown qualifiers must not be mistaken for current-sheet references.
+  if((sheet!==undefined&&value[offset-1]===']')||(sheet===undefined&&value[offset-1]==='!'))
+   throw Error('Формула содержит внешнюю или неподдерживаемую ссылку. Перенос отменён без изменений.');
   if(!cutRefInside(refRect,sourceRect))
    throw Error('Формула содержит диапазон, частично пересекающий перемещение. Сохранены исходные данные.');
   const colon=b?':'+cutRefShifted(b,rowDelta,colDelta):'';

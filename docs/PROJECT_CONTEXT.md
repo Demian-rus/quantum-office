@@ -349,3 +349,10 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - All affected formulas across sheets are validated and staged before the active sheet contents and dependent formulas are committed. A refusal leaves source, target, other sheets and Undo/Redo intact via TASK044's atomic transaction. Existing stale cut, overlap and merged-region guards remain.
 - Tests `task046.test.js`: absolute/relative refs, quoted/unquoted sheet names, string literals, full/partial ranges, inside formulas, multiple sheets, overlapping move, QBOOK persistence and atomic refusal. `task046_browser.py`: real Ctrl+X/V, other-sheet formulas, Undo/Redo and partially intersecting range refusal. TASK045's previously expected dependency refusal is revised only for cases that can now be safely rebound.
 - Required full Node Verify and complete Chromium smoke at final HEAD. Refresh offline Quantum-Office.html and ZIP and always attach user-downloadable HTML.
+
+
+## TASK 047 — external Excel links and Unicode sheet names (2026-10-29)
+
+- Confirmed TASK046 bug: cut/move from Source!D5 rewrote `[Budget.xlsx]Source!D5` (an **external** workbook reference) as though it targeted the current book. Bare Unicode `Résumé!D5` was misparsed as an unqualified local D5.
+- Tokenization now recognizes Unicode letters/numbers in identifiers and unquoted sheet qualifiers. Explicit external [Book.xlsx] prefixes and otherwise unsupported bare qualifiers that overlap moved coordinates are **rejected before mutation**; no silent rewrites.
+- Local, quoted, absolute and ranged references continue to work. Does not implement external workbook calculation or full formula AST. Tests: Node + Chromium real Ctrl+X/V, Undo/Redo, atomic rejection. Use original XLSX as backup.
