@@ -1,6 +1,6 @@
 /** In-app clipboard: preserves formulas, styles and complete merged regions.
  * All edits are prevalidated before mutating a sheet; no eval or network. */
-import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt,mergeCells,validRef,getEffectiveStyle} from './workbook.js';
+import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt,mergeCells,validRef,getEffectiveStyle,setCell} from './workbook.js';
 import {rebaseMovedFormula} from './reference-move.js';
 
 const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
@@ -65,6 +65,47 @@ export function pasteCells(sheet,target,clip){
   for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)sheet.cells[ref]=item;else delete sheet.cells[ref];}
  }
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
+}
+
+/** Paste a computed clipboard snapshot, not live formulas or the source styling.
+ * Keep target styles intact and validate the whole rectangle before mutation. */
+export function pasteValuesCells(sheet,target,clip,book=null){
+ const at=parseCell(target);
+ if(!at||!validRef(target)||!clip||clip.mode==='cut'||
+    !Number.isInteger(clip.rows)||!Number.isInteger(clip.cols)||
+    clip.rows<1||clip.cols<1||clip.rows*clip.cols>20000||
+    typeof clip.text!=='string'||!Array.isArray(clip.cells))
+  throw Error(clip?.mode==='cut'?'Для вставки значений сначала скопируйте ячейки Ctrl+C':'Недопустимый буфер для вставки значений');
+ if(at.row+clip.rows>LIMITS.rows||at.col+clip.cols>LIMITS.columns)
+  throw Error('Вставка значений выходит за пределы листа');
+ const parsed=clip.text.split('\n').map(line=>line.split('\t'));
+ if(parsed.length!==clip.rows||parsed.some(row=>row.length!==clip.cols)||
+    clip.cells.length!==clip.rows||clip.cells.some(row=>!Array.isArray(row)||row.length!==clip.cols))
+  throw Error('Значения содержат переносы строк или табуляции: безопасная вставка невозможна');
+ const endRow=at.row+clip.rows-1,endCol=at.col+clip.cols-1;
+ for(let row=at.row;row<=endRow;row++)
+  if(sheet.hiddenRows?.[row]||sheet.autoFilter?.hiddenRows?.[row])throw Error('Сначала отобразите скрытые строки назначения');
+ for(let col=at.col;col<=endCol;col++)
+  if(sheet.hiddenColumns?.[col])throw Error('Сначала отобразите скрытые столбцы назначения');
+ for(const m of sheet.merges||[]){const r=rectangle(m.from,m.to);
+  if(r.r1<=endRow&&r.r2>=at.row&&r.c1<=endCol&&r.c2>=at.col)
+   throw Error('Вставка значений в объединённые ячейки запрещена');
+ }
+ const changes=[];let nextCount=Object.keys(sheet.cells).length;
+ for(let r=0;r<clip.rows;r++)for(let c=0;c<clip.cols;c++){
+  const value=parsed[r][c];
+  // In the current raw-cell format, a leading '=' means formula, not literal.
+  if(value.length>50000||value.startsWith('='))throw Error('Значение нельзя безопасно вставить без изменения типа');
+  const ref=cellName(at.row+r,at.col+c),prev=sheet.cells[ref];
+  const willStore=!!value||!!Object.keys(prev?.style||{}).length;
+  if(!prev&&willStore)nextCount++;
+  if(prev&&!willStore)nextCount--;
+  changes.push([ref,value]);
+ }
+ const others=book?book.sheets.filter(s=>s!==sheet).reduce((n,s)=>n+Object.keys(s.cells).length,0):0;
+ if(nextCount+others>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ for(const [ref,value] of changes)setCell(sheet,ref,value);
+ return {rows:clip.rows,cols:clip.cols,end:cellName(endRow,endCol)};
 }
 
 /** Cut paste is transactional. Dependent references are adjusted on staged

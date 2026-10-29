@@ -356,3 +356,11 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - Confirmed TASK046 bug: cut/move from Source!D5 rewrote `[Budget.xlsx]Source!D5` (an **external** workbook reference) as though it targeted the current book. Bare Unicode `Résumé!D5` was misparsed as an unqualified local D5.
 - Tokenization now recognizes Unicode letters/numbers in identifiers and unquoted sheet qualifiers. Explicit external [Book.xlsx] prefixes and otherwise unsupported bare qualifiers that overlap moved coordinates are **rejected before mutation**; no silent rewrites.
 - Local, quoted, absolute and ranged references continue to work. Does not implement external workbook calculation or full formula AST. Tests: Node + Chromium real Ctrl+X/V, Undo/Redo, atomic rejection. Use original XLSX as backup.
+
+
+## TASK 048 — Excel-style Paste Values (2026-10-29)
+
+- A new compact ribbon action «Вставить значения» (Home/Edit) and physical Ctrl+Shift+V paste **snapshotted computed results**, not formulas or source styles. The target's existing styles remain. Requires an in-app Ctrl+C snapshot; standard Ctrl+V continues copying styles/formulas.
+- The values-only path rejects deferred Ctrl+X cut, any target merge, hidden destination rows/columns, out-of-bounds targets and workbook cell-cap overflow before mutating the sheet. It is one Undo/Redo transaction, and persists to QBOOK.
+- Safety limitation of TSV snapshot: embedded tab/newline results and literal result strings beginning with '=' are refused rather than silently reinterpreted as formulas. Proper typed literal results require a future typed clipboard model. This operation is not the full Excel Paste Special menu.
+- Node and Chromium regression tests, including physical keyboard, formula result, formatting, undo/redo and rejection; preserve offline HTML+ZIP.
