@@ -14,7 +14,7 @@ export function parseCell(ref) {
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
 const REF = /^\$?[A-Z]+\$?[1-9]\d*$/;
-const FORMULA_LIMITS = {rows:2000, cols:100, tokens:2000, depth:80, range:10000};
+const FORMULA_LIMITS = {rows:100000, cols:100, tokens:2000, depth:80, range:10000};
 function tokensOf(formula) {
   if (formula.length > 10000) throw Error('#ERROR!');
   const tokens=[];let pos=0;

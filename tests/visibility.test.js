@@ -22,7 +22,7 @@ test('auto-filter and user hidden are separate causes of visibility',()=>{
 });
 test('invalid hidden metadata rejected and the final visible axis entry cannot be hidden',()=>{
  const b=newWorkbook(),s=currentSheet(b);s.hiddenRows={foo:true};assert.throws(()=>validateWorkbook(b),/скрытый индекс/);
- s.hiddenRows={'2000':true};assert.throws(()=>validateWorkbook(b));s.hiddenRows={};
+ s.hiddenRows={'100000':true};assert.throws(()=>validateWorkbook(b));s.hiddenRows={};
  for(let c=0;c<99;c++)setHidden(s,'col',c,true);
  assert.throws(()=>setHidden(s,'col',99,true),/Нельзя скрыть все/);
  assert.equal(columnVisible(s,99),true);
@@ -31,8 +31,8 @@ test('structural edits shift hidden flags without mutating data',()=>{
  const s=currentSheet(newWorkbook());setHidden(s,'row',3,true);setHidden(s,'col',2,true);
  changeSheetStructure(s,'row','insert',1);assert.deepEqual(s.hiddenRows,{4:true});
  changeSheetStructure(s,'col','delete',1);assert.deepEqual(s.hiddenColumns,{1:true});
- setHidden(s,'row',1999,true);const snapshot=structuredClone(s);
- assert.throws(()=>changeSheetStructure(s,'row','insert',1999),/Последняя строка или столбец скрыта/);
+ setHidden(s,'row',99999,true);const snapshot=structuredClone(s);
+ assert.throws(()=>changeSheetStructure(s,'row','insert',99999),/Последняя строка или столбец скрыта/);
  assert.deepEqual(s,snapshot);
 });
 test('XLSX export records explicit hidden row/col and keeps values intact',async()=>{

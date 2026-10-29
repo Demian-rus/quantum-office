@@ -19,7 +19,7 @@ test('a block copy retains formulas, styles and relative references',()=>{
  assert.equal(getCell(s,'A1').value,'14');
 });
 test('invalid paste stops before mutating any target',()=>{
- const s=currentSheet(newWorkbook());setCell(s,'A1','=B2000');setCell(s,'A2','original');
+ const s=currentSheet(newWorkbook());setCell(s,'A1','=B100000');setCell(s,'A2','original');
  const copy=copyCells(s,'A1','A2');const before=structuredClone(s.cells);
  assert.throws(()=>pasteCells(s,'A2',copy),/пределы/);
  assert.deepEqual(s.cells,before);

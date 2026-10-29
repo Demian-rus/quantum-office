@@ -1,4 +1,4 @@
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
@@ -25,7 +25,7 @@ function status(message,bad=false){statusMessage=message;const node=document.get
 function persist(){try{saveWorkspace(workspace);storeWarning=false;const n=document.querySelector('#storage-indicator');if(n)n.textContent='● Автосохранено локально';}catch(e){storeWarning=true;const n=document.querySelector('#storage-indicator');if(n)n.textContent='⚠ Сохраните файл вручную';status('Память браузера недоступна: экспортируйте .qbook или архив',true);}}
 function snapshot(){const b=book();if(!b)return;const a=undoStacks.get(b.id)||[];a.push(structuredClone(b));if(a.length>50)a.shift();undoStacks.set(b.id,a);redoStacks.set(b.id,[]);}
 function changed(){if(book())book().updated=dateNow();persist();}
-function transact(callback){const active=book();if(!active)return;snapshot();try{callback();recalculator.reconcile(active,undoStacks.get(active.id).at(-1));}catch(error){recalculator.reset();throw error;}changed();}
+function transact(callback){const active=book();if(!active)return;snapshot();try{callback();for(const part of active.sheets)invalidateGridGeometry(part);recalculator.reconcile(active,undoStacks.get(active.id).at(-1));}catch(error){recalculator.reset();throw error;}changed();}
 function replaceBook(fromHistory,toHistory){const b=book();if(!b)return;const stack=fromHistory.get(b.id)||[];if(!stack.length)return;const replacement=stack.pop();fromHistory.set(b.id,stack);const other=toHistory.get(b.id)||[];other.push(structuredClone(b));toHistory.set(b.id,other);workspace.books[workspace.books.findIndex(x=>x.id===b.id)]=replacement;persist();render();}
 function undo(){replaceBook(undoStacks,redoStacks);}
 function redo(){replaceBook(redoStacks,undoStacks);}
@@ -147,7 +147,8 @@ function applyStyle(patch,selection=null){
   transact(()=>setWholeSheetAlignment(sheet(),patch.align));drawGrid();status(`Выравнивание всего листа: ${patch.align==='center'?'по центру':patch.align==='right'?'справа':'слева'}`);return;
  }
  for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r)){status('Выделение содержит скрытые строки',true);return;}
- const refs=refsBetween(a,b);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
+ if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Слишком большой диапазон',true);return;}
+ const refs=refsBetween(a,b);
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
 }
 function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd};}

@@ -2,20 +2,25 @@ import { cellName,parseCell,colLabel,evaluateCell,createCalculationSession,csvEn
 import {formatTemporal,parseTemporalInput} from './dates.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
-export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
+// 100k virtual rows; populated cell count stays capped independently.
+export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
 export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
+const geometryCache=new WeakMap();
+export function invalidateGridGeometry(sheet){if(sheet&&typeof sheet==='object')geometryCache.delete(sheet);}
 export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??DIMENSIONS.defaultColumn;}
 export function rowHeight(sheet,index){return sheet.rowHeights?.[index]??DIMENSIONS.defaultRow;}
 export function setColumnWidth(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.columns||!Number.isInteger(value)||value<DIMENSIONS.minColumn||value>DIMENSIONS.maxColumn)throw Error('Недопустимая ширина столбца');
  sheet.columnWidths??={};if(value===DIMENSIONS.defaultColumn)delete sheet.columnWidths[index];else sheet.columnWidths[index]=value;
+ invalidateGridGeometry(sheet);
 }
 export function setRowHeight(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
  sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
+ invalidateGridGeometry(sheet);
 }
 /** Explicit visibility is separate from filtering. The data and formulas remain intact. */
 export function rowVisible(sheet,row){return !sheet.hiddenRows?.[row]&&filterRowVisible(sheet,row);}
@@ -28,11 +33,12 @@ export function setHidden(sheet,axis,index,hidden){
   if(Object.keys(sheet[key]).length>=limit-1&&!sheet[key][index])throw Error('Нельзя скрыть все строки или столбцы');
   sheet[key][index]=true;
  }else delete sheet[key][index];
+ invalidateGridGeometry(sheet);
 }
 export function showAllHidden(sheet,axis){
  const key=axis==='row'?'hiddenRows':axis==='col'?'hiddenColumns':null;
  if(!key)throw Error('Неизвестная ось');
- const count=Object.keys(sheet[key]||{}).length;sheet[key]={};return count;
+ const count=Object.keys(sheet[key]||{}).length;sheet[key]={};invalidateGridGeometry(sheet);return count;
 }
 /** Filters never move or delete source cells. Only row visibility is changed. */
 export function filterRange(sheet){const value=sheet.autoFilter;return value?rectangle(value.from,value.to):null;}
@@ -52,6 +58,7 @@ export function setAutoFilter(sheet,from,to){
  const rect=rectangle(from,to);
  if(!rect||rect.r2<=rect.r1||rect.r2>=LIMITS.rows||rect.c2>=LIMITS.columns)throw Error('Выделите диапазон с заголовком и хотя бы одной строкой');
  sheet.autoFilter={from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2),rules:{}};
+ invalidateGridGeometry(sheet);
 }
 export function setFilterValue(sheet,col,value){
  const rect=filterRange(sheet);
@@ -62,13 +69,15 @@ export function setFilterValue(sheet,col,value){
   }
  const rules={...(sheet.autoFilter.rules||{})};
  if(value===null)delete rules[col];else rules[col]=value;
- sheet.autoFilter={...sheet.autoFilter,rules};
+ sheet.autoFilter={...sheet.autoFilter,rules};invalidateGridGeometry(sheet);
 }
 export function gridGeometry(sheet){
- const x=[54],y=[31];
- for(let col=0;col<LIMITS.columns;col++)x.push(x.at(-1)+(columnVisible(sheet,col)?columnWidth(sheet,col):0));
- for(let row=0;row<LIMITS.rows;row++)y.push(y.at(-1)+(rowVisible(sheet,row)?rowHeight(sheet,row):0));
- return {x,y};
+ const cached=geometryCache.get(sheet);if(cached)return cached;
+ const x=new Float64Array(LIMITS.columns+1),y=new Float64Array(LIMITS.rows+1);
+ x[0]=54;y[0]=31;
+ for(let col=0;col<LIMITS.columns;col++)x[col+1]=x[col]+(columnVisible(sheet,col)?columnWidth(sheet,col):0);
+ for(let row=0;row<LIMITS.rows;row++)y[row+1]=y[row]+(rowVisible(sheet,row)?rowHeight(sheet,row):0);
+ const geometry={x,y};geometryCache.set(sheet,geometry);return geometry;
 }
 export function firstVisibleIndex(positions,coordinate){
  let lo=0,hi=positions.length-1;
@@ -76,7 +85,7 @@ export function firstVisibleIndex(positions,coordinate){
  return Math.min(lo,positions.length-2);
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
-export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
+export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
 /** Convert explicit calendar/time input to serial values only for direct user entry.
  * All file import, clipboard and formula editing outside the UI preserve their raw values. */
 export function setTypedCell(sheet,ref,input){
@@ -239,6 +248,7 @@ export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   return String(n);
 }
 export function valuesTSV(sheet,a,b,book=null){const rect=rectangle(a,b);if(!rect)return '';
+ if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>20000)throw Error('Копирование ограничено 20 000 ячеек');
  const map=rawMap(sheet),ctx=formulaContext(book,sheet,map),rows=[];for(let r=rect.r1;r<=rect.r2;r++){const row=[];for(let c=rect.c1;c<=rect.c2;c++)row.push(String(resultOf(sheet,cellName(r,c),map,ctx)));rows.push(row.join('\t'));}return rows.join('\n');}
 export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!validRef(start))throw Error('Недопустимая ячейка');
  const rows=String(text).replace(/\r\n?/g,'\n').replace(/\n$/,'').split('\n').map(line=>line.split('\t'));
@@ -316,6 +326,7 @@ export function importCSV(text,name='Импорт CSV'){
  return book;
 }
 export function exportCSV(sheet,book=null){let maxR=0,maxC=0;for(const key of Object.keys(sheet.cells)){const p=parseCell(key);if(p){maxR=Math.max(maxR,p.row);maxC=Math.max(maxC,p.col);}}
+ if((maxR+1)*(maxC+1)>250000)throw Error('CSV превышает 250 000 ячеек. Используйте .qbook или XLSX для разреженной таблицы');
  const raw=rawMap(sheet),ctx=formulaContext(book,sheet,raw);return csvEncode(Array.from({length:maxR+1},(_,r)=>Array.from({length:maxC+1},(_,c)=>String(resultOf(sheet,cellName(r,c),raw,ctx)))));
 }
 export function validateWorkbook(book){
@@ -375,7 +386,8 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
 
 /** Clears style without deleting values/formulas or creating empty cells. */
 export function clearFormatting(sheet,from,to){
- const refs=refsBetween(from,to);if(refs.length>10000)throw Error('Максимальный диапазон: 10 000 ячеек');
+ const rect=rectangle(from,to);if(!rect||((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000))throw Error('Максимальный диапазон: 10 000 ячеек');
+ const refs=refsBetween(from,to);
  let count=0;
  for(const ref of refs){const entry=sheet.cells[ref];if(!entry||!Object.keys(entry.style||{}).length)continue;count++;entry.style={};if(!entry.value)delete sheet.cells[ref];}
  return count;

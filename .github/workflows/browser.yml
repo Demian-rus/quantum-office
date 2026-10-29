@@ -40,3 +40,4 @@ jobs:
       - run: python tests/formatting030_browser.py
       - run: python tests/task031_browser.py
       - run: python tests/task032_browser.py
+      - run: python tests/task033_browser.py

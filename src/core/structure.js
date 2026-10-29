@@ -1,5 +1,5 @@
 /** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
-import {LIMITS,cellName,parseCell} from './workbook.js';
+import {LIMITS,cellName,parseCell,invalidateGridGeometry} from './workbook.js';
 
 const MAX_BATCH=100;
 const CELL_REF=/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi;
@@ -86,5 +86,6 @@ export function changeSheetStructure(sheet,axis,mode,index,count=1){
  if(freeze[frozenKey]>10)throw Error('Нельзя увеличить закреплённую область более 10 строк или столбцов');
  // Existing data and schema remain unchanged if even one step above failed.
  sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
+ invalidateGridGeometry(sheet);
  return {axis,mode,index,count,changed:Object.keys(cells).length};
 }

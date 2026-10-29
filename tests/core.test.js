@@ -37,7 +37,7 @@ test('absolute references are evaluated without changing saved formula',()=>{
  assert.equal(resultOf(s,'B1'),7);assert.equal(getCell(s,'B1').value,'=SUM($A$1:$A$2)+$A1');
 });
 test('fill rejects underflow before modifying any target',()=>{
- const s=currentSheet(newWorkbook());setCell(s,'B1','=A2000');setCell(s,'B2','KEEP');
+ const s=currentSheet(newWorkbook());setCell(s,'B1','=A100000');setCell(s,'B2','KEEP');
  assert.throws(()=>fillSelection(s,'B1','B2','down'),/пределы/);
  assert.equal(getCell(s,'B2').value,'KEEP');
 });

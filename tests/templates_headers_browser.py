@@ -26,12 +26,12 @@ with sync_playwright() as p:
  assert abs(top_after-top_before)<1,(top_before,top_after)
  # column header click selects entire column and row header click the entire row
  page.locator('#grid-col-overlay .colhead').filter(has_text='C').first.click()
- assert page.locator('#name-box').input_value()=='C1:C2000'
+ assert page.locator('#name-box').input_value()=='C1:C100000'
  page.locator('#grid-row-overlay .rowhead').first.click()
  selected=page.locator('#name-box').input_value()
  assert selected.startswith('A') and selected.endswith(':CV'+selected.split(':')[0][1:]),selected
  page.get_by_role('button',name='Выделить весь лист').click()
- assert page.locator('#name-box').input_value()=='A1:CV2000'
+ assert page.locator('#name-box').input_value()=='A1:CV100000'
  # no extra rename button; double-click directly into tab
  page.locator('.sheet-tab').first.dblclick()
  name=page.get_by_role('textbox',name='Новое имя листа');assert name.is_visible()
