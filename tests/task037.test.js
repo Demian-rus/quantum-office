@@ -71,7 +71,7 @@ test('later full-column style wins within column, adjacent rectangle keeps its c
  validateWorkbook(b);
 });
 
-test('native roundtrip retains sparse regions, clipboard copies effective style; XLSX refuses lossy conversion',async()=>{
+test('native roundtrip retains sparse regions, clipboard copies effective style; XLSX uses bounded styled blank cells',async()=>{
  const b=newWorkbook(),s=currentSheet(b);
  setRectangleStyle(s,'B100','C90000',{bg:'#42a5f5'});
  setCell(s,'B200','Текст');
@@ -82,7 +82,10 @@ test('native roundtrip retains sparse regions, clipboard copies effective style;
  assert.equal(clip.cells[0][0].style.bg,'#42a5f5');
  pasteCells(copy,'D200',clip);
  assert.equal(getEffectiveStyle(copy,'D200').bg,'#42a5f5');
- await assert.rejects(exportXLSX(restored),/XLSX.*\.qbook/);
+ const zip=await globalThis.JSZip.loadAsync(await exportXLSX(restored),{checkCRC32:true});
+ const xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
+ assert.ok(xml.includes('<c r="C89999" s="'),'Styled Excel cell C89999 missing');
+ assert.ok((xml.match(/<c /g)||[]).length>170000);
  assert.equal(getCell(copy,'B200').value,'Текст');
  assert.equal(Object.keys(copy.cells).length,2);
 });
