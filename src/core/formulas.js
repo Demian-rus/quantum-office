@@ -17,7 +17,7 @@ const FORMULA_LIMITS = {rows:2000, cols:100, tokens:2000, depth:80, range:10000}
 function tokensOf(formula) {
   if (formula.length > 10000) throw Error('#ERROR!');
   const tokens=[];let pos=0;
-  const re = /(?:\d+(?:\.\d+)?|\.\d+)(?:[Ee][+\-]?\d+)?|\$?[A-Z]+\$?[1-9]\d*|[A-Z_][A-Z0-9_.]*|<=|>=|<>|[()+\-*/,:;&=<>&]/iy;
+  const re = /'(?:[^']|'')*'!|[A-Z_А-ЯЁ][A-Z0-9_.А-ЯЁ]*!|(?:\d+(?:\.\d+)?|\.\d+)(?:[Ee][+\-]?\d+)?|\$?[A-Z]+\$?[1-9]\d*|[A-Z_][A-Z0-9_.]*|<=|>=|<>|[()+\-*/,:;&=<>&]/iy;
   while (pos<formula.length) {
     if (/\s/.test(formula[pos])) {pos++;continue;}
     if (formula[pos]==='"') {
@@ -60,7 +60,14 @@ function parseFormula(source){const tokens=tokensOf(source);let i=0,depth=0;
     if(t.type==='string')return {kind:'literal',value:t.value};
     const value=t.value;
     if(/^(?:\d|\.)/.test(value))return {kind:'literal',value:Number(value)};
-    if(REF.test(value)){address(value);if(eat(':')){const end=tokens[i++];if(!end||!REF.test(end.value))throw Error('#ERROR!');rangeRefs(value,end.value);return {kind:'range',from:value,to:end.value};}return {kind:'ref',ref:value};}
+    let sheet=null, ref=value;
+    if(value.endsWith('!')){
+      sheet=value.startsWith("'")?value.slice(1,-2).replaceAll("''", "'"):value.slice(0,-1);
+      if(!sheet||sheet.length>100)throw Error('#REF!');
+      const next=tokens[i++];if(!next||next.type!=='token'||!REF.test(next.value))throw Error('#ERROR!');
+      ref=next.value;
+    }
+    if(REF.test(ref)){address(ref);if(eat(':')){const end=tokens[i++];if(!end||!REF.test(end.value))throw Error('#ERROR!');rangeRefs(ref,end.value);return {kind:'range',sheet,from:ref,to:end.value};}return {kind:'ref',sheet,ref};}
     if(value==='TRUE'||value==='FALSE')return {kind:'literal',value:value==='TRUE'};
     if(/^[A-Z_][A-Z0-9_.]*$/.test(value)){
       if(value.includes('.'))throw Error('#ERROR!');if(!eat('('))throw Error('#NAME?');const args=[];
@@ -101,13 +108,22 @@ function matches(actual,criterion){
   return op==='='?cmp===0:op==='<>'?cmp!==0:op==='<'?cmp<0:op==='>'?cmp>0:op==='<='?cmp<=0:cmp>=0;
 }
 
-function evaluateNode(node,cells,visiting){
-  const ev=n=>evaluateNode(n,cells,visiting);
-  const valueOfRef=r=>{const ref=r.replaceAll('$','');const v=evaluateCell(ref,cells,visiting);if(isError(v))throw Error(v);return v;};
-  const values=n=>n.kind==='range'?rangeRefs(n.from,n.to).map(valueOfRef):[ev(n)];
+function evaluateNode(node,cells,visiting,context){
+  const ev=n=>evaluateNode(n,cells,visiting,context);
+  const valueOfRef=(r,sheet=null)=>{
+    const ref=r.replaceAll('$','');
+    let target=cells,targetContext=context;
+    if(sheet!==null){
+      const match=context?.sheets?.get(sheet.toLocaleUpperCase('ru-RU'));
+      if(!match)throw Error('#REF!');
+      target=match.cells;targetContext={...context,sheetName:match.name};
+    }
+    const v=evaluateCell(ref,target,visiting,targetContext);if(isError(v))throw Error(v);return v;
+  };
+  const values=n=>n.kind==='range'?rangeRefs(n.from,n.to).map(ref=>valueOfRef(ref,n.sheet)):[ev(n)];
   const flattened=args=>args.flatMap(values);
   if(node.kind==='literal')return node.value;
-  if(node.kind==='ref')return valueOfRef(node.ref);
+  if(node.kind==='ref')return valueOfRef(node.ref,node.sheet);
   if(node.kind==='range')throw Error('#VALUE!');
   if(node.kind==='unary')return node.op==='-'?-toNumber(ev(node.arg)):toNumber(ev(node.arg));
   if(node.kind==='binary'){
@@ -127,16 +143,17 @@ function evaluateNode(node,cells,visiting){
     requireArgs(name==='SUMIF'?2:2,name==='SUMIF'?3:2);
     if(args[0].kind!=='range')throw Error('#VALUE!');
     const refs=rangeRefs(args[0].from,args[0].to);const rule=ev(args[1]);
-    let targets=refs;
+    let targets=refs,targetSheet=args[0].sheet;
     if(name==='SUMIF'&&args[2]){
+      targetSheet=args[2].sheet;
       if(args[2].kind!=='range')throw Error('#VALUE!');
       const criterionFrom=address(args[0].from),criterionTo=address(args[0].to),sumFrom=address(args[2].from);
       if(criterionFrom.row>criterionTo.row||criterionFrom.col>criterionTo.col)throw Error('#VALUE!');
       targets=refs.map(ref=>{const a=address(ref);const row=sumFrom.row+a.row-criterionFrom.row,col=sumFrom.col+a.col-criterionFrom.col;
         if(row>=FORMULA_LIMITS.rows||col>=FORMULA_LIMITS.cols)throw Error('#REF!');return cellName(row,col);});
     }
-    let count=0,total=0;for(let i=0;i<refs.length;i++)if(matches(valueOfRef(refs[i]),rule)){
-      count++;if(name==='SUMIF'){const v=valueOfRef(targets[i]);if(numericLike(v))total+=toNumber(v);}
+    let count=0,total=0;for(let i=0;i<refs.length;i++)if(matches(valueOfRef(refs[i],args[0].sheet),rule)){
+      count++;if(name==='SUMIF'){const v=valueOfRef(targets[i],targetSheet);if(numericLike(v))total+=toNumber(v);}
     }
     return name==='COUNTIF'?count:total;
   }
@@ -157,14 +174,15 @@ function evaluateNode(node,cells,visiting){
   }
   throw Error('#NAME?');
 }
-export function evaluateCell(ref, cells, visiting=new Set()) {
+export function evaluateCell(ref, cells, visiting=new Set(), context=null) {
   const normalized=String(ref).replaceAll('$','').toUpperCase();
-  if(visiting.has(normalized))return '#CYCLE!';
+  const identity=context?`${context.sheetName.toLocaleUpperCase('ru-RU')}!${normalized}`:normalized;
+  if(visiting.has(identity))return '#CYCLE!';
   const raw=String(cells[normalized]??'');if(!raw.startsWith('='))return raw;
   if(raw.includes('#REF!'))return '#REF!';
-  const next=new Set(visiting);next.add(normalized);
+  const next=new Set(visiting);next.add(identity);
   try{
-    const result=evaluateNode(parseFormula(raw.slice(1)),cells,next);
+    const result=evaluateNode(parseFormula(raw.slice(1)),cells,next,context);
     if(typeof result==='number'){if(!Number.isFinite(result))return '#NUM!';return Math.round((result+Number.EPSILON)*1e10)/1e10;}
     return result;
   }catch(e){return String(e.message||'').startsWith('#')?e.message:'#ERROR!';}

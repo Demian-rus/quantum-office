@@ -139,3 +139,8 @@ Select a range covering **2–100 adjacent rows or columns**, then use the compa
 - Wildcard `*` and `?` in conditional-aggregate criteria are supported. The interpreter never uses JavaScript `eval`. Expression and range limits remain bounded.
 - **Still not Excel parity:** no cross-sheet formulas, date types, structured table references, external links, advanced formula families, or dependency graph. Text and number coercion may differ from Excel for edge cases. Preserve a source workbook before XLSX import/export.
 - Run `node --test tests/formula_conditional.test.js`, `python tests/formula_conditional_browser.py`, `npm test`, and `npm run build`.
+
+
+### TASK 026 — inter-sheet formulas (experimental)
+
+`=График!A1` and `='Учёт оплаты'!B2`, plus supported functions over same-sheet ranges, recalculate from the current workbook. Exported XLSX retains formulas. Renaming or deleting a referenced sheet and inserting/deleting its rows and columns are blocked until cross-sheet reference rewriting is implemented. External workbooks, 3D ranges and Excel named references are unsupported.

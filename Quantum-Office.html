@@ -226,7 +226,7 @@ const FORMULA_LIMITS = {rows:2000, cols:100, tokens:2000, depth:80, range:10000}
 function tokensOf(formula) {
   if (formula.length > 10000) throw Error('#ERROR!');
   const tokens=[];let pos=0;
-  const re = /(?:\d+(?:\.\d+)?|\.\d+)(?:[Ee][+\-]?\d+)?|\$?[A-Z]+\$?[1-9]\d*|[A-Z_][A-Z0-9_.]*|<=|>=|<>|[()+\-*/,:;&=<>&]/iy;
+  const re = /'(?:[^']|'')*'!|[A-Z_А-ЯЁ][A-Z0-9_.А-ЯЁ]*!|(?:\d+(?:\.\d+)?|\.\d+)(?:[Ee][+\-]?\d+)?|\$?[A-Z]+\$?[1-9]\d*|[A-Z_][A-Z0-9_.]*|<=|>=|<>|[()+\-*/,:;&=<>&]/iy;
   while (pos<formula.length) {
     if (/\s/.test(formula[pos])) {pos++;continue;}
     if (formula[pos]==='"') {
@@ -269,7 +269,14 @@ function parseFormula(source){const tokens=tokensOf(source);let i=0,depth=0;
     if(t.type==='string')return {kind:'literal',value:t.value};
     const value=t.value;
     if(/^(?:\d|\.)/.test(value))return {kind:'literal',value:Number(value)};
-    if(REF.test(value)){address(value);if(eat(':')){const end=tokens[i++];if(!end||!REF.test(end.value))throw Error('#ERROR!');rangeRefs(value,end.value);return {kind:'range',from:value,to:end.value};}return {kind:'ref',ref:value};}
+    let sheet=null, ref=value;
+    if(value.endsWith('!')){
+      sheet=value.startsWith("'")?value.slice(1,-2).replaceAll("''", "'"):value.slice(0,-1);
+      if(!sheet||sheet.length>100)throw Error('#REF!');
+      const next=tokens[i++];if(!next||next.type!=='token'||!REF.test(next.value))throw Error('#ERROR!');
+      ref=next.value;
+    }
+    if(REF.test(ref)){address(ref);if(eat(':')){const end=tokens[i++];if(!end||!REF.test(end.value))throw Error('#ERROR!');rangeRefs(ref,end.value);return {kind:'range',sheet,from:ref,to:end.value};}return {kind:'ref',sheet,ref};}
     if(value==='TRUE'||value==='FALSE')return {kind:'literal',value:value==='TRUE'};
     if(/^[A-Z_][A-Z0-9_.]*$/.test(value)){
       if(value.includes('.'))throw Error('#ERROR!');if(!eat('('))throw Error('#NAME?');const args=[];
@@ -310,13 +317,22 @@ function matches(actual,criterion){
   return op==='='?cmp===0:op==='<>'?cmp!==0:op==='<'?cmp<0:op==='>'?cmp>0:op==='<='?cmp<=0:cmp>=0;
 }
 
-function evaluateNode(node,cells,visiting){
-  const ev=n=>evaluateNode(n,cells,visiting);
-  const valueOfRef=r=>{const ref=r.replaceAll('$','');const v=evaluateCell(ref,cells,visiting);if(isError(v))throw Error(v);return v;};
-  const values=n=>n.kind==='range'?rangeRefs(n.from,n.to).map(valueOfRef):[ev(n)];
+function evaluateNode(node,cells,visiting,context){
+  const ev=n=>evaluateNode(n,cells,visiting,context);
+  const valueOfRef=(r,sheet=null)=>{
+    const ref=r.replaceAll('$','');
+    let target=cells,targetContext=context;
+    if(sheet!==null){
+      const match=context?.sheets?.get(sheet.toLocaleUpperCase('ru-RU'));
+      if(!match)throw Error('#REF!');
+      target=match.cells;targetContext={...context,sheetName:match.name};
+    }
+    const v=evaluateCell(ref,target,visiting,targetContext);if(isError(v))throw Error(v);return v;
+  };
+  const values=n=>n.kind==='range'?rangeRefs(n.from,n.to).map(ref=>valueOfRef(ref,n.sheet)):[ev(n)];
   const flattened=args=>args.flatMap(values);
   if(node.kind==='literal')return node.value;
-  if(node.kind==='ref')return valueOfRef(node.ref);
+  if(node.kind==='ref')return valueOfRef(node.ref,node.sheet);
   if(node.kind==='range')throw Error('#VALUE!');
   if(node.kind==='unary')return node.op==='-'?-toNumber(ev(node.arg)):toNumber(ev(node.arg));
   if(node.kind==='binary'){
@@ -336,16 +352,17 @@ function evaluateNode(node,cells,visiting){
     requireArgs(name==='SUMIF'?2:2,name==='SUMIF'?3:2);
     if(args[0].kind!=='range')throw Error('#VALUE!');
     const refs=rangeRefs(args[0].from,args[0].to);const rule=ev(args[1]);
-    let targets=refs;
+    let targets=refs,targetSheet=args[0].sheet;
     if(name==='SUMIF'&&args[2]){
+      targetSheet=args[2].sheet;
       if(args[2].kind!=='range')throw Error('#VALUE!');
       const criterionFrom=address(args[0].from),criterionTo=address(args[0].to),sumFrom=address(args[2].from);
       if(criterionFrom.row>criterionTo.row||criterionFrom.col>criterionTo.col)throw Error('#VALUE!');
       targets=refs.map(ref=>{const a=address(ref);const row=sumFrom.row+a.row-criterionFrom.row,col=sumFrom.col+a.col-criterionFrom.col;
         if(row>=FORMULA_LIMITS.rows||col>=FORMULA_LIMITS.cols)throw Error('#REF!');return cellName(row,col);});
     }
-    let count=0,total=0;for(let i=0;i<refs.length;i++)if(matches(valueOfRef(refs[i]),rule)){
-      count++;if(name==='SUMIF'){const v=valueOfRef(targets[i]);if(numericLike(v))total+=toNumber(v);}
+    let count=0,total=0;for(let i=0;i<refs.length;i++)if(matches(valueOfRef(refs[i],args[0].sheet),rule)){
+      count++;if(name==='SUMIF'){const v=valueOfRef(targets[i],targetSheet);if(numericLike(v))total+=toNumber(v);}
     }
     return name==='COUNTIF'?count:total;
   }
@@ -366,14 +383,15 @@ function evaluateNode(node,cells,visiting){
   }
   throw Error('#NAME?');
 }
-function evaluateCell(ref, cells, visiting=new Set()) {
+function evaluateCell(ref, cells, visiting=new Set(), context=null) {
   const normalized=String(ref).replaceAll('$','').toUpperCase();
-  if(visiting.has(normalized))return '#CYCLE!';
+  const identity=context?`${context.sheetName.toLocaleUpperCase('ru-RU')}!${normalized}`:normalized;
+  if(visiting.has(identity))return '#CYCLE!';
   const raw=String(cells[normalized]??'');if(!raw.startsWith('='))return raw;
   if(raw.includes('#REF!'))return '#REF!';
-  const next=new Set(visiting);next.add(normalized);
+  const next=new Set(visiting);next.add(identity);
   try{
-    const result=evaluateNode(parseFormula(raw.slice(1)),cells,next);
+    const result=evaluateNode(parseFormula(raw.slice(1)),cells,next,context);
     if(typeof result==='number'){if(!Number.isFinite(result))return '#NUM!';return Math.round((result+Number.EPSILON)*1e10)/1e10;}
     return result;
   }catch(e){return String(e.message||'').startsWith('#')?e.message:'#ERROR!';}
@@ -564,9 +582,35 @@ function fillSelection(sheet, from, to, direction){
 }
 
 function rawMap(sheet){return Object.fromEntries(Object.entries(sheet.cells).map(([k,v])=>[k,v.value]));}
-function resultOf(sheet,ref,map=rawMap(sheet)){return evaluateCell(ref,map);}
-function displayedValue(sheet,ref,map=rawMap(sheet)){
-  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map);if(result===''||result==null)return '';
+/** Prepare a bounded workbook snapshot for cross-sheet references. The current sheet map may be reused. */
+function referencedFromOtherSheet(book,target){
+  const needle=target.name.toLocaleUpperCase('ru-RU');
+  for(const other of book.sheets){if(other.id===target.id)continue;
+    for(const cell of Object.values(other.cells)){
+      if(!cell.value.startsWith('='))continue;
+      // Quoted sheet names may contain doubled apostrophes. Conservative guard: reject
+      // on a matching prefix even in unusual formulas rather than silently break links.
+      const prefixes=cell.value.match(/'(?:[^']|'')*'!|[A-Z_А-ЯЁ][A-Z0-9_.А-ЯЁ]*!/gi)||[];
+      if(prefixes.some(x=>{
+        const name=x[0]==="'"?x.slice(1,-2).replaceAll("''", "'"):x.slice(0,-1);
+        return name.toLocaleUpperCase('ru-RU')===needle;
+      }))return true;
+    }
+  }
+  return false;
+}
+function formulaContext(book,sheet,map=rawMap(sheet)){
+ if(!book)return null;
+ const sheets=new Map();
+ for(const part of book.sheets){const name=part.name.toLocaleUpperCase('ru-RU');
+   if(sheets.has(name))throw Error('Неоднозначное название листа');
+   sheets.set(name,{name:part.name,cells:part.id===sheet.id?map:rawMap(part)});
+ }
+ return {sheetName:sheet.name,sheets};
+}
+function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evaluateCell(ref,map,new Set(),context);}
+function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
+  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
   if(typeof result!=='number')return String(result);
   const n=Number.isFinite(result)?result:0;
   if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
@@ -656,7 +700,9 @@ function exportCSV(sheet){let maxR=0,maxC=0;for(const key of Object.keys(sheet.c
 }
 function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
- let total=0;const ids=new Set();for(const sheet of book.sheets){
+ let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
+  if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
+  names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
@@ -798,27 +844,22 @@ function createBudgetTemplate(){
 }
 
 
-/** In-app clipboard: preserves formulas, styles and complete merged regions.
- * All edits are prevalidated before mutating a sheet; no eval or network. */
-
-const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
-const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
+/** In-app clipboard: the system clipboard can be unavailable for file:// previews.
+ * Preserve raw formulas and cell styles without using eval or a web service. */
 
 function copyCells(sheet,start,end){
  let rect=rectangle(start,end);if(!rect||!validRef(start)||!validRef(end))throw Error('Недопустимый диапазон');
- // Clicking one merged cell means copying the entire logical cell, as in a spreadsheet.
  if(start===end){const merged=mergeAt(sheet,start);if(merged)rect=rectangle(merged.from,merged.to);}
  const rows=rect.r2-rect.r1+1,cols=rect.c2-rect.c1+1;
  if(rows*cols>20000)throw Error('Копирование ограничено 20 000 ячейками');
  const merges=[];
  for(const merge of sheet.merges||[]){
-  const region=rectangle(merge.from,merge.to);
-  if(!overlaps(rect,region))continue;
-  if(!inside(region,rect))throw Error('Объединённая ячейка попала в выделение частично. Выделите её целиком');
-  merges.push({r1:region.r1-rect.r1,c1:region.c1-rect.c1,r2:region.r2-rect.r1,c2:region.c2-rect.c1});
+  const m=rectangle(merge.from,merge.to);
+  if(m.r1>rect.r2||m.r2<rect.r1||m.c1>rect.c2||m.c2<rect.c1)continue;
+  if(m.r1<rect.r1||m.r2>rect.r2||m.c1<rect.c1||m.c2>rect.c2)throw Error('Объединённая ячейка попала в выделение частично. Выделите её целиком');
+  merges.push({r1:m.r1-rect.r1,c1:m.c1-rect.c1,r2:m.r2-rect.r1,c2:m.c2-rect.c1});
  }
- const first=cellName(rect.r1,rect.c1),last=cellName(rect.r2,rect.c2);
- return {start:first,rows,cols,text:valuesTSV(sheet,first,last),merges,
+ return {start:cellName(rect.r1,rect.c1),rows,cols,text:valuesTSV(sheet,cellName(rect.r1,rect.c1),cellName(rect.r2,rect.c2)),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
    return {value:item.value,style:structuredClone(item.style||{})};
@@ -830,29 +871,28 @@ function pasteCells(sheet,target,clip){
  if(!at||!from||!validRef(target)||!Number.isInteger(clip.rows)||!Number.isInteger(clip.cols)||!Array.isArray(clip.cells))throw Error('Повреждённые данные буфера');
  if(clip.rows<1||clip.cols<1||clip.rows*clip.cols>20000)throw Error('Слишком большой диапазон');
  if(at.row+clip.rows>LIMITS.rows||at.col+clip.cols>LIMITS.columns)throw Error('Вставка выходит за пределы листа');
- const targetRect={r1:at.row,c1:at.col,r2:at.row+clip.rows-1,c2:at.col+clip.cols-1};
- // Even a partial overwrite of an existing merge would corrupt its geometry.
- for(const m of sheet.merges||[])if(overlaps(targetRect,rectangle(m.from,m.to)))throw Error('Вставка поверх объединённой ячейки запрещена. Сначала разъедините ячейки назначения');
+ const t={r1:at.row,c1:at.col,r2:at.row+clip.rows-1,c2:at.col+clip.cols-1};
+ for(const m of sheet.merges||[]){
+  const x=rectangle(m.from,m.to);
+  if(t.r1<=x.r2&&t.r2>=x.r1&&t.c1<=x.c2&&t.c2>=x.c1)throw Error('Вставка поверх объединённой ячейки запрещена. Сначала разъедините ячейки назначения');
+ }
  const merges=clip.merges??[];
  if(!Array.isArray(merges)||merges.length>500)throw Error('Повреждённые данные объединений');
- const mergeCellsUsed=new Set();
+ const seen=new Set();
  for(const m of merges){
   if(!m||![m.r1,m.c1,m.r2,m.c2].every(Number.isInteger)||m.r1<0||m.c1<0||m.r2>=clip.rows||m.c2>=clip.cols||m.r1>m.r2||m.c1>m.c2||(m.r1===m.r2&&m.c1===m.c2))throw Error('Повреждённые данные объединений');
-  for(let r=m.r1;r<=m.r2;r++)for(let c=m.c1;c<=m.c2;c++){
-   const key=`${r}:${c}`;if(mergeCellsUsed.has(key))throw Error('Пересекающиеся объединения в буфере');mergeCellsUsed.add(key);
-  }
+  for(let r=m.r1;r<=m.r2;r++)for(let c=m.c1;c<=m.c2;c++){const k=r+':'+c;if(seen.has(k))throw Error('Пересекающиеся объединения в буфере');seen.add(k);}
  }
  const changes=[];
  for(let r=0;r<clip.rows;r++){
   if(!Array.isArray(clip.cells[r])||clip.cells[r].length!==clip.cols)throw Error('Повреждённые данные буфера');
   for(let c=0;c<clip.cols;c++){
-   const item=clip.cells[r][c];if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
+   const item=clip.cells[r][c];
+   if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
    const value=translateFormula(item.value,at.row-from.row,at.col-from.col);
    changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style)}]);
   }
  }
- // Apply all changes to a draft when copying merges. The merge validator checks
- // covered cells, frozen panes, hidden rows/columns and active auto-filters.
  if(merges.length){
   const trial=structuredClone(sheet);
   for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)trial.cells[ref]=item;else delete trial.cells[ref];}
@@ -865,36 +905,38 @@ function pasteCells(sheet,target,clip){
 }
 
 
-/** Bounded, atomic row/column changes. No truncation or partial mutation. */
+/** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
 
-const CELL_REF=/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi;
 const MAX_BATCH=100;
+const CELL_REF=/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi;
 
 /** Structural edits move even $-anchored references (unlike fill/copy). */
 function rewriteStructureFormula(formula,axis,mode,index,count=1){
  if(typeof formula!=='string'||!formula.startsWith('='))return formula;
- if(!['row','col'].includes(axis)||!['insert','delete'].includes(mode)||!Number.isInteger(index)||!Number.isInteger(count)||count<1)throw Error('Некорректная структурная операция');
- const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
- return '='+formula.slice(1).replace(CELL_REF,(full,lockCol,letters,lockRow,digits)=>{
+ const result='='+formula.slice(1).replace(CELL_REF,(full,lockCol,letters,lockRow,digits)=>{
   const source=parseCell(letters+digits);
   if(!source||source.row>=LIMITS.rows||source.col>=LIMITS.columns)return full;
   const old=axis==='row'?source.row:source.col;
   if(mode==='delete'&&old>=index&&old<index+count)return '#REF!';
   const shifted=mode==='insert'?(old>=index?old+count:old):(old>=index+count?old-count:old);
-  if(shifted<0||shifted>=limit)throw Error('Формула выходит за пределы листа');
+  if(shifted<0||shifted>=(axis==='row'?LIMITS.rows:LIMITS.columns))throw Error('Формула выходит за пределы листа');
   return axis==='row'?`${lockCol}${letters.toUpperCase()}${lockRow}${shifted+1}`:`${lockCol}${cellName(0,shifted).replace(/\d+$/,'')}${lockRow}${digits}`;
  });
+ if(result.length>50000)throw Error('После перемещения формула превышает лимит');
+ return result;
 }
 
 /**
- * Change one or more adjacent rows/columns in one atomic transaction.
- * No intermediate one-by-one changes: merge and dimension checks operate on final state.
+ * Edit exactly one row/column. Build new cells and dimensions before touching sheet.
+ * A filter is rejected until moving its range and selection rules can be proven safe.
  */
 function changeSheetStructure(sheet,axis,mode,index,count=1){
  if(!['row','col'].includes(axis)||!['insert','delete'].includes(mode))throw Error('Неизвестная структурная операция');
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
- if(!Number.isInteger(index)||!Number.isInteger(count)||count<1||count>MAX_BATCH||index<0||index+count>limit)throw Error('Диапазон вставки/удаления вне таблицы или больше 100');
+ if(!Number.isInteger(index)||!Number.isInteger(count)||count<1||count>MAX_BATCH||index<0||index+count>limit)throw Error('Диапазон вне таблицы или больше 100');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
+ // Validate the projected geometry before mutating any cell. Insertions may
+ // shift or expand a merge; non-anchor deletions may shrink it.
  const newMerges=[];const last=index+count-1;
  for(const merge of sheet.merges||[]){
   const a=parseCell(merge.from),b=parseCell(merge.to);
@@ -904,12 +946,12 @@ function changeSheetStructure(sheet,axis,mode,index,count=1){
   if(mode==='insert'){
    if(index<=start){nextStart+=count;nextEnd+=count;}
    else if(index<=end){nextEnd+=count;}
-  } else if(last<start){nextStart-=count;nextEnd-=count;}
+  }else if(last<start){nextStart-=count;nextEnd-=count;}
   else if(index<=end&&last>=start){
    if(index<=start)throw Error('Удаление диапазона с началом объединения запрещено: сначала разъедините ячейки');
    nextEnd-=Math.min(last,end)-index+1;
   }
-  if(nextStart<0||nextEnd>=limit)throw Error('Объединение выйдет за пределы листа');
+  if(nextEnd>=limit)throw Error('Объединение выйдет за пределы листа');
   const r1=axis==='row'?nextStart:a.row,c1=axis==='col'?nextStart:a.col;
   const r2=axis==='row'?nextEnd:b.row,c2=axis==='col'?nextEnd:b.col;
   if((r2-r1+1)*(c2-c1+1)>2000)throw Error('Объединение превысит лимит 2000 ячеек');
@@ -924,30 +966,32 @@ function changeSheetStructure(sheet,axis,mode,index,count=1){
   if(destination>=limit)throw Error('Последняя строка или столбец содержит данные; вставка запрещена');
   const r=axis==='row'?destination:pos.row,c=axis==='col'?destination:pos.col;
   const value=rewriteStructureFormula(cell.value,axis,mode,index,count);
-  if(value.length>50000)throw Error('После перемещения формула превышает лимит');
   cells[cellName(r,c)]={value,style:structuredClone(cell.style||{})};
  }
- const dimensionKey=axis==='row'?'rowHeights':'columnWidths';
- const dimensions={};
- for(const [k,v] of Object.entries(sheet[dimensionKey]||{})){
-  const old=Number(k);if(mode==='delete'&&old>=index&&old<=last)continue;
+ const key=axis==='row'?'rowHeights':'columnWidths';
+ const shiftedDimensions={};
+ for(const [k,v] of Object.entries(sheet[key]||{})){
+  const old=Number(k);
+  if(mode==='delete'&&old>=index&&old<=last)continue;
   const next=mode==='insert'?(old>=index?old+count:old):(old>last?old-count:old);
   if(next>=limit)throw Error('Последняя строка или столбец имеет пользовательский размер');
-  dimensions[next]=v;
+  shiftedDimensions[next]=v;
  }
- const hiddenKey=axis==='row'?'hiddenRows':'hiddenColumns';const hidden={};
- for(const indexText of Object.keys(sheet[hiddenKey]||{})){
-  const old=Number(indexText);if(mode==='delete'&&old>=index&&old<=last)continue;
+ const hiddenKey=axis==='row'?'hiddenRows':'hiddenColumns';
+ const hidden={};for(const indexText of Object.keys(sheet[hiddenKey]||{})){
+  const old=Number(indexText);
+  if(mode==='delete'&&old>=index&&old<=last)continue;
   const next=mode==='insert'?(old>=index?old+count:old):(old>last?old-count:old);
   if(next>=limit)throw Error('Последняя строка или столбец скрыта: сначала отобразите её');
   hidden[next]=true;
  }
- const freeze={...(sheet.freeze||{rows:0,cols:0})};const frozenKey=axis==='row'?'rows':'cols';
+ const freeze={...(sheet.freeze||{rows:0,cols:0})};
+ const frozenKey=axis==='row'?'rows':'cols';
  if(mode==='insert'&&index<freeze[frozenKey])freeze[frozenKey]+=count;
  if(mode==='delete'&&index<freeze[frozenKey])freeze[frozenKey]-=Math.min(count,freeze[frozenKey]-index);
  if(freeze[frozenKey]>10)throw Error('Нельзя увеличить закреплённую область более 10 строк или столбцов');
- // A single committed assignment after all validation, preserving existing state on any failure.
- sheet.cells=cells;sheet[dimensionKey]=dimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
+ // Existing data and schema remain unchanged if even one step above failed.
+ sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
  return {axis,mode,index,count,changed:Object.keys(cells).length};
 }
 
@@ -1159,13 +1203,14 @@ function clearSelected(){if(refuseHiddenSelection())return;const size=rectangle(
 function clearSelectedFormat(){commitEditor();if(refuseHiddenSelection())return;try{const draft=structuredClone(sheet());const count=clearFormatting(draft,activeCell,rangeEnd);if(!count){status('Оформление уже сброшено');return;}transact(()=>{sheet().cells=draft.cells;});drawGrid();status(`Сброшено оформление: ${count} ячеек`);}catch(err){status(err.message,true);}}
 function autoSum(){commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
 function fillSelected(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
-function updateSelectionStats(){const node=document.querySelector('#selection-stats');if(!node||!sheet())return;const rect=rectangle(activeCell,rangeEnd);if(!rect)return;const n=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);if(n>10000){node.textContent=`Выделено: ${n} ячеек`;return;}const raw=rawMap(sheet());let count=0,sum=0;for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){const value=resultOf(sheet(),cellName(r,c),raw);const number=Number(value);if(value!==''&&Number.isFinite(number)){count++;sum+=number;}}node.textContent=count?`Чисел: ${count} · Сумма: ${Number(sum.toFixed(8))} · Среднее: ${Number((sum/count).toFixed(8))}`:`Выделено: ${n}`;}
+function updateSelectionStats(){const node=document.querySelector('#selection-stats');if(!node||!sheet())return;const rect=rectangle(activeCell,rangeEnd);if(!rect)return;const n=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);if(n>10000){node.textContent=`Выделено: ${n} ячеек`;return;}const raw=rawMap(sheet()),ctx=formulaContext(book(),sheet(),raw);let count=0,sum=0;for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){const value=resultOf(sheet(),cellName(r,c),raw,ctx);const number=Number(value);if(value!==''&&Number.isFinite(number)){count++;sum+=number;}}node.textContent=count?`Чисел: ${count} · Сумма: ${Number(sum.toFixed(8))} · Среднее: ${Number((sum/count).toFixed(8))}`:`Выделено: ${n}`;}
 function structuralAction(axis,mode){
  commitEditor();if(!sheet())return;
  const pos=parseCell(activeCell);if(!pos)return;
  const rect=rectangle(activeCell,rangeEnd);
  const index=axis==='row'?rect.r1:rect.c1;
  const count=axis==='row'?rect.r2-rect.r1+1:rect.c2-rect.c1+1;
+ if(referencedFromOtherSheet(book(),sheet())){status('Изменение структуры листа со ссылками из других листов пока запрещено',true);return;}
  try{
   const draft=structuredClone(sheet());
   changeSheetStructure(draft,axis,mode,index,count); // Validate before adding undo history.
@@ -1235,7 +1280,7 @@ function toggleWrap(){const next=!getCell(sheet(),activeCell).style?.wrap;const 
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,{wrap:next});
   // Expand rows only when needed; never shrink a user-defined custom height.
   if(next){for(let r=rect.r1;r<=rect.r2;r++){let need=rowHeight(sheet(),r);for(let c=rect.c1;c<=rect.c2;c++){
-    const content=displayedValue(sheet(),cellName(r,c)),charsPerLine=Math.max(5,Math.floor((columnWidth(sheet(),c)-16)/7));
+    const content=displayedValue(sheet(),cellName(r,c),rawMap(sheet()),formulaContext(book(),sheet())),charsPerLine=Math.max(5,Math.floor((columnWidth(sheet(),c)-16)/7));
     const count=String(content).split('\n').reduce((n,line)=>n+Math.max(1,Math.ceil(line.length/charsPerLine)),0);
     need=Math.max(need,Math.min(DIMENSIONS.maxRow,Math.max(DIMENSIONS.minRow,count*17+8)));
    } if(need>rowHeight(sheet(),r))setRowHeight(sheet(),r,need);}}
@@ -1264,12 +1309,13 @@ function renameSheet(id=sheet()?.id){const b=book(),s=b?.sheets.find(x=>x.id===i
  const input=document.createElement('input');input.className='sheet-tab-editor';input.setAttribute('aria-label','Новое имя листа');input.maxLength=31;input.value=s.name;let settled=false;
  const finish=cancel=>{if(settled)return;settled=true;const next=input.value.trim();
   if(!cancel&&next&&next!==s.name){if(/[\\/*?:\[\]]/.test(next)||b.sheets.some(x=>x.id!==id&&x.name.toLowerCase()===next.toLowerCase()))status('Название листа недопустимо или уже существует',true);
+   else if(referencedFromOtherSheet(b,s))status('Переименование листа со ссылками из других листов пока запрещено',true);
    else transact(()=>{s.name=next});}
   render();};
  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();finish(false);}if(e.key==='Escape'){e.preventDefault();finish(true);}e.stopPropagation();});
  input.addEventListener('blur',()=>finish(false));tab.replaceWith(input);input.focus();input.select();}
 
-function deleteSheet(){const b=book();if(b.sheets.length<=1){status('Нельзя удалить единственный лист');return;}if(!confirm(`Удалить лист «${sheet().name}»?`))return;const id=b.activeSheetId;transact(()=>{b.sheets=b.sheets.filter(s=>s.id!==id);b.activeSheetId=b.sheets[0].id;});setSelection('A1');render();}
+function deleteSheet(){const b=book();if(b.sheets.length<=1){status('Нельзя удалить единственный лист');return;}if(referencedFromOtherSheet(b,sheet())){status('Этот лист используется в формулах других листов — удаление запрещено',true);return;}if(!confirm(`Удалить лист «${sheet().name}»?`))return;const id=b.activeSheetId;transact(()=>{b.sheets=b.sheets.filter(s=>s.id!==id);b.activeSheetId=b.sheets[0].id;});setSelection('A1');render();}
 function topbar(){
  const tabs=`<nav class="modules" aria-label="Разделы приложения"><button class="module ${page==='home'?'active':''}" data-action="route" data-target="home">Обзор</button><button class="module ${page==='sheet'?'active':''}" data-action="route" data-target="sheet">▦ Таблицы</button><button class="module ${page==='writer'?'active':''}" data-action="route" data-target="writer">▤ Тексты</button><button class="module ${page==='slides'?'active':''}" data-action="route" data-target="slides">▣ Презентации</button></nav>`;
  if(page==='sheet'&&book())return `<header class="global-bar compact-shell"><button class="logo" data-action="route" data-target="home" title="На главную"><span class="logo-mark">Q</span><span>QUANTUM <b>OFFICE</b></span></button>${tabs}<div class="shell-document"><input id="book-name" aria-label="Название книги" value="${esc(book().name)}" maxlength="200" title="Изменить название книги"><span class="shell-save" id="storage-indicator">● Локально</span></div><div class="global-right"><button class="shell-action" data-action="import" title="Открыть файл">↥ <span>Открыть</span></button><button class="shell-action primary" data-action="save" title="Сохранить книгу">⇩ <span>Сохранить</span></button><button class="icon-button" data-action="backup" title="Резервная копия">▣</button></div></header>`;
@@ -1313,7 +1359,7 @@ function homepage(){
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
 function changeSize(kind){commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
  try{if(!Number.isInteger(value))throw Error('Введите целое число');transact(()=>{if(kind==='col')setColumnWidth(sheet(),p.col,value);else setRowHeight(sheet(),p.row,value);});drawGrid();status(`Размер изменён: ${value} пикселей`);}catch(err){status(err.message,true);}}
-function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const map=rawMap(sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,map));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
+function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const map=rawMap(sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,map,formulaContext(book(),sheet(),map)));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
  transact(()=>setColumnWidth(sheet(),c,width));drawGrid();status(`Столбец ${cellName(0,c).replace(/\d+$/,'')}: ${width} пикселей`);}
 function resetRowHeight(index=null){const p=parseCell(activeCell);if(!p)return;transact(()=>setRowHeight(sheet(),index??p.row,DIMENSIONS.defaultRow));drawGrid();}
 function toggleAutoFilter(){commitEditor();if(sheet().autoFilter){transact(()=>{sheet().autoFilter=null});filterColumn=null;render();status('Автофильтр выключен — данные не изменены');return;}
@@ -1434,7 +1480,7 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
  const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-2),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+2);
  const rows=[...new Set([...Array.from({length:lastR-firstR+1},(_,i)=>firstR+i),...Array.from({length:freezeR},(_,i)=>i)])].sort((a,b)=>a-b);
  const cols=[...new Set([...Array.from({length:lastC-firstC+1},(_,i)=>firstC+i),...Array.from({length:freezeC},(_,i)=>i)])].sort((a,b)=>a-b);
- const rect=rectangle(activeCell,rangeEnd),filter=filterRange(s),raw=rawMap(s);let html='';
+ const rect=rectangle(activeCell,rangeEnd),filter=filterRange(s),raw=rawMap(s),ctx=formulaContext(book(),s,raw);let html='';
  for(const m of s.merges||[]){const bounds=rectangle(m.from,m.to);if(bounds.r2>=firstR&&bounds.r1<=lastR&&bounds.c2>=firstC&&bounds.c1<=lastC){if(!rows.includes(bounds.r1))rows.push(bounds.r1);if(!cols.includes(bounds.c1))cols.push(bounds.c1);}}
  rows.sort((a,b)=>a-b);cols.sort((a,b)=>a-b);
  for(const r of rows)for(const c of cols){
@@ -1442,7 +1488,7 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
   const ref=cellName(r,c),merged=mergeAt(s,ref);if(merged&&merged.from!==ref)continue;const bounds=merged?rectangle(merged.from,merged.to):null;
   const item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=item.style||{};
   const mergedBorders=bounds?{top:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r1,bounds.c1+j)).style?.borders?.top),bottom:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r2,bounds.c1+j)).style?.borders?.bottom),left:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c1)).style?.borders?.left),right:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c2)).style?.borders?.right)}:style.borders;
-  const val=displayedValue(s,ref,raw),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
+  const val=displayedValue(s,ref,raw,ctx),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
   const appearance=`${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.border==='thin'?'box-shadow:inset 0 0 0 1px #526d5c;':''}${['left','right','top','bottom'].map(side=>mergedBorders?.[side]?`border-${side}:1px solid #526d5c;`:'').join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';

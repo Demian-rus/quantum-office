@@ -155,9 +155,35 @@ export function fillSelection(sheet, from, to, direction){
 }
 
 export function rawMap(sheet){return Object.fromEntries(Object.entries(sheet.cells).map(([k,v])=>[k,v.value]));}
-export function resultOf(sheet,ref,map=rawMap(sheet)){return evaluateCell(ref,map);}
-export function displayedValue(sheet,ref,map=rawMap(sheet)){
-  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map);if(result===''||result==null)return '';
+/** Prepare a bounded workbook snapshot for cross-sheet references. The current sheet map may be reused. */
+export function referencedFromOtherSheet(book,target){
+  const needle=target.name.toLocaleUpperCase('ru-RU');
+  for(const other of book.sheets){if(other.id===target.id)continue;
+    for(const cell of Object.values(other.cells)){
+      if(!cell.value.startsWith('='))continue;
+      // Quoted sheet names may contain doubled apostrophes. Conservative guard: reject
+      // on a matching prefix even in unusual formulas rather than silently break links.
+      const prefixes=cell.value.match(/'(?:[^']|'')*'!|[A-Z_А-ЯЁ][A-Z0-9_.А-ЯЁ]*!/gi)||[];
+      if(prefixes.some(x=>{
+        const name=x[0]==="'"?x.slice(1,-2).replaceAll("''", "'"):x.slice(0,-1);
+        return name.toLocaleUpperCase('ru-RU')===needle;
+      }))return true;
+    }
+  }
+  return false;
+}
+export function formulaContext(book,sheet,map=rawMap(sheet)){
+ if(!book)return null;
+ const sheets=new Map();
+ for(const part of book.sheets){const name=part.name.toLocaleUpperCase('ru-RU');
+   if(sheets.has(name))throw Error('Неоднозначное название листа');
+   sheets.set(name,{name:part.name,cells:part.id===sheet.id?map:rawMap(part)});
+ }
+ return {sheetName:sheet.name,sheets};
+}
+export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evaluateCell(ref,map,new Set(),context);}
+export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
+  const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
   if(typeof result!=='number')return String(result);
   const n=Number.isFinite(result)?result:0;
   if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
@@ -247,7 +273,9 @@ export function exportCSV(sheet){let maxR=0,maxC=0;for(const key of Object.keys(
 }
 export function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
- let total=0;const ids=new Set();for(const sheet of book.sheets){
+ let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
+  if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
+  names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
