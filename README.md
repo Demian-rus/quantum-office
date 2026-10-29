@@ -113,16 +113,29 @@ Use **Вставка → Вставить строку / Удалить стро
 - **Limitations:** merge-aware fill/copy/paste and structural row/column edits are not yet supported. Clipboard paste into a merged area is blocked. Complex Excel merges, thick/dashed styles, rich-text runs and advanced formatting are not lossless. Preserve original XLSX and save a `.qbook` backup.
 - Regression commands: `npm test`, `npm run build`, `python tests/formatting21_browser.py`, `python tests/merge_xlsx_browser.py` plus older smoke scenarios. Desktop installers are still unverified.
 
-### TASK 022 — merged-cell copy and paste
-- Ctrl+C on a merged anchor captures its entire rectangle, including relative formulas, styles and merge geometry. Ctrl+V pastes to an unmerged area and Ctrl+Z reverts the paste.
-- Partial merges and overlapping destinations are rejected without altering the workbook. Cutting, sorting and autofill of merged ranges remain unsupported to protect data.
-- Tests: `node --test tests/merged_clipboard.test.js`, `python tests/merged_clipboard_browser.py`.
 
-### TASK 023 — merge-aware row/column editing
+### TASK 022 — merged-cell copy/paste
 
-Insert before/inside a merged range to shift/expand it. Delete a non-anchor interior band to shrink it; deleting the anchor band is blocked. A one-cell remnant becomes an ordinary cell. Atomic validation preserves data and undo. Tests: `npm test`, `python tests/merged_structure_browser.py`.
+- `Ctrl+C` on a merged cell copies its whole region, not just the top-left data cell; `Ctrl+V` pastes merge geometry, raw formulas and styles to a free destination, with regular relative/absolute reference semantics. Undo reverts one paste.
+- Partially selected merges, destination overlaps with other merges, cut/move (`Ctrl+X`) of merges, and fill/sort with merges are intentionally rejected to prevent data corruption. Undo the merge or unmerge first when those operations are required.
+- Check with `node --test tests/merged_clipboard.test.js` and `python tests/merged_clipboard_browser.py`.
 
+### TASK 023 — structural edits with merged cells
 
-### TASK 024 — multiple rows and columns
+- Inserting before a merged area shifts the range; inserting within its row/column span expands it.
+- Removing a non-anchor band inside the area shrinks the merge; removing an entire one-cell-wide remnant unmerges it.
+- Deleting a merged area's *anchor row/column* is refused to protect the only retained value. The user must unmerge first.
+- Edits remain limited to a single row/column, preserve cell contents/styles/formulas, undo in one operation, and save merged ranges to `.qbook` and supported `.xlsx`.
+- Run `npm test`, `python tests/merged_structure_browser.py`, and the full browser CI regression suite.
 
-Select 2–100 adjacent rows or columns, then choose Insert/Delete on the compact ribbon. One undo transaction; formulas and merges rebase. Active filters and deleting a merge anchor are refused. Other complex Excel structures remain unsupported.
+### TASK 024 — insert/delete multiple rows or columns
+
+Select a range covering **2–100 adjacent rows or columns**, then use the compact **Вставка** ribbon's corresponding insert/delete action. One selected cell still modifies exactly one row or column. The entire selected rows/columns are affected, not only the rectangular cells. Formulas, merged ranges, custom sizes, hidden flags and frozen panes are updated atomically; `Ctrl+Z` undoes the operation. Deletion of any merge's anchor band and structural edits under an active filter are refused to prevent data loss. No claim of full Excel structural reference compatibility is made.
+
+### TASK 025 — conditional formulas for timetables and accounting
+
+- The local formula parser now supports comparisons (`=`, `<>`, `<`, `>`, `<=`, `>=`), quoted strings (including doubled quotation marks), string concatenation (`&`), logical constants (`TRUE`, `FALSE`), and comma or semicolon separators.
+- Implemented functions: `IF`, `IFERROR`, `AND`, `OR`, `NOT`, `COUNTIF`, `SUMIF`, `ROUND`, `ABS`, `COUNTA`, `COUNTBLANK`, `LEN`, alongside prior SUM/AVERAGE/MIN/MAX/COUNT. Example: `=SUMIF(C2:C20,"Оплачено",D2:D20)`. An IF branch not selected is not evaluated.
+- Wildcard `*` and `?` in conditional-aggregate criteria are supported. The interpreter never uses JavaScript `eval`. Expression and range limits remain bounded.
+- **Still not Excel parity:** no cross-sheet formulas, date types, structured table references, external links, advanced formula families, or dependency graph. Text and number coercion may differ from Excel for edge cases. Preserve a source workbook before XLSX import/export.
+- Run `node --test tests/formula_conditional.test.js`, `python tests/formula_conditional_browser.py`, `npm test`, and `npm run build`.
