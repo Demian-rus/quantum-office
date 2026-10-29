@@ -35,3 +35,4 @@ jobs:
       - run: python tests/formula_sheets_browser.py
 
       - run: python tests/temporal_browser.py
+      - run: python tests/dependency_cache_browser.py
