@@ -16,7 +16,7 @@ test('merged block shifts and shrinks with batch operations',()=>{
  const old=structuredClone(s);assert.throws(()=>changeSheetStructure(s,'row','delete',0,2),/началом объединения/);assert.deepEqual(s,old);
 });
 test('boundary overflow refuses atomically',()=>{
- const s=currentSheet(newWorkbook());setCell(s,'A2000','last');const old=structuredClone(s);
+ const s=currentSheet(newWorkbook());setCell(s,'A100000','last');const old=structuredClone(s);
  assert.throws(()=>changeSheetStructure(s,'row','insert',1,3),/Последняя/);assert.deepEqual(s,old);
 });
 test('count bounds enforced',()=>{
