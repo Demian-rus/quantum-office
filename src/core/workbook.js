@@ -86,6 +86,13 @@ export function firstVisibleIndex(positions,coordinate){
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 
+/** Column-level inheritance excludes the explicit style of its first cell.
+ * Excel column styles must not accidentally propagate A1's custom fill to A2. */
+export function getColumnBaseStyle(sheet,col){
+ const style={...(sheet.defaultStyle||{}),...(sheet.columnStyles?.[col]||{})};
+ if(style.align===undefined&&sheet.defaultAlign!=null)style.align=sheet.defaultAlign;
+ return style;
+}
 /** Layered style resolution, without allocation for empty virtual rows. */
 export function getEffectiveStyle(sheet,ref){
  const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
