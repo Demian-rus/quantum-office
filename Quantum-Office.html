@@ -765,8 +765,8 @@ function getColumnBaseStyle(sheet,col){
  return style;
 }
 /** Layered style resolution, without allocation for empty virtual rows. */
-function getEffectiveStyle(sheet,ref){
- const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
+function getEffectiveStyle(sheet,ref,includeCell=true){
+ const pos=parseCell(ref),own=includeCell?(sheet.cells[String(ref).toUpperCase()]?.style||{}):{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
  const style={...(sheet.defaultStyle||{}),...(column||{})};
  if(pos)for(const layer of sheet.rectangleStyles||[]){
@@ -1610,6 +1610,43 @@ function safeName(name){return String(name||'Лист').replace(/[\\/\[\]*?:]/g,
 const base='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 const relNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships';
+/** OOXML requires styled blank cells for arbitrary rectangles. Expand only up
+ * to this hard limit, then refuse before creating any output. */
+const MAX_XLSX_RECTANGLE_CELLS=200000;
+const styleProps=['bg','color','bold','italic','wrap','format','align'];
+function rectangleBands(sheet,styles){
+ const rects=(sheet.rectangleStyles||[]).map(layer=>rectangle(layer.from,layer.to));
+ if(!rects.length)return [];
+ const edges=[...new Set(rects.flatMap(r=>[r.r1,r.r2+1]))].sort((a,b)=>a-b),bands=[];
+ for(let i=0;i<edges.length-1;i++){
+  const first=edges[i],last=edges[i+1]-1,active=rects.filter(r=>r.r1<=first&&r.r2>=first);
+  if(!active.length)continue;
+  for(let col=0;col<LIMITS.columns;col++){
+   if(!active.some(r=>r.c1<=col&&r.c2>=col))continue;
+   bands.push({first,last,col,id:styles.register(getEffectiveStyle(sheet,cellName(first,col),false))});
+  }
+ }
+ return bands;
+}
+function restoreSparseXLSXStyles(sheet,runs,styles){
+ const layers=[];
+ for(const run of runs)for(const prop of styleProps){
+  let start=-1,lastValue;
+  const flush=(end)=>{if(start<0)return;
+   layers.push({from:cellName(run.first,start),to:cellName(run.last,end),style:{[prop]:lastValue}});start=-1;
+  };
+  for(let col=run.c1;col<=run.c2+1;col++){
+   const expected=col<=run.c2?styles[run.id]?.[prop]:undefined;
+   const base=col<=run.c2?getColumnBaseStyle(sheet,col)[prop]:undefined;
+   const next=col<=run.c2&&expected!==base?(expected===undefined?null:expected):undefined;
+   if(start>=0&&(col>run.c2||next!==lastValue||next===undefined))flush(col-1);
+   if(next!==undefined&&start<0){start=col;lastValue=next;}
+  }
+ }
+ if(layers.length>256)throw Error('Слишком много разрозненных областей оформления в XLSX (максимум 256). Импорт отменён.');
+ sheet.rectangleStyles=layers;
+}
+
 function zipPath(target){const path=String(target||'').replace(/^\//,'').replace(/^xl\//,'');const pieces=path.split('/');if(!path||pieces.some(p=>p==='..'||p==='.'||!p))throw Error('Небезопасный путь в XLSX');return 'xl/'+path;}
 function required(zip,path){const file=zip.file(path);if(!file)throw Error('В XLSX отсутствует '+path);return file;}
 async function readXML(zip,path){const f=required(zip,path);if((f._data?.uncompressedSize||0)>10_000_000)throw Error('Слишком большой XML внутри XLSX');return parseXML(await f.async('string'));}
@@ -1656,24 +1693,60 @@ async function importXLSX(data,filename='Таблица'){
    sheet.defaultAlign=alignedColumns.get(0);
    for(const v of Object.values(sheet.columnStyles))delete v.align;
   }
-  for(const row of elements(element(xml,'sheetData'),'row')){
+  const importedRows=elements(element(xml,'sheetData'),'row');
+  const xmlCells=element(xml,'sheetData')?.getElementsByTagNameNS('*','c').length||0;
+  if(xmlCells>MAX_XLSX_RECTANGLE_CELLS+LIMITS.cells)throw Error('XLSX содержит слишком много оформленных ячеек для безопасного импорта');
+  const compact=xmlCells>LIMITS.cells;
+  for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
   }
-  for(const row of elements(element(xml,'sheetData'),'row'))for(const c of elements(row,'c')){const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
-   if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
-   const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
-   if(type==='d')throw Error('Неподдерживаемый ISO тип даты в XLSX: импорт отменён без потери данных');
-   if(formula){if(formula.getAttribute('t')==='shared'&&!formula.textContent)throw Error('Неподдерживаемая общая формула в '+ref);raw='='+formula.textContent;}
-   else if(type==='inlineStr')raw=Array.from(element(c,'is')?.getElementsByTagNameNS('*','t')||[]).map(n=>n.textContent).join('');
-   else if(type==='s'){const index=+value;if(!Number.isInteger(index)||index<0||index>=shared.length)throw Error('Повреждённая общая строка');raw=shared[index];}
-   else if(type==='b')raw=value==='1'?'TRUE':'FALSE';
-   else if(type==='e')raw=value;
-   else raw=value;
-   if(raw)setCell(sheet,ref,raw);
-   const style=fmt[Number(c.getAttribute('s')||0)]||{};if(Object.keys(style).length)setStyle(sheet,ref,style);
+  const completed=[],active=new Map();let previousRow=0;
+  for(const row of importedRows){
+   const rowIndex=Number(row.getAttribute('r')),candidates=[];
+   if(compact&&(!Number.isInteger(rowIndex)||rowIndex<1||rowIndex>LIMITS.rows||rowIndex<=previousRow))
+    throw Error('XLSX содержит некорректный порядок строк');
+   for(const c of elements(row,'c')){
+    const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
+    const p=parseCell(ref);if(!p||p.row>=LIMITS.rows||p.col>=LIMITS.columns)continue;
+    const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
+    if(type==='d')throw Error('Неподдерживаемый ISO тип даты в XLSX: импорт отменён без потери данных');
+    if(formula){if(formula.getAttribute('t')==='shared'&&!formula.textContent)throw Error('Неподдерживаемая общая формула в '+ref);raw='='+formula.textContent;}
+    else if(type==='inlineStr')raw=Array.from(element(c,'is')?.getElementsByTagNameNS('*','t')||[]).map(n=>n.textContent).join('');
+    else if(type==='s'){const index=+value;if(!Number.isInteger(index)||index<0||index>=shared.length)throw Error('Повреждённая общая строка');raw=shared[index];}
+    else if(type==='b')raw=value==='1'?'TRUE':'FALSE';
+    else if(type==='e')raw=value;
+    else raw=value;
+    const id=Number(c.getAttribute('s')||0),style=fmt[id]||{};
+    if(!compact||raw){
+     if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
+     if(raw)setCell(sheet,ref,raw);
+     if(Object.keys(style).length)setStyle(sheet,ref,style);
+    }else if(Object.keys(style.borders||{}).length||style.border)
+     throw Error('Большие XLSX-области с границами пустых ячеек пока не поддерживаются: импорт отменён');
+    if(compact&&c.hasAttribute('s'))candidates.push({col:p.col,id});
+   }
+   if(compact){
+    candidates.sort((a,b)=>a.col-b.col);
+    const runs=[];let group=null;
+    for(const item of candidates){
+     if(group&&item.col===group.c2+1&&item.id===group.id)group.c2=item.col;
+     else{if(group)runs.push(group);group={c1:item.col,c2:item.col,id:item.id};}
+    }
+    if(group)runs.push(group);
+    const next=new Map();
+    for(const run of runs){
+     const key=run.c1+':'+run.c2+':'+run.id,old=active.get(key);
+     if(old&&old.last===rowIndex-2){old.last=rowIndex-1;next.set(key,old);}
+     else next.set(key,{first:rowIndex-1,last:rowIndex-1,...run});
+    }
+    for(const [key,old] of active)if(!next.has(key))completed.push(old);
+    active.clear();for(const [key,run] of next)active.set(key,run);
+    previousRow=rowIndex;
+   }
   }
-  for(const row of elements(element(xml,'sheetData'),'row')){
+  if(compact){completed.push(...active.values());restoreSparseXLSXStyles(sheet,completed,fmt);}
+  for(const row of importedRows){
    const index=Number(row.getAttribute('r'));
    if(row.getAttribute('hidden')==='1'&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&filterRowVisible(sheet,index-1))setHidden(sheet,'row',index-1,true);
   }
@@ -1692,7 +1765,7 @@ function styleCatalog(book){
   for(let c=0;c<LIMITS.columns;c++)register(getColumnBaseStyle(sheet,c));
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
- return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
+ return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0};
 }
 function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([['',0]]);const cells=styles.unique.map(s=>{
  const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
@@ -1701,21 +1774,34 @@ function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,nu
  let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="11"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>`<${edge}${b[edge]?' style="thin"':''}/>`).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
 }
 async function exportXLSX(book){validateWorkbook(book);
- // OOXML has no sparse arbitrary-rectangle style defaults. Never silently
- // discard these native Quantum style layers in an Excel export.
- if(book.sheets.some(s=>(s.rectangleStyles||[]).length))
-  throw Error('XLSX не поддерживает большие частичные области оформления без плотной записи ячеек. Сохраните .qbook: экспорт XLSX отменён без потери стилей.');
+ const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
+  const r=rectangle(l.from,l.to);return v+(r.r2-r.r1+1)*(r.c2-r.c1+1);
+ },0),0);
+ if(area>MAX_XLSX_RECTANGLE_CELLS)
+  throw Error('Оформленные прямоугольники превышают безопасный лимит XLSX (200 000 ячеек). Сохраните .qbook: экспорт отменён без потери оформления.');
  const zip=new JSZip();const styles=styleCatalog(book);
  const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
+  const bands=rectangleBands(s,styles);
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
    const effectiveStyle=getEffectiveStyle(s,ref);
-   const styleID=styles.getId(effectiveStyle);const styleAttr=styleID?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
+   const styleID=styles.getId(effectiveStyle),pos=parseCell(ref);
+   const covered=(s.rectangleStyles||[]).some(l=>{
+    const r=rectangle(l.from,l.to);return pos.row>=r.r1&&pos.row<=r.r2&&pos.col>=r.c1&&pos.col<=r.c2;
+   });
+   const styleAttr=styleID||covered?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
    if(v.startsWith('='))tag=`<c r="${ref}"${styleAttr}><f>${xmlEscape(v.slice(1))}</f></c>`;
    else if(v!==''&&/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)&&Number.isFinite(Number(v))&&(['date','time','datetime','duration'].includes(effectiveStyle.format)||v.replace(/[^\d]/g,'').replace(/^0+/,'').length<=15))tag=`<c r="${ref}"${styleAttr}><v>${xmlEscape(['date','time','datetime','duration'].includes(effectiveStyle.format)?String(Number(Number(v).toPrecision(15))):v)}</v></c>`;
    else if(v!=='' )tag=`<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(v)}</t></is></c>`;
-   else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
+   else if(styleID||covered)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
+  }
+  // Styled blanks must exist in Excel XML; native Quantum stores only the
+  // rectangle specification. Explicit value cells are already emitted above.
+  for(const band of bands)for(let row=band.first;row<=band.last;row++){
+   const ref=cellName(row,band.col);if(Object.hasOwn(s.cells,ref))continue;
+   const number=row+1;if(!byRows.has(number))byRows.set(number,[]);
+   byRows.get(number).push([ref,`<c r="${ref}" s="${band.id}"/>`]);
   }
   const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{}),
     ...(s.defaultAlign||Object.keys(s.defaultStyle||{}).length||Object.keys(s.columnStyles||{}).length
