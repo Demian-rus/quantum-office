@@ -1,7 +1,7 @@
 import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
-import {copyCells,pasteCells,moveCells} from './core/clipboard.js';
+import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
 import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
@@ -453,6 +453,7 @@ function filterPopup(){const f=sheet()?.autoFilter,rect=filterRange(sheet());if(
 }
 // Consistent vector iconography; no external font or network requests.
 const icons={
+ pasteValues:'<path d="M8 4h9a2 2 0 0 1 2 2v5M8 4v3H5v12h8M8 4V2M9 13h10v7H9zM12 16h4M12 18h4"/>',
  hideRow:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 15h18M9 12h6"/>',
  showRows:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 9h18M3 15h18M12 10v4m-2-2h4"/>',
  hideCol:'<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M9 4v16M15 4v16M10 12h4"/>',
@@ -522,18 +523,18 @@ const icons={
 function toolIcon(action,original,extra=''){
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):action==='format'?({general:'num',currency:'currency',percent:'percent',integer:'integer',date:'date',time:'time',datetime:'datetime',duration:'duration'}[/data-value="([^"]+)"/.exec(extra)?.[1]]||'num'):
- ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
+ ({'copy':'copy','paste-values':'pasteValues','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
+ const labeled=new Set(['paste-values','find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
  let contents='';
  if(activeRibbon==='home')contents=
- group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('clear','Очистить содержимое','⌫'))+
+ group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫'))+
  group('Шрифт',button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools)+
  group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"')+button('format','Дата','📅','data-value="date"')+button('format','Время','⏱','data-value="time"')+button('format','Дата и время','◷','data-value="datetime"')+button('format','Длительность','◴','data-value="duration"'))+
@@ -541,7 +542,7 @@ function ribbon(){
  group('Оформление',button('border-menu','Границы','□')+button('merge-cells','Объединить ячейки','▣')+button('unmerge-cells','Разъединить','▤')+button('wrap','Перенос текста','↵')+button('clear-format','Сбросить формат','⟲'));
  if(activeRibbon==='edit')contents=
  group('История',button('undo','Отменить','↶')+button('redo','Повторить','↷'))+
- group('Ячейки',button('copy','Копировать','▢')+button('clear','Очистить содержимое','⌫')+button('clear-format','Сбросить формат','⟲'))+
+ group('Ячейки',button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫')+button('clear-format','Сбросить формат','⟲'))+
  group('Заполнение',button('fill-down','Заполнить вниз','↓')+button('fill-right','Заполнить вправо','→'))+
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
@@ -628,7 +629,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'border-all':setCellBorders('all');break;case 'border-none':setCellBorders('none');break;case 'wrap':toggleWrap();break;
  case 'bold':applyStyle({bold:!getEffectiveStyle(sheet(),activeCell).bold});break;case 'italic':applyStyle({italic:!getEffectiveStyle(sheet(),activeCell).italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
  case 'formula-fn':{const p=parseCell(activeCell);const from=p.row>0?cellName(0,p.col):cellName(1,p.col),to=p.row>0?cellName(p.row-1,p.col):cellName(9,p.col);const field=document.querySelector('#formula-input');if(field){field.value=`=${fn}(${from}:${to})`;field.focus();status('Проверьте диапазон, затем нажмите Enter');}break;}
- case 'copy':await copySelection();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
+ case 'copy':await copySelection();break;case 'paste-values':pasteOnlyValues();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
  case 'hide-row':visibilityAction('row',false);break;case 'show-rows':visibilityAction('row',true);break;case 'hide-col':visibilityAction('col',false);break;case 'show-cols':visibilityAction('col',true);break;
  case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
@@ -664,6 +665,17 @@ async function cutSelection(){
 async function copySelection(){const clip=captureSelection();if(!clip)return false;
  try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
  return true;}
+function pasteOnlyValues(){
+ if(!sheet())return false;
+ if(!internalClipboard){status('Сначала скопируйте диапазон через Ctrl+C',true);return false;}
+ if(refuseHiddenSelection())return false;
+ try{
+  let info;
+  transact(()=>{info=pasteValuesCells(sheet(),activeCell,internalClipboard,book());});
+  setSelection(activeCell,info.end);
+  status(`Вставлены только значения: ${info.rows} × ${info.cols}`);return true;
+ }catch(error){status(error.message||'Вставка значений отменена',true);return false;}
+}
 function pasteIntoCells(text,clip=null){if(!sheet()||refuseHiddenSelection())return false;
  try{
   if(!clip&&typeof text!=='string')throw Error('Буфер обмена пуст');
@@ -711,6 +723,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
  if(form)return;
  if(e.altKey&&(e.key==='='||e.code==='Equal')){e.preventDefault();autoSum();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='c'||e.code==='KeyC')){e.preventDefault();copySelection();return;}
+ if((e.ctrlKey||e.metaKey)&&e.shiftKey&&shortcut('v','KeyV')){e.preventDefault();pasteOnlyValues();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='v'||e.code==='KeyV')&&internalClipboard){e.preventDefault();pasteIntoCells(null,internalClipboard);return;}
  if((e.ctrlKey||e.metaKey)&&shortcut('x','KeyX')){e.preventDefault();cutSelection();return;}
  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();clearSelected();return;}
