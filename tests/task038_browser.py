@@ -1,6 +1,9 @@
 """TASK038 — Excel-compatible 180k sparse style positions incl. explicit no-fill override."""
 from pathlib import Path
 from shutil import which
+from io import BytesIO
+import base64
+from openpyxl import load_workbook
 from playwright.sync_api import sync_playwright
 
 root=Path(__file__).resolve().parents[1]
@@ -47,6 +50,21 @@ with sync_playwright() as p:
  assert data['a']=='#ff0000' and data['outside']=='#ff0000',data
  assert data['b']=='#facc15' and data['adjacent']=='#facc15',data
  assert data['mask'] is None and data['unchanged'],data
+ # Openpyxl is independent of our importer and validates actual Excel styles.
+ # An explicit style 0 blank masks a colored full-column default in a small file.
+ small=page.evaluate("""async()=>{
+  const b=newWorkbook(),s=currentSheet(b);
+  setBulkColumnStyle(s,'A1','CV100000',{bg:'#ff0000'});
+  setCell(s,'A110','База');
+  setRectangleStyle(s,'B100','B130',{bg:undefined});
+  const bytes=await exportXLSX(b),restored=await importXLSX(bytes,'small.xlsx');
+  if(getEffectiveStyle(restored.sheets[0],'B110').bg!==undefined)
+   throw Error('Lost explicit no-fill mask on short import');
+  return btoa(Array.from(bytes,v=>String.fromCharCode(v)).join(''));
+ }""")
+ excel=load_workbook(BytesIO(base64.b64decode(small)))
+ assert excel.active['A110'].fill.fgColor.rgb.endswith('FF0000')
+ assert excel.active['B110'].fill.patternType is None
  assert not errors,errors
  print('PASS TASK038: Excel XML real styles, 180k coalesced import, no-fill mask, formula and data')
  browser.close()
