@@ -1,5 +1,5 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -22,6 +22,43 @@ export function safeName(name){return String(name||'Лист').replace(/[\\/\[\]
 export const base='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
 export const relNS='http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 export const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships';
+/** OOXML requires styled blank cells for arbitrary rectangles. Expand only up
+ * to this hard limit, then refuse before creating any output. */
+export const MAX_XLSX_RECTANGLE_CELLS=200000;
+const styleProps=['bg','color','bold','italic','wrap','format','align'];
+function rectangleBands(sheet,styles){
+ const rects=(sheet.rectangleStyles||[]).map(layer=>rectangle(layer.from,layer.to));
+ if(!rects.length)return [];
+ const edges=[...new Set(rects.flatMap(r=>[r.r1,r.r2+1]))].sort((a,b)=>a-b),bands=[];
+ for(let i=0;i<edges.length-1;i++){
+  const first=edges[i],last=edges[i+1]-1,active=rects.filter(r=>r.r1<=first&&r.r2>=first);
+  if(!active.length)continue;
+  for(let col=0;col<LIMITS.columns;col++){
+   if(!active.some(r=>r.c1<=col&&r.c2>=col))continue;
+   bands.push({first,last,col,id:styles.register(getEffectiveStyle(sheet,cellName(first,col),false))});
+  }
+ }
+ return bands;
+}
+function restoreSparseXLSXStyles(sheet,runs,styles){
+ const layers=[];
+ for(const run of runs)for(const prop of styleProps){
+  let start=-1,lastValue;
+  const flush=(end)=>{if(start<0)return;
+   layers.push({from:cellName(run.first,start),to:cellName(run.last,end),style:{[prop]:lastValue}});start=-1;
+  };
+  for(let col=run.c1;col<=run.c2+1;col++){
+   const expected=col<=run.c2?styles[run.id]?.[prop]:undefined;
+   const base=col<=run.c2?getColumnBaseStyle(sheet,col)[prop]:undefined;
+   const next=col<=run.c2&&expected!==base?(expected===undefined?null:expected):undefined;
+   if(start>=0&&(col>run.c2||next!==lastValue||next===undefined))flush(col-1);
+   if(next!==undefined&&start<0){start=col;lastValue=next;}
+  }
+ }
+ if(layers.length>256)throw Error('Слишком много разрозненных областей оформления в XLSX (максимум 256). Импорт отменён.');
+ sheet.rectangleStyles=layers;
+}
+
 export function zipPath(target){const path=String(target||'').replace(/^\//,'').replace(/^xl\//,'');const pieces=path.split('/');if(!path||pieces.some(p=>p==='..'||p==='.'||!p))throw Error('Небезопасный путь в XLSX');return 'xl/'+path;}
 export function required(zip,path){const file=zip.file(path);if(!file)throw Error('В XLSX отсутствует '+path);return file;}
 export async function readXML(zip,path){const f=required(zip,path);if((f._data?.uncompressedSize||0)>10_000_000)throw Error('Слишком большой XML внутри XLSX');return parseXML(await f.async('string'));}
@@ -104,7 +141,7 @@ export function styleCatalog(book){
   for(let c=0;c<LIMITS.columns;c++)register(getColumnBaseStyle(sheet,c));
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
- return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
+ return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0};
 }
 export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([['',0]]);const cells=styles.unique.map(s=>{
  const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
@@ -113,21 +150,34 @@ export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[
  let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="11"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>`<${edge}${b[edge]?' style="thin"':''}/>`).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
 }
 export async function exportXLSX(book){validateWorkbook(book);
- // OOXML has no sparse arbitrary-rectangle style defaults. Never silently
- // discard these native Quantum style layers in an Excel export.
- if(book.sheets.some(s=>(s.rectangleStyles||[]).length))
-  throw Error('XLSX не поддерживает большие частичные области оформления без плотной записи ячеек. Сохраните .qbook: экспорт XLSX отменён без потери стилей.');
+ const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
+  const r=rectangle(l.from,l.to);return v+(r.r2-r.r1+1)*(r.c2-r.c1+1);
+ },0),0);
+ if(area>MAX_XLSX_RECTANGLE_CELLS)
+  throw Error('Оформленные прямоугольники превышают безопасный лимит XLSX (200 000 ячеек). Сохраните .qbook: экспорт отменён без потери оформления.');
  const zip=new JSZip();const styles=styleCatalog(book);
  const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
+  const bands=rectangleBands(s,styles);
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
    const effectiveStyle=getEffectiveStyle(s,ref);
-   const styleID=styles.getId(effectiveStyle);const styleAttr=styleID?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
+   const styleID=styles.getId(effectiveStyle),pos=parseCell(ref);
+   const covered=(s.rectangleStyles||[]).some(l=>{
+    const r=rectangle(l.from,l.to);return pos.row>=r.r1&&pos.row<=r.r2&&pos.col>=r.c1&&pos.col<=r.c2;
+   });
+   const styleAttr=styleID||covered?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
    if(v.startsWith('='))tag=`<c r="${ref}"${styleAttr}><f>${xmlEscape(v.slice(1))}</f></c>`;
    else if(v!==''&&/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)&&Number.isFinite(Number(v))&&(['date','time','datetime','duration'].includes(effectiveStyle.format)||v.replace(/[^\d]/g,'').replace(/^0+/,'').length<=15))tag=`<c r="${ref}"${styleAttr}><v>${xmlEscape(['date','time','datetime','duration'].includes(effectiveStyle.format)?String(Number(Number(v).toPrecision(15))):v)}</v></c>`;
    else if(v!=='' )tag=`<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(v)}</t></is></c>`;
-   else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
+   else if(styleID||covered)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
+  }
+  // Styled blanks must exist in Excel XML; native Quantum stores only the
+  // rectangle specification. Explicit value cells are already emitted above.
+  for(const band of bands)for(let row=band.first;row<=band.last;row++){
+   const ref=cellName(row,band.col);if(Object.hasOwn(s.cells,ref))continue;
+   const number=row+1;if(!byRows.has(number))byRows.set(number,[]);
+   byRows.get(number).push([ref,`<c r="${ref}" s="${band.id}"/>`]);
   }
   const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{}),
     ...(s.defaultAlign||Object.keys(s.defaultStyle||{}).length||Object.keys(s.columnStyles||{}).length
