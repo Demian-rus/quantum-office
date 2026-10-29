@@ -31,3 +31,4 @@ jobs:
       - run: python tests/merged_clipboard_browser.py
       - run: python tests/merged_structure_browser.py
       - run: python tests/bulk_structure_browser.py
+      - run: python tests/formula_conditional_browser.py

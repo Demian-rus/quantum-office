@@ -1,118 +1,173 @@
-/** MVP spreadsheet engine. Never evaluates JavaScript from user cells. */
+/** Bounded formula interpreter. No eval/Function/network, safe for untrusted sheets. */
 export function colLabel(n) {
   let result = '';
   for (let x = n + 1; x > 0; x = Math.floor((x - 1) / 26)) result = String.fromCharCode(65 + ((x - 1) % 26)) + result;
   return result;
 }
-
 export function cellName(row, col) { return `${colLabel(col)}${row + 1}`; }
-
 export function parseCell(ref) {
-  const match = /^([A-Z]+)([1-9]\d*)$/.exec(ref.toUpperCase());
+  const match = /^([A-Z]+)([1-9]\d*)$/.exec(String(ref).toUpperCase());
   if (!match) return null;
   let col = 0;
   for (const letter of match[1]) col = col * 26 + letter.charCodeAt(0) - 64;
   return { row: Number(match[2]) - 1, col: col - 1 };
 }
-
-function tokenise(str) {
-  const text = str.toUpperCase().replace(/\s+/g, '');
-  const regex = /(?:\d+(?:\.\d+)?|\.[0-9]+)|\$?[A-Z]+\$?[1-9]\d*|[A-Z]+|[()+\-*/,:]/gy;
-  const tokens = [];
-  let offset = 0;
-  while (offset < text.length) {
-    regex.lastIndex = offset;
-    const m = regex.exec(text);
-    if (!m) throw new Error('Invalid formula');
-    tokens.push(m[0]);
-    offset = regex.lastIndex;
-    if (tokens.length > 2000) throw new Error('Formula too long');
+const REF = /^\$?[A-Z]+\$?[1-9]\d*$/;
+const FORMULA_LIMITS = {rows:2000, cols:100, tokens:2000, depth:80, range:10000};
+function tokensOf(formula) {
+  if (formula.length > 10000) throw Error('#ERROR!');
+  const tokens=[];let pos=0;
+  const re = /(?:\d+(?:\.\d+)?|\.\d+)(?:[Ee][+\-]?\d+)?|\$?[A-Z]+\$?[1-9]\d*|[A-Z_][A-Z0-9_.]*|<=|>=|<>|[()+\-*/,:;&=<>&]/iy;
+  while (pos<formula.length) {
+    if (/\s/.test(formula[pos])) {pos++;continue;}
+    if (formula[pos]==='"') {
+      let value='',ended=false;pos++;
+      while(pos<formula.length){const ch=formula[pos++];if(ch==='"'){if(formula[pos]==='"'){value+='"';pos++;}else{ended=true;break;}}else value+=ch;}
+      if(!ended)throw Error('#ERROR!');tokens.push({type:'string',value});
+    } else {
+      re.lastIndex=pos;const match=re.exec(formula);
+      if(!match)throw Error('#ERROR!');const value=match[0].toUpperCase();
+      tokens.push({type:'token',value});pos=re.lastIndex;
+    }
+    if(tokens.length>FORMULA_LIMITS.tokens)throw Error('#ERROR!');
   }
   return tokens;
 }
-
-function rangeRefs(start, end) {
-  const a = parseCell(start), b = parseCell(end);
-  if (!a || !b) throw new Error('Invalid range');
-  const count = (Math.abs(a.row-b.row)+1) * (Math.abs(a.col-b.col)+1);
-  if (count > 10000) throw new Error('Range too large');
-  const refs = [];
-  for (let row=Math.min(a.row,b.row);row<=Math.max(a.row,b.row);row++)
-    for (let col=Math.min(a.col,b.col);col<=Math.max(a.col,b.col);col++) refs.push(cellName(row,col));
+function address(ref) {
+  const a=parseCell(ref.replaceAll('$',''));
+  if(!a||a.row<0||a.col<0||a.row>=FORMULA_LIMITS.rows||a.col>=FORMULA_LIMITS.cols)throw Error('#REF!');
+  return a;
+}
+function rangeRefs(a,b){const x=address(a),y=address(b),count=(Math.abs(x.row-y.row)+1)*(Math.abs(x.col-y.col)+1);
+  if(count>FORMULA_LIMITS.range)throw Error('#ERROR!');const refs=[];
+  for(let row=Math.min(x.row,y.row);row<=Math.max(x.row,y.row);row++)
+    for(let col=Math.min(x.col,y.col);col<=Math.max(x.col,y.col);col++)refs.push(cellName(row,col));
   return refs;
 }
+function parseFormula(source){const tokens=tokensOf(source);let i=0,depth=0;
+  const at=()=>tokens[i]?.value;
+  const eat=value=>{if(at()===value){i++;return true;}return false;};
+  const expect=value=>{if(!eat(value))throw Error('#ERROR!');};
+  function limited(parser){if(++depth>FORMULA_LIMITS.depth)throw Error('#ERROR!');try{return parser();}finally{depth--;}}
+  function comparison(){return limited(()=>{let n=concat();while(['=','<>','>','<','>=','<='].includes(at())){const op=tokens[i++].value;n={kind:'binary',op,left:n,right:concat()};}return n;});}
+  function concat(){let n=add();while(eat('&'))n={kind:'binary',op:'&',left:n,right:add()};return n;}
+  function add(){let n=mul();while(at()==='+'||at()==='-'){const op=tokens[i++].value;n={kind:'binary',op,left:n,right:mul()};}return n;}
+  function mul(){let n=unary();while(at()==='*'||at()==='/'){const op=tokens[i++].value;n={kind:'binary',op,left:n,right:unary()};}return n;}
+  function unary(){if(eat('-'))return {kind:'unary',op:'-',arg:unary()};if(eat('+'))return {kind:'unary',op:'+',arg:unary()};return primary();}
+  function primary(){return limited(()=>{
+    if(eat('(')){const n=comparison();expect(')');return n;}
+    const t=tokens[i++];if(!t)throw Error('#ERROR!');
+    if(t.type==='string')return {kind:'literal',value:t.value};
+    const value=t.value;
+    if(/^(?:\d|\.)/.test(value))return {kind:'literal',value:Number(value)};
+    if(REF.test(value)){address(value);if(eat(':')){const end=tokens[i++];if(!end||!REF.test(end.value))throw Error('#ERROR!');rangeRefs(value,end.value);return {kind:'range',from:value,to:end.value};}return {kind:'ref',ref:value};}
+    if(value==='TRUE'||value==='FALSE')return {kind:'literal',value:value==='TRUE'};
+    if(/^[A-Z_][A-Z0-9_.]*$/.test(value)){
+      if(value.includes('.'))throw Error('#ERROR!');if(!eat('('))throw Error('#NAME?');const args=[];
+      if(!eat(')')){do{args.push(comparison());if(args.length>100)throw Error('#ERROR!');}while(eat(',')||eat(';'));expect(')');}
+      return {kind:'call',name:value,args};
+    }
+    throw Error('#ERROR!');
+  });}
+  const root=comparison();if(i!==tokens.length)throw Error('#ERROR!');return root;
+}
+const isError=value=>typeof value==='string'&&/^#(?:REF!|DIV\/0!|VALUE!|NAME\?|CYCLE!|ERROR!|N\/A|NUM!)/.test(value);
+const numericLike=v=>typeof v==='number'||typeof v==='boolean'||v===''||(typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v)));
+const toNumber=value=>{if(isError(value))throw Error(value);if(value===''||value===null)return 0;if(typeof value==='boolean')return value?1:0;const n=Number(value);if(!Number.isFinite(n))throw Error('#VALUE!');return n;};
+const toText=value=>{if(isError(value))throw Error(value);if(value===null||value===undefined)return '';if(typeof value==='boolean')return value?'TRUE':'FALSE';return String(value);};
+const truth=value=>{if(isError(value))throw Error(value);if(typeof value==='boolean')return value;if(value===''||value===null)return false;return numericLike(value)?toNumber(value)!==0:toText(value).toUpperCase()!=='FALSE';};
+const compare=(a,b)=>{if(isError(a))throw Error(a);if(isError(b))throw Error(b);if(numericLike(a)&&numericLike(b)){const av=toNumber(a),bv=toNumber(b);return av===bv?0:av>bv?1:-1;}return toText(a).localeCompare(toText(b), 'ru',{sensitivity:'base',numeric:false});};
+function wildcardMatch(text,pattern){
+  const hay=toText(text).toLocaleLowerCase('ru-RU'),needle=pattern.toLocaleLowerCase('ru-RU');
+  let i=0,j=0,star=-1,backtrack=0;
+  while(i<hay.length){
+    if(j<needle.length&&(needle[j]==='?'||needle[j]===hay[i])){i++;j++;}
+    else if(j<needle.length&&needle[j]==='*'){star=j++;backtrack=i;}
+    else if(star!==-1){j=star+1;i=++backtrack;}
+    else return false;
+  }
+  while(needle[j]==='*')j++;
+  return j===needle.length;
+}
+function matches(actual,criterion){
+  if(isError(actual))throw Error(actual);
+  const raw=toText(criterion);if(raw.length>512)throw Error('#VALUE!');
+  const match=/^(<=|>=|<>|=|<|>)([\s\S]*)$/.exec(raw);
+  const op=match?.[1]||'=',expected=match?match[2]:criterion;
+  if(typeof expected==='string'&&/[?*]/.test(expected)&&['=','<>'].includes(op)){
+    const ok=wildcardMatch(actual,expected);return op==='='?ok:!ok;
+  }
+  const cmp=compare(actual,expected);
+  return op==='='?cmp===0:op==='<>'?cmp!==0:op==='<'?cmp<0:op==='>'?cmp>0:op==='<='?cmp<=0:cmp>=0;
+}
 
-export function evaluateCell(ref, cells, visiting = new Set()) {
-  if (visiting.has(ref)) return '#CYCLE!';
-  const raw = String(cells[ref] ?? '');
-  if (!raw.startsWith('=')) return raw;
-  if (raw.includes('#REF!')) return '#REF!';
-  const next = new Set(visiting); next.add(ref);
-  let tokens;
-  try { tokens = tokenise(raw.slice(1)); } catch { return '#ERROR!'; }
-  let i = 0;
-  function peek() { return tokens[i]; }
-  function eat(x) { if (peek() === x) { i++; return true; } return false; }
-  function numeric(r) {
-    const v = evaluateCell(r, cells, next);
-    if (typeof v === 'string' && v.startsWith('#')) throw new Error(v);
-    if (v === '') return 0;
-    const n = Number(v);
-    if (!Number.isFinite(n)) throw new Error('#VALUE!');
-    return n;
+function evaluateNode(node,cells,visiting){
+  const ev=n=>evaluateNode(n,cells,visiting);
+  const valueOfRef=r=>{const ref=r.replaceAll('$','');const v=evaluateCell(ref,cells,visiting);if(isError(v))throw Error(v);return v;};
+  const values=n=>n.kind==='range'?rangeRefs(n.from,n.to).map(valueOfRef):[ev(n)];
+  const flattened=args=>args.flatMap(values);
+  if(node.kind==='literal')return node.value;
+  if(node.kind==='ref')return valueOfRef(node.ref);
+  if(node.kind==='range')throw Error('#VALUE!');
+  if(node.kind==='unary')return node.op==='-'?-toNumber(ev(node.arg)):toNumber(ev(node.arg));
+  if(node.kind==='binary'){
+    const a=ev(node.left),b=ev(node.right);
+    if(node.op==='&')return toText(a)+toText(b);
+    if(['=','<>','<','>','<=','>='].includes(node.op)){const diff=compare(a,b);return node.op==='='?diff===0:node.op==='<>'?diff!==0:node.op==='<'?diff<0:node.op==='>'?diff>0:node.op==='<='?diff<=0:diff>=0;}
+    const x=toNumber(a),y=toNumber(b);if(node.op==='/'&&y===0)throw Error('#DIV/0!');
+    return node.op==='+'?x+y:node.op==='-'?x-y:node.op==='*'?x*y:x/y;
   }
-  function expression() {
-    let n = term();
-    while (peek() === '+' || peek() === '-') {
-      const op = tokens[i++]; const rhs = term(); n = op === '+' ? n+rhs : n-rhs;
+  const {name,args}=node;
+  const requireArgs=(min,max=min)=>{if(args.length<min||args.length>max)throw Error('#ERROR!');};
+  if(name==='IF'){requireArgs(2,3);return truth(ev(args[0]))?ev(args[1]):args.length===3?ev(args[2]):false;}
+  if(name==='IFERROR'){requireArgs(2);try{const answer=ev(args[0]);return isError(answer)?ev(args[1]):answer;}catch(e){if(String(e.message).startsWith('#'))return ev(args[1]);throw e;}}
+  if(name==='AND'||name==='OR'){if(!args.length)throw Error('#ERROR!');if(name==='AND'){for(const a of args)if(!truth(ev(a)))return false;return true;}for(const a of args)if(truth(ev(a)))return true;return false;}
+  if(name==='NOT'){requireArgs(1);return !truth(ev(args[0]));}
+  if(name==='COUNTIF'||name==='SUMIF'){
+    requireArgs(name==='SUMIF'?2:2,name==='SUMIF'?3:2);
+    if(args[0].kind!=='range')throw Error('#VALUE!');
+    const refs=rangeRefs(args[0].from,args[0].to);const rule=ev(args[1]);
+    let targets=refs;
+    if(name==='SUMIF'&&args[2]){
+      if(args[2].kind!=='range')throw Error('#VALUE!');
+      const criterionFrom=address(args[0].from),criterionTo=address(args[0].to),sumFrom=address(args[2].from);
+      if(criterionFrom.row>criterionTo.row||criterionFrom.col>criterionTo.col)throw Error('#VALUE!');
+      targets=refs.map(ref=>{const a=address(ref);const row=sumFrom.row+a.row-criterionFrom.row,col=sumFrom.col+a.col-criterionFrom.col;
+        if(row>=FORMULA_LIMITS.rows||col>=FORMULA_LIMITS.cols)throw Error('#REF!');return cellName(row,col);});
     }
-    return n;
-  }
-  function term() {
-    let n = factor();
-    while (peek() === '*' || peek() === '/') {
-      const op = tokens[i++]; const rhs = factor();
-      if (op === '/' && rhs === 0) throw new Error('#DIV/0!');
-      n = op === '*' ? n*rhs : n/rhs;
+    let count=0,total=0;for(let i=0;i<refs.length;i++)if(matches(valueOfRef(refs[i]),rule)){
+      count++;if(name==='SUMIF'){const v=valueOfRef(targets[i]);if(numericLike(v))total+=toNumber(v);}
     }
-    return n;
+    return name==='COUNTIF'?count:total;
   }
-  function factor() {
-    if (eat('-')) return -factor();
-    if (eat('+')) return factor();
-    if (eat('(')) { const v=expression(); if (!eat(')')) throw new Error('#ERROR!'); return v; }
-    const token = tokens[i++];
-    if (!token) throw new Error('#ERROR!');
-    if (/^(?:\d|\.)/.test(token)) return Number(token);
-    if (/^\$?[A-Z]+\$?[1-9]\d*$/.test(token)) return numeric(token.replaceAll('$',''));
-    if (/^[A-Z]+$/.test(token)) {
-      if (!['SUM','AVERAGE','MIN','MAX','COUNT'].includes(token) || !eat('(')) throw new Error('#NAME?');
-      const vals = [];
-      if (!eat(')')) {
-        do {
-          if (/^\$?[A-Z]+\$?[1-9]\d*$/.test(peek()||'') && tokens[i+1] === ':') {
-            const first=tokens[i++].replaceAll('$',''); i++;
-            const last=(tokens[i++]||'').replaceAll('$','');
-            for (const r of rangeRefs(first,last)) vals.push(numeric(r));
-          } else vals.push(expression());
-        } while (eat(','));
-        if (!eat(')')) throw new Error('#ERROR!');
-      }
-      if (token === 'SUM') return vals.reduce((a,b)=>a+b,0);
-      if (token === 'COUNT') return vals.length;
-      if (token === 'AVERAGE') return vals.length ? vals.reduce((a,b)=>a+b,0)/vals.length : 0;
-      if (token === 'MIN') return vals.length ? Math.min(...vals) : 0;
-      return vals.length ? Math.max(...vals) : 0;
-    }
-    throw new Error('#ERROR!');
+  if(name==='ROUND'){requireArgs(1,2);const x=toNumber(ev(args[0])),digits=args[1]?toNumber(ev(args[1])):0;
+    if(!Number.isInteger(digits)||digits< -12||digits>12)throw Error('#NUM!');const power=10**digits;return Math.sign(x)*Math.round((Math.abs(x)+Number.EPSILON)*power)/power;}
+  if(name==='ABS'){requireArgs(1);return Math.abs(toNumber(ev(args[0])));}
+  if(name==='LEN'){requireArgs(1);return toText(ev(args[0])).length;}
+  if(name==='SUM'||name==='AVERAGE'||name==='COUNT'||name==='COUNTA'||name==='COUNTBLANK'||name==='MIN'||name==='MAX'){
+    if(!args.length)throw Error('#ERROR!');const vs=flattened(args);
+    if(name==='COUNTA')return vs.filter(v=>v!==''&&v!==null).length;
+    if(name==='COUNTBLANK')return vs.filter(v=>v===''||v===null).length;
+    const nums=vs.filter(numericLike).filter(v=>v!=='').map(toNumber);
+    if(name==='COUNT')return nums.length;
+    if(name==='SUM')return nums.reduce((a,b)=>a+b,0);
+    if(!nums.length)return name==='AVERAGE'?'#DIV/0!':0;
+    if(name==='AVERAGE')return nums.reduce((a,b)=>a+b,0)/nums.length;
+    return name==='MIN'?Math.min(...nums):Math.max(...nums);
   }
-  try {
-    const result=expression();
-    if (i !== tokens.length || !Number.isFinite(result)) return '#ERROR!';
-    return Math.round((result + Number.EPSILON) * 1e10) / 1e10;
-  } catch (e) {
-    return e.message?.startsWith('#') ? e.message : '#ERROR!';
-  }
+  throw Error('#NAME?');
+}
+export function evaluateCell(ref, cells, visiting=new Set()) {
+  const normalized=String(ref).replaceAll('$','').toUpperCase();
+  if(visiting.has(normalized))return '#CYCLE!';
+  const raw=String(cells[normalized]??'');if(!raw.startsWith('='))return raw;
+  if(raw.includes('#REF!'))return '#REF!';
+  const next=new Set(visiting);next.add(normalized);
+  try{
+    const result=evaluateNode(parseFormula(raw.slice(1)),cells,next);
+    if(typeof result==='number'){if(!Number.isFinite(result))return '#NUM!';return Math.round((result+Number.EPSILON)*1e10)/1e10;}
+    return result;
+  }catch(e){return String(e.message||'').startsWith('#')?e.message:'#ERROR!';}
 }
 
 export function csvEncode(grid) {

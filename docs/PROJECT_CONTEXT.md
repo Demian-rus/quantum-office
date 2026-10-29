@@ -105,26 +105,35 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - User data policy remains: browser preview is not durable desktop storage; export `.qbook` and a separate backup for real work; XLSX complex features remain only partially supported.
 - Acceptance: Node tests for overlap/data preservation/borders; Chromium dialog interactions, merge/unmerge and undo; XLSX roundtrip with `openpyxl`; all existing browser regressions; never claim full Excel equivalence.
 
-## TASK 022 — safe merged clipboard
-- Copying a single merged anchor copies the complete merged range. Multiple fully contained merges copy with their geometry; partial intersections refuse.
-- Paste into free area preserves formulas/styles and new merges in a single undoable action. Collision, bounds, formula and freeze incompatibility are prevalidated before mutation.
-- Keyboard navigation skips the covered cells of the currently selected merge.
-- Ctrl+X, sort and fill on merged ranges remain blocked; insert/delete with merges remains blocked by the earlier safety policy.
-- Run 66 Node tests and merged clipboard Chromium scenario. Do not claim browser localStorage is durable file storage.
 
+## TASK 022 — safe merged-range clipboard and navigation (2026-10-28)
 
-## TASK 023 — structural edits with merged cells
+- Ctrl+C on the anchor of a single merged cell copies the **whole merged rectangle** (values, formulas, styling and merge geometry). Fully contained merges in multi-cell selections also copy. Partial selections that cut through a merge are rejected *without changing the workbook*.
+- Ctrl+V into an unmerged destination transfers all merge geometry, moves relative formula references, keeps `$` absolute anchors, and is one undo transaction. Destination intersections with existing merges, invalid/malformed clipboard content, output outside 2,000 × 100 limits, hidden/frozen incompatible regions and formula translation errors are rejected before mutation.
+- Movement via arrows skips the covered cells within the currently selected merged block (keyboard navigation); `Ctrl+X` with merges remains blocked to avoid silent loss of source geometry.
+- Fill and row sorting involving any merged range are refused before changing cells. Structural insert/delete with merges remains explicitly blocked by existing safety policy until a separately tested reference-safe implementation exists.
+- Native desktop app is still not released, and browser localStorage is not a guarantee of durable files. `qbook`/`qbackup` exports remain recommended for important work; XLSX import/export is partial.
+- Acceptance: `npm test`, `npm run build`, `python tests/merged_clipboard_browser.py`, existing clipboard, structure and XLSX regression scripts; CI must pass before merge.
 
-- Inserting **before** a merged range shifts its anchor and rectangle; inserting **inside** it expands the rectangle while keeping the upper-left value.
-- Deleting rows/columns above or before an area shifts it; deleting a **non-anchor** band inside shrinks it. If only one cell remains, the merge disappears but the anchor content stays.
-- Deleting the row/column that contains the **upper-left anchor** is deliberately refused, rather than silently losing its content. Unmerge first.
-- Existing bounds (2,000 × 100 cells, 2,000 cells/merge) remain enforced before mutation; active filters still block structural edits. Undo is one step.
-- Verified with dedicated Node tests, a Chromium ribbon/undo workflow and independent XLSX inspection via openpyxl.
-- This is bounded support; cross-sheet references, multi-row structural actions and all Excel merged-editing semantics are not yet complete.
+## TASK 023 — structural editing of merged cells (2026-10-28)
 
+- Structural row/column edits are now merge-aware. Inserting **before** the first merged row/column shifts the entire merge; inserting **inside** the merged rectangle expands it. The content and formatting stay anchored at the upper-left cell.
+- Deleting rows or columns **above/before** a merge shifts it; deleting a non-anchor interior band shrinks it. A resulting single-cell region ceases to be a merge.
+- Deleting the band that contains the upper-left anchor of a merged region is intentionally rejected, even for an empty anchor: silently deleting that anchor or reanchoring its value is unsafe. Unmerge before this operation.
+- Inserts that would push a merge outside 2,000 × 100 bounds, or grow it beyond 2,000 cells, reject without mutation. Active auto-filters still block structural operations. All edits occur atomically in the model and are covered by UI undo/redo.
+- Tests: `tests/merged_structure.test.js`, `tests/merged_structure_browser.py` (real ribbon controls, undo, independent XLSX `openpyxl` check), all previous browser and model regression suites. The UI resolves a covered merged cell to its anchor; interior editing is supported by the model but selecting the interior of an existing merge through the name box currently resolves to the anchor.
+- This is **bounded support**, not Excel-complete structural editing. Bulk inserted/deleted rows/columns, reorganizing references across sheets and advanced dynamic array formulas are still outstanding.
 
-## TASK 024 — bounded mass insertion/deletion
+## TASK 024 — bounded multi-row/column structural editing (2026-10-29)
 
-- Selecting a range and choosing Insert/Delete rows or columns affects the number of selected rows/columns, up to 100 per action. One cell still means one row/column. Entire bands are changed, not just their selected cells.
-- The core computes one final state: formulas, merges, custom dimensions, hidden flags, frozen panes and cell styles are rebased atomically. Deletion including the top-left merge anchor, overflow, active filter and excessive counts are rejected.
-- Existing XLSX compatibility remains partial. The installed desktop editor is still future work. Verify with model tests and Chromium bulk-structure regression.
+- Insert/Delete actions on the compact **Вставка** ribbon operate on the entire set of rows (or columns) covered by the current selection, max 100 adjacent rows/columns. Single-cell selection remains a single-row/single-column operation. Existing filtered sheets refuse the operation.
+- The structural engine computes the final state once, without sequential single-row edits: values, styles, absolute/relative formula references, merges, custom dimensions, explicit hidden flags and frozen panes move consistently. The formula engine is still a limited MVP; range-references and advanced Excel structured references need later work.
+- Deleting a band that intersects the top-left anchor of any merge refuses the whole action; deleting a non-anchor interior band shrinks the merge. Insertion at/inside merges shifts or expands them. Any out-of-bounds or 2,000-cell merged area is rejected before mutation.
+- One operation means one undo step, with only the supported bounded result exported to XLSX. Keep existing `.qbook` backups; complex Excel workbooks are lossy.
+- Required acceptance: `npm test`, `npm run build`, `tests/bulk_structure_browser.py`, and prior merged/structural/XLSX browser regressions.
+
+## TASK 025 — conditional formula engine (2026-10-29)
+
+- After TASK 024 was merged (squash `2eab3ffb184e77e38af3f3192bb92a1e75567f14`), formula support was expanded for tuition/timetable/accounting use: `IF`, `IFERROR`, `AND`, `OR`, `NOT`, `COUNTIF`, `SUMIF`, `ROUND`, `ABS`, `COUNTA`, `COUNTBLANK`, `LEN`, comparisons, quoted text and text concatenation. Both comma and semicolon argument separators are accepted.
+- Parser produces a bounded AST, with lazy `IF`/`IFERROR` branches and no dynamic JavaScript execution. Preserve old SUM/AVERAGE/MIN/MAX/COUNT and cyclic-reference error behavior. Existing XLSX text formulas are left intact and recalculated in Excel on opening.
+- Do not claim full Excel function compatibility. This is a bounded subset; cross-sheet references, dates and dependency tracking remain missing. Add new functions with independent Node and Chromium tests, and retain explicit file backups.
