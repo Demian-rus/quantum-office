@@ -55,7 +55,10 @@ export async function importXLSX(data,filename='Таблица'){
    const columnAlign=col.hasAttribute('style')?fmt[columnStyleIndex]?.align:undefined;
    if(columnAlign)for(let c=min-1;c<max;c++)alignedColumns.set(c,columnAlign);
    if(col.hasAttribute('style')&&fmt[columnStyleIndex]){
-    const loaded={...fmt[columnStyleIndex]};
+    // Column borders cannot be compactly represented by this model; preserve
+    // the supported font, fill, number and alignment properties only.
+    const allowed=new Set(['bg','color','bold','italic','wrap','format','align']);
+    const loaded=Object.fromEntries(Object.entries(fmt[columnStyleIndex]).filter(([k])=>allowed.has(k)));
     for(let c=min-1;c<max;c++)if(Object.keys(loaded).length)sheet.columnStyles[String(c)]=loaded;
    }
    const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=48&&px<=520)for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
