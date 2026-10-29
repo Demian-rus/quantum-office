@@ -2,11 +2,12 @@ import { cellName,parseCell,colLabel,evaluateCell,createCalculationSession,csvEn
 import {formatTemporal,parseTemporalInput} from './dates.js';
 import {validateCharts} from './charts.js';
 import {validateConditionalRules} from './conditional.js';
+import {validateDataRules,checkValidatedInput} from './validation.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -208,7 +209,7 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  sheet.defaultStyle=next;sheet.columnStyles=columns;sheet.rectangleStyles=remainingRectangleStyles;
 }
 
-export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
+export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');checkValidatedInput(sheet,ref,String(value??'').slice(0,50000));const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
 /** Convert explicit calendar/time input to serial values only for direct user entry.
  * All file import, clipboard and formula editing outside the UI preserve their raw values. */
 export function setTypedCell(sheet,ref,input){
@@ -390,6 +391,8 @@ export function fillSelection(sheet, from, to, direction){
    const original=getCell(sheet,cellName(originR,originC));
    changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),structuredClone(original.style||{})]);
  }
+ // Precheck validation for the entire fill to preserve atomicity.
+ for(const [ref,value] of changes)checkValidatedInput(sheet,ref,value);
  // Do not corrupt existing data if even one translated reference is out of bounds.
  for(const [ref,value,style] of changes){
    if(value||Object.keys(style).length)sheet.cells[ref]={value,style};
@@ -448,6 +451,7 @@ export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!va
  const maxR=Math.min(LIMITS.rows-at.row,rows.length),maxC=Math.min(LIMITS.columns-at.col,Math.max(...rows.map(r=>r.length)));
  if(maxR*maxC>20000)throw Error('Вставка ограничена 20 000 ячеек');
  for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)if(mergeAt(sheet,cellName(at.row+r,at.col+c)))throw Error('Вставка в объединённый диапазон пока не поддерживается');
+ for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)checkValidatedInput(sheet,cellName(at.row+r,at.col+c),rows[r][c]);
  for(let r=0;r<maxR;r++)for(let c=0;c<Math.min(maxC,rows[r].length);c++)setCell(sheet,cellName(at.row+r,at.col+c),rows[r][c]);
  return {rows:maxR,cols:maxC,end:cellName(at.row+maxR-1,at.col+maxC-1)};
 }
@@ -528,6 +532,7 @@ export function validateWorkbook(book){
  let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
   validateCharts(sheet);
   validateConditionalRules(sheet);
+  validateDataRules(sheet);
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
