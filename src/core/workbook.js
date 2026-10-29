@@ -349,6 +349,30 @@ export function translateFormula(source, rowDelta, colDelta){
  });
 }
 /** Atomic fill plan: snapshot source values/styles first, validate, then mutate. */
+/** Excel Ctrl+Enter: one typed value or a relative formula across a selection.
+ * Validate every destination and stage changes before touching the source.
+ * Existing destination styles are preserved unless typed date/time formatting
+ * intentionally changes their number format. */
+export function fillTypedSelection(sheet,from,to,input,origin=from){
+ const area=rectangle(from,to),start=parseCell(origin);
+ if(!area||!validRef(from)||!validRef(to)||!validRef(origin)||
+    start.row<area.r1||start.row>area.r2||start.col<area.c1||start.col>area.c2)
+  throw Error('Недопустимый диапазон заполнения');
+ if(typeof input!=='string'||input.length>50000)throw Error('Недопустимое содержимое ячейки');
+ const total=(area.r2-area.r1+1)*(area.c2-area.c1+1);
+ if(total>10000)throw Error('Массовый ввод ограничен 10 000 ячеек');
+ if((sheet.merges||[]).some(m=>{const r=rectangle(m.from,m.to);return r.r1<=area.r2&&r.r2>=area.r1&&r.c1<=area.c2&&r.c2>=area.c1;}))
+  throw Error('Массовый ввод в объединённые ячейки не поддерживается');
+ const staged=structuredClone(sheet);
+ for(let row=area.r1;row<=area.r2;row++)for(let col=area.c1;col<=area.c2;col++){
+  const ref=cellName(row,col);
+  const typed=input.startsWith('=')?translateFormula(input,row-start.row,col-start.col):input;
+  setTypedCell(staged,ref,typed);
+ }
+ if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=staged.cells;
+ return total;
+}
 export function fillSelection(sheet, from, to, direction){
  if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
  const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
