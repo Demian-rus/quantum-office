@@ -174,8 +174,8 @@ function applyStyle(patch,selection=null){
  if(Object.keys(patch).length===1&&patch.align&&rect.r1===0&&rect.c1===0&&rect.r2===LIMITS.rows-1&&rect.c2===LIMITS.columns-1){
   transact(()=>setWholeSheetAlignment(sheet(),patch.align));drawGrid();status(`Выравнивание всего листа: ${patch.align==='center'?'по центру':patch.align==='right'?'справа':'слева'}`);return;
  }
+ if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Слишком большой диапазон для нанесения нового оформления (максимум 10 000 ячеек)',true);return;}
  for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r)){status('Выделение содержит скрытые строки',true);return;}
- if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Слишком большой диапазон',true);return;}
  const refs=refsBetween(a,b);
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
 }
