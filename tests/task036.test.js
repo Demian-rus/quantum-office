@@ -89,8 +89,8 @@ test('XLSX stores one column style across 100k rows without materializing 100k c
  assert.match(xml,/<col min="2" max="2"[^>]*style="\d+"/);
  assert.match(xml,/r="B100000"/);
  assert.equal((xml.match(/<c /g)||[]).length,2);
- const columnId=/<col min="2" max="2"[^>]*style="(\\d+)"/.exec(xml)?.[1];
- const firstCellId=/<c r="B1"[^>]*s="(\\d+)"/.exec(xml)?.[1];
+ const columnId=/<col min="2" max="2"[^>]*style="(\d+)"/.exec(xml)?.[1];
+ const firstCellId=/<c r="B1"[^>]*s="(\d+)"/.exec(xml)?.[1];
  assert.ok(columnId&&firstCellId);
  assert.notEqual(columnId,firstCellId,'B1 custom color leaked to whole column');
  assert.match(styles,/FFAABBCC/);
