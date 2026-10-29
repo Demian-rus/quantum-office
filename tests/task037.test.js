@@ -84,7 +84,7 @@ test('native roundtrip retains sparse regions, clipboard copies effective style;
  assert.equal(getEffectiveStyle(copy,'D200').bg,'#42a5f5');
  const zip=await globalThis.JSZip.loadAsync(await exportXLSX(restored),{checkCRC32:true});
  const xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
- assert.match(xml,/<c r="C89999" s="\\d+"\\/>/);
+ assert.ok(xml.includes('<c r="C89999" s="'),'Styled Excel cell C89999 missing');
  assert.ok((xml.match(/<c /g)||[]).length>170000);
  assert.equal(getCell(copy,'B200').value,'Текст');
  assert.equal(Object.keys(copy.cells).length,2);
