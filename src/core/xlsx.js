@@ -1,5 +1,5 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -54,10 +54,17 @@ export async function importXLSX(data,filename='Таблица'){
    const columnStyleIndex=Number(col.getAttribute('style'));
    const columnAlign=col.hasAttribute('style')?fmt[columnStyleIndex]?.align:undefined;
    if(columnAlign)for(let c=min-1;c<max;c++)alignedColumns.set(c,columnAlign);
+   if(col.hasAttribute('style')&&fmt[columnStyleIndex]){
+    const loaded={...fmt[columnStyleIndex]};
+    for(let c=min-1;c<max;c++)if(Object.keys(loaded).length)sheet.columnStyles[String(c)]=loaded;
+   }
    const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=48&&px<=520)for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
    if(col.getAttribute('hidden')==='1')for(let c=min-1;c<max;c++)setHidden(sheet,'col',c,true);
   }
-  if(alignedColumns.size===LIMITS.columns&&new Set(alignedColumns.values()).size===1)sheet.defaultAlign=alignedColumns.get(0);
+  if(alignedColumns.size===LIMITS.columns&&new Set(alignedColumns.values()).size===1){
+   sheet.defaultAlign=alignedColumns.get(0);
+   for(const v of Object.values(sheet.columnStyles))delete v.align;
+  }
   for(const row of elements(element(xml,'sheetData'),'row')){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
@@ -91,11 +98,8 @@ export function styleCatalog(book){
  const keyOf=s=>JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{}));
  const register=s=>{const key=keyOf(s);if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}return lookup.get(key);};
  for(const sheet of book.sheets){
-  if(sheet.defaultAlign)register({align:sheet.defaultAlign});
-  for(const c of Object.values(sheet.cells)){
-   const style=sheet.defaultAlign?{...c.style,align:c.style?.align||sheet.defaultAlign}:(c.style||{});
-   register(style);
-  }
+  for(let c=0;c<LIMITS.columns;c++)register(getEffectiveStyle(sheet,cellName(0,c)));
+  for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
  return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
 }
@@ -109,17 +113,25 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
  const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
-   const effectiveStyle=s.defaultAlign?{...c.style,align:c.style?.align||s.defaultAlign}:(c.style||{});
+   const effectiveStyle=getEffectiveStyle(s,ref);
    const styleID=styles.getId(effectiveStyle);const styleAttr=styleID?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
    if(v.startsWith('='))tag=`<c r="${ref}"${styleAttr}><f>${xmlEscape(v.slice(1))}</f></c>`;
-   else if(v!==''&&/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)&&Number.isFinite(Number(v))&&(['date','time','datetime','duration'].includes(c.style?.format)||v.replace(/[^\d]/g,'').replace(/^0+/,'').length<=15))tag=`<c r="${ref}"${styleAttr}><v>${xmlEscape(['date','time','datetime','duration'].includes(c.style?.format)?String(Number(Number(v).toPrecision(15))):v)}</v></c>`;
+   else if(v!==''&&/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)&&Number.isFinite(Number(v))&&(['date','time','datetime','duration'].includes(effectiveStyle.format)||v.replace(/[^\d]/g,'').replace(/^0+/,'').length<=15))tag=`<c r="${ref}"${styleAttr}><v>${xmlEscape(['date','time','datetime','duration'].includes(effectiveStyle.format)?String(Number(Number(v).toPrecision(15))):v)}</v></c>`;
    else if(v!=='' )tag=`<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(v)}</t></is></c>`;
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{}),...(s.defaultAlign?Array.from({length:LIMITS.columns},(_,i)=>String(i)):[])]);
-  const columnStyleID=s.defaultAlign?styles.getId({align:s.defaultAlign}):0;
-  const cols=[...colIndexes].sort((a,b)=>Number(a)-Number(b)).map(index=>{const pixels=s.columnWidths?.[index];return `<col min="${Number(index)+1}" max="${Number(index)+1}"${pixels?` width="${((pixels-5)/7).toFixed(2)}" customWidth="1"`:''}${s.hiddenColumns?.[index]?' hidden="1"':''}${columnStyleID?` style="${columnStyleID}"`:''}/>`;}).join('');
+  const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{}),
+    ...(s.defaultAlign||Object.keys(s.defaultStyle||{}).length||Object.keys(s.columnStyles||{}).length
+       ?Array.from({length:LIMITS.columns},(_,i)=>String(i)):[])]);
+  const cols=[...colIndexes].sort((a,b)=>+a-+b).map(index=>{
+   const pixels=s.columnWidths?.[index],style=getEffectiveStyle(s,cellName(0,+index));
+   const id=styles.getId(style);
+   return '<col min="'+(+index+1)+'" max="'+(+index+1)+'"'+
+     (pixels?' width="'+((pixels-5)/7).toFixed(2)+'" customWidth="1"':'')+
+     (s.hiddenColumns?.[index]?' hidden="1"':'')+
+     (id?' style="'+id+'"':'')+'/>';
+  }).join('');
   const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
