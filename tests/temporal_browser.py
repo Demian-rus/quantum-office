@@ -56,7 +56,9 @@ with TemporaryDirectory() as tmp, sync_playwright() as p:
     sh['C1']=timedelta(hours=27,minutes=15);sh['C1'].number_format='[h]:mm'
     target=Path(tmp)/'dates.xlsx';imported.save(target)
     page.locator('#file-picker').set_input_files(str(target))
-    page.wait_for_selector('.grid-cell[data-ref="A1"]')
+    # Wait for the *imported workbook*, not an A1 grid cell that already exists
+    # in the previous document. Otherwise this check races asynchronous XLSX import.
+    page.wait_for_function("() => sheet()?.name === 'Время'")
     assert displayed('A1')=='29.02.2024',displayed('A1')
     assert displayed('B1')=='29.02.2024 09:30',displayed('B1')
     assert displayed('C1')=='27:15',displayed('C1')
