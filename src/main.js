@@ -4,6 +4,7 @@ import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
+import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
 const app=document.getElementById('app');
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const niceDate=s=>{try{return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(s));}catch{return '—'}};
@@ -15,16 +16,23 @@ const recalculator=createWorkbookRecalculator();
 let templateKind='sheet';
 let page='home', activeRibbon='home', activeCell='A1', rangeEnd='A1', editing=null,mouseSelecting=false;
 let pendingColorSelection=null, activePalette=null, borderMenuOpen=false;
-let scrollLeft=0,scrollTop=0, saveHandle=null,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
+let scrollLeft=0,scrollTop=0,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
+const directFiles=new Map(),dirtyFiles=new Set(),savingBooks=new Set();
 let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
 let resizeDrag=null, filterColumn=null;
 let internalClipboard=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
-function persist(){try{saveWorkspace(workspace);storeWarning=false;const n=document.querySelector('#storage-indicator');if(n)n.textContent='● Автосохранено локально';}catch(e){storeWarning=true;const n=document.querySelector('#storage-indicator');if(n)n.textContent='⚠ Сохраните файл вручную';status('Память браузера недоступна: экспортируйте .qbook или архив',true);}}
+function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
+ const linked=b&&directFiles.has(b.id);
+ n.textContent=linked?(dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+(storeWarning?' · нет автосохранения браузера':''):
+  storeWarning?'⚠ Черновик не записан':'● Черновик в браузере';
+ n.title=storeWarning?'Локальная память браузера недоступна. Прямые сохранения на диск и резервные копии проверяйте отдельно.':'Черновики браузера не заменяют отдельные резервные копии.';
+}
+function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
 function snapshot(){const b=book();if(!b)return;const a=undoStacks.get(b.id)||[];a.push(structuredClone(b));if(a.length>50)a.shift();undoStacks.set(b.id,a);redoStacks.set(b.id,[]);}
-function changed(){if(book())book().updated=dateNow();persist();}
+function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}persist();}
 function transact(callback){const active=book();if(!active)return;snapshot();try{callback();for(const part of active.sheets)invalidateGridGeometry(part);recalculator.reconcile(active,undoStacks.get(active.id).at(-1));}catch(error){recalculator.reset();throw error;}changed();}
 function replaceBook(fromHistory,toHistory,verb){
  const b=book();if(!b)return false;
@@ -33,7 +41,7 @@ function replaceBook(fromHistory,toHistory,verb){
  const replacement=stack.pop();fromHistory.set(b.id,stack);
  const other=toHistory.get(b.id)||[];other.push(structuredClone(b));toHistory.set(b.id,other);
  workspace.books[workspace.books.findIndex(x=>x.id===b.id)]=replacement;
- recalculator.reset();persist();render();
+ recalculator.reset();dirtyFiles.add(b.id);persist();render();
  document.getElementById('grid-scroll')?.focus({preventScroll:true});
  status(verb==='undo'?'Действие отменено':'Действие повторено');
  return true;
@@ -41,10 +49,10 @@ function replaceBook(fromHistory,toHistory,verb){
 function undo(){return replaceBook(undoStacks,redoStacks,'undo');}
 function redo(){return replaceBook(redoStacks,undoStacks,'redo');}
 function route(target){commitEditor();if(target==='home'){page='home';render();return;}if(target==='sheet'){page='sheet';if(!book()){if(!workspace.books.length){createBook();return;}workspace.active=workspace.books[0].id;}render();return;}page=target;render();}
-function createBook(example=false){const b=example==='schedule'?createScheduleTemplate():example==='journal'?createJournalTemplate():example==='budget'?createBudgetTemplate():example?createExample():newWorkbook();workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;saveHandle=null;persist();render();}
-function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;saveHandle=null;persist();render();}
-function removeBook(id){saveHandle=null;const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
-function cloneBook(id){saveHandle=null;const orig=workspace.books.find(x=>x.id===id);if(!orig)return;const copy=structuredClone(orig), fresh=newWorkbook();copy.id=fresh.id;copy.name=`${copy.name} — копия`;copy.created=copy.updated=dateNow();workspace.books.unshift(copy);workspace.active=copy.id;persist();page='sheet';render();}
+function createBook(example=false){const b=example==='schedule'?createScheduleTemplate():example==='journal'?createJournalTemplate():example==='budget'?createBudgetTemplate():example?createExample():newWorkbook();workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
+function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
+function removeBook(id){const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;directFiles.delete(id);dirtyFiles.delete(id);workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
+function cloneBook(id){const orig=workspace.books.find(x=>x.id===id);if(!orig)return;const copy=structuredClone(orig), fresh=newWorkbook();copy.id=fresh.id;copy.name=`${copy.name} — копия`;copy.created=copy.updated=dateNow();workspace.books.unshift(copy);workspace.active=copy.id;persist();page='sheet';render();}
 /** Rename a library card without opening its workbook or changing cell data. */
 function renameBookInline(id,button){
  const item=workspace.books.find(b=>b.id===id),card=button.closest('.file-card');
@@ -59,7 +67,7 @@ function renameBookInline(id,button){
  form.addEventListener('submit',e=>{
   e.preventDefault();const title=input.value.trim();
   if(!title){status('Название книги не может быть пустым',true);input.focus();return;}
-  if(title!==item.name){item.name=title;item.updated=dateNow();persist();}
+  if(title!==item.name){item.name=title;item.updated=dateNow();dirtyFiles.add(item.id);persist();}
   render();
  });
  form.append(input,ok,cancel);card.querySelector('.file-card-actions').before(form);
@@ -67,13 +75,69 @@ function renameBookInline(id,button){
 }
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
 function download(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
-async function saveBook(){commitEditor();const b=book();if(!b)return;const filename=`${safeFile(b.name)}.qbook`,data=encodeBook(b);try{if('showSaveFilePicker' in window){if(!saveHandle){saveHandle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});}const writer=await saveHandle.createWritable();await writer.write(data);await writer.close();status('Файл сохранён на диск');return;}}catch(err){if(err.name==='AbortError')return;saveHandle=null;status(`Прямое сохранение не удалось; файл будет скачан`,true);}download(filename,data,'application/json');status('Скачан файл .qbook');}
-function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Резервная копия скачана');}
+async function saveBook(asNew=false){
+ commitEditor();const b=book();if(!b)return;
+ const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
+ if(savingBooks.has(id)){status('Сохранение этой книги уже выполняется',true);return;}
+ if(typeof window.showSaveFilePicker!=='function'){
+  if(directFiles.has(id)){status('Прямое сохранение недоступно; связанный файл не изменён',true);return;}
+  download(filename,serialized,'application/json');
+  status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
+ }
+ savingBooks.add(id);
+ try{
+  let link=asNew?null:directFiles.get(id);
+  if(!link){
+   const handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});
+   const previous=await readDirectFileText(handle);
+   if(previous!==''&&previous!==serialized)throw Error('Выбранный файл уже содержит другие данные. Перезапись запрещена — выберите другое имя.');
+   link={handle,text:previous};
+  }
+  await writeVerifiedQBook(link.handle,link.text,serialized);
+  const current=workspace.books.find(x=>x.id===id);
+  if(current){
+   directFiles.set(id,{handle:link.handle,text:serialized});
+   const upToDate=encodeBook(current)===serialized;
+   if(upToDate)dirtyFiles.delete(id);else dirtyFiles.add(id);
+   updateSaveIndicator();
+   status(upToDate?'Файл сохранён и проверен на диске':'Предыдущая версия сохранена. Есть новые несохранённые изменения.',!upToDate);
+  }
+ }catch(error){if(error.name!=='AbortError')status(error.message||'Запись не удалась. Проверьте файл на диске.',true);}
+ finally{savingBooks.delete(id);updateSaveIndicator();}
+}
+async function openBookFromDisk(){
+ if(typeof window.showOpenFilePicker!=='function'){status('Прямое открытие недоступно. Используйте обычный импорт .qbook без привязки к файлу.',true);return;}
+ try{
+  const [handle]=await window.showOpenFilePicker({multiple:false,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});
+  if(!handle)return;
+  const {book:loaded,text}=await openDirectQBook(handle);
+  const imported=structuredClone(loaded);imported.id=newWorkbook().id;
+  workspace.books.unshift(imported);workspace.active=imported.id;
+  directFiles.set(imported.id,{handle,text});dirtyFiles.delete(imported.id);
+  page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;
+  recalculator.reset();persist();render();
+  status('Файл с диска открыт. Изменения записываются только по команде «Сохранить».');
+ }catch(error){if(error.name!=='AbortError')status(error.message||'Ошибка открытия',true);}
+}
+function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Скачивание резервной копии запрошено. Проверьте загрузки.');}
 async function importFile(file){if(!file)return;if(file.size>15_000_000){status('Файл больше 15 МБ не поддерживается',true);return;}try{
- const name=file.name.toLowerCase();const text=name.endsWith('.xlsx')?'':await file.text();if(name.endsWith('.qbackup')){const restored=decodeWorkspace(text);if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;workspace=restored;page='home';workspace.active=workspace.books[0]?.id??null;persist();render();status('Рабочее пространство восстановлено');return;}
- let imported;if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}else if(name.endsWith('.csv')){imported=importCSV(text,file.name.replace(/\.csv$/i,''));}else if(name.endsWith('.xlsx')){imported=await importXLSX(await file.arrayBuffer(),file.name);}else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
- workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';saveHandle=null;persist();render();status(name.endsWith('.xlsx')?'XLSX открыт: проверьте данные. Диаграммы и сложные возможности не переносились.':'Импорт завершён');
- }catch(e){status(e.message||'Не удалось открыть файл',true);}}
+ const name=file.name.toLowerCase(),text=name.endsWith('.xlsx')?'':await file.text();
+ if(name.endsWith('.qbackup')){
+  const restored=decodeWorkspace(text);
+  if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;
+  workspace=restored;directFiles.clear();dirtyFiles.clear();
+  page='home';workspace.active=workspace.books[0]?.id??null;persist();render();
+  status('Черновики восстановлены из архива. Файлы на диске не привязаны.');return;
+ }
+ let imported;
+ if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}
+ else if(name.endsWith('.csv'))imported=importCSV(text,file.name.replace(/\.csv$/i,''));
+ else if(name.endsWith('.xlsx'))imported=await importXLSX(await file.arrayBuffer(),file.name);
+ else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
+ workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';persist();render();
+ status(name.endsWith('.xlsx')?'XLSX открыт: сложные возможности не переносились.':'Импорт завершён. Для записи на диск используйте «Сохранить».');
+ }catch(e){status(e.message||'Не удалось открыть файл',true);}
+}
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
 function setSelection(a,b=a){if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
 function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:activeCell);if(!p)return;let r=Math.min(Math.max(p.row+dr,0),LIMITS.rows-1),c=Math.min(Math.max(p.col+dc,0),LIMITS.columns-1);
@@ -194,7 +258,7 @@ function applyStyle(patch,selection=null){
   if(refuseHiddenSelection())return;
   try{
    transact(()=>setRectangleStyle(sheet(),a,b,patch));drawGrid();
-   status('Оформление сохранено компактно. Для этого диапазона используйте .qbook: XLSX пока не поддерживается.');
+   status('Оформление сохранено компактно. Экспорт XLSX доступен в пределах 200 000 позиций.');
   }catch(err){status(err.message,true);}
   return;
  }
@@ -321,7 +385,7 @@ function homepage(){
  <button class="launcher-tile writer" data-action="route" data-target="writer"><span class="launcher-art">${launcherIcon('writer')}</span><span class="launcher-name">Тексты</span><span class="launcher-description">Документы и оформление</span><span class="launcher-state">В разработке</span></button>
  <button class="launcher-tile slides" data-action="route" data-target="slides"><span class="launcher-art">${launcherIcon('slides')}</span><span class="launcher-name">Презентации</span><span class="launcher-description">Слайды и выступления</span><span class="launcher-state">В разработке</span></button></div>
  <div class="launcher-template-actions" aria-label="Каталоги шаблонов"><button data-action="templates" data-kind="sheet">Шаблоны таблиц <span>→</span></button><button data-action="templates" data-kind="writer">Шаблоны текстов <span>→</span></button><button data-action="templates" data-kind="slides">Шаблоны презентаций <span>→</span></button></div>
- <div class="launcher-secondary"><button data-action="example">Открыть пример таблицы</button><button data-action="import">Открыть файл XLSX / QBOOK / CSV</button></div>
+ <div class="launcher-secondary"><button data-action="example">Открыть пример таблицы</button><button data-action="import">Открыть файл XLSX / QBOOK / CSV</button><button data-action="open-disk">Открыть QBOOK с диска</button></div>
  <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Скачать резервную копию всех черновиков">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
 }
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
@@ -412,12 +476,12 @@ const icons={
 function toolIcon(action,original,extra=''){
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):action==='format'?({general:'num',currency:'currency',percent:'percent',integer:'integer',date:'date',time:'time',datetime:'datetime',duration:'duration'}[/data-value="([^"]+)"/.exec(extra)?.[1]]||'num'):
- ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
+ ({'copy':'copy','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
+ const labeled=new Set(['find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
@@ -438,13 +502,13 @@ function ribbon(){
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Листы',button('sheet-add','Новый лист','+'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
  if(activeRibbon==='view')contents=group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
- if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('backup','Архив','▤')+button('import','Открыть','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
+ if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('save-as','Сохранить как','⇩')+button('open-disk','Открыть с диска','↥')+button('backup','Архив','▤')+button('import','Импорт','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}</div><div class="ribbon-controls">${contents}</div>${palettePopup()}${bordersPopup()}${finder}</div>`;
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div></main>`;}
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
- if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();updateSelectionStats();}}
+ if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
 function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
  const s=sheet(),{x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
@@ -488,7 +552,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
- case 'import':document.querySelector('#file-picker')?.click();break;case 'backup':backup();break;case 'save':await saveBook();break;
+ case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: частичная совместимость, сохраните оригинал отдельно');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
  case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':showFind=false;render();break;case 'find-next':nextMatch();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-right':fillSelected('right');break;
@@ -573,7 +637,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
    !(t?.id==='formula-input'&&t.value===getCell(sheet(),activeCell).value));
 
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();showSearch();return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveBook();return;}
+ if((e.ctrlKey||e.metaKey)&&shortcut('s','KeyS')){e.preventDefault();saveBook(e.shiftKey);return;}
  if((e.ctrlKey||e.metaKey)&&shortcut('z','KeyZ')&&!textEdit){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
  if((e.ctrlKey||e.metaKey)&&shortcut('y','KeyY')&&!textEdit){e.preventDefault();redo();return;}
  if((e.ctrlKey||e.metaKey)&&shortcut('d','KeyD')&&!form){e.preventDefault();fillSelected('down');return;}
