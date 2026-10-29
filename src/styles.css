@@ -243,3 +243,13 @@
 .file-card-rename button{height:32px;padding:5px 10px;background:#e5f2ec;border-radius:5px;font-weight:700;color:#1d6547}
 .file-card-rename button.cancel-rename{background:#eff1f5;color:#536678}
 .file-card-actions button[data-action="rename-book"]{color:#276c53;font-weight:720}
+
+
+/* TASK 032: render frozen panes in stable viewport-anchored layers.
+   A vertical scroll never destroys/recreates the merged header nodes. */
+.grid-frozen-rows,.grid-frozen-cols{position:absolute;overflow:hidden;pointer-events:none;box-sizing:border-box}
+.grid-frozen-rows{top:31px;left:54px;right:0;z-index:24}
+.grid-frozen-cols{top:31px;left:54px;bottom:0;z-index:23}
+.grid-frozen-rows .grid-cell,.grid-frozen-cols .grid-cell{pointer-events:auto}
+.grid-frozen-rows .grid-cell{z-index:1}
+.grid-frozen-cols .grid-cell{z-index:1}
