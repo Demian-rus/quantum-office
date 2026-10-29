@@ -31,7 +31,7 @@ with sync_playwright() as p:
  # display on an empty cell and roundtrip through undo.
  page.get_by_role('button',name='Выделить весь лист').click()
  page.locator('#grid-scroll').evaluate('(el)=>{el.scrollTop=690;el.dispatchEvent(new Event("scroll"));}')
- assert page.locator('#name-box').input_value()=='A1:CV2000'
+ assert page.locator('#name-box').input_value()=='A1:CV100000'
  before=page.evaluate('Object.keys(sheet().cells).length')
  page.get_by_role('button',name='По центру').click()
  after=page.evaluate("""() => ({
@@ -47,9 +47,9 @@ with sync_playwright() as p:
  assert page.evaluate('sheet().defaultAlign') is None
  page.get_by_role('button',name='Повторить').first.click()
  assert page.evaluate('sheet().defaultAlign')=='center'
- page.locator('#name-box').fill('CV2000');page.locator('#name-box').press('Enter')
- assert page.locator('.grid-cell[data-ref=CV2000]').evaluate('el=>getComputedStyle(el).justifyContent')=='center'
- # Format is not a 200000-entry cell map.
+ page.locator('#name-box').fill('CV100000');page.locator('#name-box').press('Enter')
+ assert page.locator('.grid-cell[data-ref=CV100000]').evaluate('el=>getComputedStyle(el).justifyContent')=='center'
+ # Format is not a 10000000-entry cell map.
  assert page.evaluate('Object.keys(sheet().cells).length')<=before
  page.get_by_role('button',name='Обзор').click()
  page.get_by_role('button',name='Шаблоны таблиц').click()
