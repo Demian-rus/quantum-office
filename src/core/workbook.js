@@ -1,4 +1,5 @@
 import { cellName,parseCell,colLabel,evaluateCell,csvEncode,csvDecode } from './formulas.js';
+import {formatTemporal,parseTemporalInput} from './dates.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 export const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
@@ -76,6 +77,15 @@ export function firstVisibleIndex(positions,coordinate){
 }
 export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}
+/** Convert explicit calendar/time input to serial values only for direct user entry.
+ * All file import, clipboard and formula editing outside the UI preserve their raw values. */
+export function setTypedCell(sheet,ref,input){
+ const parsed=typeof input==='string'&&!input.startsWith('=')?parseTemporalInput(input):null;
+ setCell(sheet,ref,parsed?parsed.value:input);
+ if(parsed)setStyle(sheet,ref,{format:parsed.format});
+ else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'date'});
+ else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'time'});
+}
 export function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);const style={...prev.style,...patch};for(const [name,value] of Object.entries(patch))if(value===undefined)delete style[name];if(!prev.value&&!Object.keys(style).length)delete sheet.cells[key];else sheet.cells[key]={value:prev.value,style};}
 /** Merge geometry is independent of styling. Covered cells never silently lose content. */
 export function mergeAt(sheet,ref){const p=parseCell(ref);if(!p)return null;return (sheet.merges||[]).find(m=>{const v=rectangle(m.from,m.to);return p.row>=v.r1&&p.row<=v.r2&&p.col>=v.c1&&p.col<=v.c2;})||null;}
@@ -186,6 +196,7 @@ export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
   if(typeof result!=='number')return String(result);
   const n=Number.isFinite(result)?result:0;
+  if(['date','time','datetime','duration'].includes(cell.style?.format))return formatTemporal(n,cell.style.format);
   if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
   if(cell.style?.format==='percent')return new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:2}).format(n);
   if(cell.style?.format==='integer')return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n);
@@ -314,7 +325,7 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
        ('border' in style&&!['thin'].includes(style.border))||
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
-       ('format' in style&&!['general','currency','percent','integer'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
+       ('format' in style&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
 }
 export function createExample(){const b=newWorkbook('Пример — бюджет проекта'),s=currentSheet(b);s.name='Бюджет';
