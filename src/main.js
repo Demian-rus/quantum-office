@@ -1,7 +1,7 @@
 import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
-import {copyCells,pasteCells} from './core/clipboard.js';
+import {copyCells,pasteCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
 import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
@@ -653,6 +653,14 @@ app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.targ
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;setSelection(cell.dataset.ref);editCell();}});
 function captureSelection(){if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
+async function cutSelection(){
+ const clip=captureSelection();if(!clip)return false;
+ clip.mode='cut';clip.bookId=book().id;clip.sheetId=sheet().id;
+ internalClipboard=clip;
+ try{await navigator.clipboard.writeText(clip.text);}catch{/* Retain internal clipboard without a browser permission */}
+ status('Вырезано: исходные ячейки сохраняются до успешной вставки Ctrl+V');
+ return true;
+}
 async function copySelection(){const clip=captureSelection();if(!clip)return false;
  try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
  return true;}
@@ -660,8 +668,10 @@ function pasteIntoCells(text,clip=null){if(!sheet()||refuseHiddenSelection())ret
  try{
   if(!clip&&typeof text!=='string')throw Error('Буфер обмена пуст');
   if(!clip&&text.length===0)throw Error('Буфер обмена пуст');
-  let info;transact(()=>{info=clip?pasteCells(sheet(),activeCell,clip):pasteTSV(sheet(),activeCell,text);});
-  setSelection(activeCell,info.end);status(`Вставлено: ${info.rows} × ${info.cols}`);return true;
+  let info;const moving=clip?.mode==='cut';
+  transact(()=>{info=moving?moveCells(book(),sheet(),activeCell,clip):clip?pasteCells(sheet(),activeCell,clip):pasteTSV(sheet(),activeCell,text);});
+  if(moving)internalClipboard=null;
+  setSelection(activeCell,info.end);status(moving?`Перемещено: ${info.rows} × ${info.cols}`:`Вставлено: ${info.rows} × ${info.cols}`);return true;
  }catch(error){status(error.message||'Вставка не выполнена',true);return false;}
 }
 // Clipboard events handle external data. In-app keyboard copy/paste also works on file:// without Clipboard API permissions.
@@ -669,6 +679,11 @@ window.addEventListener('copy',e=>{
  if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]')){internalClipboard=null;return;}
  const clip=captureSelection();if(!clip)return;
  if(e.clipboardData){e.preventDefault();e.clipboardData.setData('text/plain',clip.text);status('Скопировано');}
+});
+window.addEventListener('cut',e=>{
+ if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]'))return;
+ e.preventDefault();cutSelection();
+ if(e.clipboardData&&internalClipboard?.mode==='cut')e.clipboardData.setData('text/plain',internalClipboard.text);
 });
 window.addEventListener('paste',e=>{
  if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]'))return;
@@ -697,7 +712,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
  if(e.altKey&&(e.key==='='||e.code==='Equal')){e.preventDefault();autoSum();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='c'||e.code==='KeyC')){e.preventDefault();copySelection();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='v'||e.code==='KeyV')&&internalClipboard){e.preventDefault();pasteIntoCells(null,internalClipboard);return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();const clip=captureSelection();if(clip?.merges?.length){status('Перемещение объединённых ячеек через Ctrl+X пока не поддерживается. Используйте копирование',true);return;}if(clip){copySelection().then(ok=>{if(ok)clearSelected();});}return;}
+ if((e.ctrlKey||e.metaKey)&&shortcut('x','KeyX')){e.preventDefault();cutSelection();return;}
  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();clearSelected();return;}
  if(e.key==='F2'){e.preventDefault();editCell();return;}
  const steps={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],Tab:[0,e.shiftKey?-1:1],Enter:[e.shiftKey?-1:1,0]};
