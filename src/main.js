@@ -77,14 +77,16 @@ function updateSelectionStats(){const node=document.querySelector('#selection-st
 function structuralAction(axis,mode){
  commitEditor();if(!sheet())return;
  const pos=parseCell(activeCell);if(!pos)return;
- const index=axis==='row'?pos.row:pos.col;
+ const rect=rectangle(activeCell,rangeEnd);
+ const index=axis==='row'?rect.r1:rect.c1;
+ const count=axis==='row'?rect.r2-rect.r1+1:rect.c2-rect.c1+1;
  try{
   const draft=structuredClone(sheet());
-  changeSheetStructure(draft,axis,mode,index); // Validate before adding undo history.
-  transact(()=>changeSheetStructure(sheet(),axis,mode,index));
-  const next=mode==='delete'?Math.min(index,axis==='row'?LIMITS.rows-2:LIMITS.columns-2):index;
+  changeSheetStructure(draft,axis,mode,index,count);
+  transact(()=>changeSheetStructure(sheet(),axis,mode,index,count));
+  const next=index;
   const dest=axis==='row'?cellName(next,pos.col):cellName(pos.row,next);
-  filterColumn=null;internalClipboard=null;setSelection(dest);render();status(`${mode==='insert'?'Вставлен':'Удалён'} ${axis==='row'?'ряд':'столбец'} ${index+1}`);
+  filterColumn=null;internalClipboard=null;setSelection(dest);render();status((mode==='insert'?'Вставлено: ':'Удалено: ')+count+(axis==='row'?' строк':' столбцов'));
  }catch(err){status(err.message||'Операция отклонена',true);}
 }
 function visibilityAction(axis,show){
@@ -330,7 +332,7 @@ function ribbon(){
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
- if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить строку','+')+button('delete-row','Удалить строку','×')+button('insert-col','Вставить столбец','+')+button('delete-col','Удалить столбец','×'))+group('Листы',button('sheet-add','Новый лист','+'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
+ if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Листы',button('sheet-add','Новый лист','+'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
  if(activeRibbon==='view')contents=group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('backup','Архив','▤')+button('import','Открыть','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';

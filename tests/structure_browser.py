@@ -14,20 +14,20 @@ with sync_playwright() as p:
         page.locator('#formula-input').fill(text);page.locator('#formula-input').press('Enter')
     write('A1','7');write('B1','=A1*2')
     page.get_by_role('tab',name='Вставка').click()
-    assert page.get_by_role('button',name='Вставить строку').is_visible()
-    page.get_by_role('button',name='Вставить строку').click()
+    assert page.get_by_role('button',name='Вставить выбранные строки').is_visible()
+    page.get_by_role('button',name='Вставить выбранные строки').click()
     page.locator('#name-box').fill('B2');page.locator('#name-box').press('Enter')
     assert page.locator('#formula-input').input_value()=='=A2*2'
     assert page.locator('.grid-cell[data-ref="B2"]').inner_text()=='14'
     # Column operation via same ribbon; maintain formula references
-    page.get_by_role('button',name='Вставить столбец').click()
+    page.get_by_role('button',name='Вставить выбранные столбцы').click()
     page.locator('#name-box').fill('C2');page.locator('#name-box').press('Enter')
     assert page.locator('#formula-input').input_value()=='=A2*2'
     page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
     assert page.locator('.grid-cell[data-ref="B2"]').inner_text()=='14'
     assert page.locator('.grid-cell[data-ref="C2"]').inner_text()==''
     page.locator('#name-box').fill('A1');page.locator('#name-box').press('Enter')
-    page.get_by_role('button',name='Удалить строку').click()
+    page.get_by_role('button',name='Удалить выбранные строки').click()
     assert page.locator('.grid-cell[data-ref="A1"]').inner_text()=='7'
     assert page.locator('.grid-cell[data-ref="B1"]').inner_text()=='14'
     assert not errors,errors
