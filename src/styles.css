@@ -253,3 +253,5 @@
 .grid-frozen-rows .grid-cell,.grid-frozen-cols .grid-cell{pointer-events:auto}
 .grid-frozen-rows .grid-cell{z-index:1}
 .grid-frozen-cols .grid-cell{z-index:1}
+
+.grid-frozen-rows .grid-cell.frozen-col{z-index:5}
