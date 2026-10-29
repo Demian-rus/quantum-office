@@ -69,19 +69,24 @@ test('cross-sheet SUMIF range edges, snapshot isolation and .qbook roundtrip',()
  assert.equal(resultOf(after.sheets[0],'A1',reloaded.raw,reloaded.ctx),2010);
 });
 
-test('200-cell fanout computes its shared subtotal once per snapshot',()=>{
+test('200-cell fanout computes its shared subtotal once per snapshot (with measured timings)',()=>{
  const b=newWorkbook('Нагрузка'),s=currentSheet(b);
  for(let i=1;i<=200;i++)setCell(s,'B'+i,String(i));
  setCell(s,'A1','=SUM(B1:B200)');
  for(let i=1;i<=200;i++)setCell(s,'C'+i,'=$A$1*2');
- const {raw,ctx}=calculation(b,s);
+ const raw=rawMap(s);
+ const baselineStart=performance.now();
+ for(let i=1;i<=200;i++)assert.equal(evaluateCell('C'+i,raw),40200);
+ const uncachedMs=performance.now()-baselineStart;
+ const ctx=formulaContext(b,s,raw),cachedStart=performance.now();
  for(let i=1;i<=200;i++)assert.equal(resultOf(s,'C'+i,raw,ctx),40200);
+ const cachedMs=performance.now()-cachedStart;
  assert.equal(ctx.calculation.stats.evaluated,201);
  assert.equal(ctx.calculation.stats.parsed,201);
  assert.equal(ctx.calculation.stats.hits,199);
  assert.ok(ctx.calculation.dependencies.get('ЛИСТ 1!A1').has('ЛИСТ 1!B200'));
  assert.equal(ctx.calculation.graphComplete,true);
- assert.equal(evaluateCell('C200',raw),40200);
+ console.log('TASK028 200 dependent formulas: no session '+uncachedMs.toFixed(1)+' ms; snapshot '+cachedMs.toFixed(1)+' ms. Informational only; no timing-based PASS.');
 });
 
 test('editing, undo and TODAY all construct fresh calculation snapshots',()=>{
