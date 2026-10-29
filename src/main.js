@@ -1,4 +1,4 @@
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,invalidateGridGeometry } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
@@ -6,6 +6,16 @@ import {changeSheetStructure} from './core/structure.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
 import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
 const app=document.getElementById('app');
+/** Only validated, fixed border enums become CSS. */
+function borderCSS(side,edge){
+ if(!edge)return '';
+ const line=edge.line;
+ const width=['medium','mediumDashed','mediumDashDot','mediumDashDotDot'].includes(line)?2:
+  line==='thick'?3:line==='double'?3:1;
+ const type=line==='double'?'double':line==='dotted'?'dotted':
+  ['dashed','mediumDashed','dashDot','dashDotDot','mediumDashDot','mediumDashDotDot','slantDashDot'].includes(line)?'dashed':'solid';
+ return `border-${side}:${width}px ${type} ${edge.color};`;
+}
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const niceDate=s=>{try{return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(s));}catch{return '—'}};
 const dateNow=()=>new Date().toISOString();
@@ -524,9 +534,14 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
   if(!rowVisible(s,r)||!columnVisible(s,c))continue;
   const ref=cellName(r,c),merged=mergeAt(s,ref);if(merged&&merged.from!==ref)continue;const bounds=merged?rectangle(merged.from,merged.to):null;
   const item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=getEffectiveStyle(s,ref);
-  const mergedBorders=bounds?{top:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getEffectiveStyle(s,cellName(bounds.r1,bounds.c1+j)).borders?.top),bottom:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getEffectiveStyle(s,cellName(bounds.r2,bounds.c1+j)).borders?.bottom),left:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c1)).borders?.left),right:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)).borders?.right)}:style.borders;
+  const boundary={
+   top:bounds?[...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1,bounds.c1+j)),'top')).find(Boolean):resolveBorderSide(style,'top'),
+   bottom:bounds?[...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r2,bounds.c1+j)),'bottom')).find(Boolean):resolveBorderSide(style,'bottom'),
+   left:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c1)),'left')).find(Boolean):resolveBorderSide(style,'left'),
+   right:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)),'right')).find(Boolean):resolveBorderSide(style,'right')
+  };
   const val=displayedValue(s,ref,raw,ctx),align=style.align||s.defaultAlign||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>mergedBorders?.[side]?`border-${side}:1px solid ${style.borderColor||'#526d5c'};`:'').join('')}text-align:${align};`;
+  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   const destination=pinnedR?'row':pinnedC?'col':'main';
