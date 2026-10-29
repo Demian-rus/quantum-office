@@ -44,7 +44,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Цвет текста').click()
  page.locator('[data-action=palette-pick][data-value="#ef4444"]').click()
  assert effective('B99999')['color']=='#ef4444'
- assert effective('C99999')['color'] is None
+ assert effective('C99999').get('color') is None
  select('B100000')
  assert page.locator('.grid-cell[data-ref=B100000]').evaluate('el=>getComputedStyle(el).justifyContent')=='center'
  # Re-saving and rendering far-away cells preserves layer and actual values.
