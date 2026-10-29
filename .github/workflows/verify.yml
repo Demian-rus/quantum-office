@@ -11,3 +11,10 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node -e "const fs=require('fs');if(!fs.readFileSync('dist/index.html','utf8').includes('grid-scroll'))process.exit(1)"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-offline
+          path: |
+            Quantum-Office.html
+            Quantum-Office.zip
+          if-no-files-found: error
