@@ -269,3 +269,7 @@
 .sheet-status #selection-info{color:#142637;font-weight:800}
 .sheet-status #selection-stats{color:#202b38;font-weight:650}
 @media(max-width:730px){.sheet-status{gap:8px;font-size:11px}}
+
+/* Prior mobile rules hid the last/second status span. Both are essential now. */
+@media(max-width:1100px){.sheet-status span:last-child{display:inline}}
+@media(max-width:730px){.sheet-status span:nth-child(2){display:inline}}
