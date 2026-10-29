@@ -16,7 +16,7 @@ test('outer border is a perimeter of independent cells; no merging, no lost cont
  assert.deepEqual(getCell(sheet,'B2').style.borders,{top:true,left:true});
  assert.deepEqual(getCell(sheet,'C2').style.borders,{top:true});
  assert.deepEqual(getCell(sheet,'D3').style.borders,{right:true});
- assert.deepEqual(getCell(sheet,'C3').style.borders,{top:true,bottom:true,left:true,right:true});
+ assert.equal(getCell(sheet,'C3').style.border,'thin'); // Legacy thin border is preserved without converting interior cells
  assert.equal(getCell(sheet,'C3').style.bg,'#123456');
  validateWorkbook(book);
  const loaded=decodeBook(encodeBook(book));
