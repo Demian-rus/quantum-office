@@ -25,6 +25,12 @@ with sync_playwright() as p:
  assert page.evaluate('Object.keys(sheet().cells).length')==4
  page.get_by_role('button',name='Выделить весь лист').click()
  assert page.locator('#name-box').input_value()=='A1:CV100000'
+ # Hidden data remains protected even for ten million selected positions.
+ page.evaluate("() => {transact(()=>setHidden(sheet(),'row',99999,true));drawGrid();}")
+ page.locator('#grid-scroll').focus();page.keyboard.press('Delete')
+ assert page.evaluate("sheet().cells.CV100000.value")=='низ'
+ assert 'скрытые' in page.locator('#toast').inner_text().lower()
+ page.evaluate("() => {transact(()=>setHidden(sheet(),'row',99999,false));drawGrid();}")
  page.locator('#grid-scroll').focus()
  page.keyboard.press('Delete')
  cleared=page.evaluate("""() => ({
