@@ -109,20 +109,38 @@ export function unmergeCells(sheet,ref){const item=mergeAt(sheet,ref);if(!item)r
 export function applyBorderPreset(sheet,a,b,preset){
  if(!['outline','all','none','bottom','top','left','right'].includes(preset))throw Error('Неизвестный вариант границ');
  const r=rectangle(a,b);if(!r||!validRef(a)||!validRef(b))throw Error('Недопустимый диапазон');
- if((r.r2-r.r1+1)*(r.c2-r.c1+1)>10000)throw Error('Слишком большой диапазон');
- for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++){
-  const ref=cellName(row,col),previous=getCell(sheet,ref).style||{};
-  let borders={...(previous.borders|| (previous.border==='thin'?{top:true,bottom:true,left:true,right:true}:{}))};
-  if(preset==='none')borders={};
-  else if(preset==='all')borders={top:true,bottom:true,left:true,right:true};
-  else if(preset==='outline'){
-   borders={...borders,top:row===r.r1||undefined,bottom:row===r.r2||undefined,left:col===r.c1||undefined,right:col===r.c2||undefined};
-  } else if(preset==='bottom')borders.bottom=row===r.r2||undefined;
-  else if(preset==='top')borders.top=row===r.r1||undefined;
-  else if(preset==='left')borders.left=col===r.c1||undefined;
-  else if(preset==='right')borders.right=col===r.c2||undefined;
-  borders=Object.fromEntries(Object.entries(borders).filter(([,v])=>v===true));
-  setStyle(sheet,ref,{border:undefined,borders:Object.keys(borders).length?borders:undefined});
+ const count=(r.r2-r.r1+1)*(r.c2-r.c1+1);
+ // Outside / one-sided borders only touch perimeter cells, even on an entire
+ // sheet selection. No merge is required and existing interior borders survive.
+ if(['all','none'].includes(preset)&&count>10000)throw Error('Все границы и их очистка ограничены 10 000 ячеек; внешняя рамка работает для всего диапазона');
+ const targets=new Map();
+ const include=(row,col,sides)=>{
+  const ref=cellName(row,col);
+  const prev=targets.get(ref)||new Set();
+  for(const side of sides)prev.add(side);
+  targets.set(ref,prev);
+ };
+ if(preset==='all'||preset==='none'){
+  for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++)include(row,col,['top','bottom','left','right']);
+ }else{
+  if(preset==='outline'||preset==='top'||preset==='bottom'){
+   if(preset!=='bottom')for(let col=r.c1;col<=r.c2;col++)include(r.r1,col,['top']);
+   if(preset!=='top')for(let col=r.c1;col<=r.c2;col++)include(r.r2,col,['bottom']);
+  }
+  if(preset==='outline'||preset==='left'||preset==='right'){
+   if(preset!=='right')for(let row=r.r1;row<=r.r2;row++)include(row,r.c1,['left']);
+   if(preset!=='left')for(let row=r.r1;row<=r.r2;row++)include(row,r.c2,['right']);
+  }
+ }
+ // Avoid producing a book above the global cell limit; fail before mutation.
+ const additions=[...targets.keys()].filter(ref=>!sheet.cells[ref]).length;
+ if(Object.keys(sheet.cells).length+additions>LIMITS.cells)throw Error('Превышен лимит оформленных ячеек (50 000)');
+ for(const [ref,sides] of targets){
+  const previous=getCell(sheet,ref).style||{};
+  const border={...(previous.borders||(previous.border==='thin'?{top:true,bottom:true,left:true,right:true}:{}))};
+  if(preset==='none')for(const side of sides)delete border[side];
+  else for(const side of sides)border[side]=true;
+  setStyle(sheet,ref,{border:undefined,borders:Object.keys(border).length?border:undefined});
  }
 }
 export function validRef(ref){const p=parseCell(String(ref));return !!p&&p.row<LIMITS.rows&&p.col<LIMITS.columns;}
