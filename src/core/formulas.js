@@ -1,3 +1,4 @@
+import {dateSerial,serialDateParts,timeSerial,serialTimeParts} from './dates.js';
 /** Bounded formula interpreter. No eval/Function/network, safe for untrusted sheets. */
 export function colLabel(n) {
   let result = '';
@@ -156,6 +157,29 @@ function evaluateNode(node,cells,visiting,context){
       count++;if(name==='SUMIF'){const v=valueOfRef(targets[i],targetSheet);if(numericLike(v))total+=toNumber(v);}
     }
     return name==='COUNTIF'?count:total;
+  }
+  if(name==='DATE'){
+    requireArgs(3);const p=args.map(a=>toNumber(ev(a)));
+    if(!p.every(Number.isInteger))throw Error('#VALUE!');
+    try{return dateSerial(p[0],p[1],p[2],true);}catch{throw Error('#NUM!');}
+  }
+  if(name==='TODAY'){
+    requireArgs(0);const now=new Date();return dateSerial(now.getFullYear(),now.getMonth()+1,now.getDate());
+  }
+  if(name==='YEAR'||name==='MONTH'||name==='DAY'){
+    requireArgs(1);
+    try{const p=serialDateParts(toNumber(ev(args[0])));return name==='YEAR'?p.year:name==='MONTH'?p.month:p.day;}
+    catch{throw Error('#NUM!');}
+  }
+  if(name==='TIME'){
+    requireArgs(3);const p=args.map(a=>toNumber(ev(a)));
+    if(!p.every(Number.isInteger))throw Error('#VALUE!');
+    try{return timeSerial(p[0],p[1],p[2]);}catch{throw Error('#NUM!');}
+  }
+  if(name==='HOUR'||name==='MINUTE'){
+    requireArgs(1);
+    try{const p=serialTimeParts(toNumber(ev(args[0])));return name==='HOUR'?p.hours:p.minutes;}
+    catch{throw Error('#NUM!');}
   }
   if(name==='ROUND'){requireArgs(1,2);const x=toNumber(ev(args[0])),digits=args[1]?toNumber(ev(args[1])):0;
     if(!Number.isInteger(digits)||digits< -12||digits>12)throw Error('#NUM!');const power=10**digits;return Math.sign(x)*Math.round((Math.abs(x)+Number.EPSILON)*power)/power;}
