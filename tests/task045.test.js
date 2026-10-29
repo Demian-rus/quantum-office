@@ -59,19 +59,23 @@ test('stale sources, invalid target, hidden areas and source changes reject with
  assert.throws(()=>moveCells(b,extra,'A1',fresh),/исходный лист/);
  assert.equal(raw(s),before);
 });
-test('dependency guard forbids silent damage for direct, range and qualified formulas',()=>{
- for(const formula of ['=A1*2','=SUM(A1:B4)',"='Лист 1'!A1+1"]){
+test('dependent direct and qualified references now follow moved cells; partial ranges remain guarded',()=>{
+ for(const [formula,expected] of [['=A1*2','=E5*2'],["='Лист 1'!$A$1+1","='Лист 1'!$E$5+1"]]){
   const b=newWorkbook(),s=currentSheet(b);
   setCell(s,'A1','20');setCell(s,'Z9',formula);
   const clip=cut(b,s,'A1');
-  const before=raw(s);
-  assert.throws(()=>moveCells(b,s,'E5',clip),/ссылаются формулы/,formula);
-  assert.equal(raw(s),before);
+  assert.equal(moveCells(b,s,'E5',clip).end,'E5');
+  assert.equal(getCell(s,'Z9').value,expected);
  }
  const b=newWorkbook(),s=currentSheet(b);
- setCell(s,'A1','20');setCell(s,'Z9','=Q2*2');
- const clip=cut(b,s,'A1');
- assert.equal(moveCells(b,s,'E5',clip).end,'E5');
+ setCell(s,'A1','20');setCell(s,'Z9','=SUM(A1:B4)');
+ const clip=cut(b,s,'A1'),before=raw(s);
+ assert.throws(()=>moveCells(b,s,'E5',clip),/частично пересекающий/);
+ assert.equal(raw(s),before);
+ const c=newWorkbook(),t=currentSheet(c);
+ setCell(t,'A1','20');setCell(t,'Z9','=Q2*2');
+ const another=cut(c,t,'A1');
+ assert.equal(moveCells(c,t,'E5',another).end,'E5');
 });
 test('full-sheet cell cap is checked before applying a move',()=>{
  const b=newWorkbook(),s=currentSheet(b);
