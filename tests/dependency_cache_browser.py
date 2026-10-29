@@ -17,9 +17,10 @@ with sync_playwright() as p:
   return page.locator('.grid-cell[data-ref="'+ref+'"]').inner_text()
  # Many dependent cells in one workbook, one source subtotal.
  page.evaluate("""() => {
-  const s=sheet();setCell(s,'A1','10');setCell(s,'B1','=A1*2');setCell(s,'C1','=B1+1');
-  for(let i=1;i<=150;i++)setCell(s,'D'+i,'=B1+2');
-  drawGrid();
+  const s=sheet();transact(()=>{
+   setCell(s,'A1','10');setCell(s,'B1','=A1*2');setCell(s,'C1','=B1+1');
+   for(let i=1;i<=150;i++)setCell(s,'D'+i,'=B1+2');
+  });drawGrid();
  }""")
  assert read('C1')=='21',read('C1')
  stats=page.evaluate("""() => {
