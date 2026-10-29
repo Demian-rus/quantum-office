@@ -142,8 +142,8 @@ export function setTypedCell(sheet,ref,input){
  const parsed=typeof input==='string'&&!input.startsWith('=')?parseTemporalInput(input):null;
  setCell(sheet,ref,parsed?parsed.value:input);
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
- else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'date'});
- else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'time'});
+ else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'date'});
+ else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'time'});
 }
 /** Full-sheet alignment is one property, not 200,000 styled cells.
  * Existing per-cell alignments are reset so this action truly affects all cells.
