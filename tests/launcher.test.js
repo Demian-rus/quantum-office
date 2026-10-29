@@ -14,6 +14,8 @@ test('weekly teaching schedule follows day grouping, payment and subject columns
  assert.equal(getCell(s,'D2').value,'Время занятий');
  assert.equal(getCell(s,'I2').value,'Стоимость');
  assert.deepEqual(s.freeze,{rows:3,cols:2});
+ assert.ok(s.merges.some(x=>x.from==='A4'&&x.to==='A8'));
+ assert.ok(s.rowHeights[3]>=34);
  assert.equal(b.sheets[1].name,'Бухгалтерия');
  assert.equal(b.sheets[2].name,'Партнёрка');
 });
@@ -23,6 +25,6 @@ test('weekly schedule saves and reopens without losing sheets, content or dimens
  s.cells.C7={value:'Алгебра: 9 класс',style:{bold:true}};
  const reopened=decodeBook(encodeBook(b));
  assert.equal(reopened.sheets[0].cells.C7.value,'Алгебра: 9 класс');
- assert.equal(reopened.sheets[0].columnWidths['2'],170);
+ assert.equal(reopened.sheets[0].columnWidths['2'],190);
  assert.equal(reopened.sheets.length,3);
 });

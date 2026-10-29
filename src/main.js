@@ -34,6 +34,26 @@ function createBook(example=false){const b=example==='schedule'?createScheduleTe
 function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;saveHandle=null;persist();render();}
 function removeBook(id){saveHandle=null;const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
 function cloneBook(id){saveHandle=null;const orig=workspace.books.find(x=>x.id===id);if(!orig)return;const copy=structuredClone(orig), fresh=newWorkbook();copy.id=fresh.id;copy.name=`${copy.name} — копия`;copy.created=copy.updated=dateNow();workspace.books.unshift(copy);workspace.active=copy.id;persist();page='sheet';render();}
+/** Rename a library card without opening its workbook or changing cell data. */
+function renameBookInline(id,button){
+ const item=workspace.books.find(b=>b.id===id),card=button.closest('.file-card');
+ if(!item||!card||card.querySelector('.file-card-rename'))return;
+ const form=document.createElement('form');form.className='file-card-rename';
+ const input=document.createElement('input');input.type='text';input.maxLength=200;
+ input.setAttribute('aria-label','Новое название книги');input.value=item.name;
+ const ok=document.createElement('button');ok.type='submit';ok.textContent='Сохранить';
+ const cancel=document.createElement('button');cancel.type='button';cancel.className='cancel-rename';cancel.textContent='Отмена';
+ cancel.addEventListener('click',()=>form.remove());
+ input.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();form.remove();}});
+ form.addEventListener('submit',e=>{
+  e.preventDefault();const title=input.value.trim();
+  if(!title){status('Название книги не может быть пустым',true);input.focus();return;}
+  if(title!==item.name){item.name=title;item.updated=dateNow();persist();}
+  render();
+ });
+ form.append(input,ok,cancel);card.querySelector('.file-card-actions').before(form);
+ input.focus();input.select();
+}
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
 function download(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
 async function saveBook(){commitEditor();const b=book();if(!b)return;const filename=`${safeFile(b.name)}.qbook`,data=encodeBook(b);try{if('showSaveFilePicker' in window){if(!saveHandle){saveHandle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});}const writer=await saveHandle.createWritable();await writer.write(data);await writer.close();status('Файл сохранён на диск');return;}}catch(err){if(err.name==='AbortError')return;saveHandle=null;status(`Прямое сохранение не удалось; файл будет скачан`,true);}download(filename,data,'application/json');status('Скачан файл .qbook');}
@@ -225,7 +245,7 @@ function templatesPage(){
  return `<main class="templates-page"><div class="templates-heading"><button data-action="route" data-target="home" class="templates-back">← На главную</button><h1>${data.name}</h1><p>${data.description}</p></div><div class="templates-grid">${cards}</div></main>`;
 }
 function homepage(){
- const cards=workspace.books.map(b=>`<article class="file-card"><button class="file-open" data-action="open" data-id="${esc(b.id)}"><span class="file-emoji" aria-hidden="true">▦</span><span class="file-card-name">${esc(b.name)}</span><small>${b.sheets.length} ${b.sheets.length===1?'лист':'листов'} · ${niceDate(b.updated)}</small></button><div class="file-card-actions"><button data-action="clone" data-id="${esc(b.id)}">Дублировать</button><button data-action="delete" data-id="${esc(b.id)}">Удалить</button></div></article>`).join('');
+ const cards=workspace.books.map(b=>`<article class="file-card"><button class="file-open" data-action="open" data-id="${esc(b.id)}"><span class="file-emoji" aria-hidden="true">▦</span><span class="file-card-name">${esc(b.name)}</span><small>${b.sheets.length} ${b.sheets.length===1?'лист':'листов'} · ${niceDate(b.updated)}</small></button><div class="file-card-actions"><button data-action="rename-book" data-id="${esc(b.id)}" aria-label="Переименовать книгу ${esc(b.name)}">Переименовать</button><button data-action="clone" data-id="${esc(b.id)}">Дублировать</button><button data-action="delete" data-id="${esc(b.id)}">Удалить</button></div></article>`).join('');
  return `<main class="home-main office-launcher"><div class="launcher-tools" aria-label="Выбор редактора">
  <button class="launcher-tile sheets" data-action="new"><span class="launcher-art">${launcherIcon('sheet')}</span><span class="launcher-name">Таблицы</span><span class="launcher-description">Данные, расчёты и расписания</span><span class="launcher-state available">Доступен</span></button>
  <button class="launcher-tile writer" data-action="route" data-target="writer"><span class="launcher-art">${launcherIcon('writer')}</span><span class="launcher-name">Тексты</span><span class="launcher-description">Документы и оформление</span><span class="launcher-state">В разработке</span></button>
@@ -333,7 +353,7 @@ function ribbon(){
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
  let contents='';
  if(activeRibbon==='home')contents=
- group('Буфер',button('copy','Копировать','▢')+button('clear','Очистить содержимое','⌫'))+
+ group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('clear','Очистить содержимое','⌫'))+
  group('Шрифт',button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools)+
  group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"')+button('format','Дата','📅','data-value="date"')+button('format','Время','⏱','data-value="time"')+button('format','Дата и время','◷','data-value="datetime"')+button('format','Длительность','◴','data-value="duration"'))+
@@ -388,7 +408,7 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
  canvas.innerHTML=html;
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
- switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'delete':removeBook(id);break;
+ switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':document.querySelector('#file-picker')?.click();break;case 'backup':backup();break;case 'save':await saveBook();break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: частичная совместимость, сохраните оригинал отдельно');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
@@ -405,8 +425,8 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'freeze-clear':updateFreeze(0,0);break;
  case 'column-width':changeSize('col');break;case 'column-fit':autoFitColumn();break;case 'row-height':changeSize('row');break;case 'row-reset':resetRowHeight();break;
   case 'text-palette':case 'fill-palette':recordColorSelection();activePalette=action==='text-palette'?'color':'bg';borderMenuOpen=false;render();break;
- case 'palette-pick':applySelectedColor(activePalette,value);activePalette=null;render();break;
- case 'palette-clear':applySelectedColor(activePalette,undefined);activePalette=null;render();break;
+ case 'palette-pick':applySelectedColor(activePalette,value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});break;
+ case 'palette-clear':applySelectedColor(activePalette,undefined);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});break;
  case 'border-menu':borderMenuOpen=!borderMenuOpen;activePalette=null;render();break;
  case 'border-mode':setCellBorders(value);break;
  case 'popup-close':activePalette=null;borderMenuOpen=false;render();break;
@@ -423,7 +443,7 @@ app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))reco
 app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.target.closest('.format-popover,[data-action=fill-palette],[data-action=text-palette],[data-action=border-menu]')){activePalette=null;borderMenuOpen=false;document.querySelectorAll('.format-popover').forEach(el=>el.remove());}},true);
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
-app.addEventListener('change',e=>{const t=e.target;if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();}else if(t.id==='formula-input'){transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();}});
+app.addEventListener('change',e=>{const t=e.target;if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();}});
 app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});
@@ -464,7 +484,7 @@ window.addEventListener('paste',e=>{
 });
 // Copying in other windows invalidates a stale private clipboard; external paste stays native.
 window.addEventListener('blur',()=>{internalClipboard=null;});
-window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t=e.target;const form=t?.matches('input,textarea,[contenteditable]');const textEdit=form&&!t?.matches('#name-box,input[type=color]');
+window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t=e.target;const form=t?.matches('input,textarea,[contenteditable]');const textEdit=form&&!t?.matches('#name-box,input[type=color]')&&!(t?.id==='formula-input'&&t.value===getCell(sheet(),activeCell).value);
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();showSearch();return;}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveBook();return;}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!textEdit){e.preventDefault();if(e.shiftKey)redo();else undo();return;}

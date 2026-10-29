@@ -213,8 +213,11 @@ export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evalua
 export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
   if(['date','time','datetime','duration'].includes(cell.style?.format)&& (typeof result==='number'||typeof result==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(result)))return formatTemporal(Number(result),cell.style.format);
-  if(typeof result!=='number')return String(result);
-  const n=Number.isFinite(result)?result:0;
+  // Directly entered numeric cells are stored as strings. Number formatting must
+  // still apply without changing their raw values, clipboard or formula semantics.
+  const fmt=cell.style?.format,typedNumeric=['currency','percent','integer'].includes(fmt)&&typeof result==='string'&&/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(result);
+  if(typeof result!=='number'&&!typedNumeric)return String(result);
+  const n=Number.isFinite(Number(result))?Number(result):0;
   if(['date','time','datetime','duration'].includes(cell.style?.format))return formatTemporal(n,cell.style.format);
   if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
   if(cell.style?.format==='percent')return new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:2}).format(n);
@@ -392,56 +395,125 @@ export function planAutoSum(sheet,from,to){
 
 export {cellName,parseCell};
 
-/** Starter weekly timetable; no external personal data. */
-/** A practical weekly teaching schedule adapted to the user's spreadsheet structure.
- * Day sections use colored cell bands; merged regions are intentionally not
- * claimed until merging and OOXML round-trip are fully implemented. */
+/** Reusable polished template helpers. Schema remains compatible with .qbook/XLSX. */
+const tColor={ink:'#20354a',navy:'#25415d',blue:'#315e7c',pale:'#e9f1f8',green:'#28664e',mint:'#e7f4ec',gold:'#a36a1a',cream:'#fff0d4',white:'#ffffff',soft:'#f5f8fb',muted:'#617589'};
+function tMerged(sheet,from,to,value,style){
+ setCell(sheet,from,value);
+ if(from!==to)mergeCells(sheet,from,to);
+ setStyle(sheet,from,{bold:true,align:'left',...style});
+}
+function tHeaders(sheet,row,labels,widths){
+ labels.forEach((name,c)=>{
+  setColumnWidth(sheet,c,widths[c]);const ref=cellName(row,c);
+  setCell(sheet,ref,name);setStyle(sheet,ref,{bg:tColor.navy,color:tColor.white,bold:true,align:'center',wrap:true,borders:{bottom:true}});
+ });
+ setRowHeight(sheet,row,46);
+}
+function tTint(sheet,row,first,last,color){
+ for(let c=first;c<=last;c++)setStyle(sheet,cellName(row,c),{bg:color});
+}
+function tExamples(sheet,row,values,start=0){
+ values.forEach((v,i)=>{if(v!==null&&v!==undefined&&v!=='')setCell(sheet,cellName(row,start+i),String(v));});
+}
+function tTop(sheet,last,title,subtitle){
+ tMerged(sheet,'A1',colLabel(last)+'1',title,{bg:tColor.navy,color:tColor.white});
+ tMerged(sheet,'A2',colLabel(last)+'2',subtitle,{bg:tColor.soft,color:tColor.muted,bold:false,wrap:true});
+ setRowHeight(sheet,0,54);setRowHeight(sheet,1,36);
+}
+
+/** Timetable retains known A4/B2/I2 addresses and three sheets for older books/tests. */
 export function createScheduleTemplate(){
- const book=newWorkbook('График занятий');const s=currentSheet(book);s.name='График';
- const heading=['Дни недели','Ученики','Класс / предмет','Время занятий','План занятий','Результаты','Примечание','Проведено','Стоимость','Оплачено'];
- const widths=[73,148,170,123,360,145,220,108,107,105];
- widths.forEach((w,c)=>setColumnWidth(s,c,w));
- // Green upper bands and clear, editable column labels. No invented pupil data.
- for(let c=0;c<heading.length;c++){
-  const ref=cellName(0,c),ref2=cellName(1,c);
-  setCell(s,ref,c===0?'НЕДЕЛЬНЫЙ ГРАФИК':c===4?'ПЛАН ЗАНЯТИЙ':c===8?'ОПЛАТА':'');
-  setStyle(s,ref,{bg:'#00c837',color:'#153d25',bold:true,align:'center'});
-  setCell(s,ref2,heading[c]);setStyle(s,ref2,{bold:true,bg:'#f1f5f3',color:'#173f2b',align:'center'});
-  setCell(s,cellName(2,c),'');setStyle(s,cellName(2,c),{bg:'#00c837'});
- }
- setRowHeight(s,0,26);setRowHeight(s,1,39);setRowHeight(s,2,22);
+ const book=newWorkbook('Недельное расписание занятий'),s=currentSheet(book);s.name='График';
+ const headings=['День','Ученики','Класс / предмет','Время занятий','План занятий','Результаты','Примечание','Проведено','Стоимость','Оплачено'];
+ tHeaders(s,1,headings,[83,185,190,154,300,188,220,118,124,118]);
+ // Title sections do not cross the A:B frozen column boundary.
+ tMerged(s,'A1','B1','ГРАФИК НЕДЕЛИ',{bg:tColor.navy,color:tColor.white,align:'center'});
+ tMerged(s,'C1','J1','РАСПИСАНИЕ ЗАНЯТИЙ / ПЛАН / ОПЛАТА',{bg:tColor.blue,color:tColor.white});
+ setRowHeight(s,0,52);
+ tMerged(s,'A3','B3','НЕДЕЛЯ',{bg:tColor.green,color:tColor.white,align:'center'});
+ tMerged(s,'C3','G3','УЧЕБНЫЙ ПРОЦЕСС',{bg:tColor.mint,color:tColor.green});
+ tMerged(s,'H3','J3','ПОСЕЩЕНИЕ И ОПЛАТА',{bg:tColor.cream,color:tColor.gold});
+ setRowHeight(s,2,32);
  const days=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+ const bands=['#f2f7fc','#f5f9fd','#f2f8f6','#f6f9fc','#f2f7fc','#fff8ec','#f4f5f8'];
  days.forEach((day,k)=>{
-  for(let j=0;j<5;j++){
-   const r=3+k*5+j;
-   setRowHeight(s,r,29);
-   const dayRef=cellName(r,0);if(j===0)setCell(s,dayRef,day);
-   setStyle(s,dayRef,{bg:'#ffca19',bold:true,color:'#252b25',align:'center'});
-   setStyle(s,cellName(r,1),{bg:'#e0e3e5'});
-   // Visible day-boundary bands are not baked into user-entered data.
+  const first=3+k*5,last=first+4;
+  tMerged(s,cellName(first,0),cellName(last,0),day,{bg:k>=5?'#e9b963':'#ffca19',color:tColor.ink,align:'center'});
+  for(let row=first;row<=last;row++){
+   setRowHeight(s,row,34);tTint(s,row,1,9,bands[k]);
+   if(row===last)for(let c=1;c<=9;c++)setStyle(s,cellName(row,c),{borders:{bottom:true}});
   }
  });
+ tExamples(s,3,['Пример: ученик','Алгебра · 9 класс','16:00–17:00','Повторение квадратных уравнений','Задачи 1–5','Д/з: № 12, 14','Да','2500','Да'],1);
+ setStyle(s,'B4',{bold:true,color:tColor.blue});setStyle(s,'E4',{wrap:true});setStyle(s,'G4',{wrap:true});setStyle(s,'I4',{format:'currency',bg:'#f7e7be',bold:true});
  setFreeze(s,3,2);
- // Small weekly overview as in the reference sheet, to the right.
- const right=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
- right.forEach((d,i)=>{const c=11+i;setColumnWidth(s,c,78);setCell(s,cellName(1,c),d);setStyle(s,cellName(1,c),{bold:true,align:'center',bg:'#e8f5eb'});});
- const finance=newSheet('Бухгалтерия');const financeCols=['Дата','Ученик','Предмет','Занятие','Стоимость','Оплачено','Долг','Примечание'];
- financeCols.forEach((title,c)=>{setColumnWidth(finance,c,[120,175,170,150,115,115,120,255][c]);setCell(finance,cellName(0,c),title);setStyle(finance,cellName(0,c),{bold:true,bg:'#e2f2e7',color:'#165438'});});
- setFreeze(finance,1,0);
- const partner=newSheet('Партнёрка');['Контакт','Организация','Условия','Статус','Комментарий'].forEach((title,c)=>{setColumnWidth(partner,c,[175,195,260,140,290][c]);setCell(partner,cellName(0,c),title);setStyle(partner,cellName(0,c),{bold:true,bg:'#e2f2e7',color:'#165438'});});
- book.sheets.push(finance,partner);return validateWorkbook(book);
+ const pay=newSheet('Бухгалтерия');
+ tHeaders(pay,3,['Дата','Ученик','Предмет','Проведено','Стоимость','Оплачено','Долг','Комментарий'],[128,205,165,125,125,125,125,265]);
+ tTop(pay,7,'УЧЁТ ЗАНЯТИЙ И ОПЛАТ','Заполняйте занятия и суммы. Долг рассчитывается автоматически.');
+ tMerged(pay,'A3','H3','РАСЧЁТЫ И КОНТРОЛЬ ОПЛАТ',{bg:tColor.mint,color:tColor.green});setRowHeight(pay,2,30);
+ for(let row=4;row<=15;row++){
+  setRowHeight(pay,row,34);tTint(pay,row,0,7,row%2===0?tColor.white:tColor.soft);
+  for(const c of [4,5,6])setStyle(pay,cellName(row,c),{format:'currency'});
+  setCell(pay,cellName(row,6),'=E'+(row+1)+'-F'+(row+1));
+ }
+ tExamples(pay,4,['Пример','Пример: ученик','Алгебра','Да','2500','2500',null,'Данные приведены для примера']);
+ setStyle(pay,'A5',{italic:true});setStyle(pay,'H5',{italic:true,color:tColor.muted,wrap:true});setFreeze(pay,4,0);
+ const partner=newSheet('Партнёрка');
+ tHeaders(partner,3,['Контакт','Организация','Формат работы','Статус','Комментарий'],[190,215,285,150,360]);
+ tTop(partner,4,'ПАРТНЁРСТВА И КОНТАКТЫ','Рабочий реестр совместных проектов, рекомендаций и договорённостей.');
+ tMerged(partner,'A3','E3','СТАТУСЫ И ДОГОВОРЁННОСТИ',{bg:tColor.mint,color:tColor.green});
+ setRowHeight(partner,2,30);
+ for(let row=4;row<16;row++){setRowHeight(partner,row,38);tTint(partner,row,0,4,row%2===0?tColor.white:tColor.soft);}
+ tExamples(partner,4,['Пример: контакт','Образовательный проект','Совместная консультация','В обсуждении','Замените эту строку своими данными']);
+ setStyle(partner,'E5',{italic:true,color:tColor.muted,wrap:true});setFreeze(partner,4,0);
+ book.sheets.push(pay,partner);return validateWorkbook(book);
 }
-/** Blank education register, useful when lessons are not organized by week. */
+
 export function createJournalTemplate(){
- const b=newWorkbook('Журнал учеников'),s=currentSheet(b);s.name='Ученики';
- const heads=['Ученик','Класс','Предмет','Формат','Контакт','Стоимость','Примечание'];
- heads.forEach((t,c)=>{setCell(s,cellName(0,c),t);setColumnWidth(s,c,[180,90,160,130,190,120,300][c]);setStyle(s,cellName(0,c),{bold:true,bg:'#d6eee0',color:'#155a3d'});});
- setFreeze(s,1,1);return validateWorkbook(b);
+ const book=newWorkbook('Журнал учеников'),s=currentSheet(book);s.name='Ученики';
+ tHeaders(s,3,['Ученик','Класс','Предмет','Формат','Занятий','Оплачено','Прогресс','Примечания'],[206,95,180,135,110,130,200,340]);
+ tTop(s,7,'ЖУРНАЛ УЧЕНИКОВ','Учёт групп, занятий, посещаемости и прогресса. Примерные записи можно заменить.');
+ tMerged(s,'A3','D3','ОБУЧЕНИЕ И ФОРМАТ',{bg:tColor.pale,color:tColor.navy});
+ tMerged(s,'E3','H3','ПОСЕЩАЕМОСТЬ И РЕЗУЛЬТАТЫ',{bg:tColor.mint,color:tColor.green});setRowHeight(s,2,30);
+ for(let row=4;row<=25;row++){
+  setRowHeight(s,row,38);tTint(s,row,0,7,row%2===0?tColor.white:tColor.soft);
+  setStyle(s,cellName(row,5),{format:'currency'});setStyle(s,cellName(row,7),{wrap:true});
+ }
+ tExamples(s,4,['Пример: ученик 1','9','Математика','Индивидуально','4','10000','Повторение тем','Сильная сторона: алгебра']);
+ tExamples(s,5,['Пример: ученик 2','11','Физика','Онлайн','3','7500','Решение задач','Повторить динамику']);
+ for(const ref of ['A5','A6'])setStyle(s,ref,{bold:true,color:tColor.blue});
+ for(const ref of ['G5','G6'])setStyle(s,ref,{bg:tColor.mint,color:tColor.green});
+ setFreeze(s,4,0);return validateWorkbook(book);
 }
-/** Basic bookkeeping starter; formulas on a separate totals row. */
+
 export function createBudgetTemplate(){
- const b=newWorkbook('Доходы и расходы'),s=currentSheet(b);s.name='Учёт';
- const heads=['Дата','Категория','Описание','Доход','Расход','Баланс'];
- heads.forEach((t,c)=>{setCell(s,cellName(0,c),t);setColumnWidth(s,c,[130,160,290,140,140,145][c]);setStyle(s,cellName(0,c),{bold:true,bg:'#d6eee0',color:'#155a3d'});});
- setCell(s,'F2','=D2-E2');setFreeze(s,1,0);return validateWorkbook(b);
+ const book=newWorkbook('Доходы и расходы'),s=currentSheet(book);s.name='Учёт';
+ tHeaders(s,4,['Дата','Категория','Описание операции','Доход','Расход','Баланс','Статус','Комментарий'],[130,185,310,142,142,148,153,310]);
+ tTop(s,7,'ДОХОДЫ И РАСХОДЫ','Замените примерные операции своими. Баланс и итог пересчитываются автоматически.');
+ tMerged(s,'A3','C3','ОПЕРАЦИИ',{bg:tColor.pale,color:tColor.navy});
+ tMerged(s,'D3','F3','ДЕНЕЖНЫЙ ПОТОК',{bg:tColor.mint,color:tColor.green});
+ tMerged(s,'G3','H3','КОНТРОЛЬ',{bg:tColor.cream,color:tColor.gold});
+ setRowHeight(s,2,34);setRowHeight(s,3,24);
+ const examples=[
+  ['01.09.2026','Услуги','Пример: индивидуальное занятие','2500','0','Оплачено','Замените примеры своими данными'],
+  ['02.09.2026','Расходы','Пример: канцелярия','0','450','Учтено','Материалы для занятий'],
+  ['03.09.2026','Услуги','Пример: консультация','3000','0','Оплачено',''],
+  ['04.09.2026','Расходы','Пример: подписка','0','700','Учтено','']
+ ];
+ for(let row=5;row<=18;row++){
+  setRowHeight(s,row,36);tTint(s,row,0,7,row%2?tColor.white:tColor.soft);
+  for(let c=3;c<=5;c++)setStyle(s,cellName(row,c),{format:'currency',align:'right'});
+  setCell(s,cellName(row,5),'=SUM(D6:D'+(row+1)+')-SUM(E6:E'+(row+1)+')');
+ }
+ examples.forEach((entry,k)=>{
+  const row=k+5;tExamples(s,row,[entry[0],entry[1],entry[2],entry[3],entry[4],null,entry[5],entry[6]]);
+  if(k%2===0)setStyle(s,cellName(row,6),{bg:tColor.mint,color:tColor.green,bold:true});
+  if(k===0)setStyle(s,'H6',{italic:true,wrap:true,color:tColor.muted});
+ });
+ setRowHeight(s,19,42);
+ tMerged(s,'A20','C20','ИТОГО ЗА ПЕРИОД',{bg:tColor.navy,color:tColor.white});
+ for(let c=3;c<=5;c++)setStyle(s,cellName(19,c),{bg:tColor.pale,bold:true,format:'currency',borders:{top:true,bottom:true}});
+ setCell(s,'D20','=SUM(D6:D19)');setCell(s,'E20','=SUM(E6:E19)');setCell(s,'F20','=D20-E20');
+ tMerged(s,'G20','H20','Проверьте заполнение перед использованием',{bg:tColor.cream,color:tColor.gold,wrap:true,bold:false});
+ setFreeze(s,5,0);return validateWorkbook(book);
 }

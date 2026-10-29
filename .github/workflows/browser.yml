@@ -38,3 +38,4 @@ jobs:
       - run: python tests/dependency_cache_browser.py
       - run: python tests/recalculation_browser.py
       - run: python tests/formatting030_browser.py
+      - run: python tests/task031_browser.py
