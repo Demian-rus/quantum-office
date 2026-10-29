@@ -806,17 +806,18 @@ function pasteCells(sheet,target,clip){
 
 /** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
 
+const MAX_BATCH=100;
 const CELL_REF=/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi;
 
 /** Structural edits move even $-anchored references (unlike fill/copy). */
-function rewriteStructureFormula(formula,axis,mode,index){
+function rewriteStructureFormula(formula,axis,mode,index,count=1){
  if(typeof formula!=='string'||!formula.startsWith('='))return formula;
  const result='='+formula.slice(1).replace(CELL_REF,(full,lockCol,letters,lockRow,digits)=>{
   const source=parseCell(letters+digits);
   if(!source||source.row>=LIMITS.rows||source.col>=LIMITS.columns)return full;
   const old=axis==='row'?source.row:source.col;
-  if(mode==='delete'&&old===index)return '#REF!';
-  const shifted=mode==='insert'?old>=index?old+1:old:old>index?old-1:old;
+  if(mode==='delete'&&old>=index&&old<index+count)return '#REF!';
+  const shifted=mode==='insert'?(old>=index?old+count:old):(old>=index+count?old-count:old);
   if(shifted<0||shifted>=(axis==='row'?LIMITS.rows:LIMITS.columns))throw Error('Формула выходит за пределы листа');
   return axis==='row'?`${lockCol}${letters.toUpperCase()}${lockRow}${shifted+1}`:`${lockCol}${cellName(0,shifted).replace(/\d+$/,'')}${lockRow}${digits}`;
  });
@@ -828,26 +829,26 @@ function rewriteStructureFormula(formula,axis,mode,index){
  * Edit exactly one row/column. Build new cells and dimensions before touching sheet.
  * A filter is rejected until moving its range and selection rules can be proven safe.
  */
-function changeSheetStructure(sheet,axis,mode,index){
+function changeSheetStructure(sheet,axis,mode,index,count=1){
  if(!['row','col'].includes(axis)||!['insert','delete'].includes(mode))throw Error('Неизвестная структурная операция');
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
- if(!Number.isInteger(index)||index<0||index>=limit)throw Error('Строка или столбец вне таблицы');
+ if(!Number.isInteger(index)||!Number.isInteger(count)||count<1||count>MAX_BATCH||index<0||index+count>limit)throw Error('Диапазон вне таблицы или больше 100');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
  // Validate the projected geometry before mutating any cell. Insertions may
  // shift or expand a merge; non-anchor deletions may shrink it.
- const newMerges=[];
+ const newMerges=[];const last=index+count-1;
  for(const merge of sheet.merges||[]){
   const a=parseCell(merge.from),b=parseCell(merge.to);
   if(!a||!b)throw Error('Повреждённое объединение');
   const start=axis==='row'?a.row:a.col,end=axis==='row'?b.row:b.col;
   let nextStart=start,nextEnd=end;
   if(mode==='insert'){
-   if(index<=start){nextStart++;nextEnd++;}
-   else if(index<=end){nextEnd++;}
-  }else if(index<start){nextStart--;nextEnd--;}
-  else if(index<=end){
-   if(index===start)throw Error('Удаление строки или столбца с началом объединения запрещено: сначала разъедините ячейки');
-   nextEnd--;
+   if(index<=start){nextStart+=count;nextEnd+=count;}
+   else if(index<=end){nextEnd+=count;}
+  }else if(last<start){nextStart-=count;nextEnd-=count;}
+  else if(index<=end&&last>=start){
+   if(index<=start)throw Error('Удаление диапазона с началом объединения запрещено: сначала разъедините ячейки');
+   nextEnd-=Math.min(last,end)-index+1;
   }
   if(nextEnd>=limit)throw Error('Объединение выйдет за пределы листа');
   const r1=axis==='row'?nextStart:a.row,c1=axis==='col'?nextStart:a.col;
@@ -859,39 +860,40 @@ function changeSheetStructure(sheet,axis,mode,index){
  for(const [ref,cell] of Object.entries(sheet.cells)){
   const pos=parseCell(ref);if(!pos||pos.row>=LIMITS.rows||pos.col>=LIMITS.columns)throw Error('Недопустимый адрес ячейки');
   const previous=axis==='row'?pos.row:pos.col;
-  if(mode==='delete'&&previous===index)continue;
-  const destination=mode==='insert'?previous>=index?previous+1:previous:previous>index?previous-1:previous;
+  if(mode==='delete'&&previous>=index&&previous<=last)continue;
+  const destination=mode==='insert'?(previous>=index?previous+count:previous):(previous>last?previous-count:previous);
   if(destination>=limit)throw Error('Последняя строка или столбец содержит данные; вставка запрещена');
   const r=axis==='row'?destination:pos.row,c=axis==='col'?destination:pos.col;
-  const value=rewriteStructureFormula(cell.value,axis,mode,index);
+  const value=rewriteStructureFormula(cell.value,axis,mode,index,count);
   cells[cellName(r,c)]={value,style:structuredClone(cell.style||{})};
  }
  const key=axis==='row'?'rowHeights':'columnWidths';
  const shiftedDimensions={};
  for(const [k,v] of Object.entries(sheet[key]||{})){
   const old=Number(k);
-  if(mode==='delete'&&old===index)continue;
-  const next=mode==='insert'?old>=index?old+1:old:old>index?old-1:old;
+  if(mode==='delete'&&old>=index&&old<=last)continue;
+  const next=mode==='insert'?(old>=index?old+count:old):(old>last?old-count:old);
   if(next>=limit)throw Error('Последняя строка или столбец имеет пользовательский размер');
   shiftedDimensions[next]=v;
  }
  const hiddenKey=axis==='row'?'hiddenRows':'hiddenColumns';
  const hidden={};for(const indexText of Object.keys(sheet[hiddenKey]||{})){
   const old=Number(indexText);
-  if(mode==='delete'&&old===index)continue;
-  const next=mode==='insert'&&old>=index?old+1:mode==='delete'&&old>index?old-1:old;
+  if(mode==='delete'&&old>=index&&old<=last)continue;
+  const next=mode==='insert'?(old>=index?old+count:old):(old>last?old-count:old);
   if(next>=limit)throw Error('Последняя строка или столбец скрыта: сначала отобразите её');
   hidden[next]=true;
  }
  const freeze={...(sheet.freeze||{rows:0,cols:0})};
  const frozenKey=axis==='row'?'rows':'cols';
- if(mode==='insert'&&index<freeze[frozenKey])freeze[frozenKey]++;
- if(mode==='delete'&&index<freeze[frozenKey])freeze[frozenKey]--;
+ if(mode==='insert'&&index<freeze[frozenKey])freeze[frozenKey]+=count;
+ if(mode==='delete'&&index<freeze[frozenKey])freeze[frozenKey]-=Math.min(count,freeze[frozenKey]-index);
  if(freeze[frozenKey]>10)throw Error('Нельзя увеличить закреплённую область более 10 строк или столбцов');
  // Existing data and schema remain unchanged if even one step above failed.
  sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
- return {axis,mode,index,changed:Object.keys(cells).length};
+ return {axis,mode,index,count,changed:Object.keys(cells).length};
 }
+
 
 
 
@@ -1104,14 +1106,16 @@ function updateSelectionStats(){const node=document.querySelector('#selection-st
 function structuralAction(axis,mode){
  commitEditor();if(!sheet())return;
  const pos=parseCell(activeCell);if(!pos)return;
- const index=axis==='row'?pos.row:pos.col;
+ const rect=rectangle(activeCell,rangeEnd);
+ const index=axis==='row'?rect.r1:rect.c1;
+ const count=axis==='row'?rect.r2-rect.r1+1:rect.c2-rect.c1+1;
  try{
   const draft=structuredClone(sheet());
-  changeSheetStructure(draft,axis,mode,index); // Validate before adding undo history.
-  transact(()=>changeSheetStructure(sheet(),axis,mode,index));
-  const next=mode==='delete'?Math.min(index,axis==='row'?LIMITS.rows-2:LIMITS.columns-2):index;
+  changeSheetStructure(draft,axis,mode,index,count);
+  transact(()=>changeSheetStructure(sheet(),axis,mode,index,count));
+  const next=index;
   const dest=axis==='row'?cellName(next,pos.col):cellName(pos.row,next);
-  filterColumn=null;internalClipboard=null;setSelection(dest);render();status(`${mode==='insert'?'Вставлен':'Удалён'} ${axis==='row'?'ряд':'столбец'} ${index+1}`);
+  filterColumn=null;internalClipboard=null;setSelection(dest);render();status((mode==='insert'?'Вставлено: ':'Удалено: ')+count+(axis==='row'?' строк':' столбцов'));
  }catch(err){status(err.message||'Операция отклонена',true);}
 }
 function visibilityAction(axis,show){
@@ -1357,7 +1361,7 @@ function ribbon(){
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
- if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить строку','+')+button('delete-row','Удалить строку','×')+button('insert-col','Вставить столбец','+')+button('delete-col','Удалить столбец','×'))+group('Листы',button('sheet-add','Новый лист','+'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
+ if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Листы',button('sheet-add','Новый лист','+'))+`<div class="ribbon-help">Диаграммы и изображения — в разработке</div>`;
  if(activeRibbon==='view')contents=group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('backup','Архив','▤')+button('import','Открыть','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';

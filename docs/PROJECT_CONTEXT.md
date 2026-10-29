@@ -121,3 +121,10 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - Existing bounds (2,000 × 100 cells, 2,000 cells/merge) remain enforced before mutation; active filters still block structural edits. Undo is one step.
 - Verified with dedicated Node tests, a Chromium ribbon/undo workflow and independent XLSX inspection via openpyxl.
 - This is bounded support; cross-sheet references, multi-row structural actions and all Excel merged-editing semantics are not yet complete.
+
+
+## TASK 024 — bounded mass insertion/deletion
+
+- Selecting a range and choosing Insert/Delete rows or columns affects the number of selected rows/columns, up to 100 per action. One cell still means one row/column. Entire bands are changed, not just their selected cells.
+- The core computes one final state: formulas, merges, custom dimensions, hidden flags, frozen panes and cell styles are rebased atomically. Deletion including the top-left merge anchor, overflow, active filter and excessive counts are rejected.
+- Existing XLSX compatibility remains partial. The installed desktop editor is still future work. Verify with model tests and Chromium bulk-structure regression.

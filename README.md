@@ -121,3 +121,8 @@ Use **Вставка → Вставить строку / Удалить стро
 ### TASK 023 — merge-aware row/column editing
 
 Insert before/inside a merged range to shift/expand it. Delete a non-anchor interior band to shrink it; deleting the anchor band is blocked. A one-cell remnant becomes an ordinary cell. Atomic validation preserves data and undo. Tests: `npm test`, `python tests/merged_structure_browser.py`.
+
+
+### TASK 024 — multiple rows and columns
+
+Select 2–100 adjacent rows or columns, then choose Insert/Delete on the compact ribbon. One undo transaction; formulas and merges rebase. Active filters and deleting a merge anchor are refused. Other complex Excel structures remain unsupported.
