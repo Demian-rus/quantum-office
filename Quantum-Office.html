@@ -1532,6 +1532,84 @@ function pasteCells(sheet,target,clip){
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
 }
 
+/** A cut is a deferred same-sheet move, NEVER deletion on Ctrl+X.
+ * Sheet and source must still match their clipboard snapshot at paste time.
+ * Moving data referenced by formulas is currently refused: the full AST
+ * reference-rebasing semantics are not implemented, and silent damage to
+ * dependent calculations would be worse than an explicit limitation. */
+function referencedByFormula(book,sourceSheet,region){
+ if(!book?.sheets)return false;
+ const targetName=sourceSheet.name.toLocaleUpperCase('ru-RU');
+ const regex=/(?<![A-Za-z0-9_.$])(?:(?:'((?:[^']|'')+)'|([A-Za-z_А-ЯЁ][A-Za-z0-9_.А-ЯЁ]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![A-Za-z0-9_.])/gi;
+ for(const sh of book.sheets)for(const cell of Object.values(sh.cells||{})){
+  if(!cell?.value?.startsWith('='))continue;
+  const expression=cell.value.replace(/"(?:[^"]|"")*"/g,'""');
+  regex.lastIndex=0;
+  for(const match of expression.matchAll(regex)){
+   const explicit=match[1]!==undefined?match[1].replaceAll("''","'"):match[2];
+   const addressed=(explicit||sh.name).toLocaleUpperCase('ru-RU');
+   if(addressed!==targetName)continue;
+   const start=parseCell(match[3].replaceAll('$','')),end=parseCell((match[4]||match[3]).replaceAll('$',''));
+   if(!start||!end)continue;
+   const refRect={r1:Math.min(start.row,end.row),c1:Math.min(start.col,end.col),r2:Math.max(start.row,end.row),c2:Math.max(start.col,end.col)};
+   if(overlaps(region,refRect))return true;
+  }
+ }
+ return false;
+}
+function moveCells(book,sheet,target,cutClip){
+ if(!book||!sheet||!cutClip||cutClip.mode!=='cut'||cutClip.bookId!==book.id||cutClip.sheetId!==sheet.id)
+  throw Error('Вырезанный диапазон можно перенести только в исходный лист');
+ if(sheet.autoFilter)throw Error('Выключите автофильтр перед перемещением диапазона');
+ const origin=parseCell(cutClip.start),dest=parseCell(target);
+ if(!origin||!dest||!validRef(target)||!Number.isInteger(cutClip.rows)||!Number.isInteger(cutClip.cols)||
+    cutClip.rows<1||cutClip.cols<1||cutClip.rows*cutClip.cols>10000)
+  throw Error('Повреждённый диапазон вырезания');
+ const src={r1:origin.row,c1:origin.col,r2:origin.row+cutClip.rows-1,c2:origin.col+cutClip.cols-1};
+ const dst={r1:dest.row,c1:dest.col,r2:dest.row+cutClip.rows-1,c2:dest.col+cutClip.cols-1};
+ if(src.r2>=LIMITS.rows||src.c2>=LIMITS.columns||dst.r2>=LIMITS.rows||dst.c2>=LIMITS.columns)
+  throw Error('Перемещение выходит за границы листа');
+ // Verify that neither region includes invisible material, even if cut
+ // metadata came from an earlier visible state.
+ for(const row of new Set([...Array(cutClip.rows)].flatMap((_,i)=>[src.r1+i,dst.r1+i])))
+  if(sheet.hiddenRows?.[row]||sheet.autoFilter?.hiddenRows?.[row])throw Error('Сначала отобразите скрытые строки');
+ for(const col of new Set([...Array(cutClip.cols)].flatMap((_,i)=>[src.c1+i,dst.c1+i])))
+  if(sheet.hiddenColumns?.[col])throw Error('Сначала отобразите скрытые столбцы');
+ const live=copyCells(sheet,cutClip.start,cellName(src.r2,src.c2),book);
+ if(JSON.stringify(live.cells)!==JSON.stringify(cutClip.cells)||JSON.stringify(live.merges)!==JSON.stringify(cutClip.merges))
+  throw Error('Исходные ячейки изменились после вырезания. Вырежьте диапазон заново');
+ if(src.r1===dst.r1&&src.c1===dst.c1)return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2),unchanged:true};
+ if(referencedByFormula(book,sheet,src))
+  throw Error('На перемещаемые ячейки ссылаются формулы. Перенос без перепривязки ссылок запрещён; используйте копирование');
+ const draft=structuredClone(sheet);
+ const fullMerges=(sheet.merges||[]).filter(m=>inside(rectangle(m.from,m.to),src));
+ draft.merges=(draft.merges||[]).filter(m=>!fullMerges.some(source=>source.from===m.from&&source.to===m.to));
+ for(const m of draft.merges)if(overlaps(dst,rectangle(m.from,m.to)))
+  throw Error('Место вставки пересекается с другим объединением');
+ // Remove only individually stored entries, not the sparse sheet defaults.
+ for(const ref of Object.keys(draft.cells)){
+  const p=parseCell(ref);
+  if(p.row>=src.r1&&p.row<=src.r2&&p.col>=src.c1&&p.col<=src.c2)delete draft.cells[ref];
+ }
+ // The captured visible formatting must move with values. Snapshot-first
+ // staging also handles overlapping source/destination rectangles correctly.
+ for(let r=0;r<cutClip.rows;r++)for(let c=0;c<cutClip.cols;c++){
+  const item=cutClip.cells[r]?.[c];
+  if(typeof item?.value!=='string'||!item.style||typeof item.style!=='object'||Array.isArray(item.style))
+   throw Error('Повреждённые данные вырезания');
+  const ref=cellName(dst.r1+r,dst.c1+c);
+  if(item.value||Object.keys(item.style).length)draft.cells[ref]={value:item.value,style:structuredClone(item.style)};
+  else delete draft.cells[ref];
+ }
+ for(const m of cutClip.merges||[])
+  mergeCells(draft,cellName(dst.r1+m.r1,dst.c1+m.c1),cellName(dst.r1+m.r2,dst.c1+m.c2));
+ const oldCount=Object.keys(sheet.cells).length,nextCount=Object.keys(draft.cells).length;
+ const total=book.sheets.reduce((n,sh)=>n+Object.keys(sh.cells).length,0)-oldCount+nextCount;
+ if(total>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=draft.cells;sheet.merges=draft.merges;
+ return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2)};
+}
+
 
 /** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
 
@@ -2782,6 +2860,14 @@ app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.targ
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;setSelection(cell.dataset.ref);editCell();}});
 function captureSelection(){if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
+async function cutSelection(){
+ const clip=captureSelection();if(!clip)return false;
+ clip.mode='cut';clip.bookId=book().id;clip.sheetId=sheet().id;
+ internalClipboard=clip;
+ try{await navigator.clipboard.writeText(clip.text);}catch{/* Retain internal clipboard without a browser permission */}
+ status('Вырезано: исходные ячейки сохраняются до успешной вставки Ctrl+V');
+ return true;
+}
 async function copySelection(){const clip=captureSelection();if(!clip)return false;
  try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
  return true;}
@@ -2789,8 +2875,10 @@ function pasteIntoCells(text,clip=null){if(!sheet()||refuseHiddenSelection())ret
  try{
   if(!clip&&typeof text!=='string')throw Error('Буфер обмена пуст');
   if(!clip&&text.length===0)throw Error('Буфер обмена пуст');
-  let info;transact(()=>{info=clip?pasteCells(sheet(),activeCell,clip):pasteTSV(sheet(),activeCell,text);});
-  setSelection(activeCell,info.end);status(`Вставлено: ${info.rows} × ${info.cols}`);return true;
+  let info;const moving=clip?.mode==='cut';
+  transact(()=>{info=moving?moveCells(book(),sheet(),activeCell,clip):clip?pasteCells(sheet(),activeCell,clip):pasteTSV(sheet(),activeCell,text);});
+  if(moving)internalClipboard=null;
+  setSelection(activeCell,info.end);status(moving?`Перемещено: ${info.rows} × ${info.cols}`:`Вставлено: ${info.rows} × ${info.cols}`);return true;
  }catch(error){status(error.message||'Вставка не выполнена',true);return false;}
 }
 // Clipboard events handle external data. In-app keyboard copy/paste also works on file:// without Clipboard API permissions.
@@ -2798,6 +2886,11 @@ window.addEventListener('copy',e=>{
  if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]')){internalClipboard=null;return;}
  const clip=captureSelection();if(!clip)return;
  if(e.clipboardData){e.preventDefault();e.clipboardData.setData('text/plain',clip.text);status('Скопировано');}
+});
+window.addEventListener('cut',e=>{
+ if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]'))return;
+ e.preventDefault();cutSelection();
+ if(e.clipboardData&&internalClipboard?.mode==='cut')e.clipboardData.setData('text/plain',internalClipboard.text);
 });
 window.addEventListener('paste',e=>{
  if(page!=='sheet'||editing||e.target?.matches?.('input,textarea,[contenteditable]'))return;
@@ -2826,7 +2919,7 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
  if(e.altKey&&(e.key==='='||e.code==='Equal')){e.preventDefault();autoSum();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='c'||e.code==='KeyC')){e.preventDefault();copySelection();return;}
  if((e.ctrlKey||e.metaKey)&&(e.key.toLowerCase()==='v'||e.code==='KeyV')&&internalClipboard){e.preventDefault();pasteIntoCells(null,internalClipboard);return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='x'){e.preventDefault();const clip=captureSelection();if(clip?.merges?.length){status('Перемещение объединённых ячеек через Ctrl+X пока не поддерживается. Используйте копирование',true);return;}if(clip){copySelection().then(ok=>{if(ok)clearSelected();});}return;}
+ if((e.ctrlKey||e.metaKey)&&shortcut('x','KeyX')){e.preventDefault();cutSelection();return;}
  if(e.key==='Backspace'||e.key==='Delete'){e.preventDefault();clearSelected();return;}
  if(e.key==='F2'){e.preventDefault();editCell();return;}
  const steps={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],Tab:[0,e.shiftKey?-1:1],Enter:[e.shiftKey?-1:1,0]};
