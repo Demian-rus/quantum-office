@@ -255,3 +255,17 @@
 .grid-frozen-cols .grid-cell{z-index:1}
 
 .grid-frozen-rows .grid-cell.frozen-col{z-index:30}
+
+
+/* TASK 035: the vertical scrollbar belongs to the data viewport, below the
+   fixed A/B/C column-letter header. Grid canvas y=0 is the first data row. */
+.grid-frame>.grid-scroll{
+ position:absolute;top:31px;right:0;bottom:0;left:0;
+ width:auto;height:auto;min-height:0;
+ overflow:auto;scrollbar-gutter:stable;
+}
+/* Keep the status bar intentionally minimal and readable at desktop scale. */
+.sheet-status{gap:18px;font-size:12px;font-weight:650;color:#1c2734;line-height:1.3}
+.sheet-status #selection-info{color:#142637;font-weight:800}
+.sheet-status #selection-stats{color:#202b38;font-weight:650}
+@media(max-width:730px){.sheet-status{gap:8px;font-size:11px}}
