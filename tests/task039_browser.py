@@ -44,7 +44,13 @@ with sync_playwright() as p:
  page.locator('[data-action=save]').first.click()
  page.wait_for_function('fakeDrive.a.closed===1')
  assert page.evaluate('decodeBook(fakeDrive.a.raw).sheets[0].cells.A1.value')=='Книга A'
- page.wait_for_function("document.querySelector('#storage-indicator')?.textContent?.includes('Файл проверен на диске')")
+ page.wait_for_timeout(250)
+ assert 'Файл проверен на диске' in state()['marker'],page.evaluate("""()=>({
+  marker:document.getElementById('storage-indicator')?.textContent,
+  toast:document.getElementById('toast')?.textContent,
+  links:directFiles.size,dirty:[...dirtyFiles],busy:[...savingBooks],
+  disk:fakeDrive.a.raw.slice(0,100),book:book().id,updated:book().updated
+ })""")
  write('A1','Версия A2')
  assert 'не сохранено на диск' in state()['marker']
  page.locator('[data-action=save]').first.click()
