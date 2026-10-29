@@ -105,24 +105,60 @@ export async function importXLSX(data,filename='Таблица'){
    sheet.defaultAlign=alignedColumns.get(0);
    for(const v of Object.values(sheet.columnStyles))delete v.align;
   }
-  for(const row of elements(element(xml,'sheetData'),'row')){
+  const importedRows=elements(element(xml,'sheetData'),'row');
+  const xmlCells=element(xml,'sheetData')?.getElementsByTagNameNS('*','c').length||0;
+  if(xmlCells>MAX_XLSX_RECTANGLE_CELLS+LIMITS.cells)throw Error('XLSX содержит слишком много оформленных ячеек для безопасного импорта');
+  const compact=xmlCells>LIMITS.cells;
+  for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
   }
-  for(const row of elements(element(xml,'sheetData'),'row'))for(const c of elements(row,'c')){const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\d*)$/i.test(ref))continue;
-   if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
-   const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
-   if(type==='d')throw Error('Неподдерживаемый ISO тип даты в XLSX: импорт отменён без потери данных');
-   if(formula){if(formula.getAttribute('t')==='shared'&&!formula.textContent)throw Error('Неподдерживаемая общая формула в '+ref);raw='='+formula.textContent;}
-   else if(type==='inlineStr')raw=Array.from(element(c,'is')?.getElementsByTagNameNS('*','t')||[]).map(n=>n.textContent).join('');
-   else if(type==='s'){const index=+value;if(!Number.isInteger(index)||index<0||index>=shared.length)throw Error('Повреждённая общая строка');raw=shared[index];}
-   else if(type==='b')raw=value==='1'?'TRUE':'FALSE';
-   else if(type==='e')raw=value;
-   else raw=value;
-   if(raw)setCell(sheet,ref,raw);
-   const style=fmt[Number(c.getAttribute('s')||0)]||{};if(Object.keys(style).length)setStyle(sheet,ref,style);
+  const completed=[],active=new Map();let previousRow=0;
+  for(const row of importedRows){
+   const rowIndex=Number(row.getAttribute('r')),candidates=[];
+   if(compact&&(!Number.isInteger(rowIndex)||rowIndex<1||rowIndex>LIMITS.rows||rowIndex<=previousRow))
+    throw Error('XLSX содержит некорректный порядок строк');
+   for(const c of elements(row,'c')){
+    const ref=c.getAttribute('r')||'';if(!/^([A-Z]+)([1-9]\\d*)$/i.test(ref))continue;
+    const p=parseCell(ref);if(!p||p.row>=LIMITS.rows||p.col>=LIMITS.columns)continue;
+    const type=c.getAttribute('t'),value=text(c,'v'),formula=element(c,'f');let raw='';
+    if(type==='d')throw Error('Неподдерживаемый ISO тип даты в XLSX: импорт отменён без потери данных');
+    if(formula){if(formula.getAttribute('t')==='shared'&&!formula.textContent)throw Error('Неподдерживаемая общая формула в '+ref);raw='='+formula.textContent;}
+    else if(type==='inlineStr')raw=Array.from(element(c,'is')?.getElementsByTagNameNS('*','t')||[]).map(n=>n.textContent).join('');
+    else if(type==='s'){const index=+value;if(!Number.isInteger(index)||index<0||index>=shared.length)throw Error('Повреждённая общая строка');raw=shared[index];}
+    else if(type==='b')raw=value==='1'?'TRUE':'FALSE';
+    else if(type==='e')raw=value;
+    else raw=value;
+    const id=Number(c.getAttribute('s')||0),style=fmt[id]||{};
+    if(!compact||raw){
+     if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
+     if(raw)setCell(sheet,ref,raw);
+     if(Object.keys(style).length)setStyle(sheet,ref,style);
+    }else if(Object.keys(style.borders||{}).length||style.border)
+     throw Error('Большие XLSX-области с границами пустых ячеек пока не поддерживаются: импорт отменён');
+    if(compact&&c.hasAttribute('s'))candidates.push({col:p.col,id});
+   }
+   if(compact){
+    candidates.sort((a,b)=>a.col-b.col);
+    const runs=[];let group=null;
+    for(const item of candidates){
+     if(group&&item.col===group.c2+1&&item.id===group.id)group.c2=item.col;
+     else{if(group)runs.push(group);group={c1:item.col,c2:item.col,id:item.id};}
+    }
+    if(group)runs.push(group);
+    const next=new Map();
+    for(const run of runs){
+     const key=run.c1+':'+run.c2+':'+run.id,old=active.get(key);
+     if(old&&old.last===rowIndex-2){old.last=rowIndex-1;next.set(key,old);}
+     else next.set(key,{first:rowIndex-1,last:rowIndex-1,...run});
+    }
+    for(const [key,old] of active)if(!next.has(key))completed.push(old);
+    active.clear();for(const [key,run] of next)active.set(key,run);
+    previousRow=rowIndex;
+   }
   }
-  for(const row of elements(element(xml,'sheetData'),'row')){
+  if(compact){completed.push(...active.values());restoreSparseXLSXStyles(sheet,completed,fmt);}
+  for(const row of importedRows){
    const index=Number(row.getAttribute('r'));
    if(row.getAttribute('hidden')==='1'&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&filterRowVisible(sheet,index-1))setHidden(sheet,'row',index-1,true);
   }
