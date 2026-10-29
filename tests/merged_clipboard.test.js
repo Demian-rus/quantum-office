@@ -22,13 +22,13 @@ test('partial selection and collision are rejected before changing any cells',()
 });
 test('out-of-range and invalid merged clipboard fail atomically',()=>{
  const s=sheet();mergeCells(s,'A1','B2');const clip=copyCells(s,'A1','A1'),before=structuredClone(s);
- assert.throws(()=>pasteCells(s,'CV2000',clip),/пределы/);
+ assert.throws(()=>pasteCells(s,'CV100000',clip),/пределы/);
  const bad=structuredClone(clip);bad.merges[0].r2=99;
  assert.throws(()=>pasteCells(s,'F4',bad),/Повреждённые/);assert.deepEqual(s,before);
 });
 test('formula translation error never partially writes pasted data',()=>{
  const s=sheet();mergeCells(s,'B1','C1');const clip=copyCells(s,'A1','C1'),before=structuredClone(s);
- clip.cells[0][0].value='=A2000';
+ clip.cells[0][0].value='=A100000';
  assert.throws(()=>pasteCells(s,'D2',clip),/пределы/);assert.deepEqual(s,before);
 });
 test('sort and fill reject merged regions atomically',()=>{
