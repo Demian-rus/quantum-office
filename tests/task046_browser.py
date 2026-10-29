@@ -25,7 +25,7 @@ with sync_playwright() as p:
   setCell(s,'Z11','="A1"&$A$1');
   setStyle(s,'A1',{bg:'#ccffcc'});
   setCell(summary,'A1',"='Лист 1'!$A$1+1");
-  setCell(summary,'A2','="A1"&\'Лист 1\'!B1');
+  setCell(summary,'A2',`="A1"&'Лист 1'!B1`);
  }""")
  select('A1:B2')
  page.keyboard.press('Control+x')
