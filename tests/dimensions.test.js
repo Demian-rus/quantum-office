@@ -8,8 +8,8 @@ test('column/row geometry is non-uniform and searchable',()=>{
  const s=currentSheet(newWorkbook());setColumnWidth(s,1,208);setRowHeight(s,2,61);
  assert.equal(columnWidth(s,1),208);assert.equal(rowHeight(s,2),61);
  const {x,y}=gridGeometry(s);
- assert.deepEqual(x.slice(0,4),[54,170,378,494]);
- assert.deepEqual(y.slice(0,5),[31,60,89,150,179]);
+ assert.deepEqual(Array.from(x.slice(0,4)),[54,170,378,494]);
+ assert.deepEqual(Array.from(y.slice(0,5)),[31,60,89,150,179]);
  assert.equal(firstVisibleIndex(x,170),1);
  assert.equal(firstVisibleIndex(y,90),2);
 });
