@@ -299,3 +299,12 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - If an individual Excel cell has an explicit style without a border, it can mask inherited borders using an empty borders map. Unrepresentable huge masks refuse import instead of dropping edges silently.
 - Native QBOOK validation and Excel export include the row and column defaults. Chromium test builds an independent XLSX with column borders, row borders, white fill, explicit no-border cells and merges, then tests computed CSS borders and export via openpyxl.
 - Remaining limits: complete precedence parity for complex Excel files, per-edge line weights/colors, conditional formatting and exact visual comparison to the original XLSX.
+
+
+## TASK 042 — XLSX theme and indexed palette fills (2026-10-29)
+
+- The owner asked to continue after TASK041. The owner workbook XLSX is still not attached, so root causes of any remaining color mismatch cannot be proved by the screenshot alone.
+- Additional confirmed importer limitation: `stylesFromXML` only supported `rgb` attributes. Excel also uses `theme` and `indexed` colors, often for fills, fonts and borders. Unsupported colors silently appeared as default white/black.
+- TASK042 resolves the workbook's real OOXML theme color scheme from its theme relationship and `clrScheme`; crucial SpreadsheetML ordering: theme 0=lt1 (white), 1=dk1 (black), 2=lt2, 3=dk2, 4–9 accent1–accent6. Supports `sysClr.lastClr`, `srgbClr.val`, legacy default indexed palette, optional custom `indexedColors` in styles.xml, and Excel-style luminance tint. A bounded default Office palette is used if the theme part is absent. Converts on input to existing safe #RRGGBB fields: no workbook schema change, no dense cell materialization and no external network.
+- Independent browser test writes themed fills with custom accent1 and tinted variants, indexed fill, theme font/border via openpyxl; replaces real theme1.xml entry to prove no hardcoded accent. It verifies computed CSS, .qbook serialization and Excel export, plus Node tests for theme ordering/indexed/tint. Preserve the user's original source XLSX.
+- Still unsupported: patterned/gradient fills, conditional formatting, alpha/transparency, full custom workbook theme roundtrip (export is resolved static RGB) and all advanced Excel drawing and font features. No pixel-perfect claim for the user's file without the actual XLSX.
