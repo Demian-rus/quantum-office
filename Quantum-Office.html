@@ -243,6 +243,18 @@
 .file-card-rename button{height:32px;padding:5px 10px;background:#e5f2ec;border-radius:5px;font-weight:700;color:#1d6547}
 .file-card-rename button.cancel-rename{background:#eff1f5;color:#536678}
 .file-card-actions button[data-action="rename-book"]{color:#276c53;font-weight:720}
+
+
+/* TASK 032: render frozen panes in stable viewport-anchored layers.
+   A vertical scroll never destroys/recreates the merged header nodes. */
+.grid-frozen-rows,.grid-frozen-cols{position:absolute;overflow:hidden;pointer-events:none;box-sizing:border-box}
+.grid-frozen-rows{top:31px;left:54px;right:0;z-index:24}
+.grid-frozen-cols{top:31px;left:54px;bottom:0;z-index:23}
+.grid-frozen-rows .grid-cell,.grid-frozen-cols .grid-cell{pointer-events:auto}
+.grid-frozen-rows .grid-cell{z-index:1}
+.grid-frozen-cols .grid-cell{z-index:1}
+
+.grid-frozen-rows .grid-cell.frozen-col{z-index:30}
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -643,7 +655,7 @@ function csvDecode(input) {
 const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 const stamp=()=>new Date().toISOString();
 const LIMITS={rows:2000,columns:100,cells:50000,sheets:25};
-function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[]};}
+function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null};}
 function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -725,6 +737,20 @@ function setTypedCell(sheet,ref,input){
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
  else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'date'});
  else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getCell(sheet,ref).style.format||getCell(sheet,ref).style.format==='general'))setStyle(sheet,ref,{format:'time'});
+}
+/** Full-sheet alignment is one property, not 200,000 styled cells.
+ * Existing per-cell alignments are reset so this action truly affects all cells.
+ * Empty style-only entries may be removed without losing any content. */
+function setWholeSheetAlignment(sheet,align){
+ if(!['left','center','right'].includes(align))throw Error('Недопустимое выравнивание всего листа');
+ sheet.defaultAlign=align;
+ for(const [ref,item] of Object.entries(sheet.cells)){
+  if(item.style?.align!==undefined){
+   const style={...item.style};delete style.align;
+   if(!item.value&&!Object.keys(style).length)delete sheet.cells[ref];
+   else sheet.cells[ref]={...item,style};
+  }
+ }
 }
 function setStyle(sheet,ref,patch){if(!validRef(ref))throw Error('Недопустимая ячейка');const key=ref.toUpperCase();const prev=getCell(sheet,key);const style={...prev.style,...patch};for(const [name,value] of Object.entries(patch))if(value===undefined)delete style[name];if(!prev.value&&!Object.keys(style).length)delete sheet.cells[key];else sheet.cells[key]={value:prev.value,style};}
 /** Merge geometry is independent of styling. Covered cells never silently lose content. */
@@ -949,6 +975,7 @@ function validateWorkbook(book){
  let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
+  if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
@@ -1182,7 +1209,9 @@ function copyCells(sheet,start,end,book=null){
  return {start:first,rows,cols,text:valuesTSV(sheet,first,last,book),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
-   return {value:item.value,style:structuredClone(item.style||{})};
+   const effective={...(item.style||{})};
+   if(sheet.defaultAlign&&!effective.align)effective.align=sheet.defaultAlign;
+   return {value:item.value,style:structuredClone(effective)};
   }))};
 }
 
@@ -1380,12 +1409,17 @@ async function importXLSX(data,filename='Таблица'){
     const index=rect.c1+Number(col.getAttribute('colId'));
     const opts=elements(element(col,'filters'),'filter');if(opts.length>=1&&opts.length<=200)setFilterValue(sheet,index,opts.length===1?(opts[0].getAttribute('val')||''):opts.map(n=>n.getAttribute('val')||''));
    }}catch{sheet.autoFilter=null;}}}
+  const alignedColumns=new Map();
   for(const col of elements(element(xml,'cols'),'col')){
    const min=Number(col.getAttribute('min')),max=Number(col.getAttribute('max')),width=Number(col.getAttribute('width'));
    if(!Number.isInteger(min)||!Number.isInteger(max)||min<1||max>LIMITS.columns||max<min)continue;
+   const columnStyleIndex=Number(col.getAttribute('style'));
+   const columnAlign=col.hasAttribute('style')?fmt[columnStyleIndex]?.align:undefined;
+   if(columnAlign)for(let c=min-1;c<max;c++)alignedColumns.set(c,columnAlign);
    const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=48&&px<=520)for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
    if(col.getAttribute('hidden')==='1')for(let c=min-1;c<max;c++)setHidden(sheet,'col',c,true);
   }
+  if(alignedColumns.size===LIMITS.columns&&new Set(alignedColumns.values()).size===1)sheet.defaultAlign=alignedColumns.get(0);
   for(const row of elements(element(xml,'sheetData'),'row')){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
@@ -1414,7 +1448,19 @@ async function importXLSX(data,filename='Таблица'){
  }
  book.activeSheetId=book.sheets[0].id;return validateWorkbook(book);
 }
-function styleCatalog(book){const unique=[{}],lookup=new Map([['{}',0]]);for(const sheet of book.sheets)for(const c of Object.values(sheet.cells)){const s=c.style||{},key=JSON.stringify(Object.keys(s).sort().reduce((x,k)=>(x[k]=s[k],x),{}));if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}}return {unique,lookup,getId:s=>lookup.get(JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{})))||0};}
+function styleCatalog(book){
+ const unique=[{}],lookup=new Map([['{}',0]]);
+ const keyOf=s=>JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{}));
+ const register=s=>{const key=keyOf(s);if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}return lookup.get(key);};
+ for(const sheet of book.sheets){
+  if(sheet.defaultAlign)register({align:sheet.defaultAlign});
+  for(const c of Object.values(sheet.cells)){
+   const style=sheet.defaultAlign?{...c.style,align:c.style?.align||sheet.defaultAlign}:(c.style||{});
+   register(style);
+  }
+ }
+ return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
+}
 function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([['',0]]);const cells=styles.unique.map(s=>{
  const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
  let fillId=0;if(s.bg){if(!fillIds.has(s.bg)){fillIds.set(s.bg,fills.length);fills.push(s.bg);}fillId=fillIds.get(s.bg);}
@@ -1425,15 +1471,17 @@ async function exportXLSX(book){validateWorkbook(book);const zip=new JSZip();con
  const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
-   const styleID=styles.getId(c.style||{});const styleAttr=styleID?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
+   const effectiveStyle=s.defaultAlign?{...c.style,align:c.style?.align||s.defaultAlign}:(c.style||{});
+   const styleID=styles.getId(effectiveStyle);const styleAttr=styleID?` s="${styleID}"`:'';const v=String(c.value??'');let tag='';
    if(v.startsWith('='))tag=`<c r="${ref}"${styleAttr}><f>${xmlEscape(v.slice(1))}</f></c>`;
    else if(v!==''&&/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(v)&&Number.isFinite(Number(v))&&(['date','time','datetime','duration'].includes(c.style?.format)||v.replace(/[^\d]/g,'').replace(/^0+/,'').length<=15))tag=`<c r="${ref}"${styleAttr}><v>${xmlEscape(['date','time','datetime','duration'].includes(c.style?.format)?String(Number(Number(v).toPrecision(15))):v)}</v></c>`;
    else if(v!=='' )tag=`<c r="${ref}"${styleAttr} t="inlineStr"><is><t xml:space="preserve">${xmlEscape(v)}</t></is></c>`;
    else if(styleID)tag=`<c r="${ref}"${styleAttr}/>`;
    if(tag)byRows.get(row).push([ref,tag]);
   }
-  const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{})]);
-  const cols=[...colIndexes].sort((a,b)=>Number(a)-Number(b)).map(index=>{const pixels=s.columnWidths?.[index];return `<col min="${Number(index)+1}" max="${Number(index)+1}"${pixels?` width="${((pixels-5)/7).toFixed(2)}" customWidth="1"`:''}${s.hiddenColumns?.[index]?' hidden="1"':''}/>`;}).join('');
+  const colIndexes=new Set([...Object.keys(s.columnWidths||{}),...Object.keys(s.hiddenColumns||{}),...(s.defaultAlign?Array.from({length:LIMITS.columns},(_,i)=>String(i)):[])]);
+  const columnStyleID=s.defaultAlign?styles.getId({align:s.defaultAlign}):0;
+  const cols=[...colIndexes].sort((a,b)=>Number(a)-Number(b)).map(index=>{const pixels=s.columnWidths?.[index];return `<col min="${Number(index)+1}" max="${Number(index)+1}"${pixels?` width="${((pixels-5)/7).toFixed(2)}" customWidth="1"`:''}${s.hiddenColumns?.[index]?' hidden="1"':''}${columnStyleID?` style="${columnStyleID}"`:''}/>`;}).join('');
   const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
@@ -1683,6 +1731,9 @@ function applyStyle(patch,selection=null){
  // Do not ever apply a stale snapshot to a different document or worksheet.
  if(selection&&(selection.bookId!==book()?.id||selection.sheetId!==sheet()?.id)){status('Исходный лист изменился — выберите цвет заново',true);return;}
  const rect=rectangle(a,b);if(!rect||!sheet())return;
+ if(Object.keys(patch).length===1&&patch.align&&rect.r1===0&&rect.c1===0&&rect.r2===LIMITS.rows-1&&rect.c2===LIMITS.columns-1){
+  transact(()=>setWholeSheetAlignment(sheet(),patch.align));drawGrid();status(`Выравнивание всего листа: ${patch.align==='center'?'по центру':patch.align==='right'?'справа':'слева'}`);return;
+ }
  for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r)){status('Выделение содержит скрытые строки',true);return;}
  const refs=refsBetween(a,b);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
@@ -1912,17 +1963,18 @@ function ribbon(){
  const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}</div><div class="ribbon-controls">${contents}</div>${palettePopup()}${bordersPopup()}${finder}</div>`;
 }
-function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span><span>${LIMITS.rows.toLocaleString('ru-RU')} строк × ${LIMITS.columns} столбцов</span><span>Quantum Sheets / alpha</span></div></div></main>`;}
+function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span><span>${LIMITS.rows.toLocaleString('ru-RU')} строк × ${LIMITS.columns} столбцов</span><span>Quantum Sheets / alpha</span></div></div></main>`;}
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
- if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid();},{passive:true});drawGrid();updateSelectionStats();}}
-function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
+ if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();updateSelectionStats();}}
+let frozenRowScrollX=null;
+function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
  const s=sheet(),{x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
  canvas.style.width=`${x.at(-1)}px`;canvas.style.height=`${y.at(-1)}px`;
  const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop)-2),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight)+2);
  const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-2),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+2);
  const rows=[...new Set([...Array.from({length:lastR-firstR+1},(_,i)=>firstR+i),...Array.from({length:freezeR},(_,i)=>i)])].sort((a,b)=>a-b);
  const cols=[...new Set([...Array.from({length:lastC-firstC+1},(_,i)=>firstC+i),...Array.from({length:freezeC},(_,i)=>i)])].sort((a,b)=>a-b);
- const rect=rectangle(activeCell,rangeEnd),filter=filterRange(s);const {raw,ctx}=recalculator.view(book(),s);let html='';
+ const rect=rectangle(activeCell,rangeEnd),filter=filterRange(s);const {raw,ctx}=recalculator.view(book(),s);let html='',pinnedRowsHtml='',pinnedColsHtml='';
  for(const m of s.merges||[]){const bounds=rectangle(m.from,m.to);if(bounds.r2>=firstR&&bounds.r1<=lastR&&bounds.c2>=firstC&&bounds.c1<=lastC){if(!rows.includes(bounds.r1))rows.push(bounds.r1);if(!cols.includes(bounds.c1))cols.push(bounds.c1);}}
  rows.sort((a,b)=>a-b);cols.sort((a,b)=>a-b);
  for(const r of rows)for(const c of cols){
@@ -1930,11 +1982,15 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
   const ref=cellName(r,c),merged=mergeAt(s,ref);if(merged&&merged.from!==ref)continue;const bounds=merged?rectangle(merged.from,merged.to):null;
   const item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=item.style||{};
   const mergedBorders=bounds?{top:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r1,bounds.c1+j)).style?.borders?.top),bottom:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r2,bounds.c1+j)).style?.borders?.bottom),left:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c1)).style?.borders?.left),right:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c2)).style?.borders?.right)}:style.borders;
-  const val=displayedValue(s,ref,raw,ctx),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
+  const val=displayedValue(s,ref,raw,ctx),align=style.align||s.defaultAlign||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
   const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.border==='thin'?'box-shadow:inset 0 0 0 1px #526d5c;':''}${['left','right','top','bottom'].map(side=>mergedBorders?.[side]?`border-${side}:1px solid #526d5c;`:'').join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
-  html+=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${y[r]+(pinnedR?scrollTop:0)}px;left:${x[c]+(pinnedC?scrollLeft:0)}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
+  const destination=pinnedR?'row':pinnedC?'col':'main';
+  const cellMarkup=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${destination==='row'?y[r]-headerH:destination==='col'?y[r]-headerH-scrollTop:y[r]}px;left:${destination==='row'?x[c]-rowW-(pinnedC?0:scrollLeft):destination==='col'?x[c]-rowW:x[c]}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
+  if(destination==='row')pinnedRowsHtml+=cellMarkup;
+  else if(destination==='col')pinnedColsHtml+=cellMarkup;
+  else html+=cellMarkup;
  }
  const rowOverlay=document.getElementById('grid-row-overlay'),colOverlay=document.getElementById('grid-col-overlay');
  let rowHtml='',colHtml='';
@@ -1946,6 +2002,10 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
  }
  rowOverlay.innerHTML=rowHtml;colOverlay.innerHTML=colHtml;
  canvas.innerHTML=html;
+ const top=document.getElementById('grid-frozen-rows'),left=document.getElementById('grid-frozen-cols');
+ if(top){top.style.height=`${y[freezeR]-headerH}px`;top.style.display=freezeR?'block':'none';
+  if(!fromScroll||frozenRowScrollX!==view.scrollLeft||top.dataset.sheetId!==s.id){top.innerHTML=pinnedRowsHtml;frozenRowScrollX=view.scrollLeft;top.dataset.sheetId=s.id;}}
+ if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
