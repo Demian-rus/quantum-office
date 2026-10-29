@@ -273,3 +273,28 @@
 /* Prior mobile rules hid the last/second status span. Both are essential now. */
 @media(max-width:1100px){.sheet-status span:last-child{display:inline}}
 @media(max-width:730px){.sheet-status span:nth-child(2){display:inline}}
+
+/* TASK050: offline SVG charts float above grid without changing ribbon height. */
+.chart-panel{position:absolute;right:17px;top:164px;width:min(530px,calc(100vw - 34px));max-height:calc(100% - 192px);overflow:auto;z-index:1100;border-radius:12px;background:#fff;border:1px solid #bccbd3;box-shadow:0 16px 48px rgba(20,45,68,.25);color:#294156;font:12px "Segoe UI",Arial,sans-serif}
+.chart-panel-head{height:43px;display:flex;align-items:center;gap:12px;padding:0 13px;background:#f3f7f5;border-bottom:1px solid #dfe8e5}
+.chart-panel-head strong{font-size:14px}.chart-panel-head span{margin-left:auto;color:#718496}
+.chart-panel-head button{background:transparent;padding:5px;font-size:23px;color:#607a88;cursor:pointer}
+.chart-list{display:flex;align-items:center;gap:7px;padding:8px 12px;overflow-x:auto;border-bottom:1px solid #e8eef0}
+.chart-list span{color:#697e90;padding:6px}
+.chart-choice{border:1px solid #cbd9df;border-radius:6px;background:#f6f9fa;color:#486179;padding:7px 11px;font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+.chart-choice.active{border-color:#7db597;background:#e1f2e9;color:#216d4e;font-weight:750}
+.chart-settings{padding:12px 14px 6px}
+.chart-settings label{display:flex;align-items:center;gap:10px;color:#64788a;font-weight:700}
+.chart-settings input{width:100%;min-width:0;flex:1;border:1px solid #c9d5df;border-radius:5px;font:12px "Segoe UI",sans-serif;color:#213e51;padding:7px 9px;background:white}
+.chart-kinds{display:flex;gap:8px;margin:9px 0}
+.chart-kinds button{flex:1;cursor:pointer;background:#f6faf8;border:1px solid #cbd8d2;border-radius:6px;color:#476759;padding:7px 3px;font-size:11px}
+.chart-kinds button.active{background:#dcefe5;border-color:#74af93;color:#196847;font-weight:750}
+.chart-settings small{font-size:10px;color:#85949f}
+.chart-preview{margin:4px 12px 10px;overflow:hidden;min-height:205px;border:1px solid #e5ebf0;border-radius:8px;background:#fff}
+.qo-chart-svg{display:block;width:100%;height:auto;max-height:328px}
+.chart-empty,.chart-error{min-height:205px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;color:#617789;line-height:1.5}
+.chart-error{color:#a23c38;background:#fff8f8}
+.chart-panel-foot{display:flex;align-items:center;gap:12px;padding:4px 14px 12px}
+.chart-panel-foot button{white-space:nowrap;cursor:pointer;color:#9a4545;background:#fff2f2;border:1px solid #efcdcd;padding:7px 10px;border-radius:6px}
+.chart-panel-foot span{font-size:10px;color:#8696a1;line-height:1.4}
+@media(max-width:650px){.chart-panel{top:150px;right:7px;max-height:calc(100% - 169px)}}
