@@ -255,7 +255,7 @@ function applyStyle(patch,selection=null){
   if(refuseHiddenSelection())return;
   try{
    transact(()=>setRectangleStyle(sheet(),a,b,patch));drawGrid();
-   status('Оформление сохранено компактно. Для этого диапазона используйте .qbook: XLSX пока не поддерживается.');
+   status('Оформление сохранено компактно. Экспорт XLSX доступен в пределах 200 000 позиций.');
   }catch(err){status(err.message,true);}
   return;
  }
