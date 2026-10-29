@@ -54,9 +54,19 @@ with sync_playwright() as p:
  assert effective('C50000')['bg']=='#facc15'
  assert page.evaluate('Object.keys(sheet().cells).length')==1
  assert page.evaluate("""()=>{const restored=decodeBook(encodeBook(book()));return getEffectiveStyle(restored.sheets[0],'C50000').color;}""")=='#ef4444'
- safe=page.evaluate("""async()=>{try{await exportXLSX(book());return 'WRONG: silent export';}
-   catch(e){return String(e.message);}}""")
- assert 'XLSX' in safe and '.qbook' in safe,safe
+ # Now exports supported rectangles as real Excel style records and reimports.
+ page.set_default_timeout(120000)
+ roundtrip=page.evaluate("""async()=>{
+  const bytes=await exportXLSX(book()),loaded=await importXLSX(bytes,'roundtrip.xlsx'),s=loaded.sheets[0];
+  return {cells:Object.keys(s.cells).length,
+    text:getCell(s,'B50000').value,
+    above:getEffectiveStyle(s,'C44000'),middle:getEffectiveStyle(s,'C50000'),
+    outside:getEffectiveStyle(s,'D50000'),regions:s.rectangleStyles.length};
+ }""")
+ assert roundtrip['cells']==1 and roundtrip['text']=='Содержание',roundtrip
+ assert roundtrip['middle']['color']=='#ef4444' and roundtrip['middle']['bg']=='#facc15',roundtrip
+ assert roundtrip['above']['bg']=='#facc15' and roundtrip['outside'].get('bg') is None,roundtrip
+ assert 1<=roundtrip['regions']<=256,roundtrip
  assert not errors,errors
- print('PASS TASK037: 180k sparse formatting, overlap, split/reset, undo/redo, native persistence, XLSX safety')
+ print('PASS TASK037: 180k sparse formatting, overlap, split/reset, undo/redo, native persistence, XLSX roundtrip')
  browser.close()
