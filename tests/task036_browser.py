@@ -65,6 +65,16 @@ with sync_playwright() as p:
  }""")
  assert info['n']==2 and info['columns']==100 and info['hasStyle'],info
  assert info['red'] and info['yellow'] and info['sized']<40000,info
+ # Re-import this concrete XLSX and check 100k-row styles survive, not just XML.
+ imported=page.evaluate("""async()=>{const bytes=await exportXLSX(book());
+  const imported=await importXLSX(bytes,'roundtrip.xlsx');
+  const s=imported.sheets[0];
+  return {rows:Object.keys(s.cells).length,value:s.cells.A99999.value,
+    red:getEffectiveStyle(s,'B100000').color,
+    yellow:getEffectiveStyle(s,'C100000').bg,
+    centered:getEffectiveStyle(s,'B70000').align};}""")
+ assert imported=={'rows':2,'value':'Дальняя строка','red':'#ff0000','yellow':'#facc15','centered':'center'},imported
+
  # Resetting whole-column formatting does not delete contents.
  select('B1:B100000')
  page.get_by_role('button',name='Сбросить формат').click()
