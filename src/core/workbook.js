@@ -95,8 +95,8 @@ export function getColumnBaseStyle(sheet,col){
  return style;
 }
 /** Layered style resolution, without allocation for empty virtual rows. */
-export function getEffectiveStyle(sheet,ref){
- const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
+export function getEffectiveStyle(sheet,ref,includeCell=true){
+ const pos=parseCell(ref),own=includeCell?(sheet.cells[String(ref).toUpperCase()]?.style||{}):{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
  const style={...(sheet.defaultStyle||{}),...(column||{})};
  if(pos)for(const layer of sheet.rectangleStyles||[]){
