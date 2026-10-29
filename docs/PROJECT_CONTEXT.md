@@ -43,7 +43,7 @@ The first operational module is **Sheets alpha**. It currently has a launcher an
 - Do not publish/sign user credentials, signing keys, private samples or personally identifiable workbook content.
 - Document new limits and limitations. Distinguish implemented, in-progress and intended features. Maintain this file as a persistent handoff.
 
-## Current work item — spreadsheet clipboard, header selection and icons
+## Previously validated work item — spreadsheet clipboard, header selection and icons
 
 Target: native-feeling copy/paste on a selected grid cell; a private in-memory clipboard fallback when `navigator.clipboard` is unavailable; preserve formulas and style within the app; allow external TSV paste. Use nonselectable shell chrome and consistent small inline vector icons. Keep compact measurements and `:focus-visible`. Tests include an actual Chromium Ctrl+C → click different cell → Ctrl+V round-trip without double-clicking, formula shifting and no header text selection. No new Sheets features should regress this behavior.
 
@@ -145,3 +145,15 @@ Target: native-feeling copy/paste on a selected grid cell; a private in-memory c
 - Recalculation on grid render follows current workbook content; cycle detection uses sheet-qualified cell identities. Missing sheets show `#REF!` and ambiguous case-insensitive sheet names are rejected on validation. Raw formula text survives `.qbook`/`.xlsx` export.
 - IMPORTANT: shifting row/column references **from other worksheets** after structural changes, and editing sheet names referenced elsewhere, are NOT yet implemented. UI prevents structure editing, rename, and delete of a sheet targeted by formulas in other sheets rather than corrupt references. Explicitly remove those formulas before changing sheet layout; a later structural rewrite engine is needed.
 - Cross-sheet formulas are a bounded subset; no 3D references (`Sheet1:Sheet3!A1`), external files, structured table references, name ranges or dependency-graph caching yet. Tested in `formula_sheets.test.js` and Chromium `formula_sheets_browser.py`. Large interlinked books can be slow until dependency tracking exists.
+
+
+## TASK 027 — bounded dates, times and calendar calculations (2026-10-29)
+
+- Date/time cells use Excel-compatible **1900-system serial numbers** stored as decimal strings plus cell style.format; actual dates are not plain display strings. YYYY-MM-DD, DD.MM.YYYY, optional time and HH:MM[:SS] typed by the user are recognized only when unambiguous; invalid input is not silently normalized. [27]:15 is explicitly a duration.
+- Supported display formats: date → ДД.ММ.ГГГГ, time → ЧЧ:ММ, datetime → both, duration → accumulated hours and minutes. Use the compact Главная > Число buttons. To calculate lesson duration, type e.g. 09:15 and 11:45, set result formula =B2-B1, then select the duration format to show 2:30.
+- Formulas: DATE, TODAY, YEAR, MONTH, DAY, TIME, HOUR, MINUTE. DATE accepts bounded integer month/day overflow and normalizes it like Excel; directly typed calendar dates validate actual Gregorian dates. TODAY uses the device's local calendar date at calculation time, not an always-on timer or dependency graph. Underlying formulas evaluate numeric serial values; YEAR/MONTH/DAY of a date string (instead of a numeric serial) are not automatically coerced.
+- Excel's historical fictitious 1900-02-29 is represented when a sheet contains serial 60, for compatibility, but it is not generated from a real Gregorian date. The application explicitly rejects XLSX with workbook date system 1904 and OOXML t=d ISO dates rather than importing with silently shifted/incorrect values.
+- XLSX export uses OOXML numeric cells and standard built-in number formats (14 date, 20 time, 22 datetime, 46 duration), and preserves formula text; import maps common built-in and basic custom calendar/clock formatting. This is NOT full Excel number formatting support and does not imply lossless XLSX round-trip. Preserve original files and .qbook/.qbackup copies.
+- .qbook stores serial values and allowed formatting tokens unchanged; pre-existing books still validate. The app's browser localStorage is not durable local-file storage.
+- Required acceptance: npm test (including tests/temporal.test.js), npm run build, Chromium tests/temporal_browser.py with independent openpyxl checks plus all prior browser suites. Do not merge PR #27 before green CI. Desktop installers remain unimplemented.
+- Next main engineering priority: safe and efficient calculation dependency graph, volatile function handling, further date/time and formula compatibility. Avoid refactoring unrelated spreadsheet UI.
