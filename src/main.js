@@ -1,4 +1,4 @@
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,getEffectiveStyle,invalidateGridGeometry } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
@@ -190,7 +190,14 @@ function applyStyle(patch,selection=null){
   }catch(err){status(err.message,true);}
   return;
  }
- if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Слишком большой диапазон для нанесения нового оформления (максимум 10 000 ячеек)',true);return;}
+ if((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){
+  if(refuseHiddenSelection())return;
+  try{
+   transact(()=>setRectangleStyle(sheet(),a,b,patch));drawGrid();
+   status('Оформление сохранено компактно. Для этого диапазона используйте .qbook: XLSX пока не поддерживается.');
+  }catch(err){status(err.message,true);}
+  return;
+ }
  for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r)){status('Выделение содержит скрытые строки',true);return;}
  const refs=refsBetween(a,b);
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
@@ -228,7 +235,15 @@ function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;con
   }catch(err){status(err.message,true);}
   return;
  }
- const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
+ const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
+ if(size>10000){
+  try{
+   transact(()=>setRectangleStyle(sheet(),activeCell,rangeEnd,{wrap:next}));drawGrid();
+   status('Перенос текста сохранён компактно. Для этого диапазона используйте .qbook.');
+  }catch(err){status(err.message,true);}
+  return;
+ }
+ const refs=refsBetween(activeCell,rangeEnd);
  const {raw,ctx}=recalculator.view(book(),sheet());
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,{wrap:next});
   // Expand rows only when needed; never shrink a user-defined custom height.

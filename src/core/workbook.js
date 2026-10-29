@@ -4,7 +4,7 @@ export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{}};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -98,14 +98,56 @@ export function getColumnBaseStyle(sheet,col){
 export function getEffectiveStyle(sheet,ref){
  const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
- const style={...(sheet.defaultStyle||{}),...(column||{}),...own};
- const align=Object.hasOwn(own,'align')?own.align:Object.hasOwn(column||{},'align')?column.align:sheet.defaultStyle?.align??sheet.defaultAlign;
+ const style={...(sheet.defaultStyle||{}),...(column||{})};
+ if(pos)for(const layer of sheet.rectangleStyles||[]){
+  const a=rectangle(layer.from,layer.to);
+  if(pos.row>=a.r1&&pos.row<=a.r2&&pos.col>=a.c1&&pos.col<=a.c2)Object.assign(style,layer.style);
+ }
+ Object.assign(style,own);
+ const align=Object.hasOwn(style,'align')?style.align:sheet.defaultAlign;
  if(align!==undefined&&align!==null)style.align=align;
  else delete style.align;
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
 const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
+export const MAX_RECTANGLE_STYLES=256;
+const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
+/** Pure subtraction, splits a rectangle into up to four untouched fragments. */
+function subtractRectangleStyles(sheet,cut,property=null){
+ const layers=[];let changed=0;
+ const add=(a,style)=>{if(a.r1<=a.r2&&a.c1<=a.c2)layers.push({from:cellName(a.r1,a.c1),to:cellName(a.r2,a.c2),style:{...style}});};
+ for(const layer of sheet.rectangleStyles||[]){
+  const a=rectangle(layer.from,layer.to);
+  if(!intersects(a,cut)||(property!==null&&!Object.hasOwn(layer.style,property))){layers.push(layer);continue;}
+  changed++;
+  const x={r1:Math.max(a.r1,cut.r1),r2:Math.min(a.r2,cut.r2),c1:Math.max(a.c1,cut.c1),c2:Math.min(a.c2,cut.c2)};
+  if(a.r1<x.r1)add({...a,r2:x.r1-1},layer.style);
+  if(x.r2<a.r2)add({...a,r1:x.r2+1},layer.style);
+  if(a.c1<x.c1)add({r1:x.r1,r2:x.r2,c1:a.c1,c2:x.c1-1},layer.style);
+  if(x.c2<a.c2)add({r1:x.r1,r2:x.r2,c1:x.c2+1,c2:a.c2},layer.style);
+ }
+ if(layers.length>MAX_RECTANGLE_STYLES)throw Error('Слишком много участков оформления');
+ return {layers,changed};
+}
+export function setRectangleStyle(sheet,from,to,patch){
+ const a=rectangle(from,to),pairs=Object.entries(patch||{});
+ if(!a||!validRef(from)||!validRef(to)||pairs.length!==1||!bulkStyleProps.has(pairs[0][0]))throw Error('Недопустимое оформление диапазона');
+ const [prop,raw]=pairs[0],value=raw===undefined?null:raw;
+ if(value!==null&&((prop==='align'&&!['left','center','right'].includes(value))||
+  (['bg','color'].includes(prop)&&!(typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value)))||
+  (['bold','italic','wrap'].includes(prop)&&typeof value!=='boolean')||
+  (prop==='format'&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(value))))
+  throw Error('Недопустимое оформление диапазона');
+ if((sheet.rectangleStyles||[]).length>=MAX_RECTANGLE_STYLES)throw Error('Слишком много участков оформления');
+ const next=[...(sheet.rectangleStyles||[]),{from:cellName(a.r1,a.c1),to:cellName(a.r2,a.c2),style:{[prop]:value}}];
+ for(const [ref,item] of Object.entries(sheet.cells)){
+  const p=parseCell(ref);if(!p||p.row<a.r1||p.row>a.r2||p.col<a.c1||p.col>a.c2||!Object.hasOwn(item.style||{},prop))continue;
+  const style={...item.style};delete style[prop];
+  if(!item.value&&!Object.keys(style).length)delete sheet.cells[ref];else sheet.cells[ref]={...item,style};
+ }
+ sheet.rectangleStyles=next;
+}
 /** Format full-height columns or entire sheet in O(saved cells + 100 columns).
  * Per-cell overrides for the changed property are cleared, other styles kept. */
 export function setBulkColumnStyle(sheet,from,to,patch){
@@ -119,6 +161,7 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  if(['bold','italic','wrap'].includes(prop)&&value!==undefined&&typeof value!=='boolean')throw Error('Недопустимое оформление');
  if(prop==='format'&&value!==undefined&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(value))throw Error('Недопустимый числовой формат');
  const full=area.c1===0&&area.c2===LIMITS.columns-1;
+ const remainingRectangleStyles=subtractRectangleStyles(sheet,area,prop).layers;
  const next={...(sheet.defaultStyle||{})},columns={...(sheet.columnStyles||{})};
  if(full){
   if(prop==='align'){sheet.defaultAlign=value??null;delete next.align;}
@@ -144,7 +187,7 @@ export function setBulkColumnStyle(sheet,from,to,patch){
   if(!cell.value&&!Object.keys(style).length)delete sheet.cells[ref];
   else sheet.cells[ref]={...cell,style};
  }
- sheet.defaultStyle=next;sheet.columnStyles=columns;
+ sheet.defaultStyle=next;sheet.columnStyles=columns;sheet.rectangleStyles=remainingRectangleStyles;
 }
 
 export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
@@ -162,6 +205,7 @@ export function setTypedCell(sheet,ref,input){
  * Empty style-only entries may be removed without losing any content. */
 export function setWholeSheetAlignment(sheet,align){
  if(!['left','center','right'].includes(align))throw Error('Недопустимое выравнивание всего листа');
+ sheet.rectangleStyles=subtractRectangleStyles(sheet,{r1:0,r2:LIMITS.rows-1,c1:0,c2:LIMITS.columns-1},'align').layers;
  sheet.defaultAlign=align;
  if(sheet.defaultStyle?.align!==undefined){const next={...sheet.defaultStyle};delete next.align;sheet.defaultStyle=next;}
  if(sheet.columnStyles)for(const col of Object.keys(sheet.columnStyles)){
@@ -373,6 +417,7 @@ export function sortSelectedRows(sheet,start,end,direction='asc'){
  const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
  if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
+ if((sheet.rectangleStyles||[]).length)throw Error('Сортировка с крупными диапазонами оформления пока недоступна');
  if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
  const rows=[];
  for(let r=rect.r1;r<=rect.r2;r++){
@@ -451,6 +496,16 @@ export function validateWorkbook(book){
     return typeof v==='boolean';
    });
   if(sheet.defaultStyle!==undefined&&!validSparseStyle(sheet.defaultStyle))throw Error('Повреждено оформление листа');
+  if(sheet.rectangleStyles!==undefined){
+   if(!Array.isArray(sheet.rectangleStyles)||sheet.rectangleStyles.length>MAX_RECTANGLE_STYLES)throw Error('Повреждены стили диапазонов');
+   for(const layer of sheet.rectangleStyles){
+    const r=layer&&typeof layer.from==='string'&&typeof layer.to==='string'?rectangle(layer.from,layer.to):null;
+    if(!r||!validRef(layer.from)||!validRef(layer.to)||
+     layer.from!==cellName(r.r1,r.c1)||layer.to!==cellName(r.r2,r.c2)||
+     !validSparseStyle(layer.style,true)||Object.keys(layer.style).length!==1)
+     throw Error('Повреждено оформление диапазона');
+   }
+  }
   if(sheet.columnStyles!==undefined){
    const styles=sheet.columnStyles;
    if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>LIMITS.columns||
@@ -512,7 +567,9 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
 export function clearFormatting(sheet,from,to,inspectOnly=false){
  const {area,entries}=sparseSelection(sheet,from,to);
  const all=area.r1===0&&area.c1===0&&area.r2===LIMITS.rows-1&&area.c2===LIMITS.columns-1;
+ const remainingRectangleStyles=subtractRectangleStyles(sheet,area);
  let count=all&&(sheet.defaultAlign!=null||Object.keys(sheet.defaultStyle||{}).length>0)?1:0;
+ count+=remainingRectangleStyles.changed;
  const columns=area.r1===0&&area.r2===LIMITS.rows-1?Object.keys(sheet.columnStyles||{}).filter(c=>+c>=area.c1&&+c<=area.c2):[];
  count+=columns.length;
  for(const [ref,entry] of entries){
@@ -524,6 +581,7 @@ export function clearFormatting(sheet,from,to,inspectOnly=false){
   }
  }
  if(!inspectOnly){
+  sheet.rectangleStyles=remainingRectangleStyles.layers;
   if(all){sheet.defaultAlign=null;sheet.defaultStyle={};}
   if(columns.length){const next={...(sheet.columnStyles||{})};for(const c of columns)delete next[c];sheet.columnStyles=next;}
  }
