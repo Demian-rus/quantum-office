@@ -399,7 +399,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   const destination=pinnedR?'row':pinnedC?'col':'main';
-  const cellMarkup=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${destination==='row'?y[r]-headerH:destination==='col'?y[r]-headerH-scrollTop:y[r]}px;left:${destination==='row'?x[c]-rowW-scrollLeft:destination==='col'?x[c]-rowW:x[c]}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
+  const cellMarkup=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${destination==='row'?y[r]-headerH:destination==='col'?y[r]-headerH-scrollTop:y[r]}px;left:${destination==='row'?x[c]-rowW-(pinnedC?0:scrollLeft):destination==='col'?x[c]-rowW:x[c]}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
   if(destination==='row')pinnedRowsHtml+=cellMarkup;
   else if(destination==='col')pinnedColsHtml+=cellMarkup;
   else html+=cellMarkup;
