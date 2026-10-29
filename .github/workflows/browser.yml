@@ -51,3 +51,4 @@ jobs:
       - run: python tests/task041_browser.py
       - run: python tests/task042_browser.py
       - run: python tests/task043_browser.py
+      - run: python tests/task044_browser.py
