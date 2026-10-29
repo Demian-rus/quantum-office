@@ -213,8 +213,11 @@ export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evalua
 export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
   if(['date','time','datetime','duration'].includes(cell.style?.format)&& (typeof result==='number'||typeof result==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(result)))return formatTemporal(Number(result),cell.style.format);
-  if(typeof result!=='number')return String(result);
-  const n=Number.isFinite(result)?result:0;
+  // Directly entered numeric cells are stored as strings. Number formatting must
+  // still apply without changing their raw values, clipboard or formula semantics.
+  const fmt=cell.style?.format,typedNumeric=['currency','percent','integer'].includes(fmt)&&typeof result==='string'&&/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(result);
+  if(typeof result!=='number'&&!typedNumeric)return String(result);
+  const n=Number.isFinite(Number(result))?Number(result):0;
   if(['date','time','datetime','duration'].includes(cell.style?.format))return formatTemporal(n,cell.style.format);
   if(cell.style?.format==='currency')return new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',maximumFractionDigits:2}).format(n);
   if(cell.style?.format==='percent')return new Intl.NumberFormat('ru-RU',{style:'percent',maximumFractionDigits:2}).format(n);
