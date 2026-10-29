@@ -519,7 +519,7 @@ export function validateWorkbook(book){
   for(const [name,max] of [['columnStyles',LIMITS.columns],['rowStyles',LIMITS.rows]]){
    const styles=sheet[name]||{};
    if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>max||
-      Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
+      Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
     throw Error('Повреждены стили строк или столбцов');
   }
   for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
