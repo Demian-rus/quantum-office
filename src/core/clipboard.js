@@ -1,6 +1,7 @@
 /** In-app clipboard: preserves formulas, styles and complete merged regions.
  * All edits are prevalidated before mutating a sheet; no eval or network. */
 import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,valuesTSV,mergeAt,mergeCells,validRef,getEffectiveStyle} from './workbook.js';
+import {rebaseMovedFormula} from './reference-move.js';
 
 const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
 const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -66,31 +67,8 @@ export function pasteCells(sheet,target,clip){
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
 }
 
-/** A cut is a deferred same-sheet move, NEVER deletion on Ctrl+X.
- * Sheet and source must still match their clipboard snapshot at paste time.
- * Moving data referenced by formulas is currently refused: the full AST
- * reference-rebasing semantics are not implemented, and silent damage to
- * dependent calculations would be worse than an explicit limitation. */
-function referencedByFormula(book,sourceSheet,region){
- if(!book?.sheets)return false;
- const targetName=sourceSheet.name.toLocaleUpperCase('ru-RU');
- const regex=/(?<![A-Za-z0-9_.$])(?:(?:'((?:[^']|'')+)'|([A-Za-z_А-ЯЁ][A-Za-z0-9_.А-ЯЁ]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![A-Za-z0-9_.])/gi;
- for(const sh of book.sheets)for(const cell of Object.values(sh.cells||{})){
-  if(!cell?.value?.startsWith('='))continue;
-  const expression=cell.value.replace(/"(?:[^"]|"")*"/g,'""');
-  regex.lastIndex=0;
-  for(const match of expression.matchAll(regex)){
-   const explicit=match[1]!==undefined?match[1].replaceAll("''","'"):match[2];
-   const addressed=(explicit||sh.name).toLocaleUpperCase('ru-RU');
-   if(addressed!==targetName)continue;
-   const start=parseCell(match[3].replaceAll('$','')),end=parseCell((match[4]||match[3]).replaceAll('$',''));
-   if(!start||!end)continue;
-   const refRect={r1:Math.min(start.row,end.row),c1:Math.min(start.col,end.col),r2:Math.max(start.row,end.row),c2:Math.max(start.col,end.col)};
-   if(overlaps(region,refRect))return true;
-  }
- }
- return false;
-}
+/** Cut paste is transactional. Dependent references are adjusted on staged
+ * workbook data only after the entire move geometry has been validated. */
 export function moveCells(book,sheet,target,cutClip){
  if(!book||!sheet||!cutClip||cutClip.mode!=='cut'||cutClip.bookId!==book.id||cutClip.sheetId!==sheet.id)
   throw Error('Вырезанный диапазон можно перенести только в исходный лист');
@@ -113,8 +91,6 @@ export function moveCells(book,sheet,target,cutClip){
  if(JSON.stringify(live.cells)!==JSON.stringify(cutClip.cells)||JSON.stringify(live.merges)!==JSON.stringify(cutClip.merges))
   throw Error('Исходные ячейки изменились после вырезания. Вырежьте диапазон заново');
  if(src.r1===dst.r1&&src.c1===dst.c1)return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2),unchanged:true};
- if(referencedByFormula(book,sheet,src))
-  throw Error('На перемещаемые ячейки ссылаются формулы. Перенос без перепривязки ссылок запрещён; используйте копирование');
  const draft=structuredClone(sheet);
  const fullMerges=(sheet.merges||[]).filter(m=>inside(rectangle(m.from,m.to),src));
  draft.merges=(draft.merges||[]).filter(m=>!fullMerges.some(source=>source.from===m.from&&source.to===m.to));
@@ -140,6 +116,24 @@ export function moveCells(book,sheet,target,cutClip){
  const oldCount=Object.keys(sheet.cells).length,nextCount=Object.keys(draft.cells).length;
  const total=book.sheets.reduce((n,sh)=>n+Object.keys(sh.cells).length,0)-oldCount+nextCount;
  if(total>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ // Stage dependent formulas on every sheet, including formulas physically
+ // relocated within the moved source. A failed range rewrite never touches
+ // another sheet, the source, or the target.
+ const dr=dst.r1-src.r1,dc=dst.c1-src.c1,pending=[];
+ for(const current of book.sheets){
+  const cells=current===sheet?draft.cells:current.cells;
+  for(const [ref,item] of Object.entries(cells)){
+   if(!item.value?.startsWith('='))continue;
+   const rewritten=rebaseMovedFormula(item.value,current.name,sheet.name,src,dr,dc);
+   if(rewritten!==item.value)pending.push({current,ref,value:rewritten});
+  }
+ }
+ // Commit only after every formula has been safely checked. There are no
+ // external awaits between this point and completion of the transaction.
  sheet.cells=draft.cells;sheet.merges=draft.merges;
+ for(const entry of pending){
+  const destination=entry.current===sheet?sheet:entry.current;
+  destination.cells[entry.ref].value=entry.value;
+ }
  return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2)};
 }

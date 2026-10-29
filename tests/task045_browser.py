@@ -68,15 +68,16 @@ with sync_playwright() as p:
  page.keyboard.press('Control+z')
  assert page.evaluate("sheet().merges.some(m=>m.from==='F10'&&m.to==='G10')")
  assert value('F10')=='MERGED'
- # A dependent formula outside the cut source must be protected.
+ # A dependent direct formula follows the moved source cell.
  page.evaluate("""()=>{
-  setCell(sheet(),'A20','value');
+  setCell(sheet(),'A20','5');
   setCell(sheet(),'Z20','=A20*2');
  }""")
  select('A20');page.keyboard.press('Control+x')
  select('E20');page.keyboard.press('Control+v')
- assert value('A20')=='value' and value('E20')==''
- assert 'ссылаются формулы' in page.locator('#toast').inner_text()
+ page.wait_for_function("getCell(sheet(),'E20').value==='5'")
+ assert value('A20')=='' and value('E20')=='5'
+ assert value('Z20')=='=E20*2'
  assert not errors,errors
- print('PASS TASK045: deferred cut, atomic paste, overlap, undo redo, stale guard, merge, dependent formulas')
+ print('PASS TASK045: deferred cut, atomic paste, overlap, undo redo, stale guard, merge, reference rebasing')
  browser.close()
