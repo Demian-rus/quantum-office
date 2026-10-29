@@ -1,4 +1,4 @@
-import { cellName,parseCell,colLabel,evaluateCell,csvEncode,csvDecode } from './formulas.js';
+import { cellName,parseCell,colLabel,evaluateCell,createCalculationSession,csvEncode,csvDecode } from './formulas.js';
 import {formatTemporal,parseTemporalInput} from './dates.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
@@ -189,7 +189,7 @@ export function formulaContext(book,sheet,map=rawMap(sheet)){
    if(sheets.has(name))throw Error('Неоднозначное название листа');
    sheets.set(name,{name:part.name,cells:part.id===sheet.id?map:rawMap(part)});
  }
- return {sheetName:sheet.name,sheets};
+ return {sheetName:sheet.name,sheets,calculation:createCalculationSession()};
 }
 export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evaluateCell(ref,map,new Set(),context);}
 export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
