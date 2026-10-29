@@ -30,6 +30,7 @@ with sync_playwright() as p:
  # Whole-sheet alignment must work without the former 10k limit, preserve data,
  # display on an empty cell and roundtrip through undo.
  page.get_by_role('button',name='Выделить весь лист').click()
+ page.locator('#grid-scroll').evaluate('(el)=>{el.scrollTop=690;el.dispatchEvent(new Event("scroll"));}')
  assert page.locator('#name-box').input_value()=='A1:CV2000'
  before=page.evaluate('Object.keys(sheet().cells).length')
  page.get_by_role('button',name='По центру').click()
