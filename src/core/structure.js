@@ -29,6 +29,7 @@ export function changeSheetStructure(sheet,axis,mode,index,count=1){
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
  if(!Number.isInteger(index)||!Number.isInteger(count)||count<1||count>MAX_BATCH||index<0||index+count>limit)throw Error('Диапазон вне таблицы или больше 100');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
+ if((sheet.rectangleStyles||[]).length)throw Error('Сначала сбросьте крупные области оформления: перенос границ при вставке и удалении пока не поддерживается');
  // Validate the projected geometry before mutating any cell. Insertions may
  // shift or expand a merge; non-anchor deletions may shrink it.
  const newMerges=[];const last=index+count-1;
