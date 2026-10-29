@@ -150,7 +150,7 @@ function palettePopup(){if(!activePalette)return '';
 }
 function bordersPopup(){if(!borderMenuOpen)return '';
  const items=[['outline','Внешние границы','borderOutline'],['all','Все границы','borderAll'],['bottom','Нижняя граница','borderBottom'],['top','Верхняя граница','borderTop'],['left','Левая граница','borderLeft'],['right','Правая граница','borderRight'],['none','Без границ','borderNone']];
- return `<div class="format-popover border-popover" role="menu" aria-label="Варианты границ"><div class="popup-header"><strong>Границы выделения</strong><button data-action="popup-close" aria-label="Закрыть">×</button></div>${items.map(([id,label,icon])=>`<button class="border-choice" role="menuitem" data-action="border-mode" data-value="${id}"><span class="border-glyph">${toolIcon(id==='none'?'border-none':id==='all'?'border-all':'border-'+id,'')}</span>${label}</button>`).join('')}</div>`;
+ return `<div class="format-popover border-popover" role="menu" aria-label="Варианты границ"><div class="popup-header"><strong>Границы выделения</strong><button data-action="popup-close" aria-label="Закрыть">×</button></div><div class="border-hint">Рамка вокруг диапазона не объединяет ячейки</div>${items.map(([id,label,icon])=>`<button class="border-choice" role="menuitem" data-action="border-mode" data-value="${id}"><span class="border-glyph">${toolIcon(id==='none'?'border-none':id==='all'?'border-all':'border-'+id,'')}</span>${label}</button>`).join('')}</div>`;
 }
 function toggleWrap(){const next=!getCell(sheet(),activeCell).style?.wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
  const refs=refsBetween(activeCell,rangeEnd);if(refs.length>10000){status('Слишком большой диапазон',true);return;}
@@ -327,7 +327,7 @@ function toolIcon(action,original,extra=''){
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all']);
+ const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
@@ -371,7 +371,7 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
   const item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style=item.style||{};
   const mergedBorders=bounds?{top:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r1,bounds.c1+j)).style?.borders?.top),bottom:[...Array(bounds.c2-bounds.c1+1)].some((_,j)=>getCell(s,cellName(bounds.r2,bounds.c1+j)).style?.borders?.bottom),left:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c1)).style?.borders?.left),right:[...Array(bounds.r2-bounds.r1+1)].some((_,j)=>getCell(s,cellName(bounds.r1+j,bounds.c2)).style?.borders?.right)}:style.borders;
   const val=displayedValue(s,ref,raw,ctx),align=style.align||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.border==='thin'?'box-shadow:inset 0 0 0 1px #526d5c;':''}${['left','right','top','bottom'].map(side=>mergedBorders?.[side]?`border-${side}:1px solid #526d5c;`:'').join('')}text-align:${align};`;
+  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.border==='thin'?'box-shadow:inset 0 0 0 1px #526d5c;':''}${['left','right','top','bottom'].map(side=>mergedBorders?.[side]?`border-${side}:1px solid #526d5c;`:'').join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   html+=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${y[r]+(pinnedR?scrollTop:0)}px;left:${x[c]+(pinnedC?scrollLeft:0)}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
@@ -379,10 +379,10 @@ function drawGrid(){if(page!=='sheet'||!sheet())return;const view=document.getEl
  const rowOverlay=document.getElementById('grid-row-overlay'),colOverlay=document.getElementById('grid-col-overlay');
  let rowHtml='',colHtml='';
  for(const r of rows){if(!rowVisible(s,r))continue;const pinned=r<freezeR;
-  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${rect.r1<=r&&r<=rect.r2?'header-selected':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
+  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${rect.r1<=r&&r<=rect.r2?'header-selected':''} ${parseCell(activeCell)?.row===r?'header-active':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
  }
  for(const c of cols){if(!columnVisible(s,c))continue;const pinned=c<freezeC;
-  colHtml+=`<div class="colhead ${pinned?'frozen-col':''} ${rect.c1<=c&&c<=rect.c2?'header-selected':''}" data-action="select-col" data-index="${c}" title="Выделить столбец ${cellName(0,c).replace(/\d+$/,'')}" style="top:0;left:${x[c]-rowW-(pinned?0:view.scrollLeft)}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
+  colHtml+=`<div class="colhead ${pinned?'frozen-col':''} ${rect.c1<=c&&c<=rect.c2?'header-selected':''} ${parseCell(activeCell)?.col===c?'header-active':''}" data-action="select-col" data-index="${c}" title="Выделить столбец ${cellName(0,c).replace(/\d+$/,'')}" style="top:0;left:${x[c]-rowW-(pinned?0:view.scrollLeft)}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
  }
  rowOverlay.innerHTML=rowHtml;colOverlay.innerHTML=colHtml;
  canvas.innerHTML=html;
@@ -464,11 +464,11 @@ window.addEventListener('paste',e=>{
 });
 // Copying in other windows invalidates a stale private clipboard; external paste stays native.
 window.addEventListener('blur',()=>{internalClipboard=null;});
-window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t=e.target;const form=t?.matches('input,textarea,[contenteditable]');
+window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;const t=e.target;const form=t?.matches('input,textarea,[contenteditable]');const textEdit=form&&!t?.matches('#name-box,input[type=color]');
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='f'){e.preventDefault();showSearch();return;}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();saveBook();return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!form){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
- if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'&&!form){e.preventDefault();redo();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!textEdit){e.preventDefault();if(e.shiftKey)redo();else undo();return;}
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'&&!textEdit){e.preventDefault();redo();return;}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'&&!form){e.preventDefault();fillSelected('down');return;}
  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='r'&&!form){e.preventDefault();fillSelected('right');return;}
  if(form)return;
