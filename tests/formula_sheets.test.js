@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {newWorkbook,newSheet,currentSheet,setCell,getCell,rawMap,formulaContext,resultOf,displayedValue,validateWorkbook,referencedFromOtherSheet} from '../src/core/workbook.js';
+import {newWorkbook,newSheet,currentSheet,setCell,getCell,rawMap,formulaContext,resultOf,displayedValue,validateWorkbook,referencedFromOtherSheet,exportCSV} from '../src/core/workbook.js';
 import {encodeBook,decodeBook} from '../src/core/store.js';
 import {exportXLSX} from '../src/core/xlsx.js';
+import {copyCells} from '../src/core/clipboard.js';
 
 const make=()=>{const book=newWorkbook('График'),schedule=currentSheet(book);schedule.name='График';const finance=newSheet('Учёт оплаты');book.sheets.push(finance);return {book,schedule,finance};};
 function calc(book,sheet,ref){const map=rawMap(sheet);return resultOf(sheet,ref,map,formulaContext(book,sheet,map));}
@@ -44,4 +45,10 @@ test('external dependencies are detected to guard rename / remove / structure ed
  const {book,schedule,finance}=make();setCell(schedule,'A1',"=SUM('Учёт оплаты'!B1:B9)");
  assert.equal(referencedFromOtherSheet(book,finance),true);assert.equal(referencedFromOtherSheet(book,schedule),false);
  setCell(schedule,'A1','нормально');assert.equal(referencedFromOtherSheet(book,finance),false);
+});
+
+test('CSV and external clipboard text use evaluated values from other sheets',()=>{
+ const {book,schedule,finance}=make();setCell(finance,'A1','50');setCell(schedule,'B2',"='Учёт оплаты'!A1*2");
+ assert.equal(copyCells(schedule,'B2','B2',book).text,'100');
+ assert.ok(exportCSV(schedule,book).includes('100'));
 });

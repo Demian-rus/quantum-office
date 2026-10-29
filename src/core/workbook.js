@@ -191,8 +191,8 @@ export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   if(cell.style?.format==='integer')return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:0}).format(n);
   return String(n);
 }
-export function valuesTSV(sheet,a,b){const rect=rectangle(a,b);if(!rect)return '';
- const map=rawMap(sheet),rows=[];for(let r=rect.r1;r<=rect.r2;r++){const row=[];for(let c=rect.c1;c<=rect.c2;c++)row.push(String(resultOf(sheet,cellName(r,c),map)));rows.push(row.join('\t'));}return rows.join('\n');}
+export function valuesTSV(sheet,a,b,book=null){const rect=rectangle(a,b);if(!rect)return '';
+ const map=rawMap(sheet),ctx=formulaContext(book,sheet,map),rows=[];for(let r=rect.r1;r<=rect.r2;r++){const row=[];for(let c=rect.c1;c<=rect.c2;c++)row.push(String(resultOf(sheet,cellName(r,c),map,ctx)));rows.push(row.join('\t'));}return rows.join('\n');}
 export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!validRef(start))throw Error('Недопустимая ячейка');
  const rows=String(text).replace(/\r\n?/g,'\n').replace(/\n$/,'').split('\n').map(line=>line.split('\t'));
  const maxR=Math.min(LIMITS.rows-at.row,rows.length),maxC=Math.min(LIMITS.columns-at.col,Math.max(...rows.map(r=>r.length)));
@@ -268,8 +268,8 @@ export function importCSV(text,name='Импорт CSV'){
  for(let r=0;r<grid.length;r++){if(grid[r].length>LIMITS.columns)throw Error('Слишком много столбцов');for(let c=0;c<grid[r].length;c++){if(grid[r][c])setCell(sheet,cellName(r,c),grid[r][c]);}}
  return book;
 }
-export function exportCSV(sheet){let maxR=0,maxC=0;for(const key of Object.keys(sheet.cells)){const p=parseCell(key);if(p){maxR=Math.max(maxR,p.row);maxC=Math.max(maxC,p.col);}}
- const raw=rawMap(sheet);return csvEncode(Array.from({length:maxR+1},(_,r)=>Array.from({length:maxC+1},(_,c)=>String(resultOf(sheet,cellName(r,c),raw)))));
+export function exportCSV(sheet,book=null){let maxR=0,maxC=0;for(const key of Object.keys(sheet.cells)){const p=parseCell(key);if(p){maxR=Math.max(maxR,p.row);maxC=Math.max(maxC,p.col);}}
+ const raw=rawMap(sheet),ctx=formulaContext(book,sheet,raw);return csvEncode(Array.from({length:maxR+1},(_,r)=>Array.from({length:maxC+1},(_,c)=>String(resultOf(sheet,cellName(r,c),raw,ctx)))));
 }
 export function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
