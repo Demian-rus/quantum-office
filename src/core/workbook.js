@@ -128,6 +128,33 @@ export function mergeCells(sheet,a,b){
  sheet.merges??=[];const m={from:cellName(r.r1,r.c1),to:cellName(r.r2,r.c2)};sheet.merges.push(m);return m;
 }
 export function unmergeCells(sheet,ref){const item=mergeAt(sheet,ref);if(!item)return false;sheet.merges=sheet.merges.filter(m=>m!==item);return true;}
+/** Iterate only stored cell entries inside a selection. A 10-million-cell
+ * selected sheet still has at most 50,000 materialized entries per workbook.
+ * Geometry, data outside the rectangle and merges are never expanded. */
+function sparseSelection(sheet,from,to){
+ const area=rectangle(from,to);
+ if(!area||!validRef(from)||!validRef(to))throw Error('Недопустимый диапазон');
+ return {area,entries:Object.entries(sheet.cells).filter(([ref])=>{
+  const p=parseCell(ref);
+  return p&&p.row>=area.r1&&p.row<=area.r2&&p.col>=area.c1&&p.col<=area.c2;
+ })};
+}
+/** Clear values/formulas in a huge sparse selection, preserving every existing style.
+ * inspectOnly counts without mutation so a no-op will not create an Undo entry. */
+export function clearCellValues(sheet,from,to,inspectOnly=false){
+ const {entries}=sparseSelection(sheet,from,to);
+ let count=0;
+ for(const [ref,entry] of entries){
+  if(!entry.value)continue;
+  count++;
+  if(!inspectOnly){
+   if(Object.keys(entry.style||{}).length)sheet.cells[ref]={...entry,value:''};
+   else delete sheet.cells[ref];
+  }
+ }
+ if(count&&!inspectOnly&&sheet.autoFilter)invalidateGridGeometry(sheet);
+ return count;
+}
 /** Border presets apply to the selected *rectangle*, not every cell separately. */
 export function applyBorderPreset(sheet,a,b,preset){
  if(!['outline','all','none','bottom','top','left','right'].includes(preset))throw Error('Неизвестный вариант границ');
@@ -135,7 +162,20 @@ export function applyBorderPreset(sheet,a,b,preset){
  const count=(r.r2-r.r1+1)*(r.c2-r.c1+1);
  // Outside / one-sided borders only touch perimeter cells, even on an entire
  // sheet selection. No merge is required and existing interior borders survive.
- if(['all','none'].includes(preset)&&count>10000)throw Error('Все границы и их очистка ограничены 10 000 ячеек; внешняя рамка работает для всего диапазона');
+ if(preset==='none'){
+  // Removing borders from a selected full column/sheet never creates cells.
+  const {entries}=sparseSelection(sheet,a,b);let removed=0;
+  for(const [ref,item] of entries){
+   const style=item.style||{};
+   if(!style.border&&!style.borders)continue;
+   removed++;
+   const next={...style};delete next.border;delete next.borders;
+   if(!item.value&&!Object.keys(next).length)delete sheet.cells[ref];
+   else sheet.cells[ref]={...item,style:next};
+  }
+  return removed;
+ }
+ if(preset==='all'&&count>10000)throw Error('Все границы ограничены 10 000 ячеек; используйте внешнюю рамку или очистку границ для больших диапазонов');
  const targets=new Map();
  const include=(row,col,sides)=>{
   const ref=cellName(row,col);
@@ -385,11 +425,21 @@ export function createExample(){const b=newWorkbook('Пример — бюдже
 
 
 /** Clears style without deleting values/formulas or creating empty cells. */
-export function clearFormatting(sheet,from,to){
- const rect=rectangle(from,to);if(!rect||((rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000))throw Error('Максимальный диапазон: 10 000 ячеек');
- const refs=refsBetween(from,to);
- let count=0;
- for(const ref of refs){const entry=sheet.cells[ref];if(!entry||!Object.keys(entry.style||{}).length)continue;count++;entry.style={};if(!entry.value)delete sheet.cells[ref];}
+/** Clear formats on stored cells, not on 10 million virtual empty positions.
+ * Reset the sheet-wide alignment only for a true whole-sheet selection. */
+export function clearFormatting(sheet,from,to,inspectOnly=false){
+ const {area,entries}=sparseSelection(sheet,from,to);
+ const all=area.r1===0&&area.c1===0&&area.r2===LIMITS.rows-1&&area.c2===LIMITS.columns-1;
+ let count=all&&sheet.defaultAlign!=null?1:0;
+ for(const [ref,entry] of entries){
+  if(!Object.keys(entry.style||{}).length)continue;
+  count++;
+  if(!inspectOnly){
+   if(entry.value)sheet.cells[ref]={...entry,style:{}};
+   else delete sheet.cells[ref];
+  }
+ }
+ if(!inspectOnly&&all)sheet.defaultAlign=null;
  return count;
 }
 /** Plan autosum operations before any mutation, protecting occupied destinations. */

@@ -66,7 +66,7 @@ test('CSV dense expansion fails safely; sparse XLSX writes only actual cells in 
  setCell(s,'Z100000','дальний');
  assert.throws(()=>exportCSV(s,b),/250 000/);
  assert.throws(()=>valuesTSV(s,'A1','CV100000',b),/20 000/);
- assert.throws(()=>clearFormatting(s,'A1','CV100000'),/10 000/);
+ assert.equal(clearFormatting(s,'A1','CV100000'),0); // Sparse no-op must not materialize empty cells
  assert.equal(getCell(s,'Z100000').value,'дальний');
  const zip=await globalThis.JSZip.loadAsync(await exportXLSX(b),{checkCRC32:true});
  const xml=await zip.file('xl/worksheets/sheet1.xml').async('string');
