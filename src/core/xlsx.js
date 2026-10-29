@@ -1,5 +1,5 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,cellName,parseCell,mergeCells,applyBorderPreset} from './workbook.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -98,7 +98,7 @@ export function styleCatalog(book){
  const keyOf=s=>JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{}));
  const register=s=>{const key=keyOf(s);if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}return lookup.get(key);};
  for(const sheet of book.sheets){
-  for(let c=0;c<LIMITS.columns;c++)register(getEffectiveStyle(sheet,cellName(0,c)));
+  for(let c=0;c<LIMITS.columns;c++)register(getColumnBaseStyle(sheet,c));
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
  return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
@@ -125,7 +125,7 @@ export async function exportXLSX(book){validateWorkbook(book);const zip=new JSZi
     ...(s.defaultAlign||Object.keys(s.defaultStyle||{}).length||Object.keys(s.columnStyles||{}).length
        ?Array.from({length:LIMITS.columns},(_,i)=>String(i)):[])]);
   const cols=[...colIndexes].sort((a,b)=>+a-+b).map(index=>{
-   const pixels=s.columnWidths?.[index],style=getEffectiveStyle(s,cellName(0,+index));
+   const pixels=s.columnWidths?.[index],style=getColumnBaseStyle(s,+index);
    const id=styles.getId(style);
    return '<col min="'+(+index+1)+'" max="'+(+index+1)+'"'+
      (pixels?' width="'+((pixels-5)/7).toFixed(2)+'" customWidth="1"':'')+
