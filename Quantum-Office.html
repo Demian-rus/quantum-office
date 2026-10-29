@@ -1696,7 +1696,13 @@ async function importXLSX(data,filename='Таблица'){
   const importedRows=elements(element(xml,'sheetData'),'row');
   const xmlCells=element(xml,'sheetData')?.getElementsByTagNameNS('*','c').length||0;
   if(xmlCells>MAX_XLSX_RECTANGLE_CELLS+LIMITS.cells)throw Error('XLSX содержит слишком много оформленных ячеек для безопасного импорта');
-  const compact=xmlCells>LIMITS.cells;
+  // A short s="0" rectangle can be just as significant as a huge one:
+  // it explicitly removes an inherited Excel column fill. Recover the mask
+  // as a sparse layer rather than dropping it on small-workbook import.
+  const needsMask=xmlCells<=LIMITS.cells&&Object.keys(sheet.columnStyles||{}).length>0&&
+   Array.from(element(xml,'sheetData')?.getElementsByTagNameNS('*','c')||[])
+    .some(c=>c.getAttribute('s')==='0'&&c.children.length===0);
+  const compact=xmlCells>LIMITS.cells||needsMask;
   for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
