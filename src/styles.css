@@ -298,3 +298,27 @@
 .chart-panel-foot button{white-space:nowrap;cursor:pointer;color:#9a4545;background:#fff2f2;border:1px solid #efcdcd;padding:7px 10px;border-radius:6px}
 .chart-panel-foot span{font-size:10px;color:#8696a1;line-height:1.4}
 @media(max-width:650px){.chart-panel{top:150px;right:7px;max-height:calc(100% - 169px)}}
+
+/* TASK 051 conditional formatting: bounded floating rules editor. */
+.cf-panel{position:absolute;right:18px;top:164px;width:min(405px,calc(100vw - 36px));max-height:calc(100% - 185px);overflow:auto;z-index:1150;border:1px solid #bdced7;border-radius:12px;background:#fff;box-shadow:0 15px 48px rgba(20,45,68,.23);font:12px "Segoe UI",Arial,sans-serif;color:#284056}
+.cf-panel [hidden]{display:none!important}
+.cf-head{display:flex;align-items:center;gap:12px;height:43px;padding:0 14px;background:#f1f7f4;border-bottom:1px solid #e0e9e6}
+.cf-head strong{font-size:14px}.cf-head span{margin-left:auto;font-size:11px;color:#7d909f}
+.cf-head button{background:transparent;color:#567182;font-size:23px;padding:4px 7px;cursor:pointer}
+.cf-form{display:grid;gap:9px;padding:14px;border-bottom:1px solid #e8eef0}
+.cf-form small{font-size:10px;color:#638075}
+.cf-form label{display:grid;grid-template-columns:95px 1fr;gap:8px;align-items:center;color:#586f7c;font-size:11px;font-weight:700}
+.cf-form select,.cf-form input:not([type=color]){min-width:0;width:100%;background:white;border:1px solid #cbd7df;border-radius:6px;padding:8px;color:#254256;font-size:12px}
+.cf-form input[type=color]{width:42px;height:30px;background:#fff;border:1px solid #cbd7df;border-radius:6px;padding:3px;cursor:pointer}
+.cf-add{margin-top:2px;border:1px solid #1b744f;background:#247951;color:#fff;font-weight:700;border-radius:6px;padding:10px 12px;cursor:pointer}
+.cf-rules{padding:11px 14px;max-height:220px;overflow:auto}
+.cf-rules h4{font-size:11px;margin:2px 0 8px;color:#607386}
+.cf-rules p{font-size:11px;color:#798b9c}
+.cf-rule{display:flex;align-items:center;gap:9px;border-bottom:1px solid #edf1f4;padding:8px 0}
+.cf-rule-swatch{width:22px;height:22px;flex:none;border:1px solid #dce3e6;border-radius:5px}
+.cf-rule-label{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
+.cf-rule-label strong{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cf-rule-label small{font-size:10px;color:#8695a2}
+.cf-rule button{background:#fff3f3;border-radius:5px;color:#a94646;font-size:17px;cursor:pointer;padding:2px 8px}
+.cf-note{border-top:1px solid #e8eef0;color:#8a9aa5;font-size:10px;line-height:1.45;padding:11px 14px}
+@media(max-width:650px){.cf-panel{right:8px;top:150px;max-height:calc(100% - 168px)}}
