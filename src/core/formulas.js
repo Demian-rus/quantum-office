@@ -84,7 +84,47 @@ export function createCalculationSession(){
  const d=new Date();
  return {results:new Map(),ast:new Map(),dependencies:new Map(),dependents:new Map(),edges:0,graphComplete:true,cycleVersion:0,today:dateSerial(d.getFullYear(),d.getMonth()+1,d.getDate()),stats:{evaluated:0,parsed:0,hits:0,edges:0}};
 }
-const identityFor=(sheet,ref)=>sheet.toLocaleUpperCase('ru-RU')+'!'+String(ref).replaceAll('typeof value==='string'&&/^#(?:REF!|DIV\/0!|VALUE!|NAME\?|CYCLE!|ERROR!|N\/A|NUM!)/.test(value);
+const identityFor=(sheet,ref)=>sheet.toLocaleUpperCase('ru-RU')+'!'+String(ref).replaceAll('$','').toUpperCase();
+const MAX_GRAPH_EDGES=120000;
+function trackDependency(ctx,visiting,ref,sheet){
+ const state=ctx?.calculation;if(!state?.graphComplete||!visiting.size)return;
+ const source=Array.from(visiting).at(-1),target=identityFor(sheet,ref);
+ let deps=state.dependencies.get(source);
+ if(!deps){deps=new Set();state.dependencies.set(source,deps);}
+ if(deps.has(target))return;
+ if(state.edges>=MAX_GRAPH_EDGES){state.graphComplete=false;return;}
+ deps.add(target);
+ let rev=state.dependents.get(target);
+ if(!rev){rev=new Set();state.dependents.set(target,rev);}
+ rev.add(source);state.edges++;state.stats.edges++;
+}
+function forgetDependencies(state,identity){
+ const deps=state.dependencies.get(identity);
+ if(!deps)return;
+ for(const target of deps){
+  const rev=state.dependents.get(target);rev?.delete(identity);
+  if(rev?.size===0)state.dependents.delete(target);
+  state.edges--;
+ }
+ state.dependencies.delete(identity);
+}
+/** Modify only a calculation snapshot (NOT the saved book). */
+export function updateCalculationValue(ctx,sheetName,ref,value){
+ const state=ctx?.calculation;
+ if(!state?.graphComplete)throw Error('Граф зависимостей неполон: создайте новый снимок');
+ const target=ctx.sheets?.get(String(sheetName).toLocaleUpperCase('ru-RU'));
+ const p=parseCell(String(ref).replaceAll('$',''));
+ if(!target||!p||p.row>=FORMULA_LIMITS.rows||p.col>=FORMULA_LIMITS.cols||typeof value!=='string'||value.length>50000)throw Error('Недопустимая ячейка');
+ const cell=cellName(p.row,p.col),root=identityFor(target.name,cell),dirty=new Set([root]),queue=[root];
+ for(let i=0;i<queue.length;i++)for(const dependent of state.dependents.get(queue[i])||[]){
+  if(!dirty.has(dependent)){dirty.add(dependent);queue.push(dependent);}
+ }
+ target.cells[cell]=value;
+ for(const key of dirty){state.results.delete(key);state.ast.delete(key);}
+ for(const key of dirty)forgetDependencies(state,key);
+ return dirty.size;
+}
+const isError=value=>typeof value==='string'&&/^#(?:REF!|DIV\/0!|VALUE!|NAME\?|CYCLE!|ERROR!|N\/A|NUM!)/.test(value);
 const numericLike=v=>typeof v==='number'||typeof v==='boolean'||v===''||(typeof v==='string'&&v.trim()!==''&&Number.isFinite(Number(v)));
 const toNumber=value=>{if(isError(value))throw Error(value);if(value===''||value===null)return 0;if(typeof value==='boolean')return value?1:0;const n=Number(value);if(!Number.isFinite(n))throw Error('#VALUE!');return n;};
 const toText=value=>{if(isError(value))throw Error(value);if(value===null||value===undefined)return '';if(typeof value==='boolean')return value?'TRUE':'FALSE';return String(value);};
