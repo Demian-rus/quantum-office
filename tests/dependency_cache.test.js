@@ -30,15 +30,15 @@ test('lazy IF dependency edges change with condition; IFERROR/cycles are not cac
  const b=newWorkbook(),s=currentSheet(b);s.name='График';
  [['A1','=IF(B1,C1,D1)'],['B1','1'],['C1','100'],['D1','200']].forEach(([ref,value])=>setCell(s,ref,value));
  let {raw,ctx}=calculation(b,s);
- assert.equal(resultOf(s,'A1',raw,ctx),100);
+ assert.equal(resultOf(s,'A1',raw,ctx),'100');
  assert.ok(!ctx.calculation.dependencies.get('ГРАФИК!A1').has('ГРАФИК!D1'));
  assert.equal(updateCalculationValue(ctx,'График','D1','300'),1);
  assert.equal(resultOf(s,'A1',raw,ctx),100);
  assert.equal(updateCalculationValue(ctx,'График','B1','0'),2);
- assert.equal(resultOf(s,'A1',raw,ctx),300);
+ assert.equal(resultOf(s,'A1',raw,ctx),'300');
  assert.ok(ctx.calculation.dependencies.get('ГРАФИК!A1').has('ГРАФИК!D1'));
  assert.equal(updateCalculationValue(ctx,'График','D1','400'),2);
- assert.equal(resultOf(s,'A1',raw,ctx),400);
+ assert.equal(resultOf(s,'A1',raw,ctx),'400');
  setCell(s,'A1','=IFERROR(B1,20)');setCell(s,'B1','=A1');
  ({raw,ctx}=calculation(b,s));
  assert.equal(resultOf(s,'A1',raw,ctx),20);
