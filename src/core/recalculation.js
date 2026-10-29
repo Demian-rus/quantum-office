@@ -29,6 +29,8 @@ export function createWorkbookRecalculator(clock=()=>new Date()){
   if(!book||!sheet)return null;
   if(!stillValid(book)){
    const ctx=formulaContext(book,sheet);
+   // Use the same local-day boundary for memoization and TODAY calculations.
+   ctx.calculation.today=serialToday(clock);
    current={book,signature:signatures(book),ctx};
    stats.created++;
   }else stats.reused++;
