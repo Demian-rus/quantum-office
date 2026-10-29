@@ -14,17 +14,17 @@ with sync_playwright() as p:
  def write(ref,value):
   select(ref);box=page.locator('#formula-input');box.fill(value);box.press('Enter')
  def bg(ref):
-  return page.locator('.grid-cell[data-ref="'+ref+'"]').evaluate('el=>getComputedStyle(el).backgroundColor')
+  return page.locator('.grid-cell[data-ref="'+ref+'"]').evaluate('el=>el.style.backgroundColor')
  def justify(ref):
   return page.locator('.grid-cell[data-ref="'+ref+'"]').evaluate('el=>getComputedStyle(el).justifyContent')
  write('B2','Репетитор');select('B2')
- assert bg('B2')=='rgb(255, 255, 255)',bg('B2')
+ assert bg('B2')=='',bg('B2')
  page.get_by_role('button',name='Заливка ячеек').click()
  page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
  assert bg('B2')=='rgb(250, 204, 21)',bg('B2')
  # Ctrl+Z must work with the name field focused (previously treated as text-edit).
  page.locator('#name-box').focus();page.keyboard.press('Control+z')
- assert bg('B2')=='rgb(255, 255, 255)',bg('B2')
+ assert bg('B2')=='',bg('B2')
  page.locator('#name-box').focus();page.keyboard.press('Control+y')
  assert bg('B2')=='rgb(250, 204, 21)',bg('B2')
  select('B2')
