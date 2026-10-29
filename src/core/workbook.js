@@ -493,7 +493,7 @@ export function createBudgetTemplate(){
  tMerged(s,'A3','C3','ОПЕРАЦИИ',{bg:tColor.pale,color:tColor.navy});
  tMerged(s,'D3','F3','ДЕНЕЖНЫЙ ПОТОК',{bg:tColor.mint,color:tColor.green});
  tMerged(s,'G3','H3','КОНТРОЛЬ',{bg:tColor.cream,color:tColor.gold});
- setRowHeight(s,2,34);setRowHeight(s,3,20);
+ setRowHeight(s,2,34);setRowHeight(s,3,24);
  const examples=[
   ['01.09.2026','Услуги','Пример: индивидуальное занятие','2500','0','Оплачено','Замените примеры своими данными'],
   ['02.09.2026','Расходы','Пример: канцелярия','0','450','Учтено','Материалы для занятий'],
