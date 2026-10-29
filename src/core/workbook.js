@@ -91,6 +91,7 @@ export function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]
 export function getColumnBaseStyle(sheet,col){
  const style={...(sheet.defaultStyle||{}),...(sheet.columnStyles?.[col]||{})};
  if(style.align===undefined&&sheet.defaultAlign!=null)style.align=sheet.defaultAlign;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
 /** Layered style resolution, without allocation for empty virtual rows. */
@@ -98,9 +99,10 @@ export function getEffectiveStyle(sheet,ref){
  const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
  const style={...(sheet.defaultStyle||{}),...(column||{}),...own};
- const align=own.align??column?.align??sheet.defaultStyle?.align??sheet.defaultAlign;
+ const align=Object.hasOwn(own,'align')?own.align:Object.hasOwn(column||{},'align')?column.align:sheet.defaultStyle?.align??sheet.defaultAlign;
  if(align!==undefined&&align!==null)style.align=align;
  else delete style.align;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
 const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
@@ -128,7 +130,10 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  }else{
   for(let col=area.c1;col<=area.c2;col++){
    const key=String(col),style={...(columns[key]||{})};
-   if(value===undefined)delete style[prop];else style[prop]=value;
+   if(value===undefined){
+    if(prop in (sheet.defaultStyle||{})||(prop==='align'&&sheet.defaultAlign!=null))style[prop]=null;
+    else delete style[prop];
+   }else style[prop]=value;
    if(Object.keys(style).length)columns[key]=style;else delete columns[key];
   }
  }
@@ -437,8 +442,9 @@ export function validateWorkbook(book){
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
-  const validSparseStyle=style=>style&&typeof style==='object'&&!Array.isArray(style)&&
+  const validSparseStyle=(style,allowNull=false)=>style&&typeof style==='object'&&!Array.isArray(style)&&
    Object.keys(style).every(k=>bulkStyleProps.has(k))&&Object.entries(style).every(([k,v])=>{
+    if(v===null)return allowNull;
     if(k==='align')return ['left','center','right'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
     if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
@@ -448,7 +454,7 @@ export function validateWorkbook(book){
   if(sheet.columnStyles!==undefined){
    const styles=sheet.columnStyles;
    if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>LIMITS.columns||
-     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style)))
+     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style,true)))
     throw Error('Повреждено оформление столбцов');
   }
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
