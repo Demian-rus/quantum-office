@@ -22,7 +22,9 @@ export function copyCells(sheet,start,end,book=null){
  return {start:first,rows,cols,text:valuesTSV(sheet,first,last,book),merges,
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const item=getCell(sheet,cellName(rect.r1+r,rect.c1+c));
-   return {value:item.value,style:structuredClone(item.style||{})};
+   const effective={...(item.style||{})};
+   if(sheet.defaultAlign&&!effective.align)effective.align=sheet.defaultAlign;
+   return {value:item.value,style:structuredClone(effective)};
   }))};
 }
 
