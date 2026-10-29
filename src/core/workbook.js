@@ -520,7 +520,7 @@ export function validateWorkbook(book){
    const styles=sheet[name]||{};
    if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>max||
       Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
-    throw Error('Повреждены стили строк или столбцов');
+    throw Error(name==='columnStyles'?'Повреждено оформление столбцов':'Повреждено оформление строк');
   }
   for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
    for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,12,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,12,DIMENSIONS.maxRow]]){
