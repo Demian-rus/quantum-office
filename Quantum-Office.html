@@ -1611,14 +1611,67 @@ const elements=(parent,tag)=>Array.from(parent?.children||[]).filter(n=>n.localN
 const text=(node,tag)=>element(node,tag)?.textContent||'';
 function parseXML(xml){if(typeof DOMParser==='undefined')throw Error('Для чтения XLSX требуется браузер с XML-парсером');const doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.getElementsByTagName('parsererror').length)throw Error('Некорректный XML в XLSX');return doc.documentElement;}
 function rgba(xml){const v=xml?.getAttribute('rgb');return v&&/^(?:[0-9A-F]{2})?[0-9A-F]{6}$/i.test(v)?'#'+v.slice(-6).toLowerCase():undefined;}
-function stylesFromXML(root){if(!root)return [{}];const fonts=elements(element(root,'fonts'),'font').map(node=>{
+/** SpreadsheetML theme references index light/dark pairs in the opposite
+ * order from the XML clrScheme element sequence. This also handles sysClr. */
+const THEME_SLOTS=['lt1','dk1','lt2','dk2','accent1','accent2','accent3','accent4','accent5','accent6','hlink','folHlink'];
+const DEFAULT_THEME=['#ffffff','#000000','#eeece1','#1f497d','#4f81bd','#c0504d','#9bbb59','#8064a2','#4bacc6','#f79646','#0000ff','#800080'];
+const INDEXED_DEFAULT='000000 FFFFFF FF0000 00FF00 0000FF FFFF00 FF00FF 00FFFF 000000 FFFFFF FF0000 00FF00 0000FF FFFF00 FF00FF 00FFFF 800000 008000 000080 808000 800080 008080 C0C0C0 808080 9999FF 993366 FFFFCC CCFFFF 660066 FF8080 0066CC CCCCFF 000080 FF00FF FFFF00 00FFFF 800080 800000 008080 0000FF 00CCFF CCFFFF CCFFCC FFFF99 99CCFF FF99CC CC99FF FFCC99 3366FF 33CCCC 99CC00 FFCC00 FF9900 FF6600 666699 969696 003366 339966 003300 333300 993300 993366 333399 333333'.split(' ').map(s=>'#'+s.toLowerCase());
+const colorHex=v=>typeof v==='string'&&/^[0-9a-f]{6}$/i.test(v)?'#'+v.toLowerCase():undefined;
+function themeColorsFromXML(theme){
+ const scheme=element(element(theme,'themeElements'),'clrScheme');
+ if(!scheme)return DEFAULT_THEME;
+ return THEME_SLOTS.map((key,i)=>{
+  const item=element(scheme,key),node=element(item,'sysClr')||element(item,'srgbClr');
+  return colorHex(node?.getAttribute('lastClr'))||colorHex(node?.getAttribute('val'))||DEFAULT_THEME[i];
+ });
+}
+/** Excel applies tint to HLS lightness, not to each RGB channel. */
+function tintHex(hex,tint){
+ if(!Number.isFinite(tint)||tint===0||tint<-1||tint>1)return hex;
+ const v=[1,3,5].map(n=>parseInt(hex.slice(n,n+2),16)/255);
+ const max=Math.max(...v),min=Math.min(...v),difference=max-min;
+ let h=0,saturation=0,lightness=(max+min)/2;
+ if(difference){
+  saturation=difference/(1-Math.abs(2*lightness-1));
+  switch(max){
+   case v[0]:h=((v[1]-v[2])/difference)%6;break;
+   case v[1]:h=(v[2]-v[0])/difference+2;break;
+   default:h=(v[0]-v[1])/difference+4;
+  }
+  h=(h/6+1)%1;
+ }
+ lightness=tint<0?lightness*(1+tint):lightness*(1-tint)+tint;
+ const chroma=(1-Math.abs(2*lightness-1))*saturation,extra=chroma*(1-Math.abs((h*6)%2-1)),base=lightness-chroma/2;
+ const group=Math.floor(h*6)%6;
+ const triples=[[chroma,extra,0],[extra,chroma,0],[0,chroma,extra],[0,extra,chroma],[extra,0,chroma],[chroma,0,extra]];
+ return '#'+triples[group].map(n=>Math.max(0,Math.min(255,Math.round((n+base)*255))).toString(16).padStart(2,'0')).join('');
+}
+function resolveXLSXColor(node,themes=DEFAULT_THEME,indexed=INDEXED_DEFAULT){
+ if(!node)return undefined;
+ let color=rgba(node);
+ if(!color&&node.hasAttribute('theme')){
+  const index=Number(node.getAttribute('theme'));
+  if(Number.isInteger(index)&&index>=0&&index<THEME_SLOTS.length)color=themes[index];
+ }
+ if(!color&&node.hasAttribute('indexed')){
+  const index=Number(node.getAttribute('indexed'));
+  if(Number.isInteger(index)&&index>=0&&index<64)color=indexed[index];
+ }
+ if(!color)return undefined;
+ const tint=Number(node.getAttribute('tint')||0);
+ return tintHex(color,tint);
+}
+function stylesFromXML(root,themes=DEFAULT_THEME){if(!root)return [{}];
+ const custom=elements(element(element(root,'colors'),'indexedColors'),'rgbColor').map(node=>rgba(node));
+ const indexed=custom.length>=64?custom:INDEXED_DEFAULT;
+ const color=node=>resolveXLSXColor(node,themes,indexed);const fonts=elements(element(root,'fonts'),'font').map(node=>{
  const fontSize=Number(element(node,'sz')?.getAttribute('val'));
- return {bold:!!element(node,'b'),italic:!!element(node,'i'),color:rgba(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
-});const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?rgba(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
+ return {bold:!!element(node,'b'),italic:!!element(node,'i'),color:color(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
+});const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?color(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
  const borders=elements(element(root,'borders'),'border').map(node=>{
  const sides=Object.fromEntries(['left','right','top','bottom'].filter(side=>!!element(node,side)?.getAttribute('style')).map(side=>[side,true]));
  const named=['left','right','top','bottom'].filter(side=>sides[side]);
- const colors=named.map(side=>rgba(element(element(node,side),'color'))||'#000000');
+ const colors=named.map(side=>color(element(element(node,side),'color'))||'#000000');
  return {sides,color:colors.length&&new Set(colors).size===1?colors[0]:undefined};
 });
  return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
@@ -1679,7 +1732,10 @@ async function importXLSX(data,filename='Таблица'){
  const rels=new Map(elements(relationships,'Relationship').map(n=>[n.getAttribute('Id'),n]));
  const sheets=elements(element(wbXML,'sheets'),'sheet');if(!sheets.length||sheets.length>LIMITS.sheets)throw Error('Недопустимое количество листов');
  const shared=[];if(zip.file('xl/sharedStrings.xml')){const sharedDoc=await readXML(zip,'xl/sharedStrings.xml');for(const si of elements(sharedDoc,'si')){shared.push(Array.from(si.getElementsByTagNameNS('*','t')).map(t=>t.textContent).join(''));if(shared.length>LIMITS.cells)throw Error('Слишком много общих строк');}}
- const fmt=zip.file('xl/styles.xml')?stylesFromXML(await readXML(zip,'xl/styles.xml')):[{}];
+ const themeRel=[...rels.values()].find(r=>r.getAttribute('Type')?.endsWith('/theme')&&r.getAttribute('TargetMode')!=='External');
+ const themePath=themeRel?zipPath(themeRel.getAttribute('Target')):'xl/theme/theme1.xml';
+ const theme=zip.file(themePath)?themeColorsFromXML(await readXML(zip,themePath)):DEFAULT_THEME;
+ const fmt=zip.file('xl/styles.xml')?stylesFromXML(await readXML(zip,'xl/styles.xml'),theme):[{}];
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
