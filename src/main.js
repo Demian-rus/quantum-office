@@ -1,4 +1,4 @@
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,invalidateGridGeometry } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells} from './core/clipboard.js';
@@ -94,10 +94,38 @@ function editCell(seed=null){if(!sheet())return;if(!rowVisible(sheet(),parseCell
  editing={node,ref,initial:initialInput};node.focus();if(seed===null)node.select();
  node.addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();commitEditor();moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();commitEditor();moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
  node.addEventListener('blur',()=>{if(editing?.node===node)commitEditor();});}
-function selectionContainsHiddenRows(){const rect=rectangle(activeCell,rangeEnd);if(!rect||!sheet())return false;for(let r=rect.r1;r<=rect.r2;r++)if(!rowVisible(sheet(),r))return true;for(let c=rect.c1;c<=rect.c2;c++)if(!columnVisible(sheet(),c))return true;return false;}
+function selectionContainsHiddenRows(){
+ const rect=rectangle(activeCell,rangeEnd),s=sheet();if(!rect||!s)return false;
+ // A range spanning 100k rows is not intrinsically expensive: first inspect
+ // explicit sparse hide maps. Only an active filter needs individual row checks.
+ if(Object.keys(s.hiddenRows||{}).some(i=>+i>=rect.r1&&+i<=rect.r2))return true;
+ if(Object.keys(s.hiddenColumns||{}).some(i=>+i>=rect.c1&&+i<=rect.c2))return true;
+ const filter=filterRange(s);
+ if(filter&&Object.keys(s.autoFilter?.rules||{}).length){
+  for(let r=Math.max(rect.r1,filter.r1+1);r<=Math.min(rect.r2,filter.r2);r++)
+   if(!rowVisible(s,r))return true;
+ }
+ return false;
+}
 function refuseHiddenSelection(){if(!selectionContainsHiddenRows())return false;status('Выделение содержит скрытые строки или столбцы. Отобразите их перед массовым изменением.',true);return true;}
-function clearSelected(){if(refuseHiddenSelection())return;const size=rectangle(activeCell,rangeEnd);if((size.r2-size.r1+1)*(size.c2-size.c1+1)>10000){status('Очистка ограничена 10 000 ячеек за раз',true);return;}const refs=refsBetween(activeCell,rangeEnd);transact(()=>{for(const ref of refs)setCell(sheet(),ref,'');});drawGrid();}
-function clearSelectedFormat(){commitEditor();if(refuseHiddenSelection())return;try{const draft=structuredClone(sheet());const count=clearFormatting(draft,activeCell,rangeEnd);if(!count){status('Оформление уже сброшено');return;}transact(()=>{sheet().cells=draft.cells;});drawGrid();status(`Сброшено оформление: ${count} ячеек`);}catch(err){status(err.message,true);}}
+function clearSelected(){
+ commitEditor();if(refuseHiddenSelection())return;
+ try{
+  const count=clearCellValues(sheet(),activeCell,rangeEnd,true);
+  if(!count){status('В выделении нет содержимого для очистки');return;}
+  transact(()=>clearCellValues(sheet(),activeCell,rangeEnd));
+  drawGrid();updateSelectionStats();status(`Очищено содержимое: ${count} ячеек`);
+ }catch(err){status(err.message,true);}
+}
+function clearSelectedFormat(){
+ commitEditor();if(refuseHiddenSelection())return;
+ try{
+  const count=clearFormatting(sheet(),activeCell,rangeEnd,true);
+  if(!count){status('Оформление уже сброшено');return;}
+  transact(()=>clearFormatting(sheet(),activeCell,rangeEnd));
+  drawGrid();status(`Сброшено оформление: ${count} элементов`);
+ }catch(err){status(err.message,true);}
+}
 function autoSum(){commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
 function fillSelected(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
 function updateSelectionStats(){const node=document.querySelector('#selection-stats');if(!node||!sheet())return;const rect=rectangle(activeCell,rangeEnd);if(!rect)return;const n=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);if(n>10000){node.textContent=`Выделено: ${n} ячеек`;return;}const {raw,ctx}=recalculator.view(book(),sheet());let count=0,sum=0;for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){const value=resultOf(sheet(),cellName(r,c),raw,ctx);const number=Number(value);if(value!==''&&Number.isFinite(number)){count++;sum+=number;}}node.textContent=count?`Чисел: ${count} · Сумма: ${Number(sum.toFixed(8))} · Среднее: ${Number((sum/count).toFixed(8))}`:`Выделено: ${n}`;}
