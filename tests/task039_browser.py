@@ -94,7 +94,7 @@ with sync_playwright() as p:
  page.get_by_role('tab',name='Файл').click()
  page.evaluate('fakeDrive.opened.push(fakeDrive.a)')
  page.get_by_role('button',name='Открыть с диска').click()
- page.wait_for_function("book().name==='Новая таблица'")
+ page.wait_for_function('(previous)=>book().id!==previous',arg=a_id)
  opened=state()
  assert opened['id']!=a_id and opened['values']['B2']['value']=='Продолжение A',opened
  assert 'проверен на диске' in opened['marker'],opened
