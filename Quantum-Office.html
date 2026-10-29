@@ -1649,7 +1649,7 @@ function chartSVG(data,type){
 const CONDITIONAL_KINDS=['gt','lt','eq','contains','scale'];
 const MAX_RULES=24,MAX_CELLS=1200;
 const COLOR=/^#[0-9a-fA-F]{6}$/;
-const numeric=value=>{
+const conditionalNumber=value=>{
  const s=String(value??'').trim();
  return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(s)&&Number.isFinite(+s)?+s:null;
 };
@@ -1676,7 +1676,7 @@ function validateConditionalRules(sheet){
    if(rule.target!==undefined||rule.color!==undefined)throw Error('Повреждена цветовая шкала');
   }else{
    if(typeof rule.target!=='string'||rule.target.length>150||!rule.target.trim()||
-      rule.kind!=='contains'&&numeric(rule.target)===null||!COLOR.test(rule.color))
+      rule.kind!=='contains'&&conditionalNumber(rule.target)===null||!COLOR.test(rule.color))
     throw Error('Недопустимое условие форматирования');
   }
   ids.add(rule.id);
@@ -1705,7 +1705,7 @@ function prepareConditionalScales(sheet,raw,context){
   if(rule.kind!=='scale')continue;
   const r=area(rule);let lo=Infinity,hi=-Infinity;
   for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++){
-   const value=numeric(resultOf(sheet,cellName(row,col),raw,context));
+   const value=conditionalNumber(resultOf(sheet,cellName(row,col),raw,context));
    if(value===null)continue;
    if(value<lo)lo=value;if(value>hi)hi=value;
   }
@@ -1726,12 +1726,12 @@ function conditionalFill(sheet,ref,value,scaleStats=new Map()){
   const r=area(rule);
   if(pos.row<r.r1||pos.row>r.r2||pos.col<r.c1||pos.col>r.c2)continue;
   if(rule.kind==='scale'){
-   const bounds=scaleStats.get(rule.id),n=numeric(value);
+   const bounds=scaleStats.get(rule.id),n=conditionalNumber(value);
    if(bounds&&n!==null){const t=bounds.max===bounds.min?1:Math.max(0,Math.min(1,(n-bounds.min)/(bounds.max-bounds.min)));
     fill=mix('#f7e2dc','#5fb486',t);}
    continue;
   }
-  const n=numeric(value),threshold=numeric(rule.target);
+  const n=conditionalNumber(value),threshold=conditionalNumber(rule.target);
   const match=rule.kind==='gt'&&n!==null&&n>threshold||
     rule.kind==='lt'&&n!==null&&n<threshold||
     rule.kind==='eq'&&(n!==null&&threshold!==null?n===threshold:String(value).toLocaleLowerCase('ru-RU')===rule.target.toLocaleLowerCase('ru-RU'))||
