@@ -21,16 +21,16 @@ with sync_playwright() as p:
  assert page.locator('.grid-cell[data-ref="B2"].is-merged').count()==1
  page.locator('#name-box').fill('A1');page.locator('#name-box').press('Enter')
  page.get_by_role('tab',name='Вставка').click()
- page.get_by_role('button',name='Вставить строку').click()
+ page.get_by_role('button',name='Вставить выбранные строки').click()
  assert page.locator('.grid-cell[data-ref="B3"].is-merged').inner_text()=='Header'
  page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
  assert page.locator('.grid-cell[data-ref="B2"].is-merged').count()==1
  page.locator('#name-box').fill('A1');page.locator('#name-box').press('Enter')
- page.get_by_role('button',name='Вставить столбец').click()
+ page.get_by_role('button',name='Вставить выбранные столбцы').click()
  assert page.locator('.grid-cell[data-ref="C2"].is-merged').inner_text()=='Header'
  page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
  page.locator('#name-box').fill('B2');page.locator('#name-box').press('Enter')
- page.get_by_role('button',name='Удалить строку').click()
+ page.get_by_role('button',name='Удалить выбранные строки').click()
  assert page.locator('.grid-cell[data-ref="B2"].is-merged').inner_text()=='Header'
  assert 'началом объединения' in page.locator('#toast').inner_text()
  page.evaluate("()=>{changeSheetStructure(sheet(),'row','insert',2);render();}")
