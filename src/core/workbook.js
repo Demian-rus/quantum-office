@@ -194,6 +194,7 @@ export function formulaContext(book,sheet,map=rawMap(sheet)){
 export function resultOf(sheet,ref,map=rawMap(sheet),context=null){return evaluateCell(ref,map,new Set(),context);}
 export function displayedValue(sheet,ref,map=rawMap(sheet),context=null){
   const cell=getCell(sheet,ref),result=resultOf(sheet,ref,map,context);if(result===''||result==null)return '';
+  if(['date','time','datetime','duration'].includes(cell.style?.format)&& (typeof result==='number'||typeof result==='string'&&/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(result)))return formatTemporal(Number(result),cell.style.format);
   if(typeof result!=='number')return String(result);
   const n=Number.isFinite(result)?result:0;
   if(['date','time','datetime','duration'].includes(cell.style?.format))return formatTemporal(n,cell.style.format);
