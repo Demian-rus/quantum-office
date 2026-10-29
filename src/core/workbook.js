@@ -10,16 +10,16 @@ export function currentSheet(book){return book.sheets.find(s=>s.id===book.active
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
 const geometryCache=new WeakMap();
 export function invalidateGridGeometry(sheet){if(sheet&&typeof sheet==='object')geometryCache.delete(sheet);}
-export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??DIMENSIONS.defaultColumn;}
-export function rowHeight(sheet,index){return sheet.rowHeights?.[index]??DIMENSIONS.defaultRow;}
+export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??sheet.defaultColumnWidth??DIMENSIONS.defaultColumn;}
+export function rowHeight(sheet,index){return sheet.rowHeights?.[index]??sheet.defaultRowHeight??DIMENSIONS.defaultRow;}
 export function setColumnWidth(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.columns||!Number.isInteger(value)||value<DIMENSIONS.minColumn||value>DIMENSIONS.maxColumn)throw Error('Недопустимая ширина столбца');
- sheet.columnWidths??={};if(value===DIMENSIONS.defaultColumn)delete sheet.columnWidths[index];else sheet.columnWidths[index]=value;
+ sheet.columnWidths??={};if(value===(sheet.defaultColumnWidth??DIMENSIONS.defaultColumn))delete sheet.columnWidths[index];else sheet.columnWidths[index]=value;
  invalidateGridGeometry(sheet);
 }
 export function setRowHeight(sheet,index,value){
  if(!Number.isInteger(index)||index<0||index>=LIMITS.rows||!Number.isInteger(value)||value<DIMENSIONS.minRow||value>DIMENSIONS.maxRow)throw Error('Недопустимая высота строки');
- sheet.rowHeights??={};if(value===DIMENSIONS.defaultRow)delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
+ sheet.rowHeights??={};if(value===(sheet.defaultRowHeight??DIMENSIONS.defaultRow))delete sheet.rowHeights[index];else sheet.rowHeights[index]=value;
  invalidateGridGeometry(sheet);
 }
 /** Explicit visibility is separate from filtering. The data and formulas remain intact. */
@@ -110,7 +110,7 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
-const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
+const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 /** Pure subtraction, splits a rectangle into up to four untouched fragments. */
@@ -492,6 +492,7 @@ export function validateWorkbook(book){
     if(v===null)return allowNull;
     if(k==='align')return ['left','center','right'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
+     if(k==='fontSize')return typeof v==='number'&&Number.isFinite(v)&&v>=6&&v<=72;
     if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
     return typeof v==='boolean';
    });
@@ -512,7 +513,8 @@ export function validateWorkbook(book){
      Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style,true)))
     throw Error('Повреждено оформление столбцов');
   }
-  for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
+  for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
+   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,12,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,12,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
    for(const [index,value] of Object.entries(map))if(!/^(0|[1-9]\d*)$/.test(index)||Number(index)>=max||!Number.isInteger(value)||value<sizeMin||value>sizeMax)throw Error('Некорректный размер строки или столбца');
@@ -544,10 +546,11 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
   }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','wrap'].includes(k))||
+    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderColor','fontSize','wrap'].includes(k))||
        ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
-       ['bg','color'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
-       ('border' in style&&!['thin'].includes(style.border))||
+       ['bg','color','borderColor'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
+       ('fontSize' in style&&(!Number.isFinite(style.fontSize)||style.fontSize<6||style.fontSize>72))||
+        ('border' in style&&!['thin'].includes(style.border))||
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
        ('format' in style&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
