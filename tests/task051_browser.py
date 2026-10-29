@@ -11,6 +11,7 @@ with sync_playwright() as p:
  page.locator('[data-action=new]').first.click()
  page.evaluate("""()=>{const s=sheet();setCell(s,'A2','10');setCell(s,'A3','20');
  setCell(s,'A4','=A3*2');setStyle(s,'A3',{bg:'#ffffff',bold:true});}""")
+ page.evaluate('recalculator.reset();drawGrid()')
  def select(address):
   box=page.locator('#name-box');box.fill(address);box.press('Enter')
  select('A2:A4')
