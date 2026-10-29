@@ -35,7 +35,7 @@ test('merged rectangular cut preserves full merge and rejects a partial source o
  assert.equal(getCell(s,'A1').value,'');
  assert.notEqual(raw(s),before);
  const other=cut(b,s,'D2','E2');
- setCell(s,'H2','occupied');mergeCells(s,'G2','H2');
+ setCell(s,'G2','occupied');mergeCells(s,'G2','H2');
  const snapshot=raw(s);
  assert.throws(()=>moveCells(b,s,'G2',other),/другим объединением/);
  assert.equal(raw(s),snapshot);
@@ -47,7 +47,7 @@ test('stale sources, invalid target, hidden areas and source changes reject with
  assert.throws(()=>moveCells(b,s,'C1',clip),/изменились/);
  assert.equal(raw(s),before);
  const fresh=cut(b,s,'A1');
- assert.throws(()=>moveCells(b,s,'CV100000',fresh),/границы/);
+ assert.throws(()=>moveCells(b,s,'A100001',fresh),/Повреждённый диапазон/);
  before=raw(s);assert.equal(raw(s),before);
  s.hiddenRows[3]=true;
  assert.throws(()=>moveCells(b,s,'A4',fresh),/скрытые строки/);
