@@ -1770,7 +1770,7 @@ function toolIcon(action,original,extra=''){
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all']);
+ const labeled=new Set(['find-open','sort-asc','sort-desc','save','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
