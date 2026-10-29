@@ -2,6 +2,7 @@
  * All edits are prevalidated before mutating a sheet; no eval or network. */
 import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,formulaContext,resultOf,mergeAt,mergeCells,validRef,getEffectiveStyle,setCell} from './workbook.js';
 import {rebaseMovedFormula} from './reference-move.js';
+import {checkValidatedInput} from './validation.js';
 
 const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
 const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -57,6 +58,7 @@ export function pasteCells(sheet,target,clip){
   for(let c=0;c<clip.cols;c++){
    const item=clip.cells[r][c];if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
    const value=translateFormula(item.value,at.row-from.row,at.col-from.col);
+   checkValidatedInput(sheet,cellName(at.row+r,at.col+c),value);
    changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style)}]);
   }
  }
@@ -157,6 +159,7 @@ export function moveCells(book,sheet,target,cutClip){
   if(typeof item?.value!=='string'||!item.style||typeof item.style!=='object'||Array.isArray(item.style))
    throw Error('Повреждённые данные вырезания');
   const ref=cellName(dst.r1+r,dst.c1+c);
+  checkValidatedInput(sheet,ref,item.value);
   if(item.value||Object.keys(item.style).length)draft.cells[ref]={value:item.value,style:structuredClone(item.style)};
   else delete draft.cells[ref];
  }
