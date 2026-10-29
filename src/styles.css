@@ -193,3 +193,28 @@
 .grid-cell.is-merged.frozen-row,.grid-cell.is-merged.frozen-col{z-index:12}
 @media(max-width:660px){.format-popover{left:8px;max-width:calc(100vw - 24px)}.border-popover{left:8px}}
 .ribbon{z-index:1000}
+
+
+/* TASK 030: neutral, high-contrast spreadsheet axis headers.
+   Selection lives in the grid, not in the header color. Inline user cell fills
+   remain authoritative; only a light blue overlay indicates selection. */
+.grid-cell.is-selected{background-color:#edf3f9}
+.grid-cell.is-selected::after{background:rgba(71,113,157,.09)}
+.grid-cell.is-selected.frozen-row,.grid-cell.is-selected.frozen-col{background-color:#edf3f9}
+.grid-col-overlay .colhead,.grid-row-overlay .rowhead{
+ background:#d7e1ec;color:#36516b;border-color:#b5c4d2;font-weight:740
+}
+.grid-col-overlay .colhead.header-selected,.grid-row-overlay .rowhead.header-selected{
+ background:#aec4db;color:#183b5e;border-color:#8ca8c2;font-weight:810
+}
+.grid-col-overlay .colhead.header-selected.frozen-col,.grid-row-overlay .rowhead.header-selected.frozen-row{
+ background:#a5bed7;color:#153956
+}
+.grid-col-overlay .colhead.header-active,.grid-row-overlay .rowhead.header-active,
+.grid-col-overlay .colhead.header-selected.frozen-col.header-active,.grid-row-overlay .rowhead.header-selected.frozen-row.header-active{
+ background:#426b8b;color:#fff;border-color:#30536f
+}
+.grid-col-overlay .colhead:hover,.grid-row-overlay .rowhead:hover{background:#c0d2e4;color:#193b57}
+.grid-corner-fixed{background:#c2d0df;border-color:#98aec1}
+.grid-corner-fixed:hover{background:#aabed1}
+.border-hint{padding:5px 9px 7px;font-size:10px;line-height:1.35;color:#5a6d7d;border-bottom:1px solid #e6ebef}
