@@ -2001,7 +2001,10 @@ function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
 function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
- n.textContent=storeWarning?'⚠ Черновик не записан':b&&directFiles.has(b.id)?dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске':'● Черновик в браузере';
+ const linked=b&&directFiles.has(b.id);
+ n.textContent=linked?(dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+(storeWarning?' · нет автосохранения браузера':''):
+  storeWarning?'⚠ Черновик не записан':'● Черновик в браузере';
+ n.title=storeWarning?'Локальная память браузера недоступна. Прямые сохранения на диск и резервные копии проверяйте отдельно.':'Черновики браузера не заменяют отдельные резервные копии.';
 }
 function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
 function snapshot(){const b=book();if(!b)return;const a=undoStacks.get(b.id)||[];a.push(structuredClone(b));if(a.length>50)a.shift();undoStacks.set(b.id,a);redoStacks.set(b.id,[]);}
