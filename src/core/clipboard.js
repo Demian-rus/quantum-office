@@ -114,6 +114,8 @@ export function pasteValuesCells(sheet,target,clip,book=null){
  }
  const others=book?book.sheets.filter(s=>s!==sheet).reduce((n,s)=>n+Object.keys(s.cells).length,0):0;
  if(nextCount+others>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ // Validate all destinations before mutating any cell; direct callers also need atomicity.
+ for(const [ref,value] of changes)checkValidatedInput(sheet,ref,value);
  for(const [ref,value] of changes)setCell(sheet,ref,value);
  return {rows:clip.rows,cols:clip.cols,end:cellName(endRow,endCol)};
 }
