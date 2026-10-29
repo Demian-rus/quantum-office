@@ -72,13 +72,69 @@ function renameBookInline(id,button){
 }
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
 function download(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
-async function saveBook(){commitEditor();const b=book();if(!b)return;const filename=`${safeFile(b.name)}.qbook`,data=encodeBook(b);try{if('showSaveFilePicker' in window){if(!saveHandle){saveHandle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});}const writer=await saveHandle.createWritable();await writer.write(data);await writer.close();status('Файл сохранён на диск');return;}}catch(err){if(err.name==='AbortError')return;saveHandle=null;status(`Прямое сохранение не удалось; файл будет скачан`,true);}download(filename,data,'application/json');status('Скачан файл .qbook');}
-function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Резервная копия скачана');}
+async function saveBook(asNew=false){
+ commitEditor();const b=book();if(!b)return;
+ const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
+ if(savingBooks.has(id)){status('Сохранение этой книги уже выполняется',true);return;}
+ if(typeof window.showSaveFilePicker!=='function'){
+  if(directFiles.has(id)){status('Прямое сохранение недоступно; связанный файл не изменён',true);return;}
+  download(filename,serialized,'application/json');
+  status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
+ }
+ savingBooks.add(id);
+ try{
+  let link=asNew?null:directFiles.get(id);
+  if(!link){
+   const handle=await window.showSaveFilePicker({suggestedName:filename,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});
+   const previous=await readDirectFileText(handle);
+   if(previous!==''&&previous!==serialized)throw Error('Выбранный файл уже содержит другие данные. Перезапись запрещена — выберите другое имя.');
+   link={handle,text:previous};
+  }
+  await writeVerifiedQBook(link.handle,link.text,serialized);
+  const current=workspace.books.find(x=>x.id===id);
+  if(current){
+   directFiles.set(id,{handle:link.handle,text:serialized});
+   const upToDate=encodeBook(current)===serialized;
+   if(upToDate)dirtyFiles.delete(id);else dirtyFiles.add(id);
+   updateSaveIndicator();
+   status(upToDate?'Файл сохранён и проверен на диске':'Предыдущая версия сохранена. Есть новые несохранённые изменения.',!upToDate);
+  }
+ }catch(error){if(error.name!=='AbortError')status(error.message||'Запись не удалась. Проверьте файл на диске.',true);}
+ finally{savingBooks.delete(id);updateSaveIndicator();}
+}
+async function openBookFromDisk(){
+ if(typeof window.showOpenFilePicker!=='function'){status('Прямое открытие недоступно. Используйте обычный импорт .qbook без привязки к файлу.',true);return;}
+ try{
+  const [handle]=await window.showOpenFilePicker({multiple:false,types:[{description:'Quantum Office book',accept:{'application/json':['.qbook']}}]});
+  if(!handle)return;
+  const {book:loaded,text}=await openDirectQBook(handle);
+  const imported=structuredClone(loaded);imported.id=newWorkbook().id;
+  workspace.books.unshift(imported);workspace.active=imported.id;
+  directFiles.set(imported.id,{handle,text});dirtyFiles.delete(imported.id);
+  page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;
+  recalculator.reset();persist();render();
+  status('Файл с диска открыт. Изменения записываются только по команде «Сохранить».');
+ }catch(error){if(error.name!=='AbortError')status(error.message||'Ошибка открытия',true);}
+}
+function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Скачивание резервной копии запрошено. Проверьте загрузки.');}
 async function importFile(file){if(!file)return;if(file.size>15_000_000){status('Файл больше 15 МБ не поддерживается',true);return;}try{
- const name=file.name.toLowerCase();const text=name.endsWith('.xlsx')?'':await file.text();if(name.endsWith('.qbackup')){const restored=decodeWorkspace(text);if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;workspace=restored;page='home';workspace.active=workspace.books[0]?.id??null;persist();render();status('Рабочее пространство восстановлено');return;}
- let imported;if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}else if(name.endsWith('.csv')){imported=importCSV(text,file.name.replace(/\.csv$/i,''));}else if(name.endsWith('.xlsx')){imported=await importXLSX(await file.arrayBuffer(),file.name);}else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
- workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';saveHandle=null;persist();render();status(name.endsWith('.xlsx')?'XLSX открыт: проверьте данные. Диаграммы и сложные возможности не переносились.':'Импорт завершён');
- }catch(e){status(e.message||'Не удалось открыть файл',true);}}
+ const name=file.name.toLowerCase(),text=name.endsWith('.xlsx')?'':await file.text();
+ if(name.endsWith('.qbackup')){
+  const restored=decodeWorkspace(text);
+  if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;
+  workspace=restored;directFiles.clear();dirtyFiles.clear();
+  page='home';workspace.active=workspace.books[0]?.id??null;persist();render();
+  status('Черновики восстановлены из архива. Файлы на диске не привязаны.');return;
+ }
+ let imported;
+ if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}
+ else if(name.endsWith('.csv'))imported=importCSV(text,file.name.replace(/\.csv$/i,''));
+ else if(name.endsWith('.xlsx'))imported=await importXLSX(await file.arrayBuffer(),file.name);
+ else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
+ workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';persist();render();
+ status(name.endsWith('.xlsx')?'XLSX открыт: сложные возможности не переносились.':'Импорт завершён. Для записи на диск используйте «Сохранить».');
+ }catch(e){status(e.message||'Не удалось открыть файл',true);}
+}
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
 function setSelection(a,b=a){if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
 function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:activeCell);if(!p)return;let r=Math.min(Math.max(p.row+dr,0),LIMITS.rows-1),c=Math.min(Math.max(p.col+dc,0),LIMITS.columns-1);
