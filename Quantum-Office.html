@@ -756,14 +756,23 @@ function firstVisibleIndex(positions,coordinate){
 }
 function getCell(sheet,ref){return sheet.cells[String(ref).toUpperCase()]||{value:'',style:{}};}
 
+/** Column-level inheritance excludes the explicit style of its first cell.
+ * Excel column styles must not accidentally propagate A1's custom fill to A2. */
+function getColumnBaseStyle(sheet,col){
+ const style={...(sheet.defaultStyle||{}),...(sheet.columnStyles?.[col]||{})};
+ if(style.align===undefined&&sheet.defaultAlign!=null)style.align=sheet.defaultAlign;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
+ return style;
+}
 /** Layered style resolution, without allocation for empty virtual rows. */
 function getEffectiveStyle(sheet,ref){
  const pos=parseCell(ref),own=sheet.cells[String(ref).toUpperCase()]?.style||{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
  const style={...(sheet.defaultStyle||{}),...(column||{}),...own};
- const align=own.align??column?.align??sheet.defaultStyle?.align??sheet.defaultAlign;
+ const align=Object.hasOwn(own,'align')?own.align:Object.hasOwn(column||{},'align')?column.align:sheet.defaultStyle?.align??sheet.defaultAlign;
  if(align!==undefined&&align!==null)style.align=align;
  else delete style.align;
+ for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
 const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align']);
@@ -791,7 +800,10 @@ function setBulkColumnStyle(sheet,from,to,patch){
  }else{
   for(let col=area.c1;col<=area.c2;col++){
    const key=String(col),style={...(columns[key]||{})};
-   if(value===undefined)delete style[prop];else style[prop]=value;
+   if(value===undefined){
+    if(prop in (sheet.defaultStyle||{})||(prop==='align'&&sheet.defaultAlign!=null))style[prop]=null;
+    else delete style[prop];
+   }else style[prop]=value;
    if(Object.keys(style).length)columns[key]=style;else delete columns[key];
   }
  }
@@ -1100,8 +1112,9 @@ function validateWorkbook(book){
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
-  const validSparseStyle=style=>style&&typeof style==='object'&&!Array.isArray(style)&&
+  const validSparseStyle=(style,allowNull=false)=>style&&typeof style==='object'&&!Array.isArray(style)&&
    Object.keys(style).every(k=>bulkStyleProps.has(k))&&Object.entries(style).every(([k,v])=>{
+    if(v===null)return allowNull;
     if(k==='align')return ['left','center','right'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
     if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
@@ -1111,7 +1124,7 @@ function validateWorkbook(book){
   if(sheet.columnStyles!==undefined){
    const styles=sheet.columnStyles;
    if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>LIMITS.columns||
-     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style)))
+     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style,true)))
     throw Error('Повреждено оформление столбцов');
   }
   for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,DIMENSIONS.minColumn,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,DIMENSIONS.minRow,DIMENSIONS.maxRow]]){
@@ -1614,7 +1627,7 @@ function styleCatalog(book){
  const keyOf=s=>JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{}));
  const register=s=>{const key=keyOf(s);if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}return lookup.get(key);};
  for(const sheet of book.sheets){
-  for(let c=0;c<LIMITS.columns;c++)register(getEffectiveStyle(sheet,cellName(0,c)));
+  for(let c=0;c<LIMITS.columns;c++)register(getColumnBaseStyle(sheet,c));
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
  return {unique,lookup,getId:s=>lookup.get(keyOf(s))||0};
@@ -1641,7 +1654,7 @@ async function exportXLSX(book){validateWorkbook(book);const zip=new JSZip();con
     ...(s.defaultAlign||Object.keys(s.defaultStyle||{}).length||Object.keys(s.columnStyles||{}).length
        ?Array.from({length:LIMITS.columns},(_,i)=>String(i)):[])]);
   const cols=[...colIndexes].sort((a,b)=>+a-+b).map(index=>{
-   const pixels=s.columnWidths?.[index],style=getEffectiveStyle(s,cellName(0,+index));
+   const pixels=s.columnWidths?.[index],style=getColumnBaseStyle(s,+index);
    const id=styles.getId(style);
    return '<col min="'+(+index+1)+'" max="'+(+index+1)+'"'+
      (pixels?' width="'+((pixels-5)/7).toFixed(2)+'" customWidth="1"':'')+
