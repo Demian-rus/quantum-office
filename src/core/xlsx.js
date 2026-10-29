@@ -11,9 +11,17 @@ export const elements=(parent,tag)=>Array.from(parent?.children||[]).filter(n=>n
 export const text=(node,tag)=>element(node,tag)?.textContent||'';
 export function parseXML(xml){if(typeof DOMParser==='undefined')throw Error('Для чтения XLSX требуется браузер с XML-парсером');const doc=new DOMParser().parseFromString(xml,'application/xml');if(doc.getElementsByTagName('parsererror').length)throw Error('Некорректный XML в XLSX');return doc.documentElement;}
 export function rgba(xml){const v=xml?.getAttribute('rgb');return v&&/^(?:[0-9A-F]{2})?[0-9A-F]{6}$/i.test(v)?'#'+v.slice(-6).toLowerCase():undefined;}
-export function stylesFromXML(root){if(!root)return [{}];const fonts=elements(element(root,'fonts'),'font').map(node=>({bold:!!element(node,'b'),italic:!!element(node,'i'),color:rgba(element(node,'color'))}));const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?rgba(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
- const borders=elements(element(root,'borders'),'border').map(node=>Object.fromEntries(['left','right','top','bottom'].filter(side=>!!element(node,side)?.getAttribute('style')).map(side=>[side,true])));
- return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(bg)style.bg=bg;const sides=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(sides).length)style.borders=sides;if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
+export function stylesFromXML(root){if(!root)return [{}];const fonts=elements(element(root,'fonts'),'font').map(node=>{
+ const fontSize=Number(element(node,'sz')?.getAttribute('val'));
+ return {bold:!!element(node,'b'),italic:!!element(node,'i'),color:rgba(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
+});const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?rgba(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
+ const borders=elements(element(root,'borders'),'border').map(node=>{
+ const sides=Object.fromEntries(['left','right','top','bottom'].filter(side=>!!element(node,side)?.getAttribute('style')).map(side=>[side,true]));
+ const named=['left','right','top','bottom'].filter(side=>sides[side]);
+ const colors=named.map(side=>rgba(element(element(node,side),'color'))||'#000000');
+ return {sides,color:colors.length&&new Set(colors).size===1?colors[0]:undefined};
+});
+ return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
  else if(id===22||(/[yd]/i.test(fmt)&&/[hs]/i.test(fmt)))style.format='datetime';
  else if([14,15,16,17].includes(id)||/[yd]/i.test(fmt))style.format='date';
  else if([18,19,20,21,45,47].includes(id)||/[hs]/i.test(fmt))style.format='time';
@@ -25,7 +33,7 @@ export const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships
 /** OOXML requires styled blank cells for arbitrary rectangles. Expand only up
  * to this hard limit, then refuse before creating any output. */
 export const MAX_XLSX_RECTANGLE_CELLS=200000;
-const styleProps=['bg','color','bold','italic','wrap','format','align'];
+const styleProps=['bg','color','bold','italic','wrap','format','align','fontSize'];
 function rectangleBands(sheet,styles){
  const rects=(sheet.rectangleStyles||[]).map(layer=>rectangle(layer.from,layer.to));
  if(!rects.length)return [];
@@ -75,6 +83,14 @@ export async function importXLSX(data,filename='Таблица'){
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
+   // Excel row heights are points. Excel column widths are character counts;
+   // the 7px character / 5px padding conversion matches Calibri 11 approx.
+   // Per-sheet defaults avoid substituting Quantum's wider 116px columns.
+   const defaults=element(xml,'sheetFormatPr');
+   const defaultCol=Number(defaults?.getAttribute('defaultColWidth')||defaults?.getAttribute('baseColWidth')||0);
+   const defaultRow=Number(defaults?.getAttribute('defaultRowHeight')||0);
+   if(defaultCol>0){const px=Math.round(defaultCol*7+5);if(px>=12&&px<=520)sheet.defaultColumnWidth=px;}
+   if(defaultRow>0){const px=Math.round(defaultRow*4/3);if(px>=12&&px<=160)sheet.defaultRowHeight=px;}
    const pane=element(element(xml,'sheetViews')?.getElementsByTagNameNS('*','sheetView')?.[0]||null,'pane');
    if(pane?.getAttribute('state')==='frozen'){
     const rows=Number(pane.getAttribute('ySplit')||0),cols=Number(pane.getAttribute('xSplit')||0);
@@ -94,11 +110,11 @@ export async function importXLSX(data,filename='Таблица'){
    if(col.hasAttribute('style')&&fmt[columnStyleIndex]){
     // Column borders cannot be compactly represented by this model; preserve
     // the supported font, fill, number and alignment properties only.
-    const allowed=new Set(['bg','color','bold','italic','wrap','format','align']);
+    const allowed=new Set(['bg','color','bold','italic','wrap','format','align','fontSize']);
     const loaded=Object.fromEntries(Object.entries(fmt[columnStyleIndex]).filter(([k])=>allowed.has(k)));
     for(let c=min-1;c<max;c++)if(Object.keys(loaded).length)sheet.columnStyles[String(c)]=loaded;
    }
-   const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=48&&px<=520)for(let c=min-1;c<max;c++)setColumnWidth(sheet,c,px);
+   const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=12&&px<=520)for(let c=min-1;c<max;c++)sheet.columnWidths[String(c)]=px;
    if(col.getAttribute('hidden')==='1')for(let c=min-1;c<max;c++)setHidden(sheet,'col',c,true);
   }
   if(alignedColumns.size===LIMITS.columns&&new Set(alignedColumns.values()).size===1){
@@ -117,7 +133,7 @@ export async function importXLSX(data,filename='Таблица'){
   const compact=xmlCells>LIMITS.cells||needsMask;
   for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
-   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=22&&px<=160)setRowHeight(sheet,index-1,px);}
+   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=12&&px<=160)sheet.rowHeights[String(index-1)]=px;}
   }
   const completed=[],active=new Map();let previousRow=0;
   for(const row of importedRows){
@@ -186,10 +202,10 @@ export function styleCatalog(book){
  return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0};
 }
 export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([['',0]]);const cells=styles.unique.map(s=>{
- const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
+ const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'',s.fontSize||11]);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
  let fillId=0;if(s.bg){if(!fillIds.has(s.bg)){fillIds.set(s.bg,fills.length);fills.push(s.bg);}fillId=fillIds.get(s.bg);}
- const edges=s.borders|| (s.border==='thin'?{left:true,right:true,top:true,bottom:true}:{});const key=['left','right','top','bottom'].filter(side=>edges[side]).join(',');if(!borderIds.has(key)){borderIds.set(key,borderDefs.length);borderDefs.push(edges);}return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,wrap:!!s.wrap,border:borderIds.get(key)};});
- let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="11"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>`<${edge}${b[edge]?' style="thin"':''}/>`).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
+ const edges=s.borders|| (s.border==='thin'?{left:true,right:true,top:true,bottom:true}:{});const key=['left','right','top','bottom'].filter(side=>edges[side]).join(',')+'|'+(s.borderColor||'');if(!borderIds.has(key)){borderIds.set(key,borderDefs.length);borderDefs.push({...edges,borderColor:s.borderColor});}return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,wrap:!!s.wrap,border:borderIds.get(key)};});
+ let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>`<${edge}${b[edge]?' style="thin"':''}>${b[edge]&&b.borderColor?`<color rgb="FF${b.borderColor.slice(1).toUpperCase()}"/>`:''}</${edge}>`).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
 }
 export async function exportXLSX(book){validateWorkbook(book);
  const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
@@ -238,7 +254,7 @@ export async function exportXLSX(book){validateWorkbook(book);
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}</worksheet>`;
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
