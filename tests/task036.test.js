@@ -80,6 +80,7 @@ test('clipboard uses inherited column fill, format and font, even for empty virt
 test('XLSX stores one column style across 100k rows without materializing 100k cells',async()=>{
  const b=newWorkbook(),s=currentSheet(b);
  setCell(s,'B100000','Низ');
+ setStyle(s,'B1',{color:'#fb923c'}); // This isolated cell must not color entire column.
  setBulkColumnStyle(s,'B1','B100000',{bg:'#aabbcc'});
  setBulkColumnStyle(s,'B1','B100000',{align:'center'});
  const zip=await globalThis.JSZip.loadAsync(await exportXLSX(b),{checkCRC32:true});
@@ -87,7 +88,11 @@ test('XLSX stores one column style across 100k rows without materializing 100k c
  const styles=await zip.file('xl/styles.xml').async('string');
  assert.match(xml,/<col min="2" max="2"[^>]*style="\d+"/);
  assert.match(xml,/r="B100000"/);
- assert.equal((xml.match(/<c /g)||[]).length,1);
+ assert.equal((xml.match(/<c /g)||[]).length,2);
+ const columnId=/<col min="2" max="2"[^>]*style="(\\d+)"/.exec(xml)?.[1];
+ const firstCellId=/<c r="B1"[^>]*s="(\\d+)"/.exec(xml)?.[1];
+ assert.ok(columnId&&firstCellId);
+ assert.notEqual(columnId,firstCellId,'B1 custom color leaked to whole column');
  assert.match(styles,/FFAABBCC/);
  assert.match(styles,/horizontal="center"/);
 });
