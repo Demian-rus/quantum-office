@@ -45,3 +45,4 @@ jobs:
       - run: python tests/task035_browser.py
       - run: python tests/task036_browser.py
       - run: python tests/task037_browser.py
+      - run: python tests/task038_browser.py
