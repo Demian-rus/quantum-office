@@ -322,6 +322,33 @@
 .cf-rule button{background:#fff3f3;border-radius:5px;color:#a94646;font-size:17px;cursor:pointer;padding:2px 8px}
 .cf-note{border-top:1px solid #e8eef0;color:#8a9aa5;font-size:10px;line-height:1.45;padding:11px 14px}
 @media(max-width:650px){.cf-panel{right:8px;top:150px;max-height:calc(100% - 168px)}}
+
+/* TASK052: compact offline validation rules, no grid-width change */
+#validation-choice-slot:empty{display:none}
+.validation-cell-control{height:33px;display:flex;align-items:center;gap:6px;padding:0 8px;border-right:1px solid #dae5ee;color:#4b796a;font-size:10px;font-weight:700}
+.validation-cell-control select{width:clamp(90px,12vw,185px);height:27px;border:1px solid #a8cbb7;border-radius:5px;background:#eef7f2;color:#22563e;padding:2px 5px;font-size:11px}
+.validation-panel{position:absolute;right:16px;top:164px;z-index:1150;width:min(405px,calc(100vw - 32px));max-height:calc(100% - 183px);overflow:auto;border:1px solid #b8ccd8;border-radius:12px;background:#fff;box-shadow:0 14px 44px rgba(20,45,67,.24);color:#2c4254;font:12px "Segoe UI",Arial,sans-serif}
+.validation-panel [hidden]{display:none!important}
+.validation-panel-head{display:flex;align-items:center;gap:12px;padding:0 13px;height:43px;border-bottom:1px solid #dae6e0;background:#f1f7f4}
+.validation-panel-head strong{font-size:14px}.validation-panel-head span{margin-left:auto;color:#81929d;font-size:11px}
+.validation-panel-head button{cursor:pointer;color:#647989;background:transparent;font-size:23px;padding:3px 8px}
+.validation-form{display:grid;gap:10px;padding:14px;border-bottom:1px solid #edf0f2}
+.validation-form small{font-size:10px;color:#718696}
+.validation-form label{display:grid;grid-template-columns:120px 1fr;align-items:center;gap:8px;font-size:11px;color:#5a7081;font-weight:650}
+.validation-form select,.validation-form input,.validation-form textarea{min-width:0;width:100%;border:1px solid #c7d7e0;border-radius:6px;background:#fff;color:#253c52;padding:7px 9px;font:12px "Segoe UI",Arial,sans-serif}
+.validation-form textarea{resize:vertical;min-height:54px}
+#validation-number-row{display:grid;gap:10px}
+.validation-add{cursor:pointer;border:1px solid #1c7352;background:#277b57;color:#fff;font-size:11px;font-weight:750;padding:10px;border-radius:6px}
+.validation-rules{padding:11px 14px;max-height:205px;overflow:auto}
+.validation-rules h4{margin:2px 0 9px;font-size:11px;color:#697e90}
+.validation-rules p{font-size:11px;color:#798b9b}
+.validation-rule{display:flex;align-items:center;gap:10px;border-bottom:1px solid #e9eff2;padding:9px 0}
+.validation-rule div{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}
+.validation-rule strong{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:11px}
+.validation-rule small{color:#8295a1;font-size:10px}
+.validation-rule button{cursor:pointer;color:#ad4a4a;background:#fff0f0;font-size:17px;border-radius:5px;padding:2px 8px}
+.validation-note{padding:10px 14px;color:#8397a2;font-size:10px;line-height:1.55;border-top:1px solid #e9eff2}
+@media(max-width:650px){.validation-panel{right:8px;top:151px;max-height:calc(100% - 169px)}}
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -2572,6 +2599,115 @@ function shiftConditionalRules(sheet,axis,mode,index,count){
  * This function preserves sheet qualifiers, case, $ anchors and string literals.
  */
 
+/** Bounded, offline Data Validation: dropdown list or inclusive numeric interval.
+ * Deliberately validates direct raw writes, not formula results or source imports.
+ */
+
+const VLD_MAX=32,VLD_CELLS=4000;
+function vldArea(rule){
+ const rect=rule&&typeof rule.from==='string'&&typeof rule.to==='string'?rectangle(rule.from,rule.to):null;
+ if(!rect||rect.r2>=LIMITS.rows||rect.c2>=LIMITS.columns||
+    rect.r1<0||rect.c1<0||cellName(rect.r1,rect.c1)!==rule.from||
+    cellName(rect.r2,rect.c2)!==rule.to||
+    (rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>VLD_CELLS)
+  throw Error('Диапазон проверки данных не должен превышать 4 000 ячеек');
+ return rect;
+}
+function validateDataRules(sheet){
+ if(sheet.validations===undefined)return;
+ if(!Array.isArray(sheet.validations)||sheet.validations.length>VLD_MAX)
+  throw Error('Повреждены правила проверки данных');
+ const ids=new Set();
+ for(const rule of sheet.validations){
+  if(!rule||typeof rule!=='object'||Array.isArray(rule)||
+     typeof rule.id!=='string'||!rule.id||rule.id.length>100||ids.has(rule.id)||
+     !['list','number'].includes(rule.kind)||
+     Object.keys(rule).some(key=>!['id','from','to','kind','options','min','max'].includes(key)))
+   throw Error('Повреждено правило проверки данных');
+  const rect=vldArea(rule);
+  if(rule.kind==='list'){
+   if(rule.min!==undefined||rule.max!==undefined||!Array.isArray(rule.options)||
+      rule.options.length<2||rule.options.length>30||
+      rule.options.some(value=>typeof value!=='string'||!value.trim()||value!==value.trim()||
+        value.length>100||value.startsWith('='))||
+      new Set(rule.options).size!==rule.options.length)throw Error('Некорректные значения выпадающего списка');
+  }else if(rule.options!==undefined||typeof rule.min!=='number'||typeof rule.max!=='number'||
+      !Number.isFinite(rule.min)||!Number.isFinite(rule.max)||rule.min>rule.max)
+   throw Error('Некорректный диапазон чисел');
+  for(const prev of sheet.validations){
+   if(prev===rule)break;
+   const earlier=vldArea(prev);
+   if(rect.r1<=earlier.r2&&rect.r2>=earlier.r1&&rect.c1<=earlier.c2&&rect.c2>=earlier.c1)
+    throw Error('Правила проверки данных не должны пересекаться');
+  }
+  ids.add(rule.id);
+ }
+}
+function validationAt(sheet,ref){
+ const p=parseCell(ref);if(!p)return null;
+ for(const rule of sheet.validations||[]){
+  const rect=vldArea(rule);
+  if(p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2)return rule;
+ }
+ return null;
+}
+function checkValidatedInput(sheet,ref,value){
+ const rule=validationAt(sheet,ref),text=String(value??'');
+ if(!rule||text===''||text.startsWith('='))return; // formulas are calculated separately
+ if(rule.kind==='list'){
+  if(!rule.options.includes(text))throw Error('Недопустимое значение в '+ref+'. Выберите вариант из списка.');
+ }else{
+  const normalized=text.trim();
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized)||
+      !Number.isFinite(Number(normalized))||
+      Number(normalized)<rule.min||Number(normalized)>rule.max)
+   throw Error('Ячейка '+ref+': разрешены числа от '+rule.min+' до '+rule.max);
+ }
+}
+function addDataRule(sheet,from,to,kind,payload){
+ if(!['list','number'].includes(kind))throw Error('Выберите тип проверки');
+ const rect=rectangle(from,to);if(!rect)throw Error('Выделите диапазон ячеек');
+ const rule={id:uid(),from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2),kind};
+ if(kind==='list'){
+  if(typeof payload!=='string'||payload.length>3099)throw Error('Слишком длинный список');
+  rule.options=payload.split(/[;\n]/).map(v=>v.trim()).filter(Boolean);
+ }else{
+  const parts=typeof payload==='string'?payload.split(';').map(v=>v.trim()):[];
+  if(parts.length!==2||parts.some(v=>!v||!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v)))
+   throw Error('Укажите минимальное и максимальное число через ;');
+  rule.min=Number(parts[0]);rule.max=Number(parts[1]);
+ }
+ const candidate={...sheet,validations:[...(sheet.validations||[]),rule]};
+ validateDataRules(candidate);
+ sheet.validations=candidate.validations;
+ return rule;
+}
+function deleteDataRule(sheet,id){
+ const old=sheet.validations||[],filtered=old.filter(rule=>rule.id!==id);
+ if(filtered.length===old.length)throw Error('Правило не найдено');
+ sheet.validations=filtered;
+}
+function shiftDataRules(sheet,axis,mode,index,count){
+ return (sheet.validations||[]).map(rule=>{
+  const r=vldArea(rule),a0=axis==='row'?r.r1:r.c1,b0=axis==='row'?r.r2:r.c2;
+  const last=index+count-1;let a=a0,b=b0;
+  if(mode==='insert'){
+   if(index<=a0){a+=count;b+=count;}
+   else if(index<=b0)b+=count;
+  }else if(last<a0){a-=count;b-=count;}
+  else if(index<=b0&&last>=a0){
+   const removed=Math.min(last,b0)-Math.max(index,a0)+1;
+   if(removed>=b0-a0+1)throw Error('Удаление уничтожит диапазон проверки данных');
+   a=index<=a0?index:a0;b=b0-removed;
+  }
+  if(a<0||b>=(axis==='row'?LIMITS.rows:LIMITS.columns))throw Error('Правило проверки выйдет за пределы листа');
+  const next={...rule,from:axis==='row'?cellName(a,r.c1):cellName(r.r1,a),
+    to:axis==='row'?cellName(b,r.c2):cellName(r.r2,b)};
+  vldArea(next);return next;
+ });
+}
+
+
 const CUT_REF_RE=/(?<![\p{L}\p{N}_.$])(?:(?:'((?:[^']|'')+)'|([\p{L}_][\p{L}\p{N}_.]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![\p{L}\p{N}_.])/giu;
 const CUT_TOKEN_RE=new RegExp('"(?:[^"]|"")*"|'+CUT_REF_RE.source,'giu');
 const cutRefOverlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -3420,6 +3556,7 @@ async function writeVerifiedQBook(handle,expectedText,serialized){
 
 
 
+
 const app=document.getElementById('app');
 /** Only validated, fixed border enums become CSS. */
 function borderCSS(side,edge){
@@ -3448,6 +3585,7 @@ let resizeDrag=null, filterColumn=null;
 let internalClipboard=null;
 let chartDrawerOpen=false,selectedChartId=null;
 let conditionalPanelOpen=false;
+let validationPanelOpen=false;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
@@ -3587,7 +3725,7 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
  }catch(e){status(e.message||'Не удалось открыть файл',true);}
 }
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
-function setSelection(a,b=a){if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
+function setSelection(a,b=a){if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;const slot=document.querySelector('#validation-choice-slot');if(slot)slot.innerHTML=validationDropdown();document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
 function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:activeCell);if(!p)return;let r=Math.min(Math.max(p.row+dr,0),LIMITS.rows-1),c=Math.min(Math.max(p.col+dc,0),LIMITS.columns-1);
  if(dr){while(r>=0&&r<LIMITS.rows&&!rowVisible(sheet(),r))r+=Math.sign(dr);r=Math.min(Math.max(r,0),LIMITS.rows-1);}
  if(dc){while(c>=0&&c<LIMITS.columns&&!columnVisible(sheet(),c))c+=Math.sign(dc);c=Math.min(Math.max(c,0),LIMITS.columns-1);}
@@ -3623,14 +3761,14 @@ function commitSelectedEntry(){
   status(`Заполнено Ctrl+Enter: ${count} ячеек`);
  }catch(error){status(error.message||'Массовый ввод не выполнен',true);}
 }
-function commitEditor(cancel=false){if(!editing)return;const {node,ref,initial}=editing;const value=cancel?initial:node.value;editing=null;node.remove();if(!cancel&&value!==initial){transact(()=>setTypedCell(sheet(),ref,value));}drawGrid();const formula=document.getElementById('formula-input');if(formula)formula.value=getCell(sheet(),ref).value;}
+function commitEditor(cancel=false){if(!editing)return true;const {node,ref,initial}=editing;const value=cancel?initial:node.value;try{if(!cancel&&value!==initial)transact(()=>setTypedCell(sheet(),ref,value));}catch(err){status(err.message||'Недопустимое значение',true);node.focus();return false;}editing=null;node.remove();drawGrid();const formula=document.getElementById('formula-input');if(formula)formula.value=getCell(sheet(),ref).value;const slot=document.querySelector('#validation-choice-slot');if(slot)slot.innerHTML=validationDropdown();return true;}
 function editCell(seed=null){if(!sheet())return;if(!rowVisible(sheet(),parseCell(activeCell)?.row)||!columnVisible(sheet(),parseCell(activeCell)?.col)){status('Ячейка скрыта: сначала отобразите строку или столбец',true);return;}commitEditor();const ref=activeCell,p=parseCell(ref),canvas=document.getElementById('grid-canvas');if(!canvas||!p)return;ensureVisible(p.row,p.col);
  const node=document.createElement('input');node.className='cell-editor';const {x,y}=gridGeometry(sheet());node.style.left=`${x[p.col]+1}px`;node.style.top=`${y[p.row]-headerH+1}px`;const merged=mergeAt(sheet(),ref),bounds=merged?rectangle(merged.from,merged.to):null;node.style.width=`${Math.max((bounds?x[bounds.c2+1]:x[p.col+1])-x[p.col]-2,160)}px`;node.style.height=`${(bounds?y[bounds.r2+1]:y[p.row+1])-y[p.row]-2}px`;const rawInput=getCell(sheet(),ref).value,fmt=getCell(sheet(),ref).style?.format;
  const {raw:editRaw,ctx:editCtx}=recalculator.view(book(),sheet());
  const initialInput=['date','time','datetime','duration'].includes(fmt)&&rawInput&&!rawInput.startsWith('=')?displayedValue(sheet(),ref,editRaw,editCtx):rawInput;
  node.value=seed===null?initialInput:seed;canvas.append(node);
  editing={node,ref,initial:initialInput};node.focus();if(seed===null)node.select();
- node.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();event.stopPropagation();commitSelectedEntry();}else if(event.key==='Enter'){event.preventDefault();commitEditor();moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();commitEditor();moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
+ node.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();event.stopPropagation();commitSelectedEntry();}else if(event.key==='Enter'){event.preventDefault();if(commitEditor())moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();if(commitEditor())moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
  node.addEventListener('blur',()=>{if(editing?.node===node)commitEditor();});}
 function selectionContainsHiddenRows(){
  const rect=rectangle(activeCell,rangeEnd),s=sheet();if(!rect||!s)return false;
@@ -3870,6 +4008,7 @@ function filterPopup(){const f=sheet()?.autoFilter,rect=filterRange(sheet());if(
 }
 // Consistent vector iconography; no external font or network requests.
 const icons={
+ validation:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 9l3 3 6-6M7 17h10"/>',
  conditional:'<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 10h18M10 3v18M11 16h7M13 13l2-2 2 2"/>',
  charts:'<rect x="3" y="11" width="4" height="9" rx="1"/><rect x="10" y="6" width="4" height="14" rx="1"/><rect x="17" y="3" width="4" height="17" rx="1"/>',
  chartLine:'<polyline points="2,19 8,12 13,15 20,4"/><circle cx="8" cy="12" r="1"/><circle cx="13" cy="15" r="1"/>',
@@ -3944,12 +4083,12 @@ const icons={
 function toolIcon(action,original,extra=''){
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):action==='format'?({general:'num',currency:'currency',percent:'percent',integer:'integer',date:'date',time:'time',datetime:'datetime',duration:'duration'}[/data-value="([^"]+)"/.exec(extra)?.[1]]||'num'):
- ({'conditional-open':'conditional','chart-bar':'charts','chart-line':'chartLine','chart-pie':'chartPie','charts-open':'charts','copy':'copy','paste-values':'pasteValues','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
+ ({'validation-open':'validation','conditional-open':'conditional','chart-bar':'charts','chart-line':'chartLine','chart-pie':'chartPie','charts-open':'charts','copy':'copy','paste-values':'pasteValues','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['conditional-open','chart-bar','chart-line','chart-pie','charts-open','paste-values','find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
+ const labeled=new Set(['validation-open','conditional-open','chart-bar','chart-line','chart-pie','charts-open','paste-values','find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
@@ -3967,7 +4106,7 @@ function ribbon(){
  group('Заполнение',button('fill-down','Заполнить вниз','↓')+button('fill-right','Заполнить вправо','→'))+
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
- if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
+ if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Проверка',button('validation-open','Проверка данных','✓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Диаграммы',button('chart-bar','Столбчатая диаграмма','▥')+button('chart-line','Линейная диаграмма','⌁')+button('chart-pie','Круговая диаграмма','◉')+button('charts-open','Мои диаграммы','▣'))+group('Листы',button('sheet-add','Новый лист','+'));
  if(activeRibbon==='view')contents=group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('save-as','Сохранить как','⇩')+button('open-disk','Открыть с диска','↥')+button('backup','Архив','▤')+button('import','Импорт','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
@@ -3975,6 +4114,48 @@ function ribbon(){
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}</div><div class="ribbon-controls">${contents}</div>${palettePopup()}${bordersPopup()}${finder}</div>`;
 }
 
+
+
+function validationDropdown(){
+ if(!sheet()||activeCell!==rangeEnd)return '';
+ const rule=validationAt(sheet(),activeCell);
+ if(!rule||rule.kind!=='list')return '';
+ const current=getCell(sheet(),activeCell).value;
+ return '<label class="validation-cell-control" title="Выберите разрешённое значение"><span>Список</span><select id="validation-cell-select" aria-label="Выбрать значение ячейки">'+
+  '<option value="" '+(current===''?'selected':'')+'>— Выберите —</option>'+
+  rule.options.map(value=>'<option value="'+esc(value)+'" '+(value===current?'selected':'')+'>'+esc(value)+'</option>').join('')+
+  '</select></label>';
+}
+function validationPanel(){
+ if(!validationPanelOpen||page!=='sheet'||!sheet())return '';
+ const rules=sheet().validations||[];
+ const list=rules.map(rule=>'<div class="validation-rule"><div><strong>'+
+   esc(rule.kind==='list'?'Выпадающий список: '+rule.options.join(', '):'Число от '+rule.min+' до '+rule.max)+
+   '</strong><small>'+esc(rule.from+':'+rule.to)+'</small></div>'+
+   '<button data-action="validation-delete" data-id="'+esc(rule.id)+'" aria-label="Удалить проверку">×</button></div>').join('');
+ return '<aside class="validation-panel" id="validation-panel" role="complementary" aria-label="Проверка данных">'+
+ '<header class="validation-panel-head"><strong>Проверка данных</strong><span>'+rules.length+' / 32</span>'+
+ '<button data-action="validation-close" aria-label="Закрыть проверку данных">×</button></header>'+
+ '<div class="validation-form"><small>Выделенный диапазон: '+esc(activeCell===rangeEnd?activeCell:activeCell+':'+rangeEnd)+'</small>'+
+ '<label>Тип правила <select id="validation-kind"><option value="list">Выпадающий список</option><option value="number">Число в диапазоне</option></select></label>'+
+ '<label id="validation-list-row">Элементы списка <textarea id="validation-list" rows="3" placeholder="Да; Нет; Не определено"></textarea></label>'+
+ '<div id="validation-number-row" hidden><label>Минимум <input id="validation-min" type="number" step="any" value="0"></label>'+
+ '<label>Максимум <input id="validation-max" type="number" step="any" value="100"></label></div>'+
+ '<button class="validation-add" data-action="validation-add">Добавить правило</button></div>'+
+ '<div class="validation-rules"><h4>Правила текущего листа</h4>'+ (list||'<p>Нет правил. Выделите нужные ячейки и добавьте первое.</p>')+'</div>'+
+ '<div class="validation-note">Пустое значение разрешено; неверный ручной ввод и вставка блокируются. Формулы не ограничены до вычисления. XLSX пока не экспортирует эти правила.</div></aside>';
+}
+function createValidationFromPanel(){
+ if(!sheet())return;
+ commitEditor();
+ try{
+  const kind=document.querySelector('#validation-kind')?.value;
+  const payload=kind==='list'?document.querySelector('#validation-list')?.value||'':
+   (document.querySelector('#validation-min')?.value||'')+';'+(document.querySelector('#validation-max')?.value||'');
+  transact(()=>addDataRule(sheet(),activeCell,rangeEnd,kind,payload));
+  render();status('Проверка данных установлена');
+ }catch(err){status(err.message||'Невозможно установить проверку',true);}
+}
 
 function conditionalPanel(){
  if(!conditionalPanelOpen||page!=='sheet'||!sheet())return '';
@@ -4041,7 +4222,7 @@ function createSelectedChart(type){
  }catch(err){status(err.message||'Диаграмма не создана',true);}
 }
 
-function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}</main>`;}
+function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}</main>`;}
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
@@ -4094,8 +4275,12 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
- case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status(book().sheets.some(s=>s.charts?.length||s.conditionalRules?.length)?'XLSX скачан БЕЗ диаграмм и условного форматирования. Сохраните .qbook':'XLSX скачан: частичная совместимость, сохраните оригинал отдельно');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
+ case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status(book().sheets.some(s=>s.charts?.length||s.conditionalRules?.length||s.validations?.length)?'XLSX скачан БЕЗ диаграмм, проверок данных и условного форматирования. Сохраните .qbook':'XLSX скачан: частичная совместимость, сохраните оригинал отдельно');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'validation-open':chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=true;render();break;
+ case 'validation-close':validationPanelOpen=false;render();break;
+ case 'validation-add':createValidationFromPanel();break;
+ case 'validation-delete':try{transact(()=>deleteDataRule(sheet(),id));render();status('Проверка удалена');}catch(err){status(err.message,true);}break;
  case 'conditional-open':chartDrawerOpen=false;conditionalPanelOpen=true;render();break;
  case 'conditional-close':conditionalPanelOpen=false;render();break;
  case 'conditional-add':addSelectedCondition();break;
@@ -4137,8 +4322,8 @@ app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))reco
 app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.target.closest('.format-popover,[data-action=fill-palette],[data-action=text-palette],[data-action=border-menu]')){activePalette=null;borderMenuOpen=false;document.querySelectorAll('.format-popover').forEach(el=>el.remove());}},true);
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
-app.addEventListener('change',e=>{const t=e.target;if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();}});
-app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
+app.addEventListener('change',e=>{const t=e.target;if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
+app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('</script></body></html>,''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});
 window.addEventListener('pointermove',e=>{if(!resizeDrag||!sheet()||sheet().id!==resizeDrag.sheetId)return;const d=resizeDrag;const offset=(d.axis==='col'?e.clientX:e.clientY)-d.start;const min=d.axis==='col'?DIMENSIONS.minColumn:DIMENSIONS.minRow,max=d.axis==='col'?DIMENSIONS.maxColumn:DIMENSIONS.maxRow;const next=Math.min(max,Math.max(min,Math.round(d.original+offset)));
