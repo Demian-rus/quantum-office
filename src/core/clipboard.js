@@ -65,3 +65,81 @@ export function pasteCells(sheet,target,clip){
  }
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
 }
+
+/** A cut is a deferred same-sheet move, NEVER deletion on Ctrl+X.
+ * Sheet and source must still match their clipboard snapshot at paste time.
+ * Moving data referenced by formulas is currently refused: the full AST
+ * reference-rebasing semantics are not implemented, and silent damage to
+ * dependent calculations would be worse than an explicit limitation. */
+function referencedByFormula(book,sourceSheet,region){
+ if(!book?.sheets)return false;
+ const targetName=sourceSheet.name.toLocaleUpperCase('ru-RU');
+ const regex=/(?<![A-Za-z0-9_.$])(?:(?:'((?:[^']|'')+)'|([A-Za-z_А-ЯЁ][A-Za-z0-9_.А-ЯЁ]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![A-Za-z0-9_.])/gi;
+ for(const sh of book.sheets)for(const cell of Object.values(sh.cells||{})){
+  if(!cell?.value?.startsWith('='))continue;
+  const expression=cell.value.replace(/"(?:[^"]|"")*"/g,'""');
+  regex.lastIndex=0;
+  for(const match of expression.matchAll(regex)){
+   const explicit=match[1]!==undefined?match[1].replaceAll("''","'"):match[2];
+   const addressed=(explicit||sh.name).toLocaleUpperCase('ru-RU');
+   if(addressed!==targetName)continue;
+   const start=parseCell(match[3].replaceAll('$','')),end=parseCell((match[4]||match[3]).replaceAll('$',''));
+   if(!start||!end)continue;
+   const refRect={r1:Math.min(start.row,end.row),c1:Math.min(start.col,end.col),r2:Math.max(start.row,end.row),c2:Math.max(start.col,end.col)};
+   if(overlaps(region,refRect))return true;
+  }
+ }
+ return false;
+}
+export function moveCells(book,sheet,target,cutClip){
+ if(!book||!sheet||!cutClip||cutClip.mode!=='cut'||cutClip.bookId!==book.id||cutClip.sheetId!==sheet.id)
+  throw Error('Вырезанный диапазон можно перенести только в исходный лист');
+ if(sheet.autoFilter)throw Error('Выключите автофильтр перед перемещением диапазона');
+ const origin=parseCell(cutClip.start),dest=parseCell(target);
+ if(!origin||!dest||!validRef(target)||!Number.isInteger(cutClip.rows)||!Number.isInteger(cutClip.cols)||
+    cutClip.rows<1||cutClip.cols<1||cutClip.rows*cutClip.cols>10000)
+  throw Error('Повреждённый диапазон вырезания');
+ const src={r1:origin.row,c1:origin.col,r2:origin.row+cutClip.rows-1,c2:origin.col+cutClip.cols-1};
+ const dst={r1:dest.row,c1:dest.col,r2:dest.row+cutClip.rows-1,c2:dest.col+cutClip.cols-1};
+ if(src.r2>=LIMITS.rows||src.c2>=LIMITS.columns||dst.r2>=LIMITS.rows||dst.c2>=LIMITS.columns)
+  throw Error('Перемещение выходит за границы листа');
+ // Verify that neither region includes invisible material, even if cut
+ // metadata came from an earlier visible state.
+ for(const row of new Set([...Array(cutClip.rows)].flatMap((_,i)=>[src.r1+i,dst.r1+i])))
+  if(sheet.hiddenRows?.[row]||sheet.autoFilter?.hiddenRows?.[row])throw Error('Сначала отобразите скрытые строки');
+ for(const col of new Set([...Array(cutClip.cols)].flatMap((_,i)=>[src.c1+i,dst.c1+i])))
+  if(sheet.hiddenColumns?.[col])throw Error('Сначала отобразите скрытые столбцы');
+ const live=copyCells(sheet,cutClip.start,cellName(src.r2,src.c2),book);
+ if(JSON.stringify(live.cells)!==JSON.stringify(cutClip.cells)||JSON.stringify(live.merges)!==JSON.stringify(cutClip.merges))
+  throw Error('Исходные ячейки изменились после вырезания. Вырежьте диапазон заново');
+ if(src.r1===dst.r1&&src.c1===dst.c1)return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2),unchanged:true};
+ if(referencedByFormula(book,sheet,src))
+  throw Error('На перемещаемые ячейки ссылаются формулы. Перенос без перепривязки ссылок запрещён; используйте копирование');
+ const draft=structuredClone(sheet);
+ const fullMerges=(sheet.merges||[]).filter(m=>inside(rectangle(m.from,m.to),src));
+ draft.merges=(draft.merges||[]).filter(m=>!fullMerges.some(source=>source.from===m.from&&source.to===m.to));
+ for(const m of draft.merges)if(overlaps(dst,rectangle(m.from,m.to)))
+  throw Error('Место вставки пересекается с другим объединением');
+ // Remove only individually stored entries, not the sparse sheet defaults.
+ for(const ref of Object.keys(draft.cells)){
+  const p=parseCell(ref);
+  if(p.row>=src.r1&&p.row<=src.r2&&p.col>=src.c1&&p.col<=src.c2)delete draft.cells[ref];
+ }
+ // The captured visible formatting must move with values. Snapshot-first
+ // staging also handles overlapping source/destination rectangles correctly.
+ for(let r=0;r<cutClip.rows;r++)for(let c=0;c<cutClip.cols;c++){
+  const item=cutClip.cells[r]?.[c];
+  if(typeof item?.value!=='string'||!item.style||typeof item.style!=='object'||Array.isArray(item.style))
+   throw Error('Повреждённые данные вырезания');
+  const ref=cellName(dst.r1+r,dst.c1+c);
+  if(item.value||Object.keys(item.style).length)draft.cells[ref]={value:item.value,style:structuredClone(item.style)};
+  else delete draft.cells[ref];
+ }
+ for(const m of cutClip.merges||[])
+  mergeCells(draft,cellName(dst.r1+m.r1,dst.c1+m.c1),cellName(dst.r1+m.r2,dst.c1+m.c2));
+ const oldCount=Object.keys(sheet.cells).length,nextCount=Object.keys(draft.cells).length;
+ const total=book.sheets.reduce((n,sh)=>n+Object.keys(sh.cells).length,0)-oldCount+nextCount;
+ if(total>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=draft.cells;sheet.merges=draft.merges;
+ return {rows:cutClip.rows,cols:cutClip.cols,end:cellName(dst.r2,dst.c2)};
+}
