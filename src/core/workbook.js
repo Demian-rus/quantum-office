@@ -4,7 +4,7 @@ export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rectangleStyles:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -98,7 +98,7 @@ export function getColumnBaseStyle(sheet,col){
 export function getEffectiveStyle(sheet,ref,includeCell=true){
  const pos=parseCell(ref),own=includeCell?(sheet.cells[String(ref).toUpperCase()]?.style||{}):{};
  const column=pos?sheet.columnStyles?.[pos.col]:null;
- const style={...(sheet.defaultStyle||{}),...(column||{})};
+ const style={...(sheet.defaultStyle||{}),...(column||{}),...(pos?sheet.rowStyles?.[pos.row]||{}:{})};
  if(pos)for(const layer of sheet.rectangleStyles||[]){
   const a=rectangle(layer.from,layer.to);
   if(pos.row>=a.r1&&pos.row<=a.r2&&pos.col>=a.c1&&pos.col<=a.c2)Object.assign(style,layer.style);
@@ -507,11 +507,20 @@ export function validateWorkbook(book){
      throw Error('Повреждено оформление диапазона');
    }
   }
-  if(sheet.columnStyles!==undefined){
-   const styles=sheet.columnStyles;
-   if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>LIMITS.columns||
-     Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||+key>=LIMITS.columns||!validSparseStyle(style,true)))
-    throw Error('Повреждено оформление столбцов');
+  // Row and column OOXML styles include border sides; validate without
+  // allocating individual cells for the full span.
+  const validAxisStyle=style=>style&&typeof style==='object'&&!Array.isArray(style)&&
+   Object.entries(style).every(([key,value])=>{
+    if(key==='borderColor')return typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value);
+    if(key==='borders')return value&&typeof value==='object'&&!Array.isArray(value)&&
+      Object.entries(value).every(([edge,on])=>['left','right','top','bottom'].includes(edge)&&on===true);
+    return validSparseStyle({[key]:value},true);
+   });
+  for(const [name,max] of [['columnStyles',LIMITS.columns],['rowStyles',LIMITS.rows]]){
+   const styles=sheet[name]||{};
+   if(!styles||typeof styles!=='object'||Array.isArray(styles)||Object.keys(styles).length>max||
+      Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
+    throw Error(name==='columnStyles'?'Повреждено оформление столбцов':'Повреждено оформление строк');
   }
   for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
    for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,12,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,12,DIMENSIONS.maxRow]]){

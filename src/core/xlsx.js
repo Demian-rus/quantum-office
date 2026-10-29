@@ -108,9 +108,8 @@ export async function importXLSX(data,filename='Таблица'){
    const columnAlign=col.hasAttribute('style')?fmt[columnStyleIndex]?.align:undefined;
    if(columnAlign)for(let c=min-1;c<max;c++)alignedColumns.set(c,columnAlign);
    if(col.hasAttribute('style')&&fmt[columnStyleIndex]){
-    // Column borders cannot be compactly represented by this model; preserve
-    // the supported font, fill, number and alignment properties only.
-    const allowed=new Set(['bg','color','bold','italic','wrap','format','align','fontSize']);
+    // XLSX may apply borders to a column without storing styled blank cells.
+    const allowed=new Set(['bg','color','bold','italic','wrap','format','align','fontSize','borders','borderColor']);
     const loaded=Object.fromEntries(Object.entries(fmt[columnStyleIndex]).filter(([k])=>allowed.has(k)));
     for(let c=min-1;c<max;c++)if(Object.keys(loaded).length)sheet.columnStyles[String(c)]=loaded;
    }
@@ -134,6 +133,11 @@ export async function importXLSX(data,filename='Таблица'){
   for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
    if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=12&&px<=160)sheet.rowHeights[String(index-1)]=px;}
+   if(row.hasAttribute('s')&&row.getAttribute('customFormat')!=='0'&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows){
+    const id=Number(row.getAttribute('s')),style=fmt[id];
+    if(!Number.isInteger(id)||!style)throw Error('Повреждён стиль строки XLSX');
+    if(Object.keys(style).length)sheet.rowStyles[String(index-1)]=style;
+   }
   }
   const completed=[],active=new Map();let previousRow=0;
   for(const row of importedRows){
@@ -152,12 +156,21 @@ export async function importXLSX(data,filename='Таблица'){
     else if(type==='e')raw=value;
     else raw=value;
     const id=Number(c.getAttribute('s')||0),style=fmt[id]||{};
+    // An explicit XLSX cell style replaces inherited row/column borders.
+    const inherited=getEffectiveStyle(sheet,ref,false);
+    const borderMask=c.hasAttribute('s')&&!style.borders&&inherited.borders;
+    const actualStyle=borderMask?{...style,borders:{}}:style;
     if(!compact||raw){
      if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
      if(raw)setCell(sheet,ref,raw);
-     if(Object.keys(style).length)setStyle(sheet,ref,style);
+     if(Object.keys(actualStyle).length)setStyle(sheet,ref,actualStyle);
     }else if(Object.keys(style.borders||{}).length||style.border)
      throw Error('Большие XLSX-области с границами пустых ячеек пока не поддерживаются: импорт отменён');
+    else if(borderMask){
+     if(xmlCells>LIMITS.cells)throw Error('Большой XLSX содержит перекрытие границ столбцов: сохранение без потерь невозможно');
+     if(++count>LIMITS.cells)throw Error('Слишком много ячеек в XLSX');
+     setStyle(sheet,ref,{borders:{}});
+    }
     if(compact&&c.hasAttribute('s'))candidates.push({col:p.col,id});
    }
    if(compact){
@@ -197,6 +210,7 @@ export function styleCatalog(book){
  const register=s=>{const key=keyOf(s);if(!lookup.has(key)){lookup.set(key,unique.length);unique.push(s);}return lookup.get(key);};
  for(const sheet of book.sheets){
   for(let c=0;c<LIMITS.columns;c++)register(getColumnBaseStyle(sheet,c));
+  for(const rowStyle of Object.values(sheet.rowStyles||{}))register(rowStyle);
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
  return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0};
@@ -253,8 +267,8 @@ export async function exportXLSX(book){validateWorkbook(book);
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
-  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1];return `<row r="${r}"${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}</worksheet>`;
+  const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...Object.keys(s.rowStyles||{}).map(v=>Number(v)+1),...hiddenRows]);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
