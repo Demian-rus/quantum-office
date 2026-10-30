@@ -385,21 +385,37 @@ export function chartSVG(data,type,settings={}){
   series.forEach((item,k)=>{
    const color=colorAt(k);
    if(settings.trendline){
-    const fit=linearRegression(item.points);
+    const quadratic=settings.trendType==='quadratic',
+     fit=quadratic?quadraticRegression(item.points):linearRegression(item.points);
     if(fit){
-     const visible=clippedTrendSegment(fit,xMin,xMax,yMin,yMax);
-     if(visible)svg+='<line class="qo-xy-trendline" data-series="'+k+
-      '" x1="'+sx(visible[0].x)+'" y1="'+sy(visible[0].y)+
-      '" x2="'+sx(visible[1].x)+'" y2="'+sy(visible[1].y)+
-      '" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" />';
+     if(quadratic){
+      let segments='',previous=null;
+      for(let t=0;t<=96;t++){
+       const X=xMin+(xMax-xMin)*t/96,Y=predictQuadratic(fit,X);
+       if(previous){
+        const visible=clipTrendLine(previous.x,previous.y,X,Y,xMin,xMax,yMin,yMax);
+        if(visible)segments+='M'+sx(visible[0])+','+sy(visible[1])+
+          'L'+sx(visible[2])+','+sy(visible[3])+' ';
+       }
+       previous={x:X,y:Y};
+      }
+      if(segments)svg+='<path class="qo-xy-trendline qo-xy-quadratic" data-series="'+k+
+       '" d="'+segments.trim()+'" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" fill="none"/>';
+     }else{
+      const visible=clippedTrendSegment(fit,xMin,xMax,yMin,yMax);
+      if(visible)svg+='<line class="qo-xy-trendline" data-series="'+k+
+       '" x1="'+sx(visible[0].x)+'" y1="'+sy(visible[0].y)+
+       '" x2="'+sx(visible[1].x)+'" y2="'+sy(visible[1].y)+
+       '" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" />';
+     }
      if(settings.trendEquation||settings.trendR2){
-      const label=(settings.trendEquation?regressionLabel(fit):'')+
+      const label=(settings.trendEquation?(quadratic?quadraticLabel(fit):regressionLabel(fit)):'')+
        (settings.trendR2?(settings.trendEquation?' · ':'')+'R² = '+fmt(fit.r2):'');
-      svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,label.slice(0,55),
+      svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,label.slice(0,67),
        'font-size="11" fill="'+color+'" text-anchor="'+(legendRight?'start':'middle')+'"');
      }
     }else svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,
-     'Ряд '+(k+1)+': X одинаковы','font-size="11" fill="#a34b4b"');
+     'Ряд '+(k+1)+': недостаточно разных X','font-size="11" fill="#a34b4b"');
    }
    item.points.forEach((p,i)=>{
     const X=sx(p.x),Y=sy(p.value);
