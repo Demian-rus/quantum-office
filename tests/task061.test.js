@@ -69,6 +69,10 @@ test('TASK061: default, pie and blank legacy charts still render, labels optiona
  const hidden=chartSVG(chartData(book,sheet,chart),'line',chartOptions(chart));
  assert.doesNotMatch(hidden,/>План<\/text>/);
  assert.doesNotMatch(xlsxChartXML(book,sheet,chart),/<c:legend>/);
+ const one=addChart(book,sheet,'bar','A1','B4');
+ changeChart(sheet,one.id,{options:{colors:['#aa2233']}});
+ const barSvg=chartSVG(chartData(book,sheet,one),'bar',chartOptions(one));
+ assert.equal((barSvg.match(/fill="#aa2233"/g)||[]).length,3);
  const pie=addChart(book,sheet,'pie','A1','B4');
  changeChart(sheet,pie.id,{options:{labels:true,legend:'none'}});
  assert.match(chartSVG(chartData(book,sheet,pie),'pie',chartOptions(pie)),/10<\/text>/);
