@@ -3,7 +3,7 @@ import {LIMITS,cellName,rectangle,getCell,parseCell} from './workbook.js';
 import {checkValidatedInput} from './validation.js';
 
 const MAX_ROWS=2000,MAX_COLUMNS=20,MAX_CELLS=10000;
-const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
+const dataAreasOverlap=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 function safeArea(sheet,area,{wide=false}={}){
  if(!area||area.r1<0||area.c1<0||area.r2>=LIMITS.rows||area.c2>=LIMITS.columns)
   throw Error('Диапазон выходит за границы листа');
@@ -14,7 +14,7 @@ function safeArea(sheet,area,{wide=false}={}){
  if((sheet.rectangleStyles||[]).length)throw Error('Сначала уберите крупные области оформления для этой операции');
  for(let r=area.r1;r<=area.r2;r++)if(sheet.hiddenRows?.[r])throw Error('Сначала покажите скрытые строки');
  for(let c=area.c1;c<=area.c2;c++)if(sheet.hiddenColumns?.[c])throw Error('Сначала покажите скрытые столбцы');
- if((sheet.merges||[]).some(m=>overlaps(area,rectangle(m.from,m.to))))
+ if((sheet.merges||[]).some(m=>dataAreasOverlap(area,rectangle(m.from,m.to))))
   throw Error('Выделение пересекается с объединёнными ячейками: сначала разъедините их');
  return {rows,cols};
 }
