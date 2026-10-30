@@ -1,4 +1,4 @@
-import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,chartLayout,CHART_MIN_WIDTH,CHART_MIN_HEIGHT,chartOptions,CHART_COLORS,linearRegression,regressionLabel} from './core/charts.js';
+import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,chartLayout,CHART_MIN_WIDTH,CHART_MIN_HEIGHT,chartOptions,CHART_COLORS,linearRegression,regressionLabel,quadraticRegression,quadraticLabel} from './core/charts.js';
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
@@ -657,19 +657,28 @@ function chartPanel(){
  const choices=saved.map(c=>'<button class="chart-choice '+(selected?.id===c.id?'active':'')+'" data-action="chart-open" data-id="'+esc(c.id)+'">'+esc(c.title)+'</button>').join('');
  const cfg=selected?chartOptions(selected):null,kind=selected?.type;
  const trendControls=selected&&kind==='scatter'?
-  '<div class="chart-trend-controls"><strong>Линейная регрессия</strong>'+
+  '<div class="chart-trend-controls"><strong>Аппроксимация XY</strong>'+
   '<label>Линия тренда <input id="chart-trendline" type="checkbox" '+(cfg.trendline?'checked':'')+'></label>'+
+  '<label>Модель <select id="chart-trend-type" aria-label="Модель тренда">'+
+  '<option value="linear" '+((cfg.trendType||'linear')==='linear'?'selected':'')+'>Линейная (1-я степень)</option>'+
+  '<option value="quadratic" '+(cfg.trendType==='quadratic'?'selected':'')+'>Полиномиальная (2-я степень)</option>'+
+  '</select></label>'+
   '<label>Показать уравнение <input id="chart-trend-equation" type="checkbox" '+(cfg.trendEquation?'checked':'')+'></label>'+
   '<label>Показать R² <input id="chart-trend-r2" type="checkbox" '+(cfg.trendR2?'checked':'')+'></label>'+
   (cfg.trendline?(()=>{
    try{
     const data=chartData(book(),sheet(),selected,{allowEmpty:true});
     if(!data.series?.some(s=>s.points.length))return '<small>Заполните числовые X и Y для расчёта тренда.</small>';
-    return '<div class="chart-regression-results">'+data.series.map((item,i)=>{
-     const fit=linearRegression(item.points);
-     return '<div><b>'+esc(item.name)+'</b>: '+(fit?
-       esc(regressionLabel(fit))+'; R² = '+fit.r2.toFixed(4):
-       'невозможно рассчитать: X одинаковы или недостаточно данных')+'</div>';
+    return '<div class="chart-regression-results">'+data.series.map(item=>{
+     const linear=linearRegression(item.points),quadratic=quadraticRegression(item.points),
+      current=(cfg.trendType||'linear')==='quadratic'?quadratic:linear,
+      equation=(cfg.trendType||'linear')==='quadratic'?quadraticLabel:regressionLabel;
+     return '<div><b>'+esc(item.name)+'</b>: '+
+      (current?esc(equation(current)):'невозможно рассчитать выбранную модель')+
+      '<div>R² линейный: '+(linear?linear.r2.toFixed(4):'недоступен')+'</div>'+
+      '<div>R² квадратичный: '+(quadratic?quadratic.r2.toFixed(4):'недоступен')+'</div>'+
+      (linear&&quadratic?'<small>ΔR² = '+(quadratic.r2-linear.r2).toFixed(4)+
+       ' (увеличение степени модели)</small>':'')+'</div>';
     }).join('')+'</div>';
    }catch(err){return '<small>'+esc(err.message)+'</small>';}
   })():'')+'</div>':'';
@@ -910,7 +919,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  }
  case 'chart-style-reset':try{transact(()=>changeChart(sheet(),selectedChartId,{options:{
   labels:false,legend:(sheet().charts||[]).find(c=>c.id===selectedChartId)?.type==='pie'?'right':'bottom',
-  grid:true,min:null,max:null,colors:[],trendline:false,trendEquation:false,trendR2:false}}));render();status('Оформление сброшено');}
+  grid:true,min:null,max:null,colors:[],trendline:false,trendEquation:false,trendR2:false,trendType:'linear'}}));render();status('Оформление сброшено');}
   catch(err){status(err.message,true);}break;
  case 'chart-delete':try{transact(()=>removeChart(sheet(),selectedChartId));selectedChartId=(sheet().charts||[])[0]?.id||null;render();status('Диаграмма удалена');}catch(err){status(err.message,true);}break;
  case 'print-open':commitEditor();printOpen=true;render();break;
@@ -954,12 +963,13 @@ app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.ta
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
 app.addEventListener('change',e=>{const t=e.target;
- if(['chart-labels','chart-legend','chart-grid','chart-trendline','chart-trend-equation','chart-trend-r2'].includes(t.id)||t.dataset.chartColor!==undefined){
+ if(['chart-labels','chart-legend','chart-grid','chart-trendline','chart-trend-equation','chart-trend-r2','chart-trend-type'].includes(t.id)||t.dataset.chartColor!==undefined){
   const patch=t.id==='chart-labels'?{labels:t.checked}:t.id==='chart-legend'?{legend:t.value}:
    t.id==='chart-grid'?{grid:t.checked}:
    t.id==='chart-trendline'?{trendline:t.checked}:
    t.id==='chart-trend-equation'?{trendEquation:t.checked}:
-   t.id==='chart-trend-r2'?{trendR2:t.checked}:(()=>{const chart=(sheet()?.charts||[]).find(c=>c.id===selectedChartId),range=rectangle(chart.from,chart.to),colors=Array.from({length:range.c2-range.c1},(_,i)=>chartOptions(chart).colors[i]||CHART_COLORS[i]);
+   t.id==='chart-trend-r2'?{trendR2:t.checked}:
+   t.id==='chart-trend-type'?{trendType:t.value}:(()=>{const chart=(sheet()?.charts||[]).find(c=>c.id===selectedChartId),range=rectangle(chart.from,chart.to),colors=Array.from({length:range.c2-range.c1},(_,i)=>chartOptions(chart).colors[i]||CHART_COLORS[i]);
      colors[Number(t.dataset.chartColor)]=t.value;return {colors};})();
   try{transact(()=>changeChart(sheet(),selectedChartId,{options:patch}));render();}
   catch(err){status(err.message,true);}return;
