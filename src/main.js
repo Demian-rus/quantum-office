@@ -529,9 +529,10 @@ function placeholder(kind){const writer=kind==='writer';return `<main class="soo
 function sizeTargets(kind,index){
  const full=kind==='col'?LIMITS.rows-1:LIMITS.columns-1,which=kind==='col'?'c':'r';
  const selected=selectedRects().filter(a=>kind==='col'?
-  a.r1===0&&a.r2===full&&index>=a.c1&&index<=a.c2:
-  a.c1===0&&a.c2===full&&index>=a.r1&&index<=a.r2);
- if(!selected.length)return [index];
+  a.r1===0&&a.r2===full:a.c1===0&&a.c2===full);
+ const contains=selected.some(a=>kind==='col'?
+  index>=a.c1&&index<=a.c2:index>=a.r1&&index<=a.r2);
+ if(!contains)return [index];
  const indices=new Set();
  for(const a of selected)for(let j=a[which+'1'];j<=a[which+'2'];j++){
   indices.add(j);if(indices.size>500)throw Error('За один раз можно изменить не более 500 строк или столбцов');
