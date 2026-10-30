@@ -78,3 +78,4 @@ jobs:
       - run: python tests/task069_browser.py
       - run: python tests/task070_browser.py
       - run: python tests/task071_browser.py
+      - run: python tests/task072_browser.py
