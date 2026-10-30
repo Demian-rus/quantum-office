@@ -1,5 +1,5 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
+import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,FONT_FAMILIES,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
 import {validateDataRules} from './validation.js';
 import {validateConditionalRules} from './conditional.js';
 import {writeXLSXCharts,importXLSXCharts} from './xlsx-charts.js';
@@ -70,7 +70,8 @@ export function stylesFromXML(root,themes=DEFAULT_THEME){if(!root)return [{}];
  const indexed=custom.length>=64?custom:INDEXED_DEFAULT;
  const color=node=>resolveXLSXColor(node,themes,indexed);const fonts=elements(element(root,'fonts'),'font').map(node=>{
  const fontSize=Number(element(node,'sz')?.getAttribute('val'));
- return {bold:!!element(node,'b'),italic:!!element(node,'i'),color:color(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
+ const family=element(node,'name')?.getAttribute('val');
+ return {fontFamily:FONT_FAMILIES.includes(family)?family:undefined,bold:!!element(node,'b'),italic:!!element(node,'i'),color:color(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
 });const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?color(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
  const borders=elements(element(root,'borders'),'border').map(node=>{
  const edges=Object.fromEntries(['left','right','top','bottom'].flatMap(side=>{
@@ -83,7 +84,7 @@ export function stylesFromXML(root,themes=DEFAULT_THEME){if(!root)return [{}];
  const colors=Object.values(edges).map(x=>x.color||'#000000');
  return {sides,edges,color:colors.length&&new Set(colors).size===1?colors[0]:undefined};
 });
- return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;style.borderEdges=border.edges;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
+ return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(font.fontFamily)style.fontFamily=font.fontFamily;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;style.borderEdges=border.edges;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
  else if(id===22||(/[yd]/i.test(fmt)&&/[hs]/i.test(fmt)))style.format='datetime';
  else if([14,15,16,17].includes(id)||/[yd]/i.test(fmt))style.format='date';
  else if([18,19,20,21,45,47].includes(id)||/[hs]/i.test(fmt))style.format='time';
@@ -95,7 +96,7 @@ export const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships
 /** OOXML requires styled blank cells for arbitrary rectangles. Expand only up
  * to this hard limit, then refuse before creating any output. */
 export const MAX_XLSX_RECTANGLE_CELLS=200000;
-const styleProps=['bg','color','bold','italic','wrap','format','align','fontSize'];
+const styleProps=['bg','color','bold','italic','wrap','format','align','fontSize','fontFamily'];
 function rectangleBands(sheet,styles){
  const rects=(sheet.rectangleStyles||[]).map(layer=>rectangle(layer.from,layer.to));
  if(!rects.length)return [];
@@ -453,7 +454,7 @@ export function styleCatalog(book){
  return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0,dxfColors,dxfIds};
 }
 export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([[JSON.stringify([null,null,null,null]),0]]);const cells=styles.unique.map(s=>{
- const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'',s.fontSize||11]);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
+ const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'',s.fontSize||11,s.fontFamily||'Aptos']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
  let fillId=0;if(s.bg){if(!fillIds.has(s.bg)){fillIds.set(s.bg,fills.length);fills.push(s.bg);}fillId=fillIds.get(s.bg);}
  const sides=s.borders||(s.border==='thin'?{left:true,right:true,top:true,bottom:true}:{});
  const perSide={};
@@ -465,7 +466,7 @@ export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[
  if(!borderIds.has(key)){borderIds.set(key,borderDefs.length);borderDefs.push({edges:perSide});}
  return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,wrap:!!s.wrap,border:borderIds.get(key)};});
  const dxfs=(styles.dxfColors||[]).map(c=>'<dxf><fill><patternFill patternType="solid"><fgColor rgb="FF'+c.slice(1).toUpperCase()+'"/><bgColor indexed="64"/></patternFill></fill></dxf>').join('');
- let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${(styles.dxfColors||[]).length}">${dxfs}</dxfs></styleSheet>`;return xml;
+ let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="${xmlEscape(f.fontFamily||'Aptos')}"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${(styles.dxfColors||[]).length}">${dxfs}</dxfs></styleSheet>`;return xml;
 }
 export async function exportXLSX(book){validateWorkbook(book);
  const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
