@@ -8,7 +8,7 @@ export const CHART_COLORS=Object.freeze([...COLORS]);
 const STYLE_KEYS=['labels','legend','grid','colors','min','max'];
 export function chartOptions(chart){
  const o=chart?.options||{};
- return {labels:o.labels??false,legend:o.legend??(chart?.type==='pie'?'right':'bottom'),
+ return {labels:o.labels??false,legend:o.legend??(chart?.type==='pie'?'right':chart?.from&&chart?.to&&chartRect(chart).c2-chartRect(chart).c1===1?'none':'bottom'),
    grid:o.grid??true,colors:o.colors??[],min:o.min??null,max:o.max??null};
 }
 export function validateChartOptions(o){
@@ -240,11 +240,12 @@ export function chartSVG(data,type,settings={}){
    }
    offset+=len;
   });
-  if(legend!=='none')pts.slice(0,12).forEach((p,i)=>{
-   const y=52+21*i;
-   svg+='<rect x="358" y="'+(y-9)+'" width="11" height="11" rx="2" fill="'+colorAt(i)+'"/>'+
-    txt(377,y,p.label.slice(0,16)+' · '+fmt(p.value/total*100)+'%','font-size="12" fill="#32465b"');
+  if(legend!=='none')pts.slice(0,legend==='bottom'?4:12).forEach((p,i)=>{
+   const x=legend==='bottom'?70+(i%2)*260:358,y=legend==='bottom'?276+Math.floor(i/2)*19:52+21*i;
+   svg+='<rect x="'+x+'" y="'+(y-9)+'" width="11" height="11" rx="2" fill="'+colorAt(i)+'"/>'+
+    txt(x+19,y,p.label.slice(0,16)+' · '+fmt(p.value/total*100)+'%','font-size="12" fill="#32465b"');
   });
+  if(legend==='bottom'&&pts.length>4)svg+=txt(575,306,'+'+(pts.length-4),'font-size="11" fill="#64748b"');
   svg+=txt(cx,cy+5,fmt(total),'font-size="18" font-weight="700" text-anchor="middle" fill="#2d4152"');
  }else{
   const values=series.flatMap(s=>s.points.map(p=>p.value)),
