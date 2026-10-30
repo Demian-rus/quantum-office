@@ -25,7 +25,7 @@ test('TASK050: cross-sheet formula results remain linked',()=>{
 });
 test('TASK050: unsafe shapes, zero pie, untrusted labels and metadata',()=>{
  const {b,s}=setup();
- assert.throws(()=>addChart(b,s,'bar','A1','C4'),/два столбца/);
+ assert.throws(()=>addChart(b,s,'bar','A1','F4'),/2–5 столбцов/);
  const short=addChart(b,s,'pie','A1','B2');
  assert.throws(()=>chartData(b,s,short),/минимум два/);
  setCell(s,'B2','текст');const malformed=addChart(b,s,'line','A1','B4');
