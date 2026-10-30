@@ -168,13 +168,13 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
   page='home';workspace.active=workspace.books[0]?.id??null;persist();render();
   status('Черновики восстановлены из архива. Файлы на диске не привязаны.');return;
  }
- let imported;
+ let imported,importSummary=null;
  if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}
  else if(name.endsWith('.csv'))imported=importCSV(text,file.name.replace(/\.csv$/i,''));
- else if(name.endsWith('.xlsx')){const warnings={};imported=await importXLSX(await file.arrayBuffer(),file.name,warnings);imported.__xlsxImportSummary=warnings;}
+ else if(name.endsWith('.xlsx')){importSummary={};imported=await importXLSX(await file.arrayBuffer(),file.name,importSummary);}
  else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
  workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';persist();render();
- if(name.endsWith('.xlsx')){const warnings=imported.__xlsxImportSummary||{};delete imported.__xlsxImportSummary;status(warnings.skippedDataValidations?`XLSX открыт: перенесено правил ${warnings.importedDataValidations||0}; пропущено неподдерживаемых ${warnings.skippedDataValidations}. Другие сложные возможности могут не переноситься.`:`XLSX открыт: перенесено правил проверки данных ${warnings.importedDataValidations||0}; другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
+ if(name.endsWith('.xlsx')){const warnings=importSummary||{};status(warnings.skippedDataValidations?`XLSX открыт: перенесено правил ${warnings.importedDataValidations||0}; пропущено неподдерживаемых ${warnings.skippedDataValidations}. Другие сложные возможности могут не переноситься.`:`XLSX открыт: перенесено правил проверки данных ${warnings.importedDataValidations||0}; другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
  }catch(e){status(e.message||'Не удалось открыть файл',true);}
 }
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
