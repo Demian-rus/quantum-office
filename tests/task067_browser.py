@@ -30,10 +30,10 @@ with sync_playwright() as p:
  assert page.locator('#data-tool-panel').count()==0
  assert page.evaluate("sheet().cells.B2.value")=='25'
  assert page.evaluate("sheet().cells.C2.value")=='Москва'
- page.locator('[data-action=undo]').first.click()
+ page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
  assert page.evaluate("sheet().cells.A2.value")=='"Иван; Петров";25;Москва'
  assert page.evaluate("sheet().cells.B2?.value||''")==''
- page.locator('[data-action=redo]').first.click()
+ page.locator('#grid-scroll').focus();page.keyboard.press('Control+y')
  assert page.evaluate("sheet().cells.C3.value")=='Уфа'
  # Existing content must trigger explicit collision opt-in, without touching data.
  page.evaluate("""()=>{
@@ -68,7 +68,7 @@ with sync_playwright() as p:
  assert page.evaluate("sheet().cells.A9.value")=='Лев'
  assert page.evaluate("sheet().cells.A10?.value||''")==''
  assert page.evaluate("sheet().cells.C9.value")=='3'
- page.locator('[data-action=undo]').first.click()
+ page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
  assert page.evaluate("sheet().cells.A9.value")=='АННА'
  # Re-applying compaction survives XLSX, but not hidden/auto-filter geometry.
  page.locator('[data-action=remove-duplicates]').click()
