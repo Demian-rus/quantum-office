@@ -18,12 +18,12 @@ const chartSeriesValue=(points,key,kind)=>'<c:'+kind+'Cache><c:ptCount val="'+po
 const absolute=(sheet,rect)=>"'"+sheet.name.replaceAll("'","''")+"'!$"+cellName(0,rect.c1).replace(/\d+$/,'')+"$"+(rect.r1+1)+':$'+cellName(0,rect.c2).replace(/\d+$/,'')+'$'+(rect.r2+1);
 const oneCol=(sheet,row1,row2,col)=>absolute(sheet,{r1:row1,r2:row2,c1:col,c2:col});
 const richTitle=title=>'<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr lang="ru-RU"/><a:t>'+escape(title)+'</a:t></a:r><a:endParaRPr lang="ru-RU"/></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>';
-const chartAxis=(catId,valId,opts={})=>
+const chartAxis=(catId,valId,opts={},percent=false)=>
  '<c:catAx><c:axId val="'+catId+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+valId+'"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblOffset val="100"/></c:catAx>'+
  '<c:valAx><c:axId val="'+valId+'"/><c:scaling><c:orientation val="minMax"/>'+
  (opts.max!=null?'<c:max val="'+opts.max+'"/>':'')+(opts.min!=null?'<c:min val="'+opts.min+'"/>':'')+
  '</c:scaling><c:axPos val="l"/>'+(opts.grid===false?'':'<c:majorGridlines/>')+
- '<c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+catId+'"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>';
+ '<c:numFmt formatCode="'+(percent?'0%':'General')+'" sourceLinked="'+(percent?'0':'1')+'"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+catId+'"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>';
 const chartDataLabels=o=>o.labels?'<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/></c:dLbls>':'';
 const chartLegend=o=>o.legend==='none'?'':'<c:legend><c:legendPos val="'+(o.legend==='right'?'r':'b')+'"/><c:overlay val="0"/></c:legend>';
 const seriesPaint=(chart,k)=>{
@@ -50,12 +50,15 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
    '<c:cat><c:strRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(entry.points,'label','str')+'</c:strRef></c:cat>'+
    '<c:val><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:val></c:ser>';
  }).join('');
- const catAxis=100000+ordinal*2,valAxis=catAxis+1;
+ const catAxis=100000+ordinal*2,valAxis=catAxis+1,
+  grouped=['bar','stacked','stacked100'].includes(chart.type),
+  grouping=chart.type==='bar'?'clustered':chart.type==='stacked100'?'percentStacked':'stacked';
  const plot=chart.type==='pie'?
   '<c:pieChart><c:varyColors val="1"/>'+seriesXML+chartDataLabels(opts)+'<c:firstSliceAng val="0"/></c:pieChart>':
-  chart.type==='bar'?
-  '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="1"/>'+seriesXML+chartDataLabels(opts)+
-  '<c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:barChart>'+chartAxis(catAxis,valAxis,opts):
+  grouped?
+  '<c:barChart><c:barDir val="col"/><c:grouping val="'+grouping+'"/><c:varyColors val="1"/>'+seriesXML+
+  chartDataLabels(opts)+(chart.type==='bar'?'':'<c:overlap val="100"/>')+
+  '<c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:barChart>'+chartAxis(catAxis,valAxis,opts,chart.type==='stacked100'):
   '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>'+seriesXML+chartDataLabels(opts)+
   '<c:marker val="1"/><c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:lineChart>'+chartAxis(catAxis,valAxis,opts);
  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
@@ -168,9 +171,12 @@ function parseChart(book,sheet,chartRoot){
  const node=direct(chartRoot,'chart'),plot=direct(node,'plotArea');
  const types=Array.from(plot?.children||[]).filter(n=>['barChart','lineChart','pieChart'].includes(n.localName));
  if(types.length!==1)return null;
- const body=types[0],type=body.localName==='pieChart'?'pie':body.localName==='lineChart'?'line':'bar';
- if(type==='bar'&&direct(body,'barDir')?.getAttribute('val')!=='col')return null;
- if(type==='bar'&&direct(body,'grouping')?.getAttribute('val')!=='clustered')return null;
+ const body=types[0],isBar=body.localName==='barChart',
+  group=isBar?direct(body,'grouping')?.getAttribute('val'):null,
+  type=body.localName==='pieChart'?'pie':body.localName==='lineChart'?'line':
+   group==='stacked'?'stacked':group==='percentStacked'?'stacked100':'bar';
+ if(isBar&&(direct(body,'barDir')?.getAttribute('val')!=='col'||
+    !['clustered','stacked','percentStacked'].includes(group)))return null;
  if(type==='line'&&direct(body,'grouping')?.getAttribute('val')!=='standard')return null;
  const series=all(body,'ser');
  if(!series.length||series.length>4||type==='pie'&&series.length!==1)return null;
@@ -211,7 +217,7 @@ function parseChart(book,sheet,chartRoot){
   if(valueAxis)opts.grid=!!direct(valueAxis,'majorGridlines');
   for(const key of ['min','max']){
    const val=direct(scaling,key)?.getAttribute('val');
-   if(val!==null&&val!==undefined&&val!==''&&Number.isFinite(Number(val)))opts[key]=Number(val);
+   if(type!=='stacked100'&&val!==null&&val!==undefined&&val!==''&&Number.isFinite(Number(val)))opts[key]=Number(val);
   }
   const rawColors=series.map(ser=>{
    const sp=direct(ser,'spPr');
