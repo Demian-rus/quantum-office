@@ -648,22 +648,22 @@ function chartPanel(){
  if(!chartDrawerOpen||page!=='sheet'||!book())return '';
  const saved=sheet().charts||[],selected=saved.find(c=>c.id===selectedChartId)||saved[0]||null;
  if(selected)selectedChartId=selected.id;
- let display='<div class="chart-empty">Выделите две колонки: категории и числа. Затем создайте диаграмму на вкладке «Вставка».</div>';
+ let display='<div class="chart-empty">Выделите категории и до четырёх столбцов чисел. Затем создайте диаграмму на вкладке «Вставка».</div>';
  if(selected){try{display=chartSVG(chartData(book(),sheet(),selected,{allowEmpty:true}),selected.type);}
   catch(err){display='<div class="chart-error">'+esc(err.message)+'</div>';}}
  const kinds={bar:'Столбчатая',line:'Линейная',pie:'Круговая'};
  const choices=saved.map(c=>'<button class="chart-choice '+(selected?.id===c.id?'active':'')+'" data-action="chart-open" data-id="'+esc(c.id)+'">'+esc(c.title)+'</button>').join('');
  const settings=selected?'<div class="chart-settings"><label>Название <input id="chart-title" maxlength="120" value="'+esc(selected.title)+'" aria-label="Название диаграммы"></label>'+
-   '<div class="chart-source"><label>Источник данных <input id="chart-range" spellcheck="false" aria-label="Диапазон диаграммы" value="'+esc(selected.from+':'+selected.to)+'" placeholder="A1:B6"></label>'+
+   '<div class="chart-source"><label>Источник данных <input id="chart-range" spellcheck="false" aria-label="Диапазон диаграммы" value="'+esc(selected.from+':'+selected.to)+'" placeholder="A1:D6"></label>'+
    '<div class="chart-source-actions"><button data-action="chart-source">Применить диапазон</button><button data-action="chart-use-selection">По выделению</button></div></div>'+
    '<div class="chart-kinds">'+
    Object.entries(kinds).map(([key,label])=>'<button data-action="chart-type" data-type="'+key+'" class="'+(selected.type===key?'active':'')+'">'+label+'</button>').join('')+'</div>'+
-   '<small>Первый столбец — подписи, второй — числа. Можно создать пустую диаграмму и заполнить ячейки позже.</small></div>':'';
+   '<small>Первый столбец — категории, следующие 1–4 столбца — числовые ряды. Для каждого ряда используется отдельная линия или цвет. Круговая — один ряд. Можно создать диаграмму до заполнения данных.</small></div>':'';
  return '<aside id="chart-panel" class="chart-panel" role="complementary" aria-label="Диаграммы листа">'+
    '<header class="chart-panel-head"><strong>Диаграммы</strong><span>'+saved.length+' / 30</span><button data-action="chart-close" aria-label="Закрыть диаграммы">×</button></header>'+
    '<nav class="chart-list">'+(choices||'<span>На листе пока нет диаграмм</span>')+'</nav>'+
    settings+'<div id="chart-preview" class="chart-preview">'+display+'</div>'+
-   (selected?'<div class="chart-panel-foot"><button data-action="chart-delete">Удалить диаграмму</button><span>Столбчатые, линейные и круговые диаграммы с одним рядом данных переносятся в XLSX. Остальное — через .qbook.</span></div>':'')+'</aside>';
+   (selected?'<div class="chart-panel-foot"><button data-action="chart-delete">Удалить диаграмму</button><span>Столбчатые и линейные диаграммы (до 4 рядов) и круговые (1 ряд) сохраняются в XLSX. Резервная копия — .qbook.</span></div>':'')+'</aside>';
 }
 function refreshChartPreview(){
  const el=document.getElementById('chart-preview');if(!el||!book())return;
@@ -738,7 +738,7 @@ function createSelectedChart(type){
  if(!sheet())return;
  commitEditor();
  try{
-  const source=suggestChartRange(sheet(),activeCell,rangeEnd);
+  const source=suggestChartRange(sheet(),activeCell,rangeEnd,type);
   let c;transact(()=>{c=addChart(book(),sheet(),type,source.from,source.to);});
   selectedChartId=c.id;chartDrawerOpen=true;render();
   status(source.mode==='empty'?'Пустая диаграмма создана: заполните категории и числа или измените источник данных.':
@@ -861,10 +861,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'chart-type':try{transact(()=>changeChart(sheet(),selectedChartId,{type:target.dataset.type}));render();}catch(err){status(err.message,true);}break;
  case 'chart-source':{const value=document.getElementById('chart-range')?.value.trim().replaceAll('$','').toUpperCase();
   const match=/^([A-Z]+[1-9]\d*):([A-Z]+[1-9]\d*)$/.exec(value||'');
-  if(!match){status('Введите два столбца диапазоном, например A1:B6',true);break;}
+  if(!match){status('Введите диапазон из 2–5 соседних столбцов, например A1:D6',true);break;}
   try{transact(()=>changeChart(sheet(),selectedChartId,{from:match[1],to:match[2]}));render();status('Источник диаграммы изменён');}
   catch(err){status(err.message,true);}break;}
- case 'chart-use-selection':try{const source=suggestChartRange(sheet(),activeCell,rangeEnd);
+ case 'chart-use-selection':try{const source=suggestChartRange(sheet(),activeCell,rangeEnd,(sheet().charts||[]).find(c=>c.id===selectedChartId)?.type||'bar');
   transact(()=>changeChart(sheet(),selectedChartId,{from:source.from,to:source.to}));render();status('Источник диаграммы привязан к выделению');}
   catch(err){status(err.message,true);}break;
  case 'chart-delete':try{transact(()=>removeChart(sheet(),selectedChartId));selectedChartId=(sheet().charts||[])[0]?.id||null;render();status('Диаграмма удалена');}catch(err){status(err.message,true);}break;
