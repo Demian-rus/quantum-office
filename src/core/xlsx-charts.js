@@ -177,11 +177,11 @@ function parseChart(book,sheet,chartRoot){
  }
  let row=cats.start.row;
  if(row>0){
-  const hasHeader=series.every((_,k)=>{
-   const before=String(getCell(sheet,cellName(row-1,valsFirst.start.col+k)).value||'').trim();
-   return before!==''&&Number.isNaN(Number(before));
-  });
-  if(hasHeader)row--;
+  const heads=series.map((_,k)=>String(getCell(sheet,cellName(row-1,valsFirst.start.col+k)).value||'').trim());
+  const textHeaders=heads.every(v=>v!==''&&Number.isNaN(Number(v)));
+  const yearHeaders=series.length>1&&heads.every(v=>/^(?:19|20)\d{2}$/.test(v))&&
+    String(getCell(sheet,cellName(row-1,cats.start.col)).value||'').trim()!=='';
+  if(textHeaders||yearHeaders)row--;
  }
  const range={from:cellName(row,cats.start.col),to:cellName(valsFirst.end.row,valsFirst.start.col+series.length-1)};
  const titleNode=direct(node,'title');
