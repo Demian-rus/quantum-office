@@ -1028,8 +1028,9 @@ function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templ
  if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
 function refreshFillHandle(){
- const handle=document.getElementById('grid-fill-handle'),frame=document.getElementById('grid-frame');
- if(!handle||!frame)return;
+ const handle=document.getElementById('grid-fill-handle'),frame=document.getElementById('grid-frame'),
+  view=document.getElementById('grid-scroll');
+ if(!handle||!frame||!view)return;
  const rects=selectedRects();
  if(page!=='sheet'||!sheet()||editing||rects.length!==1||fillDrag){
   handle.hidden=true;return;
@@ -1038,12 +1039,13 @@ function refreshFillHandle(){
  if((r.r2-r.r1+1)*(r.c2-r.c1+1)>10000){handle.hidden=true;return;}
  const end=cellName(r.r2,r.c2),cell=Array.from(frame.querySelectorAll('.grid-cell')).find(el=>el.dataset.ref===end);
  if(!cell){handle.hidden=true;return;}
- const box=cell.getBoundingClientRect(),parent=frame.getBoundingClientRect(),
-  visible=box.bottom>=parent.top+headerH&&box.bottom<=parent.bottom&&
-   box.right>=parent.left+rowW&&box.right<=parent.right;
+ const box=cell.getBoundingClientRect(),parent=frame.getBoundingClientRect(),viewport=view.getBoundingClientRect(),
+  right=viewport.left+view.clientWidth,bottom=viewport.top+view.clientHeight,
+  visible=box.bottom>=parent.top+headerH&&box.bottom<=bottom+0.5&&
+   box.right>=parent.left+rowW&&box.right<=right+0.5;
  if(!visible){handle.hidden=true;return;}
- handle.style.left=Math.round(box.right-parent.left-5)+'px';
- handle.style.top=Math.round(box.bottom-parent.top-5)+'px';
+ handle.style.left=Math.round(Math.min(box.right-5,right-11)-parent.left)+'px';
+ handle.style.top=Math.round(Math.min(box.bottom-5,bottom-11)-parent.top)+'px';
  handle.hidden=false;
 }
 function showFillDragPreview(){
@@ -1051,34 +1053,58 @@ function showFillDragPreview(){
  const cells=document.querySelectorAll('.grid-cell');
  for(const el of cells){
   const p=parseCell(el.dataset.ref),r=d?.area;
-  const isNew=r&&d.direction==='down'?
-   p.row>d.source.r2&&p.row<=r.r2&&p.col>=r.c1&&p.col<=r.c2:
-   r&&d.direction==='right'?
-    p.col>d.source.c2&&p.col<=r.c2&&p.row>=r.r1&&p.row<=r.r2:false;
+  const isNew=r&&p.row>=r.r1&&p.row<=r.r2&&p.col>=r.c1&&p.col<=r.c2&&
+   !(p.row>=d.source.r1&&p.row<=d.source.r2&&p.col>=d.source.c1&&p.col<=d.source.c2);
   el.classList.toggle('fill-preview',!!isNew);
  }
 }
 function fillDragTargetAt(x,y){
- const d=fillDrag;if(!d||!sheet())return;
- const node=document.elementFromPoint(x,y)?.closest('.grid-cell'),p=parseCell(node?.dataset.ref);
- if(!p||!rowVisible(sheet(),p.row)||!columnVisible(sheet(),p.col))return;
- const a=d.source,down=Math.max(0,p.row-a.r2),right=Math.max(0,p.col-a.c2);
- const direction=down&&right?(down>=right?'down':'right'):down?'down':right?'right':null;
- const target=direction==='down'?p.row:direction==='right'?p.col:null;
+ const d=fillDrag,view=document.getElementById('grid-scroll'),frame=document.getElementById('grid-frame');
+ if(!d||!view||!frame||sheet()?.id!==d.sheetId)return;
+ // Geometry hit testing also works beyond the viewport, over headers/charts,
+ // and in frozen regions, without relying on recycled DOM cells.
+ const box=frame.getBoundingClientRect(),v=view.getBoundingClientRect(),geo=gridGeometry(sheet()),
+  localX=Math.max(rowW,Math.min(v.left+view.clientWidth-box.left-1,x-box.left)),
+  localY=Math.max(headerH,Math.min(v.top+view.clientHeight-box.top-1,y-box.top)),
+  col=firstVisibleIndex(geo.x,localX+(localX<geo.x[sheet().freeze?.cols||0]?0:view.scrollLeft)),
+  row=firstVisibleIndex(geo.y,localY+(localY<geo.y[sheet().freeze?.rows||0]?0:view.scrollTop));
+ const a=d.source,up=row<a.r1,down=row>a.r2,left=col<a.c1,right=col>a.c2,
+  dy=up?geo.y[a.r1]-geo.y[row]:down?geo.y[row+1]-geo.y[a.r2+1]:0,
+  dx=left?geo.x[a.c1]-geo.x[col]:right?geo.x[col+1]-geo.x[a.c2+1]:0,
+  direction=dy||dx?(dy>=dx?(up?'up':'down'):(left?'left':'right')):null,
+  target=direction==='up'||direction==='down'?row:direction?col:null;
  if(direction===d.direction&&target===d.target)return;
  d.direction=direction;d.target=target;d.area=direction?
-  {r1:a.r1,c1:a.c1,r2:direction==='down'?target:a.r2,
+  {r1:direction==='up'?target:a.r1,c1:direction==='left'?target:a.c1,
+   r2:direction==='down'?target:a.r2,
    c2:direction==='right'?target:a.c2}:null;
  showFillDragPreview();
 }
+function scrollFillDrag(time){
+ const d=fillDrag;if(!d)return;
+ const view=document.getElementById('grid-scroll');
+ if(page!=='sheet'||sheet()?.id!==d.sheetId||!view){endFillDrag(false);return;}
+ const box=view.getBoundingClientRect(),geo=gridGeometry(sheet()),
+  edge=(p,min,max)=>p<min+28?-Math.min(900,120+(min+28-p)*12):
+   p>max-28?Math.min(900,120+(p-max+28)*12):0,
+  vx=edge(d.x,box.left+geo.x[sheet().freeze?.cols||0],box.left+view.clientWidth),
+  vy=edge(d.y,box.top+geo.y[sheet().freeze?.rows||0]-headerH,box.top+view.clientHeight),
+  dt=d.time==null?0:Math.min(0.05,(time-d.time)/1000),oldX=view.scrollLeft,oldY=view.scrollTop;
+ d.time=time;view.scrollLeft+=vx*dt;view.scrollTop+=vy*dt;
+ if(view.scrollLeft!==oldX||view.scrollTop!==oldY){
+  scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);fillDragTargetAt(d.x,d.y);
+ }
+ d.frame=requestAnimationFrame(scrollFillDrag);
+}
 function endFillDrag(apply){
  const d=fillDrag;if(!d)return;
+ cancelAnimationFrame(d.frame);
  fillDrag=null;document.body.classList.remove('is-fill-dragging');
  document.querySelectorAll('.grid-cell.fill-preview').forEach(el=>el.classList.remove('fill-preview'));
  if(apply&&d.direction&&d.target!=null&&sheet()?.id===d.sheetId){
   try{
-   const count=(d.direction==='down'?d.target-d.source.r2:d.target-d.source.c2)*
-    (d.direction==='down'?d.source.c2-d.source.c1+1:d.source.r2-d.source.r1+1);
+   const count=(d.area.r2-d.area.r1+1)*(d.area.c2-d.area.c1+1)-
+    (d.source.r2-d.source.r1+1)*(d.source.c2-d.source.c1+1);
    if(count>10000)throw Error('Автозаполнение ограничено 10 000 ячеек');
    let out;transact(()=>{out=extendFillHandle(sheet(),
     cellName(d.source.r1,d.source.c1),cellName(d.source.r2,d.source.c2),d.direction,d.target);});
@@ -1132,6 +1158,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
   if(!fromScroll||frozenRowScrollX!==view.scrollLeft||top.dataset.sheetId!==s.id){top.innerHTML=pinnedRowsHtml;frozenRowScrollX=view.scrollLeft;top.dataset.sheetId=s.id;}}
  if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
  refreshFillHandle();
+ if(fillDrag)showFillDragPreview();
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
@@ -1250,13 +1277,20 @@ app.addEventListener('pointerdown',e=>{
  if(e.button!==0||!e.target.closest('#grid-fill-handle')||!sheet())return;
  e.preventDefault();e.stopPropagation();commitEditor();
  const rects=selectedRects();if(rects.length!==1)return;
- fillDrag={source:rects[0],sheetId:sheet().id,direction:null,target:null,area:null};
+ fillDrag={source:rects[0],sheetId:sheet().id,direction:null,target:null,area:null,
+  x:e.clientX,y:e.clientY,pointerId:e.pointerId,time:null,frame:requestAnimationFrame(scrollFillDrag)};
  mouseSelecting=false;document.body.classList.add('is-fill-dragging');
  document.getElementById('grid-fill-handle').hidden=true;
 },true);
-window.addEventListener('pointermove',e=>{if(fillDrag)fillDragTargetAt(e.clientX,e.clientY);});
-window.addEventListener('pointerup',()=>endFillDrag(true));
-window.addEventListener('pointercancel',()=>endFillDrag(false));
+window.addEventListener('pointermove',e=>{if(fillDrag?.pointerId===e.pointerId){
+ fillDrag.x=e.clientX;fillDrag.y=e.clientY;fillDragTargetAt(e.clientX,e.clientY);
+}});
+window.addEventListener('pointerup',e=>{if(fillDrag?.pointerId===e.pointerId)endFillDrag(true);});
+window.addEventListener('pointercancel',e=>{if(fillDrag?.pointerId===e.pointerId)endFillDrag(false);});
+window.addEventListener('blur',()=>endFillDrag(false));
+window.addEventListener('keydown',e=>{if(fillDrag){
+ e.preventDefault();e.stopImmediatePropagation();if(e.key==='Escape')endFillDrag(false);
+}},true);
 app.addEventListener('pointerdown',startChartPointerDrag,true);
 window.addEventListener('pointermove',previewChartPointerDrag);
 window.addEventListener('pointerup',()=>finishChartPointerDrag(true));
