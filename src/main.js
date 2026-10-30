@@ -2,7 +2,7 @@ import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,ch
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
@@ -424,6 +424,34 @@ function setCellBorders(mode){
   transact(()=>applyBorderPreset(sheet(),activeCell,rangeEnd,mode));borderMenuOpen=false;render();status('Границы обновлены');
  }catch(err){status(err.message,true);}
 }
+function insertCheckboxes(){
+ if(!sheet()||!book())return;
+ commitEditor();if(refuseHiddenSelection())return;
+ const rects=selectedRects();
+ const refs=[];
+ for(const a of rects)for(let r=a.r1;r<=a.r2;r++)for(let c=a.c1;c<=a.c2;c++){
+  refs.push(cellName(r,c));
+  if(refs.length>10000){status('Можно вставить не более 10 000 отметок за раз',true);return;}
+ }
+ try{
+  for(const ref of refs){
+   const value=getCell(sheet(),ref).value;
+   if(value&&value!=='☐'&&value!=='☑')throw Error('Выделение содержит данные: вставка чекбоксов не заменяет текст');
+   if(mergeAt(sheet(),ref))throw Error('Нельзя вставить отметку в объединённую ячейку');
+  }
+  transact(()=>{for(const ref of refs){setCell(sheet(),ref,'☐');setStyle(sheet(),ref,{align:'center'});}});
+  drawGrid();status('Добавлено отметок: '+refs.length);
+ }catch(err){status(err.message,true);}
+}
+function toggleCellCheckbox(ref){
+ if(!sheet())return;
+ const current=getCell(sheet(),ref).value;
+ if(current!=='☐'&&current!=='☑')return;
+ try{
+  transact(()=>setCell(sheet(),ref,current==='☐'?'☑':'☐'));
+  setSelection(ref);
+ }catch(err){status(err.message,true);}
+}
 function updateMerge(mode){if(!requireSingleRange())return;
  commitEditor();if(!sheet())return;
  try{const draft=structuredClone(sheet());if(mode==='merge')mergeCells(draft,activeCell,rangeEnd);else if(!unmergeCells(draft,activeCell)){status('Выбранная ячейка не объединена');return;}
@@ -691,6 +719,12 @@ function toolIcon(action,original,extra=''){
  const path=icons[name];return path?`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${path}</svg>`:original;
 }
 function ribbon(){
+ const chosenFont=getEffectiveStyle(sheet(),activeCell).fontFamily||'Aptos';
+ const chosenSize=getEffectiveStyle(sheet(),activeCell).fontSize||11;
+ const fontTools='<select class="ribbon-font-picker" id="font-family-select" title="Гарнитура шрифта" aria-label="Шрифт">'+
+  FONT_FAMILIES.map(name=>'<option value="'+esc(name)+'"'+(name===chosenFont?' selected':'')+'>'+esc(name)+'</option>').join('')+
+  '</select><select class="ribbon-font-size" id="font-size-select" title="Размер шрифта" aria-label="Размер шрифта">'+
+  [8,9,10,11,12,14,16,18,20,24,28,32,36,48,72].map(value=>'<option value="'+value+'"'+(value===chosenSize?' selected':'')+'>'+value+'</option>').join('')+'</select>';
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
  const labeled=new Set();
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
@@ -699,7 +733,7 @@ function ribbon(){
  let contents='';
  if(activeRibbon==='home')contents=
  group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫'))+
- group('Шрифт',button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools)+
+ group('Шрифт',fontTools+button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools)+
  group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"')+button('format','Дата','📅','data-value="date"')+button('format','Время','⏱','data-value="time"')+button('format','Дата и время','◷','data-value="datetime"')+button('format','Длительность','◴','data-value="duration"'))+
  group('Вычисления',button('autosum','Автосумма','Σ'))+
@@ -711,7 +745,7 @@ function ribbon(){
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''));
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Очистка данных',button('text-to-columns','Текст по столбцам','⇥')+button('remove-duplicates','Удалить дубликаты','≡'))+group('Проверка',button('validation-open','Проверка данных','✓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
- if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Диаграммы',button('chart-bar','Столбчатая диаграмма','▥')+
+ if(activeRibbon==='insert')contents=group('Отметки',button('insert-checkbox','Вставить чекбокс','☑'))+group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Диаграммы',button('chart-bar','Столбчатая диаграмма','▥')+
   button('chart-stacked','С накоплением','▥')+
   button('chart-stacked100','С накоплением 100%','▥')+button('chart-line','Линейная диаграмма','⌁')+button('chart-scatter','Точечная XY','·')+button('chart-pie','Круговая диаграмма','◉')+button('charts-open','Мои диаграммы','▣'))+group('Листы',button('sheet-add','Новый лист','+'));
  if(activeRibbon==='view')contents=group('Печать',button('print-open','Печать таблицы','▤'))+group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
@@ -1024,8 +1058,17 @@ function dataToolPanel(){
   '>Применить</button></div></div></aside>';
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}</main>`;}
-function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
- if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
+function render(){
+ const previousGrid=document.getElementById('grid-scroll');
+ if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){
+  scrollLeft=previousGrid.scrollLeft;scrollTop=previousGrid.scrollTop;
+ }
+ app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
+ if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.dataset.sheetId=sheet().id;view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;
+ view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
+  if(view._gridFrame)return;
+  view._gridFrame=requestAnimationFrame(()=>{view._gridFrame=null;if(view.isConnected)drawGrid(true);});
+ },{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
 function refreshFillHandle(){
  const handle=document.getElementById('grid-fill-handle'),frame=document.getElementById('grid-frame');
@@ -1136,8 +1179,8 @@ function endFillDrag(apply){
 function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
  const s=sheet(),{x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
  canvas.style.width=`${x.at(-1)}px`;canvas.style.height=`${y.at(-1)-headerH}px`;
- const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop+headerH)-2),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight+headerH)+2);
- const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-2),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+2);
+ const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop+headerH)-16),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight+headerH)+16);
+ const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-3),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+3);
  const rows=[...new Set([...Array.from({length:lastR-firstR+1},(_,i)=>firstR+i),...Array.from({length:freezeR},(_,i)=>i)])].sort((a,b)=>a-b);
  const cols=[...new Set([...Array.from({length:lastC-firstC+1},(_,i)=>firstC+i),...Array.from({length:freezeC},(_,i)=>i)])].sort((a,b)=>a-b);
  const rect=rectangle(activeCell,rangeEnd),allSelection=selectedRects(),filter=filterRange(s);const {raw,ctx}=recalculator.view(book(),s);const scaleStats=prepareConditionalScales(s,raw,ctx);let html='',pinnedRowsHtml='',pinnedColsHtml='';
@@ -1155,11 +1198,11 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
    right:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)),'right')).find(Boolean):resolveBorderSide(style,'right')
   };
   const val=displayedValue(s,ref,raw,ctx),align=style.align||s.defaultAlign||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
+  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.fontFamily&&FONT_FAMILIES.includes(style.fontFamily)?`font-family:'${style.fontFamily}',sans-serif;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   const destination=pinnedR?'row':pinnedC?'col':'main';
-  const cellMarkup=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${destination==='row'?y[r]-headerH:destination==='col'?y[r]-headerH-scrollTop:y[r]-headerH}px;left:${destination==='row'?x[c]-rowW-(pinnedC?0:scrollLeft):destination==='col'?x[c]-rowW:x[c]}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${esc(val)}${action}</div>`;
+  const cellMarkup=`<div class="grid-cell ${merged?'is-merged':''} ${style.wrap?'is-wrapped':''} ${selected?'is-selected':''} ${active?'is-active':''} ${pinnedR?'frozen-row':''} ${pinnedC?'frozen-col':''}" data-ref="${ref}" role="gridcell" aria-selected="${selected}" style="top:${destination==='row'?y[r]-headerH:destination==='col'?y[r]-headerH-scrollTop:y[r]-headerH}px;left:${destination==='row'?x[c]-rowW-(pinnedC?0:scrollLeft):destination==='col'?x[c]-rowW:x[c]}px;width:${(bounds?x[bounds.c2+1]:x[c+1])-x[c]}px;height:${(bounds?y[bounds.r2+1]:y[r+1])-y[r]}px;${appearance}" title="${esc(ref)}">${val==='☐'||val==='☑'?`<button type="button" class="cell-checkbox" role="checkbox" data-action="checkbox-toggle" data-ref="${ref}" aria-label="Отметка ${ref}" aria-checked="${val==='☑'}" title="${val==='☑'?'Отмечено':'Отметить'}">${val==='☑'?'✓':''}</button>`:esc(val)}${action}</div>`;
   if(destination==='row')pinnedRowsHtml+=cellMarkup;
   else if(destination==='col')pinnedColsHtml+=cellMarkup;
   else html+=cellMarkup;
@@ -1262,6 +1305,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'border-menu':borderMenuOpen=!borderMenuOpen;activePalette=null;render();break;
  case 'border-mode':setCellBorders(value);break;
  case 'popup-close':activePalette=null;borderMenuOpen=false;render();break;
+ case 'insert-checkbox':insertCheckboxes();break;case 'checkbox-toggle':e.preventDefault();toggleCellCheckbox(ref);break;
  case 'merge-cells':updateMerge('merge');break;case 'unmerge-cells':updateMerge('unmerge');break;
  case 'border-all':setCellBorders('all');break;case 'border-none':setCellBorders('none');break;case 'wrap':toggleWrap();break;
  case 'bold':applyStyle({bold:!getEffectiveStyle(sheet(),activeCell).bold});break;case 'italic':applyStyle({italic:!getEffectiveStyle(sheet(),activeCell).italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
@@ -1314,7 +1358,9 @@ app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))reco
 app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.target.closest('.format-popover,[data-action=fill-palette],[data-action=text-palette],[data-action=border-menu]')){activePalette=null;borderMenuOpen=false;document.querySelectorAll('.format-popover').forEach(el=>el.remove());}},true);
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
-app.addEventListener('change',e=>{const t=e.target;
+app.addEventListener('change',e=>{const t=e.target;if(t.id==='font-family-select'){if(FONT_FAMILIES.includes(t.value))applyStyle({fontFamily:t.value});return;}
+ if(t.id==='font-size-select'){const value=Number(t.value);if(Number.isInteger(value)&&value>=6&&value<=72)applyStyle({fontSize:value});return;}
+
  if(dataTool&&['data-tool-delimiter','data-tool-overwrite','data-tool-header','data-tool-key'].includes(t.id)){
   if(t.id==='data-tool-delimiter')dataTool.delimiter=t.value;
   if(t.id==='data-tool-overwrite')dataTool.overwrite=t.checked;
@@ -1344,10 +1390,10 @@ window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDra
  if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
 window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
 app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
-app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)addSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
+app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)addSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
 app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref,true);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
-app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;setSelection(cell.dataset.ref);editCell();}});
+app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;setSelection(cell.dataset.ref);editCell();}});
 function captureSelection(){if(!requireSingleRange())return null;if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
 async function cutSelection(){
  const clip=captureSelection();if(!clip)return false;
