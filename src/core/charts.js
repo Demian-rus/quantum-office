@@ -250,7 +250,7 @@ export function chartSVG(data,type,settings={}){
  }else{
   const values=series.flatMap(s=>s.points.map(p=>p.value)),
    autoMin=Math.min(0,...values),autoMax=Math.max(0,...values),
-   min=settings.min??Math.min(autoMin,(settings.max??autoMin)-1),
+   min=settings.min??(settings.max!=null?Math.min(autoMin,settings.max-1):autoMin),
    max=settings.max??Math.max(autoMax,min+1),range=max-min||1,
    x0=64,x1=legend==='right'?450:604,y0=35,y1=legend==='bottom'&&series.length>1?230:254,
    w=x1-x0,h=y1-y0;
