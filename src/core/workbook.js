@@ -460,6 +460,10 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
   const b=rectangle(m.from,m.to);
   return b.r1<=affected.r2&&b.r2>=affected.r1&&b.c1<=affected.c2&&b.c2>=affected.c1;
  }))throw Error('Автозаполнение через объединённые ячейки не поддерживается');
+ for(let row=affected.r1;row<=affected.r2;row++)if(!rowVisible(sheet,row))
+  throw Error('Автозаполнение через скрытые или отфильтрованные строки запрещено');
+ for(let col=affected.c1;col<=affected.c2;col++)if(!columnVisible(sheet,col))
+  throw Error('Автозаполнение через скрытые столбцы запрещено');
  const prepared=[];
  const numeric=v=>typeof v==='string'&&v.trim()!==''&&
   /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(v.trim())&&Number.isFinite(Number(v));
