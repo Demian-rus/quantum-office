@@ -253,7 +253,8 @@ function editCell(seed=null){if(!sheet())return;if(!rowVisible(sheet(),parseCell
  node.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();event.stopPropagation();commitSelectedEntry();}else if(event.key==='Enter'){event.preventDefault();if(commitEditor())moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();if(commitEditor())moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
  node.addEventListener('blur',()=>{if(editing?.node===node)commitEditor();});}
 function selectionContainsHiddenRows(){
- const rect=rectangle(activeCell,rangeEnd),s=sheet();if(!rect||!s)return false;
+ const rects=selectedRects(),s=sheet();if(!rects.length||!s)return false;
+ for(const rect of rects){
  // A range spanning 100k rows is not intrinsically expensive: first inspect
  // explicit sparse hide maps. Only an active filter needs individual row checks.
  if(Object.keys(s.hiddenRows||{}).some(i=>+i>=rect.r1&&+i<=rect.r2))return true;
@@ -263,11 +264,20 @@ function selectionContainsHiddenRows(){
   for(let r=Math.max(rect.r1,filter.r1+1);r<=Math.min(rect.r2,filter.r2);r++)
    if(!rowVisible(s,r))return true;
  }
+ }
  return false;
 }
 function refuseHiddenSelection(){if(!selectionContainsHiddenRows())return false;status('Выделение содержит скрытые строки или столбцы. Отобразите их перед массовым изменением.',true);return true;}
 function clearSelected(){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  try{
+   const draft=structuredClone(sheet());let count=0;
+   for(const a of selectedRects())count+=clearCellValues(draft,cellName(a.r1,a.c1),cellName(a.r2,a.c2));
+   if(!count){status('В выделении нет содержимого для очистки');return;}
+   transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status('Очищено: '+count+' ячеек');return;
+  }catch(err){status(err.message,true);return;}
+ }
  try{
   const count=clearCellValues(sheet(),activeCell,rangeEnd,true);
   if(!count){status('В выделении нет содержимого для очистки');return;}
@@ -277,6 +287,14 @@ function clearSelected(){
 }
 function clearSelectedFormat(){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  try{
+   const draft=structuredClone(sheet());let count=0;
+   for(const a of selectedRects())count+=clearFormatting(draft,cellName(a.r1,a.c1),cellName(a.r2,a.c2));
+   if(!count){status('Оформление уже сброшено');return;}
+   transact(()=>{sheet().cells=draft.cells;});drawGrid();status('Оформление сброшено: '+count);return;
+  }catch(err){status(err.message,true);return;}
+ }
  try{
   const count=clearFormatting(sheet(),activeCell,rangeEnd,true);
   if(!count){status('Оформление уже сброшено');return;}
@@ -339,6 +357,19 @@ function visibilityAction(axis,show){
  }catch(err){status(err.message||'Не удалось скрыть',true);}
 }
 function applyStyle(patch,selection=null){
+ const all=selection?.ranges||selectedRects();
+ if(all.length>1){
+  if(selection&&(selection.bookId!==book()?.id||selection.sheetId!==sheet()?.id)){status('Исходный лист изменился',true);return;}
+  try{
+   if(refuseHiddenSelection())return;
+   let total=0;for(const r of all)total+=(r.r2-r.r1+1)*(r.c2-r.c1+1);
+   if(total>10000)throw Error('Множественное оформление ограничено 10 000 ячейками');
+   const refs=new Set();
+   for(const r of all)for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++)refs.add(cellName(row,col));
+   transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();status('Оформлено областей: '+all.length);
+  }catch(err){status(err.message,true);}
+  return;
+ }
  const a=selection?.start||activeCell,b=selection?.end||rangeEnd;
  // A color picker may dispatch change only after focus moved to another cell.
  // Do not ever apply a stale snapshot to a different document or worksheet.
@@ -364,10 +395,17 @@ function applyStyle(patch,selection=null){
  const refs=refsBetween(a,b);
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
 }
-function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd};}
+function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd,ranges:selectedRects()};}
 function applySelectedColor(kind,value){const captured=pendingColorSelection;pendingColorSelection=null;applyStyle({[kind]:value},captured);}
 function setCellBorders(mode){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  const draft=structuredClone(sheet());
+  try{
+   for(const r of selectedRects())applyBorderPreset(draft,cellName(r.r1,r.c1),cellName(r.r2,r.c2),mode);
+   transact(()=>{sheet().cells=draft.cells;});borderMenuOpen=false;render();status('Границы применены ко всем областям');
+  }catch(err){status(err.message,true);}return;
+ }
  const draft=structuredClone(sheet());try{applyBorderPreset(draft,activeCell,rangeEnd,mode);
   transact(()=>applyBorderPreset(sheet(),activeCell,rangeEnd,mode));borderMenuOpen=false;render();status('Границы обновлены');
  }catch(err){status(err.message,true);}
