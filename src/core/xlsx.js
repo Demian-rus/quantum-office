@@ -2,6 +2,7 @@ import '../vendor/jszip.min.js';
 import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
 import {validateDataRules} from './validation.js';
 import {validateConditionalRules} from './conditional.js';
+import {writeXLSXCharts,importXLSXCharts} from './xlsx-charts.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -144,7 +145,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
  const theme=zip.file(themePath)?themeColorsFromXML(await readXML(zip,themePath)):DEFAULT_THEME;
  const styleRoot=zip.file('xl/styles.xml')?await readXML(zip,'xl/styles.xml'):null;
  const fmt=stylesFromXML(styleRoot,theme),dxfs=xlsxDifferentialFills(styleRoot,theme);
- const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
+ const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;const chartDescriptors=[];
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
    // Excel row heights are points. Excel column widths are character counts;
@@ -266,9 +267,11 @@ export async function importXLSX(data,filename='Таблица',report=null){
   for(const merged of merges){const pieces=String(merged.getAttribute('ref')||'').toUpperCase().split(':');if(pieces.length!==2)throw Error('Повреждённый диапазон объединения');mergeCells(sheet,pieces[0],pieces[1]);}
   importXLSXValidations(sheet,xml,report);
   importXLSXConditionalFormatting(sheet,xml,dxfs,report,theme);
-  book.sheets.push(sheet);
+  book.sheets.push(sheet);chartDescriptors.push({sheet,xml,path});
  }
- book.activeSheetId=book.sheets[0].id;return validateWorkbook(book);
+ book.activeSheetId=book.sheets[0].id;
+ await importXLSXCharts(zip,book,chartDescriptors,report);
+ return validateWorkbook(book);
 }
 
 /** TASK054 supported OOXML data validation: literal lists and decimal intervals. */
@@ -506,10 +509,11 @@ export async function exportXLSX(book){validateWorkbook(book);
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
+  const chartParts=writeXLSXCharts(zip,book,s,i+1);
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...Object.keys(s.rowStyles||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}</worksheet>`;
-  zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}${chartParts.drawing}</worksheet>`;
+  zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,...chartParts.overrides);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
  zip.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${base}" xmlns:r="${relNS}"><workbookPr date1904="0"/><sheets>${sheets.join('')}</sheets><calcPr fullCalcOnLoad="1"/></workbook>`);
