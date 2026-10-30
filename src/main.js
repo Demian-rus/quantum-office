@@ -2,7 +2,7 @@ import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,ch
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
-import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
+import { newWorkbook,newSheet,currentSheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
@@ -231,12 +231,14 @@ function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if
 function commitSelectedEntry(){
  if(!editing||!sheet())return;
  const {node}=editing,value=node.value;
- if(activeCell===rangeEnd){commitEditor();return;}
+ if(selectedRects().length===1&&activeCell===rangeEnd){commitEditor();return;}
  if(refuseHiddenSelection())return;
  try{
-  const from=activeCell,to=rangeEnd;
+  const from=activeCell,to=rangeEnd,areas=selectedRects();
   let count=0;
-  transact(()=>{count=fillTypedSelection(sheet(),from,to,value,from);});
+  transact(()=>{count=areas.length>1?
+    fillTypedAreas(sheet(),areas.map(a=>({from:cellName(a.r1,a.c1),to:cellName(a.r2,a.c2)})),value,from):
+    fillTypedSelection(sheet(),from,to,value,from);});
   editing=null;node.remove();drawGrid();updateSelectionStats();
   const formula=document.getElementById('formula-input');if(formula)formula.value=getCell(sheet(),activeCell).value;
   document.getElementById('grid-scroll')?.focus({preventScroll:true});
@@ -303,7 +305,18 @@ function clearSelectedFormat(){
  }catch(err){status(err.message,true);}
 }
 function autoSum(){if(!requireSingleRange())return;commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
-function fillSelected(direction){if(!requireSingleRange())return;if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
+function fillSelected(direction){
+ if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;
+ const areas=selectedRects(),ranges=areas.map(a=>({from:cellName(a.r1,a.c1),to:cellName(a.r2,a.c2)}));
+ const draft=structuredClone(sheet());
+ try{
+  const count=areas.length>1?fillAreasDirection(draft,ranges,direction):
+   fillSelection(draft,activeCell,rangeEnd,direction);
+  if(!count){status('Нет ячеек для заполнения');return;}
+  transact(()=>{sheet().cells=draft.cells;});
+  drawGrid();updateSelectionStats();status('Заполнено '+count+' ячеек'+(areas.length>1?' в '+areas.length+' областях':''));
+ }catch(e){status(e.message,true);}
+}
 function updateSelectionStats(){
  const node=document.querySelector('#selection-stats');if(!node||!sheet())return;
  const rects=selectedRects();if(!rects.length)return;
