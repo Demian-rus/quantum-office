@@ -1,6 +1,7 @@
 /** Offline, data-linked charts. No third-party scripts or remote services. */
-import {uid,rectangle,cellName,LIMITS,formulaContext,resultOf} from './workbook.js';
+import {uid,rectangle,cellName,LIMITS,formulaContext,resultOf,gridGeometry} from './workbook.js';
 export const CHART_TYPES=['bar','line','pie'];
+export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;
 const COLORS=['#277c58','#397eb9','#e5a43b','#8a60b7','#dc7775','#42a8aa','#7e9e4a','#d58e4b'];
 const escapeSVG=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=s=>{const v=String(s??'').trim();return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v)&&Number.isFinite(+v)?+v:null;};
@@ -13,6 +14,29 @@ export function chartRect(chart){
   throw Error('Нужны два столбца и от 2 до 51 строки данных');
  return rect;
 }
+/** A chart owns its visual position separately from its data source. The coordinates
+ * are scrollable sheet pixels (not viewport coordinates), so pan/zoom and virtualization
+ * do not move it away from its cells. Old QBOOK chart records are supported. */
+export function chartLayout(sheet,chart,index=0){
+ if(chart.layout)return {...chart.layout};
+ const r=chartRect(chart),{x,y}=gridGeometry(sheet),width=480,height=292;
+ const left=Math.max(54,Math.min(x.at(-1)-width,x[Math.min(LIMITS.columns,r.c2+2)]));
+ const top=Math.max(0,Math.min(y.at(-1)-31-height,y[r.r1]-31+index*330));
+ return {x:Math.round(left),y:Math.round(top),width,height};
+}
+export function validateChartLayout(sheet,layout){
+ if(!layout||typeof layout!=='object'||Array.isArray(layout)||
+    Object.keys(layout).sort().join(',')!=='height,width,x,y'||
+    Object.values(layout).some(x=>!Number.isSafeInteger(x))||
+    layout.x<54||layout.y<0||
+    layout.width<CHART_MIN_WIDTH||layout.width>1000||
+    layout.height<CHART_MIN_HEIGHT||layout.height>700)
+  throw Error('Неверное положение или размер диаграммы');
+ const {x,y}=gridGeometry(sheet);
+ if(layout.x+layout.width>x.at(-1)||layout.y+layout.height>y.at(-1)-31)
+  throw Error('Диаграмма выходит за пределы листа');
+ return layout;
+}
 export function validateCharts(sheet){
  if(sheet.charts===undefined)return;
  if(!Array.isArray(sheet.charts)||sheet.charts.length>30)throw Error('Повреждён список диаграмм');
@@ -22,9 +46,9 @@ export function validateCharts(sheet){
     typeof chart.id!=='string'||!chart.id||chart.id.length>100||seen.has(chart.id)||
     !CHART_TYPES.includes(chart.type)||typeof chart.title!=='string'||
     !chart.title.trim()||chart.title.length>120||
-    Object.keys(chart).some(k=>!['id','type','title','from','to'].includes(k)))
+    Object.keys(chart).some(k=>!['id','type','title','from','to','layout'].includes(k)))
     throw Error('Повреждена диаграмма');
-  chartRect(chart);seen.add(chart.id);
+  chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);seen.add(chart.id);
  }
 }
 /** Find a useful nearby table when the user clicks Insert Chart without selecting a range.
@@ -87,7 +111,7 @@ export function addChart(book,sheet,type,from,to){
  if(!rect)throw Error('Выделите диапазон с категориями и числами');
  const chart={id:uid(),type,title:'Диаграмма '+((sheet.charts?.length||0)+1),
    from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2)};
- chartRect(chart);
+ chartRect(chart);chart.layout=chartLayout(sheet,chart,(sheet.charts||[]).length);
  if((sheet.charts?.length||0)>=30)throw Error('Лимит: 30 диаграмм на лист');
  (sheet.charts??=[]).push(chart);
  return chart;
@@ -102,6 +126,7 @@ export function changeChart(sheet,id,patch){
   next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
  }
  chartRect(next);
+ if(patch.layout!==undefined){next.layout={...patch.layout};validateChartLayout(sheet,next.layout);}
  Object.assign(chart,next);
  return chart;
 }
