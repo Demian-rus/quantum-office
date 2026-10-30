@@ -941,7 +941,8 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
    const t=dataTool,plan=t.kind==='split'?
     planTextToColumns(sheet(),t.from,t.to,{delimiter:t.delimiter,overwrite:t.overwrite}):
     planRemoveDuplicates(sheet(),t.from,t.to,{header:t.header,key:t.key});
-   transact(()=>t.kind==='split'?applyTextToColumns(sheet(),plan):applyRemoveDuplicates(sheet(),plan));
+   if(t.kind==='dedup'&&!plan.removed){dataTool=null;render();status('Повторов не найдено');break;}
+   transact(()=>{if(t.kind==='split')applyTextToColumns(sheet(),plan);else applyRemoveDuplicates(sheet(),plan);validateWorkbook(book());});
    dataTool=null;render();status(t.kind==='split'?'Текст разделён по '+plan.cols+' столбцам':
     'Удалено повторов: '+plan.removed);
   }catch(err){render();status(err.message,true);}
