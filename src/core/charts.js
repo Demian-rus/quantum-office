@@ -155,10 +155,14 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
    return {label:item.label,value};
   })
  }));
- if(chart.type==='stacked100'){
+ if(STACKED_TYPES.includes(chart.type)){
   for(let i=0;i<pointsBySeries[0].points.length;i++){
-   const values=pointsBySeries.map(s=>s.points[i].value),sum=values.reduce((a,b)=>a+b,0);
-   if(values.some(v=>v<0)||sum<=0)throw Error('100% с накоплением: для каждой категории нужны неотрицательные числа с положительной суммой');
+   const values=pointsBySeries.map(s=>s.points[i].value),
+    pos=values.filter(v=>v>0).reduce((a,b)=>a+b,0),
+    neg=values.filter(v=>v<0).reduce((a,b)=>a+b,0);
+   if(!Number.isFinite(pos)||!Number.isFinite(neg))throw Error('Слишком большие значения для накопительной диаграммы');
+   if(chart.type==='stacked100'&&(values.some(v=>v<0)||pos<=0))
+    throw Error('100% с накоплением: для каждой категории нужны неотрицательные числа с положительной суммой');
   }
  }
  if(chart.type==='pie'){
