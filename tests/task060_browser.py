@@ -66,7 +66,7 @@ with sync_playwright() as p:
   const xmlAgain=await zipAgain.file('xl/charts/chart1-1.xml').async('string');
   if((xmlAgain.match(/<c:ser>/g)||[]).length!==3)throw Error('Re-export lost series');
   // Unsupported disjoint data references must be skipped, not imported as misleading chart.
-  zip.file('xl/charts/chart1-1.xml',chart.replace(/\\$D\\$2:\\$D\\$4/g,'$F$2:$F$4'));
+  zip.file('xl/charts/chart1-1.xml',chart.replace(/\$D\$2:\$D\$4/g,'$F$2:$F$4'));
   const invalid=await zip.generateAsync({type:'uint8array',compression:'DEFLATE'}),warn={};
   const partial=await importXLSX(invalid,'Чужие данные.xlsx',warn);
   if(warn.skippedCharts!==1||partial.sheets[0].charts.length!==0)
