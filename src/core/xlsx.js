@@ -265,7 +265,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
   if(merges.length>500)throw Error('Слишком много объединённых диапазонов');
   for(const merged of merges){const pieces=String(merged.getAttribute('ref')||'').toUpperCase().split(':');if(pieces.length!==2)throw Error('Повреждённый диапазон объединения');mergeCells(sheet,pieces[0],pieces[1]);}
   importXLSXValidations(sheet,xml,report);
-  importXLSXConditionalFormatting(sheet,xml,dxfs,report);
+  importXLSXConditionalFormatting(sheet,xml,dxfs,report,theme);
   book.sheets.push(sheet);
  }
  book.activeSheetId=book.sheets[0].id;return validateWorkbook(book);
@@ -343,7 +343,7 @@ export function xlsxDifferentialFills(root,themes=DEFAULT_THEME){
 const CF_NUMBER=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
 const CF_COLOR=/^#[0-9a-f]{6}$/i;
 /** Excel priorities run ascending, whereas Quantum's last matching fill wins. */
-export function importXLSXConditionalFormatting(sheet,root,dxfs=[],report=null){
+export function importXLSXConditionalFormatting(sheet,root,dxfs=[],report=null,themes=DEFAULT_THEME){
  const candidates=[];
  for(const group of elements(root,'conditionalFormatting')){
   const refs=String(group.getAttribute('sqref')||'').trim().split(/\s+/);
@@ -361,7 +361,7 @@ export function importXLSXConditionalFormatting(sheet,root,dxfs=[],report=null){
   if(type==='colorScale'){
    const scale=element(node,'colorScale'),points=elements(scale,'cfvo'),colors=elements(scale,'color');
    if(points.length===2&&colors.length===2&&points[0].getAttribute('type')==='min'&&points[1].getAttribute('type')==='max'){
-    const lowColor=resolveXLSXColor(colors[0]),highColor=resolveXLSXColor(colors[1]);
+    const lowColor=resolveXLSXColor(colors[0],themes),highColor=resolveXLSXColor(colors[1],themes);
     if(CF_COLOR.test(lowColor||'')&&CF_COLOR.test(highColor||''))spec={kind:'scale',lowColor,highColor};
    }
   }else{
