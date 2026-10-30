@@ -70,7 +70,7 @@ export function validateCharts(sheet){
     !chart.title.trim()||chart.title.length>120||
     Object.keys(chart).some(k=>!['id','type','title','from','to','layout','options'].includes(k)))
     throw Error('Повреждена диаграмма');
-  chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined)validateChartOptions(chart.options);seen.add(chart.id);
+  const rect=chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined){validateChartOptions(chart.options);if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
  }
 }
 /** Find a useful nearby table when the user clicks Insert Chart without selecting a range.
@@ -180,7 +180,9 @@ export function changeChart(sheet,id,patch){
   if(typeof patch.from!=='string'||typeof patch.to!=='string')throw Error('Укажите диапазон, например A1:B6');
   next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
  }
- chartRect(next);
+ const sourceRect=chartRect(next);
+ if((patch.from!==undefined||patch.to!==undefined||patch.type!==undefined)&&next.options?.colors?.length>sourceRect.c2-sourceRect.c1)
+  next.options={...next.options,colors:next.options.colors.slice(0,sourceRect.c2-sourceRect.c1)};
  if(patch.layout!==undefined){next.layout={...patch.layout};validateChartLayout(sheet,next.layout);}
  if(patch.options!==undefined){
   if(!patch.options||typeof patch.options!=='object'||Array.isArray(patch.options))throw Error('Недопустимые параметры оформления диаграммы');
