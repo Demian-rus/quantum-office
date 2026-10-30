@@ -54,7 +54,7 @@ with sync_playwright() as p:
  # Atomic rollback when a selected cell has validation constraints.
  page.evaluate("""()=>{
   const s=sheet();
-  s.validations=[{id:'rule69',kind:'list',from:'F4',to:'F4',options:['yes']}];
+  s.validations=[{id:'rule69',kind:'list',from:'F4',to:'F4',options:['yes','okay']}];
   setSelection('B4');addSelection('F4');
  }""")
  cell('F4').click(modifiers=['Control']) if False else None
