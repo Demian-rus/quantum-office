@@ -568,6 +568,9 @@ function homepage(){
 }
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
 function sizeTargets(kind,index){
+ // A whole-sheet selection is a compact default-dimension change, not 100k per-row writes.
+ if(selectedRects().some(a=>a.r1===0&&a.r2===LIMITS.rows-1&&a.c1===0&&a.c2===LIMITS.columns-1))
+  return ['all'];
  const full=kind==='col'?LIMITS.rows-1:LIMITS.columns-1,which=kind==='col'?'c':'r';
  const selected=selectedRects().filter(a=>kind==='col'?
   a.r1===0&&a.r2===full:a.c1===0&&a.c2===full);
@@ -591,7 +594,7 @@ function sizeContextPanel(){
   max=m.kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn;
  const initial=m.kind==='row'?rowHeight(sheet(),m.index):columnWidth(sheet(),m.index);
  return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="dialog" aria-label="'+title+'">'+
-  '<label>'+title+(targets.length>1?' ('+targets.length+')':'')+
+  '<label>'+title+(targets[0]==='all'?' (все)':'')+(targets.length>1?' ('+targets.length+')':'')+
   '<input id="size-context-number" type="number" step="1" min="'+min+'" max="'+max+'" value="'+initial+'" aria-label="'+title+' в пикселях"></label>'+
   '<small>Допустимо: '+min+'–'+max+' пикселей</small>'+
   '<div class="size-context-actions"><button data-action="size-context-close">Отмена</button>'+
@@ -614,11 +617,17 @@ function applyContextSize(){
   if(value<(kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn)||
      value>(kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn))
    throw Error('Размер вне допустимых границ');
-  if(targets.every(i=>(kind==='row'?rowHeight(sheet(),i):columnWidth(sheet(),i))===value)){
+  if(targets[0]!=='all'&&targets.every(i=>(kind==='row'?rowHeight(sheet(),i):columnWidth(sheet(),i))===value)){
    sizeContext=null;document.getElementById('size-context-menu')?.remove();return;
   }
-  transact(()=>{for(const i of targets)if(kind==='row')setRowHeight(sheet(),i,value);else setColumnWidth(sheet(),i,value);});
-  sizeContext=null;render();status('Размер '+(kind==='row'?'строк':'столбцов')+': '+value+' px ('+targets.length+')');
+  transact(()=>{
+   if(targets[0]==='all'){
+    if(kind==='row'){sheet().defaultRowHeight=value;sheet().rowHeights={};}
+    else{sheet().defaultColumnWidth=value;sheet().columnWidths={};}
+    invalidateGridGeometry(sheet());
+   }else for(const i of targets)if(kind==='row')setRowHeight(sheet(),i,value);else setColumnWidth(sheet(),i,value);
+  });
+  sizeContext=null;render();status('Размер '+(kind==='row'?'строк':'столбцов')+': '+value+' px ('+(targets[0]==='all'?'все':targets.length)+')');
  }catch(err){status(err.message,true);}
 }
 function changeSize(kind){if(sizeContext){sizeContext=null;document.getElementById('size-context-menu')?.remove();}commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
@@ -1316,9 +1325,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
 app.addEventListener('contextmenu',e=>{
- const header=e.target.closest('.rowhead,.colhead'),cell=e.target.closest('.grid-cell');
- if(!header&&!cell)return; // keep browser context menu outside the spreadsheet grid
+ const header=e.target.closest('.rowhead,.colhead'),cell=e.target.closest('.grid-cell'),corner=e.target.closest('#grid-corner');
+ if(!header&&!cell&&!corner)return; // keep browser context menu outside the spreadsheet grid
  e.preventDefault();e.stopPropagation();
+ if(corner){setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));openSizeContext('cell',0,e.clientX,e.clientY);return;}
  if(header){
   const kind=header.classList.contains('colhead')?'col':'row',index=Number(header.dataset.index);
   const fullSelected=selectedRects().some(r=>kind==='col'?
