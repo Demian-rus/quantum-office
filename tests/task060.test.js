@@ -33,6 +33,17 @@ test('TASK060: multi-series source yields grouped bars, named legends and formul
  assert.deepEqual(chartData(saved,saved.sheets[0],saved.sheets[0].charts[0]).series[1].points[1].value,37);
  validateWorkbook(saved);
 });
+test('TASK060: numeric year headings are series names rather than an extra group of data',()=>{
+ const {b,s}=make();
+ setCell(s,'B1','2024');setCell(s,'C1','2025');setCell(s,'D1','2026');
+ const c=addChart(b,s,'line','A1','D4'),data=chartData(b,s,c);
+ assert.equal(data.header,true);
+ assert.deepEqual(data.series.map(x=>x.name),['2024','2025','2026']);
+ assert.deepEqual(data.points.map(x=>x.label),['Январь','Февраль','Март']);
+ const xml=xlsxChartXML(b,s,c);
+ assert.equal((xml.match(/<c:ser>/g)||[]).length,3);
+ assert.match(xml,/\$B\$2:\$B\$4/);
+});
 test('TASK060: strict series bounds, pie isolation, malformed data and atomic source/type transitions',()=>{
  const {b,s}=make(),c=addChart(b,s,'line','A1','D4');
  assert.throws(()=>addChart(b,s,'bar','A1','F4'),/2–5 столбцов/);
