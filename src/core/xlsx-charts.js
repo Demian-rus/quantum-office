@@ -1,5 +1,5 @@
 /** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
-import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout} from './charts.js';
+import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS} from './charts.js';
 import {uid,parseCell,cellName,getCell,gridGeometry,firstVisibleIndex} from './workbook.js';
 
 const DRAW='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
@@ -18,12 +18,24 @@ const chartSeriesValue=(points,key,kind)=>'<c:'+kind+'Cache><c:ptCount val="'+po
 const absolute=(sheet,rect)=>"'"+sheet.name.replaceAll("'","''")+"'!$"+cellName(0,rect.c1).replace(/\d+$/,'')+"$"+(rect.r1+1)+':$'+cellName(0,rect.c2).replace(/\d+$/,'')+'$'+(rect.r2+1);
 const oneCol=(sheet,row1,row2,col)=>absolute(sheet,{r1:row1,r2:row2,c1:col,c2:col});
 const richTitle=title=>'<c:title><c:tx><c:rich><a:bodyPr/><a:lstStyle/><a:p><a:pPr/><a:r><a:rPr lang="ru-RU"/><a:t>'+escape(title)+'</a:t></a:r><a:endParaRPr lang="ru-RU"/></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>';
-const chartAxis=(catId,valId)=>
+const chartAxis=(catId,valId,opts={})=>
  '<c:catAx><c:axId val="'+catId+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="b"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+valId+'"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblOffset val="100"/></c:catAx>'+
- '<c:valAx><c:axId val="'+valId+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/><c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+catId+'"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>';
+ '<c:valAx><c:axId val="'+valId+'"/><c:scaling><c:orientation val="minMax"/>'+
+ (opts.max!=null?'<c:max val="'+opts.max+'"/>':'')+(opts.min!=null?'<c:min val="'+opts.min+'"/>':'')+
+ '</c:scaling><c:axPos val="l"/>'+(opts.grid===false?'':'<c:majorGridlines/>')+
+ '<c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+catId+'"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>';
+const chartDataLabels=o=>o.labels?'<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/></c:dLbls>':'';
+const chartLegend=o=>o.legend==='none'?'':'<c:legend><c:legendPos val="'+(o.legend==='right'?'r':'b')+'"/><c:overlay val="0"/></c:legend>';
+const seriesPaint=(chart,k)=>{
+ const hex=chart.options?.colors?.[k];
+ if(!hex)return '';
+ const clr='<a:solidFill><a:srgbClr val="'+hex.slice(1).toUpperCase()+'"/></a:solidFill>';
+ return chart.type==='line'?'<c:spPr><a:ln w="28575">'+clr+'</a:ln></c:spPr>':
+  '<c:spPr>'+clr+'</c:spPr>';
+};
 /** Reference formulas keep charts live when worksheet values change in Excel. */
 export function xlsxChartXML(book,sheet,chart,ordinal=0){
- const rect=chartRect(chart),data=chartData(book,sheet,chart,{allowEmpty:true});
+ const rect=chartRect(chart),data=chartData(book,sheet,chart,{allowEmpty:true}),opts=chartOptions(chart);
  const header=data.header;
  const row1=rect.r1+(header?1:0),row2=rect.r2;
  const cat=oneCol(sheet,row1,row2,rect.c1),val=oneCol(sheet,row1,row2,rect.c2);
@@ -34,22 +46,22 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
    '<c:tx><c:strRef><c:f>'+escape(titleCell)+'</c:f>'+
     chartSeriesValue([{name:entry.name}],'name','str')+'</c:strRef></c:tx>':
    '<c:tx><c:v>'+escape(entry.name)+'</c:v></c:tx>';
-  return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+
+  return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+seriesPaint(chart,k)+
    '<c:cat><c:strRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(entry.points,'label','str')+'</c:strRef></c:cat>'+
    '<c:val><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:val></c:ser>';
  }).join('');
  const catAxis=100000+ordinal*2,valAxis=catAxis+1;
  const plot=chart.type==='pie'?
-  '<c:pieChart><c:varyColors val="1"/>'+seriesXML+'<c:firstSliceAng val="0"/></c:pieChart>':
+  '<c:pieChart><c:varyColors val="1"/>'+seriesXML+chartDataLabels(opts)+'<c:firstSliceAng val="0"/></c:pieChart>':
   chart.type==='bar'?
-  '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="1"/>'+seriesXML+
-  '<c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:barChart>'+chartAxis(catAxis,valAxis):
-  '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>'+seriesXML+
-  '<c:marker val="1"/><c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:lineChart>'+chartAxis(catAxis,valAxis);
+  '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="1"/>'+seriesXML+chartDataLabels(opts)+
+  '<c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:barChart>'+chartAxis(catAxis,valAxis,opts):
+  '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>'+seriesXML+chartDataLabels(opts)+
+  '<c:marker val="1"/><c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:lineChart>'+chartAxis(catAxis,valAxis,opts);
  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
  '<c:chartSpace xmlns:c="'+C+'" xmlns:a="'+A+'" xmlns:r="'+R+'"><c:lang val="ru-RU"/>'+
  '<c:chart>'+richTitle(chart.title)+'<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>'+plot+
- '</c:plotArea><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>';
+ '</c:plotArea>'+chartLegend(opts)+'<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>';
 }
 // Excel drawing anchors use cell indices and offsets in English Metric Units.
 // Keep objects at their native sheet positions; no more arbitrary 'to the right' placement.
@@ -190,6 +202,26 @@ function parseChart(book,sheet,chartRoot){
  const textNodes=titleNode?Array.from(titleNode.getElementsByTagNameNS(A,'t')):[];
  const caption=textNodes.map(x=>x.textContent).join('').trim();
  const chart={id:uid(),type,title:(caption||'Диаграмма '+((sheet.charts||[]).length+1)).slice(0,120),...range};
+ // Read supported visual options without allowing untrusted OOXML markup into the model.
+ const legendNode=direct(node,'legend'),legendPos=direct(legendNode,'legendPos')?.getAttribute('val');
+ const opts={legend:legendNode?(legendPos==='r'?'right':'bottom'):'none',
+  labels:direct(direct(body,'dLbls'),'showVal')?.getAttribute('val')==='1',grid:true};
+ if(type!=='pie'){
+  const valueAxis=direct(plot,'valAx'),scaling=direct(valueAxis,'scaling');
+  if(valueAxis)opts.grid=!!direct(valueAxis,'majorGridlines');
+  for(const key of ['min','max']){
+   const val=direct(scaling,key)?.getAttribute('val');
+   if(val!==null&&val!==undefined&&val!==''&&Number.isFinite(Number(val)))opts[key]=Number(val);
+  }
+  const rawColors=series.map(ser=>{
+   const sp=direct(ser,'spPr');
+   const fill=type==='line'?direct(direct(sp,'ln'),'solidFill'):direct(sp,'solidFill');
+   return direct(fill,'srgbClr')?.getAttribute('val')||null;
+  });
+  if(rawColors.some(Boolean))opts.colors=rawColors.map((raw,k)=>
+   raw&&/^[0-9A-F]{6}$/i.test(raw)?'#'+raw.toLowerCase():CHART_COLORS[k]);
+ }
+ try{validateChartOptions(opts);chart.options=opts;}catch{return null;}
  try{chartData(book,sheet,chart,{allowEmpty:true});validateCharts({...sheet,charts:[...(sheet.charts||[]),chart]});}
  catch{return null;}
  return chart;

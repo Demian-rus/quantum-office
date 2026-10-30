@@ -1,4 +1,4 @@
-import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,chartLayout,CHART_MIN_WIDTH,CHART_MIN_HEIGHT} from './core/charts.js';
+import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,chartLayout,CHART_MIN_WIDTH,CHART_MIN_HEIGHT,chartOptions,CHART_COLORS} from './core/charts.js';
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
@@ -649,16 +649,28 @@ function chartPanel(){
  const saved=sheet().charts||[],selected=saved.find(c=>c.id===selectedChartId)||saved[0]||null;
  if(selected)selectedChartId=selected.id;
  let display='<div class="chart-empty">Выделите категории и до четырёх столбцов чисел. Затем создайте диаграмму на вкладке «Вставка».</div>';
- if(selected){try{display=chartSVG(chartData(book(),sheet(),selected,{allowEmpty:true}),selected.type);}
+ if(selected){try{display=chartSVG(chartData(book(),sheet(),selected,{allowEmpty:true}),selected.type,chartOptions(selected));}
   catch(err){display='<div class="chart-error">'+esc(err.message)+'</div>';}}
  const kinds={bar:'Столбчатая',line:'Линейная',pie:'Круговая'};
  const choices=saved.map(c=>'<button class="chart-choice '+(selected?.id===c.id?'active':'')+'" data-action="chart-open" data-id="'+esc(c.id)+'">'+esc(c.title)+'</button>').join('');
+ const cfg=selected?chartOptions(selected):null,kind=selected?.type;
+ const formatControls=selected?'<div class="chart-format" aria-label="Оформление диаграммы">'+
+  '<strong>Оформление</strong><label>Подписи значений <input id="chart-labels" type="checkbox" '+(cfg.labels?'checked':'')+'></label>'+
+  '<label>Легенда <select id="chart-legend">'+[['none','Скрыта'],['bottom','Снизу'],['right','Справа']].map(([v,label])=>'<option value="'+v+'" '+(cfg.legend===v?'selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
+  (kind!=='pie'?'<label>Линии сетки <input id="chart-grid" type="checkbox" '+(cfg.grid?'checked':'')+'></label>'+
+  '<div class="chart-axis-fields"><label>Минимум оси <input id="chart-axis-min" type="number" step="any" placeholder="Авто" value="'+(cfg.min??'')+'"></label>'+
+  '<label>Максимум оси <input id="chart-axis-max" type="number" step="any" placeholder="Авто" value="'+(cfg.max??'')+'"></label>'+
+  '<button data-action="chart-axis-save">Применить оси</button></div>':'')+
+  (kind!=='pie'?'<div class="chart-colors"><small>Цвета рядов</small>'+
+    Array.from({length:Math.max(1,rectangle(selected.from,selected.to).c2-rectangle(selected.from,selected.to).c1)},(_,i)=>
+    '<label>Ряд '+(i+1)+' <input type="color" data-chart-color="'+i+'" aria-label="Цвет ряда '+(i+1)+'" value="'+(cfg.colors[i]||CHART_COLORS[i])+'"></label>').join('')+'</div>':'')+
+  '<button data-action="chart-style-reset" class="chart-reset">Сбросить оформление</button></div>':'';
  const settings=selected?'<div class="chart-settings"><label>Название <input id="chart-title" maxlength="120" value="'+esc(selected.title)+'" aria-label="Название диаграммы"></label>'+
    '<div class="chart-source"><label>Источник данных <input id="chart-range" spellcheck="false" aria-label="Диапазон диаграммы" value="'+esc(selected.from+':'+selected.to)+'" placeholder="A1:D6"></label>'+
    '<div class="chart-source-actions"><button data-action="chart-source">Применить диапазон</button><button data-action="chart-use-selection">По выделению</button></div></div>'+
    '<div class="chart-kinds">'+
    Object.entries(kinds).map(([key,label])=>'<button data-action="chart-type" data-type="'+key+'" class="'+(selected.type===key?'active':'')+'">'+label+'</button>').join('')+'</div>'+
-   '<small>Первый столбец — категории, следующие 1–4 столбца — числовые ряды. Для каждого ряда используется отдельная линия или цвет. Круговая — один ряд. Можно создать диаграмму до заполнения данных.</small></div>':'';
+   '<small>Первый столбец — категории, следующие 1–4 столбца — числовые ряды. Для каждого ряда используется отдельная линия или цвет. Круговая — один ряд. Можно создать диаграмму до заполнения данных.</small></div>'+formatControls:'';
  return '<aside id="chart-panel" class="chart-panel" role="complementary" aria-label="Диаграммы листа">'+
    '<header class="chart-panel-head"><strong>Диаграммы</strong><span>'+saved.length+' / 30</span><button data-action="chart-close" aria-label="Закрыть диаграммы">×</button></header>'+
    '<nav class="chart-list">'+(choices||'<span>На листе пока нет диаграмм</span>')+'</nav>'+
@@ -668,7 +680,7 @@ function chartPanel(){
 function refreshChartPreview(){
  const el=document.getElementById('chart-preview');if(!el||!book())return;
  const c=(sheet().charts||[]).find(x=>x.id===selectedChartId);if(!c)return;
- try{el.innerHTML=chartSVG(chartData(book(),sheet(),c,{allowEmpty:true}),c.type);}
+ try{el.innerHTML=chartSVG(chartData(book(),sheet(),c,{allowEmpty:true}),c.type,chartOptions(c));}
  catch(err){el.innerHTML='<div class="chart-error">'+esc(err.message)+'</div>';}
 }
 /** Charts are sheet children, not side-panel previews. The overlay lives beside the
@@ -682,7 +694,7 @@ function refreshSheetCharts(){
  layer.innerHTML=(s.charts||[]).map((chart,i)=>{
   const layout=chartLayout(s,chart,i);
   let content='';
-  try{content=chartSVG(chartData(book(),s,chart,{allowEmpty:true}),chart.type);}
+  try{content=chartSVG(chartData(book(),s,chart,{allowEmpty:true}),chart.type,chartOptions(chart));}
   catch(err){content='<div class="chart-error">'+esc(err.message)+'</div>';}
   return '<section class="qo-sheet-chart'+(chart.id===selectedChartId?' is-chart-selected':'')+
    '" data-id="'+esc(chart.id)+'" style="left:'+layout.x+'px;top:'+layout.y+
@@ -867,6 +879,15 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'chart-use-selection':try{const source=suggestChartRange(sheet(),activeCell,rangeEnd,(sheet().charts||[]).find(c=>c.id===selectedChartId)?.type||'bar');
   transact(()=>changeChart(sheet(),selectedChartId,{from:source.from,to:source.to}));render();status('Источник диаграммы привязан к выделению');}
   catch(err){status(err.message,true);}break;
+ case 'chart-axis-save':{
+  const read=id=>{const value=document.getElementById(id)?.value?.trim()||'';return value===''?null:Number(value);};
+  try{transact(()=>changeChart(sheet(),selectedChartId,{options:{min:read('chart-axis-min'),max:read('chart-axis-max')}}));render();status('Границы осей обновлены');}
+  catch(err){status(err.message,true);}break;
+ }
+ case 'chart-style-reset':try{transact(()=>changeChart(sheet(),selectedChartId,{options:{
+  labels:false,legend:(sheet().charts||[]).find(c=>c.id===selectedChartId)?.type==='pie'?'right':'bottom',
+  grid:true,min:null,max:null,colors:[]}}));render();status('Оформление сброшено');}
+  catch(err){status(err.message,true);}break;
  case 'chart-delete':try{transact(()=>removeChart(sheet(),selectedChartId));selectedChartId=(sheet().charts||[])[0]?.id||null;render();status('Диаграмма удалена');}catch(err){status(err.message,true);}break;
  case 'print-open':commitEditor();printOpen=true;render();break;
  case 'print-close':printOpen=false;render();break;
@@ -908,7 +929,15 @@ app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))reco
 app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.target.closest('.format-popover,[data-action=fill-palette],[data-action=text-palette],[data-action=border-menu]')){activePalette=null;borderMenuOpen=false;document.querySelectorAll('.format-popover').forEach(el=>el.remove());}},true);
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
-app.addEventListener('change',e=>{const t=e.target;if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
+app.addEventListener('change',e=>{const t=e.target;
+ if(['chart-labels','chart-legend','chart-grid'].includes(t.id)||t.dataset.chartColor!==undefined){
+  const patch=t.id==='chart-labels'?{labels:t.checked}:t.id==='chart-legend'?{legend:t.value}:
+   t.id==='chart-grid'?{grid:t.checked}:(()=>{const chart=(sheet()?.charts||[]).find(c=>c.id===selectedChartId),range=rectangle(chart.from,chart.to),colors=Array.from({length:range.c2-range.c1},(_,i)=>chartOptions(chart).colors[i]||CHART_COLORS[i]);
+     colors[Number(t.dataset.chartColor)]=t.value;return {colors};})();
+  try{transact(()=>changeChart(sheet(),selectedChartId,{options:patch}));render();}
+  catch(err){status(err.message,true);}return;
+ }
+ if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
 app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});

@@ -460,3 +460,13 @@ Excel import/export now supports native dropdown lists stored as inline quoted O
 - XLSX exporter writes one \`c:ser\` per series with separate \`c:cat\` and \`c:val\` formula references plus computed caches; source headers become chart title references. XLSX importer supports exactly 1..4 adjacent numeric series sharing the same category and row range on the same local sheet, and rejects unsupported disjoint/external/mixed/pivot sources without inventing data. In-sheet position and size remain preserved.
 - \`tests/task060.test.js\` and \`tests/task060_browser.py\` cover grouped bars, multi-lines, formulas, QBOOK, source editing, atomic type validation, Excel roundtrips and unsupported-series warnings. Full Node and Chromium CI must pass before merge.
 - Still no stacked/100% bar, scatter, dual-axis, trend lines, arbitrary range unions or pivot charts. Maintain .qbook backup for important Excel files.
+
+
+## TASK 061 — chart display and axis controls (2026-10-30)
+
+- Baseline published TASK060 at \`26126a1eca4b66efd36fb9a7bc7d5e25317a2934\`.
+- Charts now optionally store a bounded \`chart.options\` style object: \`labels\` (value display), \`legend\` (bottom/right/none), \`grid\` (boolean), \`colors\` (up to four 6-digit #RRGGBB values), \`min\` and \`max\` (optional finite numeric axis limits, -1e12..1e12 with min < max). Legacy charts without options remain valid and render with defaults.
+- User can edit these through chart settings; all updates use atomic transaction/Undo and refresh both the on-sheet chart and sidebar. Inputs escape text; the model accepts only safe hex colors and finite axis numbers.
+- XLSX chart export writes native OOXML \`c:legend\`, \`c:dLbls\`, per-series \`c:spPr\` colors, axis \`c:min\`/\`c:max\`, and \`c:majorGridlines\`. Import reads the same limited supported subset back into native chart options. This does not claim to preserve arbitrary Excel chart styles.
+- Native colors apply to line and grouped-bar series; pies retain per-slice automatic colors. Value labels are sampled at up to 12 category positions per series in the SVG to preserve legibility; Excel can display all values.
+- Tests \`tests/task061.test.js\` and \`tests/task061_browser.py\` cover validation, QBOOK, type handling, Undo and OOXML interchange. Both full CI workflows must pass before publishing.
