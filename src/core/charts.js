@@ -21,7 +21,7 @@ export function chartLayout(sheet,chart,index=0){
  if(chart.layout)return {...chart.layout};
  const r=chartRect(chart),{x,y}=gridGeometry(sheet),width=480,height=292;
  const left=Math.max(54,Math.min(x.at(-1)-width,x[Math.min(LIMITS.columns,r.c2+2)]));
- const top=Math.max(0,Math.min(y.at(-1)-31-height,y[r.r1]-31+index*330));
+ const top=Math.max(40,Math.min(y.at(-1)-31-height,y[r.r1]-31+40+index*330));
  return {x:Math.round(left),y:Math.round(top),width,height};
 }
 export function validateChartLayout(sheet,layout){
