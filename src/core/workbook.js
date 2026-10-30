@@ -377,6 +377,68 @@ export function fillTypedSelection(sheet,from,to,input,origin=from){
  sheet.cells=staged.cells;
  return total;
 }
+/** Disjoint Ctrl selections: stage all destinations, then commit a single atomic mutation.
+ * Each relative formula is translated from the active edit cell across all areas.
+ * Repeated/overlapping areas are deduplicated so no target is written twice. */
+export function fillTypedAreas(sheet,areas,input,origin){
+ if(!Array.isArray(areas)||areas.length<1||areas.length>25||
+    typeof input!=='string'||input.length>50000||!validRef(origin))
+  throw Error('Недопустимое множественное выделение');
+ const start=parseCell(origin),refs=new Set();
+ for(const item of areas){
+  const from=item.from,to=item.to,area=rectangle(from,to);
+  if(!validRef(from)||!validRef(to)||!area)throw Error('Недопустимый диапазон');
+  const total=(area.r2-area.r1+1)*(area.c2-area.c1+1);
+  if(total>10000||refs.size+total>10000)throw Error('Массовый ввод ограничен 10 000 ячеек');
+  if((sheet.merges||[]).some(m=>{
+   const r=rectangle(m.from,m.to);
+   return r.r1<=area.r2&&r.r2>=area.r1&&r.c1<=area.c2&&r.c2>=area.c1;
+  }))throw Error('Массовый ввод в объединённые ячейки не поддерживается');
+  for(let row=area.r1;row<=area.r2;row++)for(let col=area.c1;col<=area.c2;col++)
+   refs.add(cellName(row,col));
+ }
+ const staged=structuredClone(sheet);
+ for(const ref of refs){
+  const at=parseCell(ref),typed=input.startsWith('=')?
+    translateFormula(input,at.row-start.row,at.col-start.col):input;
+  setTypedCell(staged,ref,typed);
+ }
+ if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=staged.cells;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
+ return refs.size;
+}
+
+/** Ctrl+D / Ctrl+R across disjoint rectangles, preserving source styles and formulas.
+ * Reject overlaps: otherwise the fill source could be modified by another selected area. */
+export function fillAreasDirection(sheet,areas,direction){
+ if(!Array.isArray(areas)||areas.length<1||areas.length>25||
+    !['down','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
+ const rects=areas.map(a=>{
+  if(!validRef(a.from)||!validRef(a.to))throw Error('Недопустимый диапазон');
+  return rectangle(a.from,a.to);
+ });
+ let total=0;
+ for(let i=0;i<rects.length;i++){
+  const a=rects[i];
+  total+=(a.r2-a.r1+1)*(a.c2-a.c1+1);
+  if(total>10000)throw Error('Заполнение ограничено 10 000 ячеек');
+  for(let j=0;j<i;j++){
+   const b=rects[j];
+   if(a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1)
+    throw Error('Пересекающиеся области нельзя заполнить одновременно');
+  }
+ }
+ const staged=structuredClone(sheet);
+ let filled=0;
+ for(const a of rects)
+  filled+=fillSelection(staged,cellName(a.r1,a.c1),cellName(a.r2,a.c2),direction);
+ if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=staged.cells;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
+ return filled;
+}
+
 export function fillSelection(sheet, from, to, direction){
  if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
  const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
