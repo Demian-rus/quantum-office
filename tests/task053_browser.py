@@ -32,7 +32,7 @@ with sync_playwright() as p:
  page.locator('#print-scale').select_option('75')
  assert page.evaluate("sheet().printSettings.scale")==75
  assert page.evaluate("decodeBook(encodeBook(book())).sheets[0].printSettings.orientation")=='landscape'
- page.evaluate("window.__printCalled=0;window.print=()=>window.__printCalled++")
+ page.evaluate("()=>{window.__printCalled=0;window.print=()=>{window.__printCalled++};}")
  page.locator('[data-action=print-now]').click()
  assert page.evaluate("window.__printCalled")==1
  assert '@page' in page.locator('#print-page-rule').text_content()
