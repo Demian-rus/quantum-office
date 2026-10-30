@@ -6,8 +6,8 @@ const XP_PAPERS={A4:'9',Letter:'1'};
 const XP_PAPER_IDS={'9':'A4','1':'Letter'};
 const XP_SCALES=new Set([60,75,90,100,125]);
 const xpEscape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
-const xpChild=(node,tag)=>Array.from(node?.xpChildren||[]).find(c=>c.localName===tag)||null;
-const xpChildren=(node,tag)=>Array.from(node?.xpChildren||[]).filter(c=>c.localName===tag);
+const xpChild=(node,tag)=>Array.from(node?.children||[]).find(c=>c.localName===tag)||null;
+const xpChildren=(node,tag)=>Array.from(node?.children||[]).filter(c=>c.localName===tag);
 const xpAsInteger=s=>/^\d+$/.test(String(s??''))?Number(s):NaN;
 const xpTruthy=x=>x==='1'||x==='true';
 /** Print settings are exported as Excel-native paper size, orientation and page scaling. */
