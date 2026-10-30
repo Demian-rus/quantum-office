@@ -286,6 +286,10 @@
 .chart-settings{padding:12px 14px 6px}
 .chart-settings label{display:flex;align-items:center;gap:10px;color:#64788a;font-weight:700}
 .chart-settings input{width:100%;min-width:0;flex:1;border:1px solid #c9d5df;border-radius:5px;font:12px "Segoe UI",sans-serif;color:#213e51;padding:7px 9px;background:white}
+.chart-source{margin-top:11px;display:flex;flex-direction:column;gap:7px}
+.chart-source-actions{display:flex;gap:8px;justify-content:flex-end}
+.chart-source-actions button{cursor:pointer;background:#ecf4ef;border:1px solid #b8d5c4;border-radius:5px;color:#226448;font:600 11px "Segoe UI",Arial,sans-serif;padding:7px 10px}
+.chart-source-actions button:hover{background:#dceee4}
 .chart-kinds{display:flex;gap:8px;margin:9px 0}
 .chart-kinds button{flex:1;cursor:pointer;background:#f6faf8;border:1px solid #cbd8d2;border-radius:6px;color:#476759;padding:7px 3px;font-size:11px}
 .chart-kinds button.active{background:#dcefe5;border-color:#74af93;color:#196847;font-weight:750}
