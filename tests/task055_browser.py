@@ -25,7 +25,7 @@ with sync_playwright() as p:
   const st=await zip.file('xl/styles.xml').async('string');
   if((xml.match(/<conditionalFormatting /g)||[]).length!==4||
      !xml.includes('type="colorScale"')||!xml.includes('type="containsText"')||
-     !st.includes('<dxfs count="3">')||!st.includes('FF445566'))
+     !st.includes('<dxfs count="3">')||!xml.includes('FF445566'))
     throw Error('XLSX rules or DXF missing');
   const report={},restored=await importXLSX(bytes,'Стили.xlsx',report);
   const rules=restored.sheets[0].conditionalRules;
