@@ -73,7 +73,7 @@ export function planTextToColumns(sheet,from,to=from,{delimiter=';',overwrite=fa
  const nextCount=Object.keys(sheet.cells).length+
   changes.reduce((n,{ref,value})=>n+(!getCell(sheet,ref).value&&value?1:0),0);
  if(nextCount>LIMITS.cells)throw Error('Превышен лимит ячеек книги');
- return {rows,cols:width,sourceCount,overwrite,conflicts:conflicts.length,
+ return {rows,cols:width,sourceCount,delimiter,overwrite,conflicts:conflicts.length,
   from:cellName(target.r1,target.c1),to:cellName(target.r2,target.c2),
   preview:parsed.slice(0,6).map((fields,i)=>({row:source.r1+i+1,fields})),changes};
 }
