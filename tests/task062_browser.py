@@ -29,7 +29,7 @@ with sync_playwright() as p:
  page.locator('#chart-panel [data-action=chart-type][data-type=stacked100]').click()
  assert page.evaluate('sheet().charts[0].type')=='stacked100'
  assert page.locator('#chart-axis-min').count()==0
- assert '100%' in page.locator('#grid-charts-layer svg').inner_text()
+ assert '100%' in page.locator('#grid-charts-layer svg').text_content()
  assert page.locator('#grid-charts-layer svg rect').count()>=9
  # Source changes still recalculate the percentages and keep Excel refs live.
  page.evaluate("setCell(sheet(),'D2','70');changed()")
