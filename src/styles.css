@@ -500,3 +500,21 @@
 .grid-cell.fill-preview{outline:2px dashed #25865b;outline-offset:-2px;background-color:#e9f5ec!important}
 .grid-cell.fill-preview::after{background:rgba(34,141,91,.08)}
 body.is-fill-dragging,body.is-fill-dragging *{cursor:crosshair!important;user-select:none!important}
+
+/* TASK072: compact real font selectors and interactive spreadsheet check marks. */
+.ribbon-group .ribbon-font-picker,.ribbon-group .ribbon-font-size{
+ height:22px;min-width:0;border-radius:4px;border:1px solid #c9d6d0;
+ background:#fff;color:#254238;font-size:11px;padding:1px 4px;outline-offset:1px;
+}
+.ribbon-group .ribbon-font-picker{width:116px}
+.ribbon-group .ribbon-font-size{width:51px}
+.cell-checkbox{
+ appearance:none;-webkit-appearance:none;width:17px;height:17px;min-width:17px;
+ padding:0;margin:auto;border:1.5px solid #698678;border-radius:3px;
+ background:#fff;color:#fff;display:inline-flex;align-items:center;
+ justify-content:center;font-size:14px;font-weight:750;line-height:1;
+ position:relative;z-index:3;cursor:pointer;
+}
+.cell-checkbox[aria-checked="true"]{background:#258358;border-color:#258358}
+.cell-checkbox:focus-visible{outline:2px solid #1d64bb;outline-offset:2px}
+.grid-cell:has(>.cell-checkbox){padding:0 4px}
