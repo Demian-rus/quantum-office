@@ -27,14 +27,50 @@ export function validateCharts(sheet){
   chartRect(chart);seen.add(chart.id);
  }
 }
-export function chartData(book,sheet,chart){
+/** Find a useful nearby table when the user clicks Insert Chart without selecting a range.
+ * A blank workbook still yields a valid, editable A1:B6 source; no sample cells are written. */
+export function suggestChartRange(sheet,from,to=from){
+ const selection=rectangle(from,to);
+ if(!selection)throw Error('Не удалось определить место для диаграммы');
+ const startRow=selection.r1,startCol=selection.c1,rows=selection.r2-selection.r1+1,cols=selection.c2-selection.c1+1;
+ const shape=(r1,c1,r2)=>({from:cellName(r1,c1),to:cellName(r2,c1+1)});
+ if(rows>=2&&cols>=2&&startCol<LIMITS.columns-1)
+  return {...shape(startRow,startCol,Math.min(selection.r2,startRow+50)),mode:'selection'};
+ if(rows>=2&&cols===1){
+  const c=startCol>0&&Array.from({length:Math.min(rows,51)},(_,i)=>sheet.cells[cellName(startRow+i,startCol-1)]?.value).some(v=>String(v??'').trim())?startCol-1:Math.min(startCol,LIMITS.columns-2);
+  return {...shape(startRow,c,Math.min(selection.r2,startRow+50)),mode:'selection'};
+ }
+ let best=null;
+ for(const col of [startCol-1,startCol,startCol+1]){
+  if(col<0||col>=LIMITS.columns-1)continue;
+  const low=Math.max(0,startRow-15),high=Math.min(LIMITS.rows-1,startRow+50);
+  let first=Infinity,last=-1,score=0;
+  for(let row=low;row<=high;row++){
+   const label=String(sheet.cells[cellName(row,col)]?.value??'').trim();
+   const value=String(sheet.cells[cellName(row,col+1)]?.value??'').trim();
+   if(label||value){first=Math.min(first,row);last=Math.max(last,row);}
+   if(label&&(numeric(value)!==null||value.startsWith('=')))score++;
+  }
+  if(score>=2){
+   const candidate={score,first,last,col,distance:Math.abs(col-startCol)};
+   if(!best||candidate.score>best.score||candidate.score===best.score&&candidate.distance<best.distance)best=candidate;
+  }
+ }
+ if(best){
+  const first=Math.max(0,Math.min(best.first,startRow));
+  return {...shape(first,best.col,Math.min(LIMITS.rows-1,Math.max(best.last,first+1),first+50)),mode:'detected'};
+ }
+ return {...shape(startRow,Math.min(startCol,LIMITS.columns-2),Math.min(startRow+5,LIMITS.rows-1)),mode:'empty'};
+}
+export function chartData(book,sheet,chart,{allowEmpty=false}={}){
  const rect=chartRect(chart),raw=Object.fromEntries(Object.entries(sheet.cells).map(([key,v])=>[key,v.value]));
  const ctx=formulaContext(book,sheet,raw),rows=[];
  for(let r=rect.r1;r<=rect.r2;r++)rows.push({
   label:String(resultOf(sheet,cellName(r,rect.c1),raw,ctx)),
   raw:String(resultOf(sheet,cellName(r,rect.c2),raw,ctx))
  });
- const header=numeric(rows[0].raw)===null,body=rows.slice(header?1:0);
+ const header=rows[0].raw.trim()!==''&&numeric(rows[0].raw)===null,body=rows.slice(header?1:0);
+ if(allowEmpty&&body.every(p=>!p.label.trim()&&!p.raw.trim()))return {points:[],axis:header?rows[0].raw:'Значение',header,empty:true};
  if(body.length<2)throw Error('Диаграмме нужны минимум два числовых значения');
  const points=body.map(item=>{
   const value=numeric(item.raw);
@@ -43,7 +79,7 @@ export function chartData(book,sheet,chart){
  });
  if(chart.type==='pie'&&(points.some(p=>p.value<0)||points.reduce((n,p)=>n+p.value,0)<=0))
   throw Error('Круговая диаграмма: значения должны быть неотрицательными и сумма больше нуля');
- return {points,axis:header?rows[0].raw:'Значение'};
+ return {points,axis:header?rows[0].raw:'Значение',header,empty:false};
 }
 export function addChart(book,sheet,type,from,to){
  if(!CHART_TYPES.includes(type))throw Error('Неизвестный тип диаграммы');
@@ -51,15 +87,21 @@ export function addChart(book,sheet,type,from,to){
  if(!rect)throw Error('Выделите диапазон с категориями и числами');
  const chart={id:uid(),type,title:'Диаграмма '+((sheet.charts?.length||0)+1),
    from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2)};
- chartData(book,sheet,chart);
  if((sheet.charts?.length||0)>=30)throw Error('Лимит: 30 диаграмм на лист');
  (sheet.charts??=[]).push(chart);
  return chart;
 }
 export function changeChart(sheet,id,patch){
  const chart=(sheet.charts||[]).find(c=>c.id===id);if(!chart)throw Error('Диаграмма не найдена');
- if(patch.type!==undefined){if(!CHART_TYPES.includes(patch.type))throw Error('Неизвестный тип');chart.type=patch.type;}
- if(patch.title!==undefined){const title=String(patch.title).trim();if(!title||title.length>120)throw Error('Введите название до 120 символов');chart.title=title;}
+ const next={...chart};
+ if(patch.type!==undefined){if(!CHART_TYPES.includes(patch.type))throw Error('Неизвестный тип');next.type=patch.type;}
+ if(patch.title!==undefined){const title=String(patch.title).trim();if(!title||title.length>120)throw Error('Введите название до 120 символов');next.title=title;}
+ if(patch.from!==undefined||patch.to!==undefined){
+  if(typeof patch.from!=='string'||typeof patch.to!=='string')throw Error('Укажите диапазон, например A1:B6');
+  next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
+ }
+ chartRect(next);
+ Object.assign(chart,next);
  return chart;
 }
 export function removeChart(sheet,id){
@@ -87,6 +129,10 @@ export function shiftCharts(sheet,axis,mode,index,count){
 }
 export function chartSVG(data,type){
  const pts=data.points,esc=escapeSVG,txt=(x,y,s,attr='')=>'<text x="'+x+'" y="'+y+'" '+attr+'>'+esc(s)+'</text>';
+ if(!pts.length)return '<svg class="qo-chart-svg" viewBox="0 0 640 320" role="img" aria-label="Пустая диаграмма">'+
+  '<rect width="640" height="320" rx="10" fill="#fff"/>'+
+  txt(320,140,'Диаграмма создана','font-size="22" text-anchor="middle" fill="#244b3e" font-weight="600"')+
+  txt(320,177,'Добавьте категории и числовые значения','font-size="15" text-anchor="middle" fill="#6b8291"')+'</svg>';
  let svg='<rect width="640" height="320" rx="10" fill="#fff"/>';
  if(type==='pie'){
   const total=pts.reduce((n,p)=>n+p.value,0),cx=200,cy=154,r=99,c=2*Math.PI*r;let offset=0;
