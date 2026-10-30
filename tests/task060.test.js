@@ -43,6 +43,10 @@ test('TASK060: numeric year headings are series names rather than an extra group
  const xml=xlsxChartXML(b,s,c);
  assert.equal((xml.match(/<c:ser>/g)||[]).length,3);
  assert.match(xml,/\$B\$2:\$B\$4/);
+ setCell(s,'B1','План');setCell(s,'C1','Факт');
+ const mixed=chartData(b,s,c);
+ assert.deepEqual(mixed.series.map(x=>x.name),['План','Факт','2026']);
+ assert.equal(mixed.points.length,3);
 });
 test('TASK060: strict series bounds, pie isolation, malformed data and atomic source/type transitions',()=>{
  const {b,s}=make(),c=addChart(b,s,'line','A1','D4');
