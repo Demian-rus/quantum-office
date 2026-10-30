@@ -113,6 +113,8 @@ export function planRemoveDuplicates(sheet,from,to,{header=true,key='all'}={}){
   if(seen.has(code))duplicates.push(area.r1+i+1);
   else{seen.add(code);keep.push(cells);}
  }
+ const sourceSnapshot=Array.from({length:rows},(_,i)=>
+  Array.from({length:cols},(_,j)=>structuredClone(getCell(sheet,cellName(area.r1+i,area.c1+j)))));
  const rowsAfter=[...keep,...Array.from({length:duplicates.length},()=>Array.from({length:cols},()=>({value:'',style:{}})))];
  const changes=[];
  for(let i=0;i<rowsAfter.length;i++)for(let j=0;j<cols;j++){
@@ -122,13 +124,14 @@ export function planRemoveDuplicates(sheet,from,to,{header=true,key='all'}={}){
  }
  return {from:cellName(area.r1,area.c1),to:cellName(area.r2,area.c2),
   header,key,total:rows-first,removed:duplicates.length,kept:keep.length-first,
-  duplicateRows:duplicates.slice(0,10),changes};
+  duplicateRows:duplicates.slice(0,10),sourceSnapshot,changes};
 }
 export function applyRemoveDuplicates(sheet,plan){
  if(!plan||!Array.isArray(plan.changes)||plan.changes.length>MAX_CELLS)
   throw Error('Не задан корректный план удаления дублей');
  const fresh=planRemoveDuplicates(sheet,plan.from,plan.to,{header:plan.header,key:plan.key});
- if(JSON.stringify(fresh.changes)!==JSON.stringify(plan.changes))
+ if(JSON.stringify(fresh.sourceSnapshot)!==JSON.stringify(plan.sourceSnapshot)||
+    JSON.stringify(fresh.changes)!==JSON.stringify(plan.changes))
   throw Error('Данные изменились: обновите предпросмотр');
  for(const {ref,cell} of plan.changes){
   if(cell.value||Object.keys(cell.style||{}).length)sheet.cells[ref]=structuredClone(cell);
