@@ -130,7 +130,8 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
-const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize']);
+export const FONT_FAMILIES=['Aptos','Calibri','Arial','Verdana','Tahoma','Georgia','Times New Roman','Consolas'];
+const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize','fontFamily']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 /** Pure subtraction, splits a rectangle into up to four untouched fragments. */
@@ -686,6 +687,7 @@ export function validateWorkbook(book){
     if(k==='align')return ['left','center','right'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
      if(k==='fontSize')return typeof v==='number'&&Number.isFinite(v)&&v>=6&&v<=72;
+    if(k==='fontFamily')return typeof v==='string'&&FONT_FAMILIES.includes(v);
     if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
     return typeof v==='boolean';
    });
@@ -749,10 +751,11 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
   }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderEdges','borderColor','fontSize','wrap'].includes(k))||
+    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderEdges','borderColor','fontSize','fontFamily','wrap'].includes(k))||
        ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color','borderColor'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
        ('fontSize' in style&&(!Number.isFinite(style.fontSize)||style.fontSize<6||style.fontSize>72))||
+       ('fontFamily' in style&&!FONT_FAMILIES.includes(style.fontFamily))||
         ('border' in style&&!['thin'].includes(style.border))||
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
         ('borderEdges' in style&&!validBorderEdges(style.borderEdges))||
