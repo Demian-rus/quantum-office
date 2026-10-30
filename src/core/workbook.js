@@ -130,7 +130,7 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
-export const FONT_FAMILIES=['Aptos','Calibri','Arial','Verdana','Tahoma','Georgia','Times New Roman','Consolas'];
+export const FONT_FAMILIES=['Aptos','Calibri','Arial','Segoe UI','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Cambria','Constantia','Candara','Corbel','Consolas','Courier New','Palatino Linotype','Garamond','PT Sans','PT Serif','Roboto','Noto Sans','Noto Serif','Open Sans','DejaVu Sans','Liberation Sans','Liberation Serif'];
 const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize','fontFamily']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
