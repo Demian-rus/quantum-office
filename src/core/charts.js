@@ -1,6 +1,7 @@
 /** Offline, data-linked charts. No third-party scripts or remote services. */
 import {uid,rectangle,cellName,LIMITS,formulaContext,resultOf,gridGeometry} from './workbook.js';
-export const CHART_TYPES=['bar','line','pie'];
+export const CHART_TYPES=['bar','line','pie','stacked','stacked100'];
+export const STACKED_TYPES=['stacked','stacked100'];
 export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;
 export const CHART_MAX_SERIES=4;
 const COLORS=['#277c58','#397eb9','#e5a43b','#8a60b7','#dc7775','#42a8aa','#7e9e4a','#d58e4b'];
@@ -70,7 +71,8 @@ export function validateCharts(sheet){
     !chart.title.trim()||chart.title.length>120||
     Object.keys(chart).some(k=>!['id','type','title','from','to','layout','options'].includes(k)))
     throw Error('Повреждена диаграмма');
-  const rect=chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined){validateChartOptions(chart.options);if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
+  const rect=chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined){validateChartOptions(chart.options);
+   if(chart.type==='stacked100'&&(chart.options.min!=null||chart.options.max!=null))throw Error('У процентной диаграммы ось всегда 0–100%');if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
  }
 }
 /** Find a useful nearby table when the user clicks Insert Chart without selecting a range.
@@ -153,6 +155,16 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
    return {label:item.label,value};
   })
  }));
+ if(STACKED_TYPES.includes(chart.type)){
+  for(let i=0;i<pointsBySeries[0].points.length;i++){
+   const values=pointsBySeries.map(s=>s.points[i].value),
+    pos=values.filter(v=>v>0).reduce((a,b)=>a+b,0),
+    neg=values.filter(v=>v<0).reduce((a,b)=>a+b,0);
+   if(!Number.isFinite(pos)||!Number.isFinite(neg))throw Error('Слишком большие значения для накопительной диаграммы');
+   if(chart.type==='stacked100'&&(values.some(v=>v<0)||pos<=0))
+    throw Error('100% с накоплением: для каждой категории нужны неотрицательные числа с положительной суммой');
+  }
+ }
  if(chart.type==='pie'){
   const values=pointsBySeries[0].points.map(p=>p.value);
   if(values.some(v=>v<0)||values.reduce((a,b)=>a+b,0)<=0)
@@ -181,6 +193,10 @@ export function changeChart(sheet,id,patch){
   next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
  }
  const sourceRect=chartRect(next);
+ if(next.type==='stacked100'){
+  const previous={...(next.options||{})};
+  if(previous.min!=null||previous.max!=null)next.options={...previous,min:null,max:null};
+ }
  if((patch.from!==undefined||patch.to!==undefined||patch.type!==undefined)&&next.options?.colors?.length>sourceRect.c2-sourceRect.c1)
   next.options={...next.options,colors:next.options.colors.slice(0,sourceRect.c2-sourceRect.c1)};
  if(patch.layout!==undefined){next.layout={...patch.layout};validateChartLayout(sheet,next.layout);}
@@ -189,6 +205,8 @@ export function changeChart(sheet,id,patch){
   const opts={...(next.options||{}),...patch.options};
   if(patch.options.colors!==undefined)opts.colors=[...patch.options.colors];
   validateChartOptions(opts);
+  if(next.type==='stacked100'&&(opts.min!=null||opts.max!=null))
+   throw Error('У процентной диаграммы ось всегда 0–100%');
   next.options=opts;
  }
  Object.assign(chart,next);
@@ -250,19 +268,43 @@ export function chartSVG(data,type,settings={}){
   if(legend==='bottom'&&pts.length>4)svg+=txt(575,306,'+'+(pts.length-4),'font-size="11" fill="#64748b"');
   svg+=txt(cx,cy+5,fmt(total),'font-size="18" font-weight="700" text-anchor="middle" fill="#2d4152"');
  }else{
-  const values=series.flatMap(s=>s.points.map(p=>p.value)),
-   autoMin=Math.min(0,...values),autoMax=Math.max(0,...values),
-   min=settings.min??(settings.max!=null?Math.min(autoMin,settings.max-1):autoMin),
-   max=settings.max??Math.max(autoMax,min+1),range=max-min||1,
+  const isStacked=STACKED_TYPES.includes(type),isPercent=type==='stacked100',
+   values=series.flatMap(s=>s.points.map(p=>p.value)),
+   totals=pts.map((_,i)=>{
+    const items=series.map(s=>s.points[i].value);
+    return {positive:items.filter(v=>v>0).reduce((a,b)=>a+b,0),
+      negative:items.filter(v=>v<0).reduce((a,b)=>a+b,0)};
+   }),
+   autoMin=isPercent?0:isStacked?Math.min(0,...totals.map(t=>t.negative)):Math.min(0,...values),
+   autoMax=isPercent?100:isStacked?Math.max(0,...totals.map(t=>t.positive)):Math.max(0,...values),
+   min=isPercent?0:settings.min??(settings.max!=null?Math.min(autoMin,settings.max-1):autoMin),
+   max=isPercent?100:settings.max??Math.max(autoMax,min+1),range=max-min||1,
    x0=64,x1=legend==='right'?450:604,y0=35,y1=legend==='bottom'&&series.length>1?230:254,
    w=x1-x0,h=y1-y0;
   const y=v=>y1-(v-min)/range*h,x=i=>x0+(i+.5)*w/pts.length,baseline=y(0);
   for(let t=0;t<=4;t++){
    const value=min+range*t/4,Y=y(value);
    svg+=(showGrid?'<line x1="'+x0+'" y1="'+Y+'" x2="'+x1+'" y2="'+Y+'" stroke="#e3eaf0"/>':'')+
-     txt(x0-8,Y+4,fmt(value),'font-size="10" text-anchor="end" fill="#64748b"');
+     txt(x0-8,Y+4,(isPercent?fmt(value)+'%':fmt(value)),'font-size="10" text-anchor="end" fill="#64748b"');
   }
-  if(type==='bar'){
+  if(isStacked){
+   const bw=Math.max(3,Math.min(50,w/pts.length*.64));
+   pts.forEach((_,i)=>{
+    let positive=0,negative=0;
+    const total=totals[i].positive;
+    series.forEach((entry,k)=>{
+     const original=entry.points[i].value,value=isPercent?original/total*100:original,
+      from=value>=0?positive:negative,to=from+value;
+     if(value>=0)positive=to;else negative=to;
+     const top=Math.min(y(from),y(to)),height=Math.abs(y(from)-y(to));
+     if(height>0)svg+='<rect x="'+(x(i)-bw/2)+'" y="'+top+'" width="'+bw+
+      '" height="'+Math.max(.2,height)+'" fill="'+colorAt(k)+'"/>';
+     if(showValues&&height>=16&&i%Math.max(1,Math.ceil(pts.length/10))===0&&original!==0)
+      svg+=txt(x(i),top+height/2+4,isPercent?fmt(value)+'%':fmt(original),
+       'font-size="10" text-anchor="middle" fill="#fff" font-weight="600"');
+    });
+   });
+  }else if(type==='bar'){
    const group=Math.min(66,w/pts.length*.75),bw=Math.max(2,Math.min(48,group/series.length));
    series.forEach((s,k)=>s.points.forEach((p,i)=>{
     const Y=y(p.value);
@@ -294,5 +336,5 @@ export function chartSVG(data,type,settings={}){
   });
  }
  return '<svg class="qo-chart-svg" viewBox="0 0 640 320" role="img" aria-label="'+
-  (type==='pie'?'Круговая':type==='line'?'Линейная':'Столбчатая')+' диаграмма">'+svg+'</svg>';
+  (type==='pie'?'Круговая':type==='line'?'Линейная':type==='stacked100'?'Столбчатая 100% с накоплением':type==='stacked'?'Столбчатая с накоплением':'Столбчатая')+' диаграмма">'+svg+'</svg>';
 }
