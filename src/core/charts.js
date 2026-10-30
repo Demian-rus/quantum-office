@@ -415,7 +415,7 @@ export function chartSVG(data,type,settings={}){
        'font-size="11" fill="'+color+'" text-anchor="'+(legendRight?'start':'middle')+'"');
      }
     }else svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,
-     'Ряд '+(k+1)+': недостаточно разных X','font-size="11" fill="#a34b4b"');
+     'Ряд '+(k+1)+(quadratic?': недостаточно разных X':': X одинаковы'),'font-size="11" fill="#a34b4b"');
    }
    item.points.forEach((p,i)=>{
     const X=sx(p.x),Y=sy(p.value);
