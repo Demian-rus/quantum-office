@@ -23,9 +23,8 @@ const chartAxis=(catId,valId)=>
  '<c:valAx><c:axId val="'+valId+'"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:axPos val="l"/><c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="'+catId+'"/><c:crosses val="autoZero"/><c:crossBetween val="between"/></c:valAx>';
 /** Reference formulas keep charts live when worksheet values change in Excel. */
 export function xlsxChartXML(book,sheet,chart,ordinal=0){
- const rect=chartRect(chart),data=chartData(book,sheet,chart);
- const total=rect.r2-rect.r1+1,header=total-data.points.length===1;
- if(total-data.points.length!==0&&!header)throw Error('Неверная геометрия данных диаграммы');
+ const rect=chartRect(chart),data=chartData(book,sheet,chart,{allowEmpty:true});
+ const header=data.header;
  const row1=rect.r1+(header?1:0),row2=rect.r2;
  const cat=oneCol(sheet,row1,row2,rect.c1),val=oneCol(sheet,row1,row2,rect.c2);
  const pts=data.points;
@@ -139,7 +138,7 @@ function parseChart(book,sheet,chartRoot){
  const textNodes=titleNode?Array.from(titleNode.getElementsByTagNameNS(A,'t')):[];
  const caption=textNodes.map(x=>x.textContent).join('').trim();
  const chart={id:uid(),type,title:(caption||'Диаграмма '+((sheet.charts||[]).length+1)).slice(0,120),...range};
- try{chartData(book,sheet,chart);validateCharts({...sheet,charts:[...(sheet.charts||[]),chart]});}
+ try{chartData(book,sheet,chart,{allowEmpty:true});validateCharts({...sheet,charts:[...(sheet.charts||[]),chart]});}
  catch{return null;}
  return chart;
 }

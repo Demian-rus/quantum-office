@@ -1,4 +1,4 @@
-import {addChart,chartData,chartSVG,changeChart,removeChart} from './core/charts.js';
+import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange} from './core/charts.js';
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
@@ -649,13 +649,16 @@ function chartPanel(){
  const saved=sheet().charts||[],selected=saved.find(c=>c.id===selectedChartId)||saved[0]||null;
  if(selected)selectedChartId=selected.id;
  let display='<div class="chart-empty">Выделите две колонки: категории и числа. Затем создайте диаграмму на вкладке «Вставка».</div>';
- if(selected){try{display=chartSVG(chartData(book(),sheet(),selected),selected.type);}
+ if(selected){try{display=chartSVG(chartData(book(),sheet(),selected,{allowEmpty:true}),selected.type);}
   catch(err){display='<div class="chart-error">'+esc(err.message)+'</div>';}}
  const kinds={bar:'Столбчатая',line:'Линейная',pie:'Круговая'};
  const choices=saved.map(c=>'<button class="chart-choice '+(selected?.id===c.id?'active':'')+'" data-action="chart-open" data-id="'+esc(c.id)+'">'+esc(c.title)+'</button>').join('');
- const settings=selected?'<div class="chart-settings"><label>Название <input id="chart-title" maxlength="120" value="'+esc(selected.title)+'" aria-label="Название диаграммы"></label><div class="chart-kinds">'+
+ const settings=selected?'<div class="chart-settings"><label>Название <input id="chart-title" maxlength="120" value="'+esc(selected.title)+'" aria-label="Название диаграммы"></label>'+
+   '<div class="chart-source"><label>Источник данных <input id="chart-range" spellcheck="false" aria-label="Диапазон диаграммы" value="'+esc(selected.from+':'+selected.to)+'" placeholder="A1:B6"></label>'+
+   '<div class="chart-source-actions"><button data-action="chart-source">Применить диапазон</button><button data-action="chart-use-selection">По выделению</button></div></div>'+
+   '<div class="chart-kinds">'+
    Object.entries(kinds).map(([key,label])=>'<button data-action="chart-type" data-type="'+key+'" class="'+(selected.type===key?'active':'')+'">'+label+'</button>').join('')+'</div>'+
-   '<small>Источник: '+esc(selected.from+':'+selected.to)+' · обновляется при изменении данных</small></div>':'';
+   '<small>Первый столбец — подписи, второй — числа. Можно создать пустую диаграмму и заполнить ячейки позже.</small></div>':'';
  return '<aside id="chart-panel" class="chart-panel" role="complementary" aria-label="Диаграммы листа">'+
    '<header class="chart-panel-head"><strong>Диаграммы</strong><span>'+saved.length+' / 30</span><button data-action="chart-close" aria-label="Закрыть диаграммы">×</button></header>'+
    '<nav class="chart-list">'+(choices||'<span>На листе пока нет диаграмм</span>')+'</nav>'+
@@ -665,14 +668,19 @@ function chartPanel(){
 function refreshChartPreview(){
  const el=document.getElementById('chart-preview');if(!el||!book())return;
  const c=(sheet().charts||[]).find(x=>x.id===selectedChartId);if(!c)return;
- try{el.innerHTML=chartSVG(chartData(book(),sheet(),c),c.type);}
+ try{el.innerHTML=chartSVG(chartData(book(),sheet(),c,{allowEmpty:true}),c.type);}
  catch(err){el.innerHTML='<div class="chart-error">'+esc(err.message)+'</div>';}
 }
 function createSelectedChart(type){
  if(!sheet())return;
  commitEditor();
- try{let c;transact(()=>{c=addChart(book(),sheet(),type,activeCell,rangeEnd);});
-  selectedChartId=c.id;chartDrawerOpen=true;render();status('Диаграмма добавлена и связана с исходными ячейками');
+ try{
+  const source=suggestChartRange(sheet(),activeCell,rangeEnd);
+  let c;transact(()=>{c=addChart(book(),sheet(),type,source.from,source.to);});
+  selectedChartId=c.id;chartDrawerOpen=true;render();
+  status(source.mode==='empty'?'Пустая диаграмма создана: заполните категории и числа или измените источник данных.':
+    source.mode==='detected'?'Диаграмма создана: редактор автоматически нашёл соседние данные.':
+    'Диаграмма создана и связана с выбранными ячейками.');
  }catch(err){status(err.message||'Диаграмма не создана',true);}
 }
 
@@ -787,7 +795,15 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'charts-open':chartDrawerOpen=true;render();break;
  case 'chart-close':chartDrawerOpen=false;render();break;
  case 'chart-open':selectedChartId=id;render();break;
- case 'chart-type':try{transact(()=>{const chart=changeChart(sheet(),selectedChartId,{type:target.dataset.type});chartData(book(),sheet(),chart);});render();}catch(err){status(err.message,true);}break;
+ case 'chart-type':try{transact(()=>changeChart(sheet(),selectedChartId,{type:target.dataset.type}));render();}catch(err){status(err.message,true);}break;
+ case 'chart-source':{const value=document.getElementById('chart-range')?.value.trim().replaceAll('$','').toUpperCase();
+  const match=/^([A-Z]+[1-9]\d*):([A-Z]+[1-9]\d*)$/.exec(value||'');
+  if(!match){status('Введите два столбца диапазоном, например A1:B6',true);break;}
+  try{transact(()=>changeChart(sheet(),selectedChartId,{from:match[1],to:match[2]}));render();status('Источник диаграммы изменён');}
+  catch(err){status(err.message,true);}break;}
+ case 'chart-use-selection':try{const source=suggestChartRange(sheet(),activeCell,rangeEnd);
+  transact(()=>changeChart(sheet(),selectedChartId,{from:source.from,to:source.to}));render();status('Источник диаграммы привязан к выделению');}
+  catch(err){status(err.message,true);}break;
  case 'chart-delete':try{transact(()=>removeChart(sheet(),selectedChartId));selectedChartId=(sheet().charts||[])[0]?.id||null;render();status('Диаграмма удалена');}catch(err){status(err.message,true);}break;
  case 'print-open':commitEditor();printOpen=true;render();break;
  case 'print-close':printOpen=false;render();break;

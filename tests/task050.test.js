@@ -26,9 +26,12 @@ test('TASK050: cross-sheet formula results remain linked',()=>{
 test('TASK050: unsafe shapes, zero pie, untrusted labels and metadata',()=>{
  const {b,s}=setup();
  assert.throws(()=>addChart(b,s,'bar','A1','C4'),/два столбца/);
- assert.throws(()=>addChart(b,s,'pie','A1','B2'),/минимум два/);
- setCell(s,'B2','текст');assert.throws(()=>addChart(b,s,'line','A1','B4'),/названия категорий и числа/);
- setCell(s,'B2','-1');assert.throws(()=>addChart(b,s,'pie','A1','B4'),/неотрицательными/);
+ const short=addChart(b,s,'pie','A1','B2');
+ assert.throws(()=>chartData(b,s,short),/минимум два/);
+ setCell(s,'B2','текст');const malformed=addChart(b,s,'line','A1','B4');
+ assert.throws(()=>chartData(b,s,malformed),/названия категорий и числа/);
+ setCell(s,'B2','-1');const negative=addChart(b,s,'pie','A1','B4');
+ assert.throws(()=>chartData(b,s,negative),/неотрицательными/);
  const c=addChart(b,s,'bar','A1','B4');setCell(s,'A2','<img onerror=alert(1)>');
  assert.doesNotMatch(chartSVG(chartData(b,s,c),'bar'),/<img/);
  assert.match(chartSVG(chartData(b,s,c),'bar'),/&lt;img/);
