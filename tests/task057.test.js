@@ -52,6 +52,6 @@ test('TASK057: source updates reject malformed range atomically and preserve cha
  const snap=JSON.stringify(sheet.charts);
  assert.throws(()=>changeChart(sheet,chart.id,{from:'A1',to:'F9'}),/2–5 столбцов/);
  assert.equal(JSON.stringify(sheet.charts),snap);
- assert.throws(()=>changeChart(sheet,chart.id,{from:'Z1',to:'Z2'}),/два столбца/);
+ assert.throws(()=>changeChart(sheet,chart.id,{from:'Z1',to:'Z2'}),/2–5 столбцов/);
  assert.equal(JSON.stringify(sheet.charts),snap);
 });
