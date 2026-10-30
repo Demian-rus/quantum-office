@@ -174,7 +174,7 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
  else if(name.endsWith('.xlsx')){importSummary={};imported=await importXLSX(await file.arrayBuffer(),file.name,importSummary);}
  else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
  workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';persist();render();
- if(name.endsWith('.xlsx')){const warnings=importSummary||{};status(warnings.skippedDataValidations?`XLSX открыт: перенесено правил ${warnings.importedDataValidations||0}; пропущено неподдерживаемых ${warnings.skippedDataValidations}. Другие сложные возможности могут не переноситься.`:`XLSX открыт: перенесено правил проверки данных ${warnings.importedDataValidations||0}; другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
+ if(name.endsWith('.xlsx')){const warnings=importSummary||{},missed=(warnings.skippedDataValidations||0)+(warnings.skippedConditionalFormatting||0);status(`XLSX открыт: проверка данных — ${warnings.importedDataValidations||0}, условное форматирование — ${warnings.importedConditionalFormatting||0}; неподдерживаемых правил пропущено: ${missed}. Другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
  }catch(e){status(e.message||'Не удалось открыть файл',true);}
 }
 function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
@@ -597,7 +597,7 @@ function validationPanel(){
  '<label>Максимум <input id="validation-max" type="number" step="any" value="100"></label></div>'+
  '<button class="validation-add" data-action="validation-add">Добавить правило</button></div>'+
  '<div class="validation-rules"><h4>Правила текущего листа</h4>'+ (list||'<p>Нет правил. Выделите нужные ячейки и добавьте первое.</p>')+'</div>'+
- '<div class="validation-note">Пустое значение разрешено; неверный ручной ввод и вставка блокируются. Формулы не ограничены до вычисления. XLSX пока не экспортирует эти правила.</div></aside>';
+ '<div class="validation-note">Пустое значение разрешено; неверный ручной ввод и вставка блокируются. Формулы не ограничены до вычисления. В XLSX переносятся простые списки и числовые ограничения; для полной копии сохраняйте .qbook.</div></aside>';
 }
 function createValidationFromPanel(){
  if(!sheet())return;
@@ -617,7 +617,7 @@ function conditionalPanel(){
  const rules=sheet().conditionalRules||[];
  const list=rules.map(rule=>{
   const caption=rule.kind==='scale'?'Шкала от малого к большому':kinds[rule.kind]+' '+rule.target;
-  return '<div class="cf-rule"><span class="cf-rule-swatch" style="background:'+(rule.kind==='scale'?'linear-gradient(90deg,#f7e2dc,#5fb486)':rule.color)+'"></span>'+
+  return '<div class="cf-rule"><span class="cf-rule-swatch" style="background:'+(rule.kind==='scale'?'linear-gradient(90deg,'+(rule.lowColor||'#f7e2dc')+','+(rule.highColor||'#5fb486')+')':rule.color)+'"></span>'+
     '<div class="cf-rule-label"><strong>'+esc(caption)+'</strong><small>'+esc(rule.from+':'+rule.to)+'</small></div>'+
     '<button data-action="conditional-remove" data-id="'+esc(rule.id)+'" aria-label="Удалить правило" title="Удалить правило">×</button></div>';
  }).join('');
@@ -630,7 +630,7 @@ function conditionalPanel(){
    '<label id="cf-color-label">Цвет <input type="color" id="cf-color" value="#e2f2dc" aria-label="Цвет выделения"></label>'+
    '<button class="cf-add" data-action="conditional-add">Применить к выделению</button></div>'+
    '<div class="cf-rules"><h4>Правила листа</h4>'+(list||'<p>Пока нет правил. Выделите ячейки и задайте условие.</p>')+'</div>'+
-   '<div class="cf-note">Значения и ручное оформление не изменяются. В XLSX правила пока не экспортируются.</div></aside>';
+   '<div class="cf-note">Значения и ручное оформление не изменяются. В XLSX переносятся простые условия и двухцветные шкалы; для полной копии сохраняйте .qbook.</div></aside>';
 }
 function addSelectedCondition(){
  if(!sheet())return;
@@ -773,7 +773,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
- case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status(book().sheets.some(s=>s.charts?.length||s.conditionalRules?.length||s.printSettings?.area)?'XLSX скачан: выпадающие списки и числовые ограничения сохранены, но диаграммы, условное форматирование и параметры печати — нет. Сохраните .qbook':'XLSX скачан: правила проверки данных сохранены; общая совместимость с Excel пока частичная');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
+ case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status(book().sheets.some(s=>s.charts?.length||s.printSettings?.area)?'XLSX скачан: проверка данных и условное форматирование сохранены; диаграммы и настройки печати пока не перенесены. Сохраните .qbook.':'XLSX скачан: правила проверки данных и условное форматирование сохранены; совместимость с Excel остаётся частичной.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
  case 'validation-open':chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=true;render();break;
  case 'validation-close':validationPanelOpen=false;render();break;
