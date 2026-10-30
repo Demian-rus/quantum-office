@@ -11,7 +11,8 @@ export function chartOptions(chart){
  const o=chart?.options||{};
  return {labels:o.labels??false,legend:o.legend??(chart?.type==='pie'?'right':chart?.from&&chart?.to&&chartRect(chart).c2-chartRect(chart).c1===1?'none':'bottom'),
    grid:o.grid??true,colors:o.colors??[],min:o.min??null,max:o.max??null,
-   trendline:o.trendline??false,trendEquation:o.trendEquation??false,trendR2:o.trendR2??false};
+   ...(o.trendline!==undefined||o.trendEquation!==undefined||o.trendR2!==undefined?
+    {trendline:o.trendline??false,trendEquation:o.trendEquation??false,trendR2:o.trendR2??false}:{})};
 }
 export function validateChartOptions(o){
  if(!o||typeof o!=='object'||Array.isArray(o)||Object.keys(o).some(k=>!STYLE_KEYS.includes(k))||
