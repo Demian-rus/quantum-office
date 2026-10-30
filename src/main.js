@@ -525,6 +525,59 @@ function homepage(){
  <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Скачать резервную копию всех черновиков">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
 }
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
+function sizeTargets(kind,index){
+ const full=kind==='col'?LIMITS.rows-1:LIMITS.columns-1,which=kind==='col'?'c':'r';
+ const selected=selectedRects().filter(a=>kind==='col'?
+  a.r1===0&&a.r2===full&&index>=a.c1&&index<=a.c2:
+  a.c1===0&&a.c2===full&&index>=a.r1&&index<=a.r2);
+ if(!selected.length)return [index];
+ const indices=new Set();
+ for(const a of selected)for(let j=a[which+'1'];j<=a[which+'2'];j++){
+  indices.add(j);if(indices.size>500)throw Error('За один раз можно изменить не более 500 строк или столбцов');
+ }
+ return [...indices].sort((a,b)=>a-b);
+}
+function sizeContextPanel(){
+ if(!sizeContext||!sheet())return '';
+ const m=sizeContext,style='left:'+m.x+'px;top:'+m.y+'px;',title=m.kind==='row'?'Высота строки':'Ширина столбца';
+ if(m.kind==='cell')return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="menu">'+
+  '<button data-action="size-context-mode" data-kind="row" role="menuitem">Высота строки…</button>'+
+  '<button data-action="size-context-mode" data-kind="col" role="menuitem">Ширина столбца…</button></div>';
+ const targets=sizeTargets(m.kind,m.index);
+ const min=m.kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn,
+  max=m.kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn;
+ const initial=m.kind==='row'?rowHeight(sheet(),m.index):columnWidth(sheet(),m.index);
+ return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="dialog" aria-label="'+title+'">'+
+  '<label>'+title+(targets.length>1?' ('+targets.length+')':'')+
+  '<input id="size-context-number" type="number" step="1" min="'+min+'" max="'+max+'" value="'+initial+'" aria-label="'+title+' в пикселях"></label>'+
+  '<small>Допустимо: '+min+'–'+max+' пикселей</small>'+
+  '<div class="size-context-actions"><button data-action="size-context-close">Отмена</button>'+
+  '<button class="size-context-confirm" data-action="size-context-apply">Применить</button></div></div>';
+}
+function openSizeContext(kind,index,x,y){
+ commitEditor();
+ sizeContext={kind,index,x:Math.max(6,Math.min(x,window.innerWidth-268)),y:Math.max(6,Math.min(y,window.innerHeight-200))};
+ const existing=document.getElementById('size-context-menu');existing?.remove();
+ const holder=document.createElement('div');holder.innerHTML=sizeContextPanel();
+ if(holder.firstElementChild)app.append(holder.firstElementChild);
+ if(kind!=='cell'){const input=document.getElementById('size-context-number');input?.focus();input?.select();}
+}
+function applyContextSize(){
+ if(!sizeContext||!['row','col'].includes(sizeContext.kind))return;
+ const {kind,index}=sizeContext,value=Number(document.getElementById('size-context-number')?.value);
+ try{
+  if(!Number.isInteger(value))throw Error('Введите целое число пикселей');
+  const targets=sizeTargets(kind,index);
+  if(value<(kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn)||
+     value>(kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn))
+   throw Error('Размер вне допустимых границ');
+  if(targets.every(i=>(kind==='row'?rowHeight(sheet(),i):columnWidth(sheet(),i))===value)){
+   sizeContext=null;document.getElementById('size-context-menu')?.remove();return;
+  }
+  transact(()=>{for(const i of targets)if(kind==='row')setRowHeight(sheet(),i,value);else setColumnWidth(sheet(),i,value);});
+  sizeContext=null;render();status('Размер '+(kind==='row'?'строк':'столбцов')+': '+value+' px ('+targets.length+')');
+ }catch(err){status(err.message,true);}
+}
 function changeSize(kind){commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
  try{if(!Number.isInteger(value))throw Error('Введите целое число');transact(()=>{if(kind==='col')setColumnWidth(sheet(),p.col,value);else setRowHeight(sheet(),p.row,value);});drawGrid();status(`Размер изменён: ${value} пикселей`);}catch(err){status(err.message,true);}}
 function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const {raw,ctx}=recalculator.view(book(),sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,raw,ctx));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
@@ -1010,6 +1063,9 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
+ case 'size-context-mode':if(sizeContext)openSizeContext(target.dataset.kind,parseCell(activeCell)?.[target.dataset.kind==='col'?'col':'row']??sizeContext.index,sizeContext.x,sizeContext.y);break;
+ case 'size-context-apply':applyContextSize();break;
  case 'text-to-columns':case 'remove-duplicates':
   commitEditor();chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=false;printOpen=false;
   dataTool={kind:action==='text-to-columns'?'split':'dedup',from:activeCell,to:rangeEnd,
@@ -1091,6 +1147,29 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
+app.addEventListener('contextmenu',e=>{
+ const header=e.target.closest('.rowhead,.colhead'),cell=e.target.closest('.grid-cell');
+ if(!header&&!cell)return; // keep browser context menu outside the spreadsheet grid
+ e.preventDefault();e.stopPropagation();
+ if(header){
+  const kind=header.classList.contains('colhead')?'col':'row',index=Number(header.dataset.index);
+  const fullSelected=selectedRects().some(r=>kind==='col'?
+   r.r1===0&&r.r2===LIMITS.rows-1&&index>=r.c1&&index<=r.c2:
+   r.c1===0&&r.c2===LIMITS.columns-1&&index>=r.r1&&index<=r.r2);
+  if(!fullSelected)kind==='col'?setSelection(cellName(0,index),cellName(LIMITS.rows-1,index)):
+   setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));
+  openSizeContext(kind,index,e.clientX,e.clientY);
+ }else{
+  const ref=cell.dataset.ref;
+  if(!inAnySelection(parseCell(ref).row,parseCell(ref).col))setSelection(ref);
+  openSizeContext('cell',0,e.clientX,e.clientY);
+ }
+},true);
+app.addEventListener('pointerdown',e=>{
+ if(sizeContext&&!e.target.closest('#size-context-menu')&&!e.target.closest('.rowhead,.colhead,.grid-cell')){
+  sizeContext=null;document.getElementById('size-context-menu')?.remove();
+ }
+},true);
 app.addEventListener('pointerdown',startChartPointerDrag,true);
 window.addEventListener('pointermove',previewChartPointerDrag);
 window.addEventListener('pointerup',()=>finishChartPointerDrag(true));
@@ -1119,7 +1198,7 @@ app.addEventListener('change',e=>{const t=e.target;
   catch(err){status(err.message,true);}return;
  }
  if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
-app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
+app.addEventListener('keydown',e=>{if(e.target.id==='size-context-number'&&e.key==='Enter'){e.preventDefault();applyContextSize();return;}if(e.target.id==='size-context-number'&&e.key==='Escape'){e.preventDefault();sizeContext=null;document.getElementById('size-context-menu')?.remove();return;}if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});
 window.addEventListener('pointermove',e=>{if(!resizeDrag||!sheet()||sheet().id!==resizeDrag.sheetId)return;const d=resizeDrag;const offset=(d.axis==='col'?e.clientX:e.clientY)-d.start;const min=d.axis==='col'?DIMENSIONS.minColumn:DIMENSIONS.minRow,max=d.axis==='col'?DIMENSIONS.maxColumn:DIMENSIONS.maxRow;const next=Math.min(max,Math.max(min,Math.round(d.original+offset)));
