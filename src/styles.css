@@ -479,3 +479,16 @@
 .data-tool-actions button.data-tool-primary{background:#247b57;color:#fff;border-color:#247b57}
 .data-tool-actions button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:650px){.data-tool-panel{top:150px;right:7px;width:calc(100vw - 14px);max-height:calc(100% - 165px)}}
+
+/* TASK068: spreadsheet-only context menu for exact dimensions; browser menu elsewhere untouched. */
+.size-context-menu{position:fixed;z-index:1300;width:256px;display:flex;flex-direction:column;gap:9px;padding:12px;background:#fff;color:#284354;border:1px solid #bbcfc8;border-radius:11px;box-shadow:0 12px 32px #172e4138;font:12px "Segoe UI",Arial,sans-serif}
+.size-context-menu>label{display:flex;flex-direction:column;gap:7px;font-weight:700;color:#2c5e45}
+.size-context-menu input[type=number]{width:100%;height:34px;border:1px solid #bdd3c8;border-radius:7px;padding:6px 9px;color:#263b47;font:13px "Segoe UI",Arial,sans-serif;background:#fff}
+.size-context-menu input[type=number]:focus{outline:2px solid #277c5899;outline-offset:1px}
+.size-context-menu small{color:#768c91}
+.size-context-menu button{border:0;border-radius:7px;padding:9px 10px;background:#f1f6f3;color:#285843;text-align:left;cursor:pointer}
+.size-context-menu button:hover{background:#e1efe8}
+.size-context-actions{display:flex;justify-content:flex-end;gap:8px}
+.size-context-actions button.size-context-confirm{background:#247b57;color:white}
+.grid-cell.is-selected{outline:1px solid #5f9e80;outline-offset:-2px}
+.grid-cell.is-active{outline:2px solid #1b8055;outline-offset:-2px}
