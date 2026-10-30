@@ -67,7 +67,13 @@ export function suggestChartRange(sheet,from,to=from,type='bar'){
   return {...shape(first,col,Math.min(rows-1,50),Math.min(cols-1,width)),mode:'selection'};
  if(rows>=2&&cols===1){
   const c=col>0&&Array.from({length:Math.min(rows,51)},(_,i)=>sheet.cells[cellName(first+i,col-1)]?.value).some(v=>String(v??'').trim())?col-1:Math.min(col,LIMITS.columns-2);
-  return {...shape(first,c,Math.min(rows-1,50),width===1?1:Math.min(width,LIMITS.columns-c-1)),mode:'selection'};
+  let n=0;
+  for(let k=1;k<=Math.min(width,LIMITS.columns-c-1);k++){
+   const numericCells=Array.from({length:Math.min(rows,51)},(_,i)=>String(sheet.cells[cellName(first+i,c+k)]?.value??'').trim());
+   if(numericCells.some(v=>numeric(v)!==null||v.startsWith('=')))n++;
+   else break;
+  }
+  return {...shape(first,c,Math.min(rows-1,50),Math.max(1,n)),mode:'selection'};
  }
  let best=null;
  for(const c of [col-1,col,col+1]){
