@@ -85,7 +85,7 @@ export function planPrint(book,sheet,override=null){
  const availableW=paperW-96,availableH=paperH-155;
  const allWidth=cols.reduce((total,c)=>total+columnWidth(sheet,c),0);
  const userScale=cfg.scale/100;
- const scale=cfg.fitWidth?Math.min(userScale,Math.max(.45,availableW/allWidth)):userScale;
+ const scale=cfg.fitWidth?Math.min(userScale,Math.max(.45,(availableW-34)/allWidth)):userScale;
  const colGroups=grouped(cols,c=>Math.max(1,Math.ceil(columnWidth(sheet,c)*scale)),availableW-34);
  const rowGroups=grouped(rows,r=>Math.max(1,Math.ceil(rowHeight(sheet,r)*scale)),availableH-27);
  if(colGroups.length*rowGroups.length>MAX_PAGES)
@@ -116,7 +116,7 @@ export function planPrint(book,sheet,override=null){
     const style=safeStyle(sheet,ref),content=esc(displayedValue(sheet,ref,raw,context));
     cells+='<td'+span+' style="'+style+'">'+content+'</td>';
    }
-   return '<tr>'+cells+'</tr>';
+   return '<tr style="height:'+Math.max(18,Math.round(rowHeight(sheet,r)*scale))+'px">'+cells+'</tr>';
   }).join('');
   const widths='<col style="width:34px">'+cGroup.map(c=>'<col style="width:'+Math.max(1,Math.round(columnWidth(sheet,c)*scale))+'px">').join('');
   pages.push({
