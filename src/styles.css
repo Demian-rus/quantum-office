@@ -492,3 +492,11 @@
 .size-context-actions button.size-context-confirm{background:#247b57;color:white}
 .grid-cell.is-selected{outline:1px solid #5f9e80;outline-offset:-2px}
 .grid-cell.is-active{outline:2px solid #1b8055;outline-offset:-2px}
+
+/* TASK070 — Excel-style selection corner drag fill, overlay stays above the grid. */
+.grid-fill-handle{position:absolute;z-index:65;width:11px;height:11px;border:2px solid #fff;border-radius:2px;
+ background:#1b8055;box-shadow:0 0 0 1px #145f40,0 1px 4px #0004;cursor:crosshair;touch-action:none}
+.grid-fill-handle[hidden]{display:none!important}
+.grid-cell.fill-preview{outline:2px dashed #25865b;outline-offset:-2px;background-color:#e9f5ec!important}
+.grid-cell.fill-preview::after{background:rgba(34,141,91,.08)}
+body.is-fill-dragging,body.is-fill-dragging *{cursor:crosshair!important;user-select:none!important}
