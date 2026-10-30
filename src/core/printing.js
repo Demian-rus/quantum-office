@@ -130,3 +130,25 @@ export function planPrint(book,sheet,override=null){
  return {pages,paper:cfg.paper,orientation:cfg.orientation,scale,range:{from:cellName(range.r1,range.c1),to:cellName(range.r2,range.c2)},count};
 }
 export function printHTML(plan){return plan.pages.map(p=>p.html).join('');}
+
+/** Shift saved print area with structural edits; reject destructive changes. */
+export function shiftPrintArea(sheet,axis,mode,index,count){
+ const config=sheet.printSettings;if(!config?.area)return config;
+ const r=validArea(config.area),start=axis==='row'?r.r1:r.c1,end=axis==='row'?r.r2:r.c2;
+ const last=index+count-1;let first=start,finish=end;
+ if(mode==='insert'){
+  if(index<=start){first+=count;finish+=count;}
+  else if(index<=end)finish+=count;
+ }else if(last<start){first-=count;finish-=count;}
+ else if(index<=end&&last>=start){
+  const overlap=Math.min(last,end)-Math.max(index,start)+1;
+  if(overlap>=end-start+1)throw Error('Удаление уничтожит сохранённую область печати');
+  first=index<=start?index:start;finish=end-overlap;
+ }
+ if(first<0||finish>=(axis==='row'?LIMITS.rows:LIMITS.columns))
+  throw Error('Область печати выйдет за пределы листа');
+ const area=axis==='row'?
+  {from:cellName(first,r.c1),to:cellName(finish,r.c2)}:
+  {from:cellName(r.r1,first),to:cellName(r.r2,finish)};
+ const shifted={...config,area};validatePrintSettings({printSettings:shifted});return shifted;
+}
