@@ -7,6 +7,7 @@ import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWor
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
+import {planTextToColumns,applyTextToColumns,planRemoveDuplicates,applyRemoveDuplicates} from './core/data-transform.js';
 import {createWorkbookRecalculator} from './core/recalculation.js';
 import {openDirectQBook,readDirectFileText,writeVerifiedQBook} from './core/direct-file.js';
 const app=document.getElementById('app');
@@ -39,6 +40,7 @@ let chartDrawerOpen=false,selectedChartId=null,chartDrag=null;
 let conditionalPanelOpen=false;
 let validationPanelOpen=false;
 let printOpen=false;
+let dataTool=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
@@ -542,7 +544,7 @@ function toolIcon(action,original,extra=''){
 }
 function ribbon(){
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
- const labeled=new Set(['print-open','validation-open','conditional-open','chart-bar','chart-stacked','chart-stacked100','chart-line','chart-scatter','chart-pie','charts-open','paste-values','find-open','sort-asc','sort-desc','save','save-as','open-disk','import','xlsx','csv','backup','autosum','sheet-add','sheet-rename','replace-all','border-menu','merge-cells','unmerge-cells']);
+ const labeled=new Set();
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
  const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
@@ -559,8 +561,8 @@ function ribbon(){
  group('Ячейки',button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫')+button('clear-format','Сбросить формат','⟲'))+
  group('Заполнение',button('fill-down','Заполнить вниз','↓')+button('fill-right','Заполнить вправо','→'))+
  group('Поиск',button('find-open','Найти / заменить','⌕'));
- if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''))+`<div class="ribbon-help">Подсказка: =SUM(A1:A10)</div>`;
- if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Проверка',button('validation-open','Проверка данных','✓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
+ if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''));
+ if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Очистка данных',button('text-to-columns','Текст по столбцам','⇥')+button('remove-duplicates','Удалить дубликаты','≡'))+group('Проверка',button('validation-open','Проверка данных','✓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
  if(activeRibbon==='insert')contents=group('Структура',button('insert-row','Вставить выбранные строки','+')+button('delete-row','Удалить выбранные строки','×')+button('insert-col','Вставить выбранные столбцы','+')+button('delete-col','Удалить выбранные столбцы','×'))+group('Диаграммы',button('chart-bar','Столбчатая диаграмма','▥')+
   button('chart-stacked','С накоплением','▥')+
   button('chart-stacked100','С накоплением 100%','▥')+button('chart-line','Линейная диаграмма','⌁')+button('chart-scatter','Точечная XY','·')+button('chart-pie','Круговая диаграмма','◉')+button('charts-open','Мои диаграммы','▣'))+group('Листы',button('sheet-add','Новый лист','+'));
@@ -836,7 +838,44 @@ function printNow(){
  }catch(error){status(error.message||'Не удалось открыть печать',true);}
 }
 
-function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}</main>`;}
+function dataToolPanel(){
+ if(!dataTool||!sheet())return '';
+ const t=dataTool,split=t.kind==='split',title=split?'Текст по столбцам':'Удалить дубликаты';
+ let preview='',valid=true,summary='';
+ try{
+  const plan=split?
+   planTextToColumns(sheet(),t.from,t.to,{delimiter:t.delimiter,overwrite:t.overwrite}):
+   planRemoveDuplicates(sheet(),t.from,t.to,{header:t.header,key:t.key});
+  summary=split?'Строк: '+plan.rows+' · Колонок: '+plan.cols:
+   'Повторов: '+plan.removed+' · Останется: '+plan.kept;
+  preview=split?'<div class="data-tool-preview">'+plan.preview.map(p=>
+   '<div><b>'+p.row+'</b> '+p.fields.map(v=>'<span>'+esc(v.slice(0,60))+'</span>').join('')+'</div>').join('')+'</div>':
+   '<div class="data-tool-preview"><p>'+(plan.removed?
+    'Повторяющиеся строки: '+esc(plan.duplicateRows.join(', '))+(plan.removed>10?'…':''):
+    'Повторов не найдено')+'</p></div>';
+ }catch(err){valid=false;preview='<p class="data-tool-error">'+esc(err.message)+'</p>';}
+ const controls=split?
+  '<label>Разделитель <select id="data-tool-delimiter">'+
+  [[';','Точка с запятой'],[',','Запятая'],['\t','Табуляция'],[' ','Пробел'],['|','Вертикальная черта']].map(([v,label])=>
+   '<option value="'+esc(v)+'" '+(v===t.delimiter?'selected':'')+'>'+esc(label)+'</option>').join('')+
+  '</select></label><label class="data-tool-check"><input type="checkbox" id="data-tool-overwrite" '+
+  (t.overwrite?'checked':'')+'> Заменять существующие ячейки справа</label>':
+  '<label class="data-tool-check"><input type="checkbox" id="data-tool-header" '+(t.header?'checked':'')+
+  '> Первая строка — заголовки</label>'+
+  '<label>Сравнивать <select id="data-tool-key"><option value="all" '+(t.key==='all'?'selected':'')+
+  '>Все столбцы</option><option value="first" '+(t.key==='first'?'selected':'')+
+  '>Первый столбец</option></select></label>';
+ return '<aside id="data-tool-panel" class="data-tool-panel" role="dialog" aria-label="'+esc(title)+'">'+
+  '<header><strong>'+esc(title)+'</strong><button data-action="data-tool-close" aria-label="Закрыть">×</button></header>'+
+  '<div class="data-tool-body"><p class="data-tool-range">Диапазон: <b>'+esc(t.from+(t.from===t.to?'':':'+t.to))+
+  '</b></p>'+controls+'<div class="data-tool-summary">'+esc(summary)+'</div>'+preview+
+  '<p class="data-tool-caution">'+(split?'Поддерживаются кавычки CSV. Соседние ячейки не заменяются без разрешения.':
+   'Строки уплотняются только внутри выделения. Формулы и объединения в нём не поддерживаются.')+
+  '</p><div class="data-tool-actions"><button data-action="data-tool-close">Отмена</button>'+
+  '<button class="data-tool-primary" data-action="data-tool-apply" '+(valid?'':'disabled')+
+  '>Применить</button></div></div></aside>';
+}
+function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}</main>`;}
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
@@ -891,6 +930,24 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'text-to-columns':case 'remove-duplicates':
+  commitEditor();chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=false;printOpen=false;
+  dataTool={kind:action==='text-to-columns'?'split':'dedup',from:activeCell,to:rangeEnd,
+   delimiter:';',overwrite:false,header:true,key:'all'};render();break;
+ case 'data-tool-close':dataTool=null;render();break;
+ case 'data-tool-apply':{
+  if(!dataTool)break;
+  try{
+   const t=dataTool,plan=t.kind==='split'?
+    planTextToColumns(sheet(),t.from,t.to,{delimiter:t.delimiter,overwrite:t.overwrite}):
+    planRemoveDuplicates(sheet(),t.from,t.to,{header:t.header,key:t.key});
+   if(t.kind==='dedup'&&!plan.removed){dataTool=null;render();status('Повторов не найдено');break;}
+   transact(()=>{if(t.kind==='split')applyTextToColumns(sheet(),plan);else applyRemoveDuplicates(sheet(),plan);validateWorkbook(book());});
+   dataTool=null;render();status(t.kind==='split'?'Текст разделён по '+plan.cols+' столбцам':
+    'Удалено повторов: '+plan.removed);
+  }catch(err){render();status(err.message,true);}
+  break;
+ }
  case 'validation-open':chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=true;render();break;
  case 'validation-close':validationPanelOpen=false;render();break;
  case 'validation-add':createValidationFromPanel();break;
@@ -963,6 +1020,13 @@ app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.ta
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
 app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;});
 app.addEventListener('change',e=>{const t=e.target;
+ if(dataTool&&['data-tool-delimiter','data-tool-overwrite','data-tool-header','data-tool-key'].includes(t.id)){
+  if(t.id==='data-tool-delimiter')dataTool.delimiter=t.value;
+  if(t.id==='data-tool-overwrite')dataTool.overwrite=t.checked;
+  if(t.id==='data-tool-header')dataTool.header=t.checked;
+  if(t.id==='data-tool-key')dataTool.key=t.value;
+  render();return;
+ }
  if(['chart-labels','chart-legend','chart-grid','chart-trendline','chart-trend-equation','chart-trend-r2','chart-trend-type'].includes(t.id)||t.dataset.chartColor!==undefined){
   const patch=t.id==='chart-labels'?{labels:t.checked}:t.id==='chart-legend'?{legend:t.value}:
    t.id==='chart-grid'?{grid:t.checked}:
