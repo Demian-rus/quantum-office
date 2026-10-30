@@ -3,6 +3,7 @@ import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,column
 import {validateDataRules} from './validation.js';
 import {validateConditionalRules} from './conditional.js';
 import {writeXLSXCharts,importXLSXCharts} from './xlsx-charts.js';
+import {xlsxPrintSettings,xlsxPrintArea,workbookPrintAreaNodes,importXLSXPrintSettings} from './xlsx-print.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -145,8 +146,9 @@ export async function importXLSX(data,filename='Таблица',report=null){
  const theme=zip.file(themePath)?themeColorsFromXML(await readXML(zip,themePath)):DEFAULT_THEME;
  const styleRoot=zip.file('xl/styles.xml')?await readXML(zip,'xl/styles.xml'):null;
  const fmt=stylesFromXML(styleRoot,theme),dxfs=xlsxDifferentialFills(styleRoot,theme);
+ const printAreaNodes=workbookPrintAreaNodes(wbXML);
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;const chartDescriptors=[];
- for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
+ for(const [sheetIndex,sh] of sheets.entries()){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
    // Excel row heights are points. Excel column widths are character counts;
    // the 7px character / 5px padding conversion matches Calibri 11 approx.
@@ -267,6 +269,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
   for(const merged of merges){const pieces=String(merged.getAttribute('ref')||'').toUpperCase().split(':');if(pieces.length!==2)throw Error('Повреждённый диапазон объединения');mergeCells(sheet,pieces[0],pieces[1]);}
   importXLSXValidations(sheet,xml,report);
   importXLSXConditionalFormatting(sheet,xml,dxfs,report,theme);
+  importXLSXPrintSettings(sheet,xml,printAreaNodes,sheetIndex,report);
   book.sheets.push(sheet);chartDescriptors.push({sheet,xml,path});
  }
  book.activeSheetId=book.sheets[0].id;
@@ -471,7 +474,7 @@ export async function exportXLSX(book){validateWorkbook(book);
  if(area>MAX_XLSX_RECTANGLE_CELLS)
   throw Error('Оформленные прямоугольники превышают безопасный лимит XLSX (200 000 ячеек). Сохраните .qbook: экспорт отменён без потери оформления.');
  const zip=new JSZip();const styles=styleCatalog(book);
- const sheetTypes=[];const usedSheetNames=new Set();const sheets=book.sheets.map((s,i)=>{
+ const sheetTypes=[];const usedSheetNames=new Set(),printAreas=[];const sheets=book.sheets.map((s,i)=>{
   const sheetName=safeName(s.name);if(usedSheetNames.has(sheetName.toLowerCase()))throw Error('Повторяющиеся названия листов после сокращения до 31 символа');usedSheetNames.add(sheetName.toLowerCase());
   const bands=rectangleBands(s,styles);
   let byRows=new Map();for(const [ref,c] of Object.entries(s.cells)){const match=/^([A-Z]+)(\d+)$/.exec(ref);if(!match)continue;const row=+match[2];if(!byRows.has(row))byRows.set(row,[]);
@@ -509,14 +512,15 @@ export async function exportXLSX(book){validateWorkbook(book);
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
-  const chartParts=writeXLSXCharts(zip,book,s,i+1);
+  const chartParts=writeXLSXCharts(zip,book,s,i+1),printParts=xlsxPrintSettings(s);
+  const printArea=xlsxPrintArea(s,i+1,sheetName);if(printArea)printAreas.push(printArea);
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...Object.keys(s.rowStyles||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}${chartParts.drawing}</worksheet>`;
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${printParts.sheetPr}${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}${printParts.trailing}${chartParts.drawing}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,...chartParts.overrides);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
- zip.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${base}" xmlns:r="${relNS}"><workbookPr date1904="0"/><sheets>${sheets.join('')}</sheets><calcPr fullCalcOnLoad="1"/></workbook>`);
+ zip.file('xl/workbook.xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="${base}" xmlns:r="${relNS}"><workbookPr date1904="0"/><sheets>${sheets.join('')}</sheets>${printAreas.length?'<definedNames>'+printAreas.join('')+'</definedNames>':''}<calcPr fullCalcOnLoad="1"/></workbook>`);
  zip.file('xl/_rels/workbook.xml.rels',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="${pkgNS}">${book.sheets.map((_,i)=>`<Relationship Id="rId${i+1}" Type="${relNS}/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join('')}<Relationship Id="rIdStyles" Type="${relNS}/styles" Target="styles.xml"/></Relationships>`);
  zip.file('xl/styles.xml',styleXML(styles));
  zip.file('[Content_Types].xml',`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>${sheetTypes.join('')}</Types>`);
