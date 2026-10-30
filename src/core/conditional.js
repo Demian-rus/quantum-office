@@ -24,13 +24,16 @@ export function validateConditionalRules(sheet){
  for(const rule of sheet.conditionalRules){
   if(!rule||typeof rule!=='object'||Array.isArray(rule)||typeof rule.id!=='string'||
     rule.id.length<1||rule.id.length>100||ids.has(rule.id)||!CONDITIONAL_KINDS.includes(rule.kind)||
-    Object.keys(rule).some(k=>!['id','kind','from','to','target','color'].includes(k)))
+    Object.keys(rule).some(k=>!['id','kind','from','to','target','color','lowColor','highColor'].includes(k)))
    throw Error('Повреждено правило условного форматирования');
   area(rule);
   if(rule.kind==='scale'){
-   if(rule.target!==undefined||rule.color!==undefined)throw Error('Повреждена цветовая шкала');
+   if(rule.target!==undefined||rule.color!==undefined||
+      rule.lowColor!==undefined&&!COLOR.test(rule.lowColor)||
+      rule.highColor!==undefined&&!COLOR.test(rule.highColor))throw Error('Повреждена цветовая шкала');
   }else{
-   if(typeof rule.target!=='string'||rule.target.length>150||!rule.target.trim()||
+   if(rule.lowColor!==undefined||rule.highColor!==undefined||
+      typeof rule.target!=='string'||rule.target.length>150||!rule.target.trim()||
       rule.kind!=='contains'&&conditionalNumber(rule.target)===null||!COLOR.test(rule.color))
     throw Error('Недопустимое условие форматирования');
   }
@@ -83,7 +86,7 @@ export function conditionalFill(sheet,ref,value,scaleStats=new Map()){
   if(rule.kind==='scale'){
    const bounds=scaleStats.get(rule.id),n=conditionalNumber(value);
    if(bounds&&n!==null){const t=bounds.max===bounds.min?1:Math.max(0,Math.min(1,(n-bounds.min)/(bounds.max-bounds.min)));
-    fill=mix('#f7e2dc','#5fb486',t);}
+    fill=mix(rule.lowColor||'#f7e2dc',rule.highColor||'#5fb486',t);}
    continue;
   }
   const n=conditionalNumber(value),threshold=conditionalNumber(rule.target);
