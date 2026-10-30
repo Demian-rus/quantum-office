@@ -28,9 +28,9 @@ test('TASK054: XML escape Excel validation labels and single cell ranges',()=>{
 test('TASK054: unsupported unrepresentable Excel literal lists fail instead of corrupting values',()=>{
  const sheet=currentSheet(newWorkbook());
  addDataRule(sheet,'B2','B2','list','Да, наверное;Нет');
- assert.throws(()=>xlsxDataValidations(sheet),/сохраните .qbook/);
+ assert.throws(()=>xlsxDataValidations(sheet),/Сохраните \.qbook/);
  sheet.validations=[];
  addDataRule(sheet,'B2','B2','list','Да;Нет');
  sheet.validations[0].options=['А'.repeat(140),'Б'.repeat(140)];
- assert.throws(()=>xlsxDataValidations(sheet),/сохраните .qbook/);
+ assert.throws(()=>xlsxDataValidations(sheet),/Сохраните \.qbook/);
 });
