@@ -52,6 +52,7 @@ test('TASK060: range inference carries all contiguous numeric series; pie uses f
  const {s}=make();
  assert.deepEqual(suggestChartRange(s,'B2','B2'),{from:'A1',to:'D4',mode:'detected'});
  assert.deepEqual(suggestChartRange(s,'A1','D4'),{from:'A1',to:'D4',mode:'selection'});
+ assert.deepEqual(suggestChartRange(s,'A1','A4'),{from:'A1',to:'D4',mode:'selection'});
  assert.deepEqual(suggestChartRange(s,'A1','D4','pie'),{from:'A1',to:'B4',mode:'selection'});
  assert.deepEqual(suggestChartRange(s,'A1','E4'),{from:'A1',to:'E4',mode:'selection'});
 });
