@@ -35,13 +35,13 @@ with sync_playwright() as p:
  page.evaluate("window.__printCalled=0;window.print=()=>window.__printCalled++")
  page.locator('[data-action=print-now]').click()
  assert page.evaluate("window.__printCalled")==1
- assert '@page' in page.locator('#print-page-rule').inner_text()
+ assert '@page' in page.locator('#print-page-rule').text_content()
  page.locator('[data-action=print-use-used]').click()
  assert page.evaluate("sheet().printSettings.area") is None
  page.locator('[data-action=print-close]').click()
  assert page.locator('#print-view').count()==0
  page.locator('#grid-scroll').focus();page.keyboard.press('Control+z')
- assert page.evaluate("sheet().printSettings.area is not None")
+ assert page.evaluate("sheet().printSettings.area !== null")
  assert not errors,errors
  browser.close()
  print('TASK053 PASS: multi-page print, selection, paper, orientation, scale, QBOOK, browser print and undo')
