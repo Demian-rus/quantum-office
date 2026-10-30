@@ -49,7 +49,7 @@ with sync_playwright() as p:
  assert page.evaluate('sheet().charts[1].from+":"+sheet().charts[1].to')=='A1:B4'
  assert page.locator('#chart-panel svg polyline').count()==1
  # A malformed source must preserve existing reference and show a useful error.
- page.locator('#chart-range').fill('A1:C3')
+ page.locator('#chart-range').fill('A1:F3')
  page.locator('[data-action=chart-source]').click()
  assert page.evaluate('sheet().charts[1].from+":"+sheet().charts[1].to')=='A1:B4'
  assert not errors,errors

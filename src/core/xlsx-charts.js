@@ -27,17 +27,24 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
  const header=data.header;
  const row1=rect.r1+(header?1:0),row2=rect.r2;
  const cat=oneCol(sheet,row1,row2,rect.c1),val=oneCol(sheet,row1,row2,rect.c2);
- const pts=data.points;
- const series='<c:ser><c:idx val="0"/><c:order val="0"/><c:tx><c:v>'+escape(data.axis)+'</c:v></c:tx>'+
-   '<c:cat><c:strRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(pts,'label','str')+'</c:strRef></c:cat>'+
-   '<c:val><c:numRef><c:f>'+escape(val)+'</c:f>'+chartSeriesValue(pts,'value','num')+'</c:numRef></c:val></c:ser>';
+ const series=data.series||[{name:data.axis,points:data.points}];
+ const seriesXML=series.map((entry,k)=>{
+  const valueRef=oneCol(sheet,row1,row2,rect.c1+k+1),titleCell=oneCol(sheet,rect.r1,rect.r1,rect.c1+k+1);
+  const title=data.header?
+   '<c:tx><c:strRef><c:f>'+escape(titleCell)+'</c:f>'+
+    chartSeriesValue([{name:entry.name}],'name','str')+'</c:strRef></c:tx>':
+   '<c:tx><c:v>'+escape(entry.name)+'</c:v></c:tx>';
+  return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+
+   '<c:cat><c:strRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(entry.points,'label','str')+'</c:strRef></c:cat>'+
+   '<c:val><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:val></c:ser>';
+ }).join('');
  const catAxis=100000+ordinal*2,valAxis=catAxis+1;
  const plot=chart.type==='pie'?
-  '<c:pieChart><c:varyColors val="1"/>'+series+'<c:firstSliceAng val="0"/></c:pieChart>':
+  '<c:pieChart><c:varyColors val="1"/>'+seriesXML+'<c:firstSliceAng val="0"/></c:pieChart>':
   chart.type==='bar'?
-  '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="1"/>'+series+
+  '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="1"/>'+seriesXML+
   '<c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:barChart>'+chartAxis(catAxis,valAxis):
-  '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>'+series+
+  '<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>'+seriesXML+
   '<c:marker val="1"/><c:axId val="'+catAxis+'"/><c:axId val="'+valAxis+'"/></c:lineChart>'+chartAxis(catAxis,valAxis);
  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
  '<c:chartSpace xmlns:c="'+C+'" xmlns:a="'+A+'" xmlns:r="'+R+'"><c:lang val="ru-RU"/>'+
@@ -153,19 +160,32 @@ function parseChart(book,sheet,chartRoot){
  if(type==='bar'&&direct(body,'barDir')?.getAttribute('val')!=='col')return null;
  if(type==='bar'&&direct(body,'grouping')?.getAttribute('val')!=='clustered')return null;
  if(type==='line'&&direct(body,'grouping')?.getAttribute('val')!=='standard')return null;
- const series=all(body,'ser');if(series.length!==1)return null;
- const ser=series[0],cat=direct(direct(ser,'cat'),'strRef')||direct(direct(ser,'cat'),'numRef');
- const val=direct(direct(ser,'val'),'numRef');
- const cats=sourceRange(nestedText(cat,'f'),sheet.name),vals=sourceRange(nestedText(val,'f'),sheet.name);
- if(!cats||!vals||cats.start.row!==vals.start.row||cats.end.row!==vals.end.row||
-    vals.start.col!==cats.start.col+1||vals.end.row-cats.start.row<1||vals.end.row-cats.start.row>50)return null;
- let row=cats.start.row;
- // Header comes from the immediately preceding text cell only; caches never become workbook values.
- if(row>0){
-  const before=getCell(sheet,cellName(row-1,vals.start.col)).value;
-  if(before&&Number.isNaN(Number(String(before).trim())))row--;
+ const series=all(body,'ser');
+ if(!series.length||series.length>4||type==='pie'&&series.length!==1)return null;
+ let cats=null,valsFirst=null;
+ for(let k=0;k<series.length;k++){
+  const item=series[k],cat=direct(direct(item,'cat'),'strRef')||direct(direct(item,'cat'),'numRef'),
+   val=direct(direct(item,'val'),'numRef');
+  const category=sourceRange(nestedText(cat,'f'),sheet.name),values=sourceRange(nestedText(val,'f'),sheet.name);
+  if(!category||!values||category.start.row!==values.start.row||
+     category.end.row!==values.end.row||values.start.col!==category.start.col+k+1||
+     values.end.row-values.start.row<1||values.end.row-values.start.row>50||
+     cats&&(category.start.row!==cats.start.row||category.end.row!==cats.end.row||
+            category.start.col!==cats.start.col))return null;
+  if(!cats)cats=category;
+  if(!valsFirst)valsFirst=values;
  }
- const range={from:cellName(row,cats.start.col),to:cellName(vals.end.row,vals.end.col)};
+ let row=cats.start.row;
+ if(row>0){
+  const heads=series.map((_,k)=>String(getCell(sheet,cellName(row-1,valsFirst.start.col+k)).value||'').trim());
+  const textHeaders=heads.every(v=>v!==''&&
+    (Number.isNaN(Number(v))||series.length>1&&/^(?:19|20)\d{2}$/.test(v)))&&
+    heads.some(v=>Number.isNaN(Number(v)));
+  const yearHeaders=series.length>1&&heads.every(v=>/^(?:19|20)\d{2}$/.test(v))&&
+    String(getCell(sheet,cellName(row-1,cats.start.col)).value||'').trim()!=='';
+  if(textHeaders||yearHeaders)row--;
+ }
+ const range={from:cellName(row,cats.start.col),to:cellName(valsFirst.end.row,valsFirst.start.col+series.length-1)};
  const titleNode=direct(node,'title');
  const textNodes=titleNode?Array.from(titleNode.getElementsByTagNameNS(A,'t')):[];
  const caption=textNodes.map(x=>x.textContent).join('').trim();
