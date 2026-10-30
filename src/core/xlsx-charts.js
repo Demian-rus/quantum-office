@@ -1,6 +1,6 @@
 /** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
-import {chartData,chartRect,validateCharts} from './charts.js';
-import {uid,parseCell,cellName,getCell} from './workbook.js';
+import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout} from './charts.js';
+import {uid,parseCell,cellName,getCell,gridGeometry,firstVisibleIndex} from './workbook.js';
 
 const DRAW='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
 const A='http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -44,16 +44,48 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
  '<c:chart>'+richTitle(chart.title)+'<c:autoTitleDeleted val="0"/><c:plotArea><c:layout/>'+plot+
  '</c:plotArea><c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>';
 }
-const point=(row,col)=>'<xdr:col>'+col+'</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>'+row+'</xdr:row><xdr:rowOff>0</xdr:rowOff>';
+// Excel drawing anchors use cell indices and offsets in English Metric Units.
+// Keep objects at their native sheet positions; no more arbitrary 'to the right' placement.
+const chartEMU=9525;
+function chartMarker(geometry,position,axis){
+ const points=axis==='x'?geometry.x:geometry.y,shift=axis==='x'?0:31;
+ const at=Math.max(points[0],Math.min(points.at(-1)-1,position+shift));
+ const index=firstVisibleIndex(points,at);
+ const offset=Math.max(0,Math.round((at-points[index])*chartEMU));
+ return axis==='x'?'<xdr:col>'+index+'</xdr:col><xdr:colOff>'+offset+'</xdr:colOff>':
+  '<xdr:row>'+index+'</xdr:row><xdr:rowOff>'+offset+'</xdr:rowOff>';
+}
+function marker(sheet,x,y){
+ const geometry=gridGeometry(sheet);
+ return chartMarker(geometry,x,'x')+chartMarker(geometry,y,'y');
+}
 const anchor=(sheet,chart,index)=>{
- const rect=chartRect(chart),left=Math.min(91,rect.c2+2);
- const top=Math.min(99984,rect.r1+index*16);
- return '<xdr:twoCellAnchor editAs="oneCell"><xdr:from>'+point(top,left)+'</xdr:from><xdr:to>'+point(top+14,left+8)+'</xdr:to>'+
+ const rect=chartRect(chart),layout=chartLayout(sheet,chart,index);
+ const left=layout.x,top=layout.y;
+ return '<xdr:twoCellAnchor><xdr:from>'+marker(sheet,left,top)+'</xdr:from><xdr:to>'+
+  marker(sheet,left+layout.width,top+layout.height)+'</xdr:to>'+
  '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="'+(index+2)+'" name="Quantum Chart '+(index+1)+'"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>'+
  '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>'+
  '<a:graphic><a:graphicData uri="'+C+'"><c:chart xmlns:c="'+C+'" xmlns:r="'+R+'" r:id="rId'+(index+1)+'"/></a:graphicData></a:graphic>'+
  '</xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>';
 };
+function chartLayoutFromDrawing(sheet,reference){
+ let node=reference.parentElement;
+ while(node&&node.localName!=='twoCellAnchor')node=node.parentElement;
+ if(!node)return null;
+ const from=direct(node,'from'),to=direct(node,'to'),geometry=gridGeometry(sheet);
+ function position(item,axis){
+  const isX=axis==='x',index=Number(nestedText(item,isX?'col':'row')),
+   offset=Number(nestedText(item,isX?'colOff':'rowOff'));
+  const points=isX?geometry.x:geometry.y;
+  if(!Number.isInteger(index)||index<0||index>=points.length-1||
+     !Number.isFinite(offset)||offset<0)return NaN;
+  return Math.round(points[index]+offset/chartEMU-(isX?0:31));
+ }
+ const left=position(from,'x'),top=position(from,'y'),right=position(to,'x'),bottom=position(to,'y');
+ const layout={x:left,y:top,width:right-left,height:bottom-top};
+ try{validateChartLayout(sheet,layout);return layout;}catch{return null;}
+}
 /** One drawing relationship per sheet and a dedicated chart part per chart. */
 export function writeXLSXCharts(zip,book,sheet,sheetNumber){
  if(!sheet.charts?.length)return {drawing:'',overrides:[]};
@@ -162,6 +194,8 @@ export async function importXLSXCharts(zip,book,descriptors,report=null){
    const chartXML=part?await localXML(zip,part):null;
    const chart=chartXML?parseChart(book,item.sheet,chartXML):null;
    if(!chart){skipped++;continue;}
+   const importedLayout=chartLayoutFromDrawing(item.sheet,ref);
+   if(importedLayout)chart.layout=importedLayout;
    item.sheet.charts.push(chart);imported++;
   }
  }
