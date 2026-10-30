@@ -267,7 +267,7 @@ export function chartSVG(data,type,settings={}){
    series.forEach((s,k)=>s.points.forEach((p,i)=>{
     const Y=y(p.value);
     svg+='<rect x="'+(x(i)-group/2+k*bw)+'" y="'+Math.min(Y,baseline)+'" width="'+Math.max(1,bw-2)+
-      '" height="'+Math.max(1,Math.abs(Y-baseline))+'" rx="2" fill="'+colorAt(series.length===1?i:k)+'"/>';
+      '" height="'+Math.max(1,Math.abs(Y-baseline))+'" rx="2" fill="'+colorAt(series.length===1&&!colors.length?i:k)+'"/>';
     if(showValues&&i%Math.max(1,Math.ceil(pts.length/12))===0)
      svg+=txt(Math.round(x(i)-group/2+k*bw+bw/2),Math.max(15,Math.min(Y,baseline)-5),fmt(p.value),
       'font-size="10" text-anchor="middle" fill="#30465b"');
