@@ -3,11 +3,12 @@ import {formatTemporal,parseTemporalInput} from './dates.js';
 import {validateCharts} from './charts.js';
 import {validateConditionalRules} from './conditional.js';
 import {validateDataRules,checkValidatedInput} from './validation.js';
+import {validatePrintSettings} from './printing.js';
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
@@ -533,6 +534,7 @@ export function validateWorkbook(book){
   validateCharts(sheet);
   validateConditionalRules(sheet);
   validateDataRules(sheet);
+  validatePrintSettings(sheet);
   if(typeof sheet?.name!=='string'||!sheet.name.trim()||names.has(sheet.name.toLocaleUpperCase('ru-RU')))throw Error('Повторяющееся или пустое название листа');
   names.add(sheet.name.toLocaleUpperCase('ru-RU'));
   if(sheet.defaultAlign!=null&&!['left','center','right'].includes(sheet.defaultAlign))throw Error('Недопустимый формат выравнивания листа');
