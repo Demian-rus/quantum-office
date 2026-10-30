@@ -34,7 +34,7 @@ export function validateConditionalRules(sheet){
   }else{
    if(rule.lowColor!==undefined||rule.highColor!==undefined||
       typeof rule.target!=='string'||rule.target.length>150||!rule.target.trim()||
-      rule.kind!=='contains'&&conditionalNumber(rule.target)===null||!COLOR.test(rule.color))
+      !['contains','eq'].includes(rule.kind)&&conditionalNumber(rule.target)===null||!COLOR.test(rule.color))
     throw Error('Недопустимое условие форматирования');
   }
   ids.add(rule.id);
