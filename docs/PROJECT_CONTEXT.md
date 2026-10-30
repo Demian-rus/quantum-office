@@ -470,3 +470,14 @@ Excel import/export now supports native dropdown lists stored as inline quoted O
 - XLSX chart export writes native OOXML \`c:legend\`, \`c:dLbls\`, per-series \`c:spPr\` colors, axis \`c:min\`/\`c:max\`, and \`c:majorGridlines\`. Import reads the same limited supported subset back into native chart options. This does not claim to preserve arbitrary Excel chart styles.
 - Native colors apply to line and grouped-bar series; pies retain per-slice automatic colors. Value labels are sampled at up to 12 category positions per series in the SVG to preserve legibility; Excel can display all values.
 - Tests \`tests/task061.test.js\` and \`tests/task061_browser.py\` cover validation, QBOOK, type handling, Undo and OOXML interchange. Both full CI workflows must pass before publishing.
+
+
+## TASK 062 — stacked and 100%-stacked column charts (2026-10-30)
+
+- Baseline published TASK061 at \`b23f6a3f18b645e407e333c2b32261ae84c2b53d\`. Chart types now include \`stacked\` (ordinary stacked columns with independent positive/negative cumulative segments) and \`stacked100\` (100% normalized stacked columns). Original \`bar\`, \`line\` and \`pie\` types are unchanged and remain compatible with .qbook and XLSX.
+- Source remains a bounded adjacent 2..5 column block, up to four numeric series. Header labels and formulas update both new variants in real time. 100%-stacked requires nonnegative values and positive total for every populated category; ordinary stacks can contain negative values and zero. Overflowing cumulative sums are refused to avoid silent SVG/XLSX data corruption.
+- The Insert ribbon has direct stacked and 100%-stacked actions; an existing chart may switch types in its sidebar, through one Undo transaction. The 100%-stacked axis is always 0–100%, and its manual min/max inputs are hidden; changing from a manual-axis chart clears those axis limits atomically. Ordinary stacks retain optional user-defined axis bounds and styles.
+- SVG draws genuine accumulated segments, percentage labels/ticks, up to four colored series, legends, and optional value labels. It is NOT a collection of clustered bars cosmetically recolored.
+- Native OOXML import/export uses \`<c:barChart><c:grouping val="stacked|percentStacked"/>\`, \`<c:overlap val="100"/>\`, percent-axis number formatting, chart series caches and original cell-reference formulas. Unsupported groupings remain skipped with reporting; a modified/unsupported chart is never silently converted to a different type.
+- New tests: \`tests/task062.test.js\` and \`tests/task062_browser.py\` cover normal stacks, percent normalization, mixed signs, invalid categories, formula links, UI Undo, XLSX roundtrips and unsupported groupings. Full Node and Chromium CI required before merge.
+- Deliberate scope: no 100%-stacked negative categories (Excel semantics differ), no stacked area, combo charts or custom ordering. Continue recommending native .qbook backups for important Excel work.
