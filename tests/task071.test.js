@@ -74,9 +74,12 @@ test('TASK071: invalid date underflow and other guarded writes leave every sourc
  assert.throws(()=>extendFillHandle(sheet,'D3','D3','left',0),/скрытые/);
  assert.equal(JSON.stringify(sheet.cells),before);
  sheet.hiddenColumns={};
+ // Use a non-date source so the validation check, not date underflow, is exercised.
+ setCell(sheet,'D3','no');
+ const beforeValidation=JSON.stringify(sheet.cells);
  sheet.validations=[{id:'v1',from:'B3',to:'B3',kind:'list',options:['yes']}];
  assert.throws(()=>extendFillHandle(sheet,'D3','D3','left',0),/Недопустимое значение/);
- assert.equal(JSON.stringify(sheet.cells),before);
+ assert.equal(JSON.stringify(sheet.cells),beforeValidation);
 });
 test('TASK071: high cardinality and edge cases are rejected without partial mutation',()=>{
  const {sheet}=setup();setCell(sheet,'B2','12');const before=JSON.stringify(sheet.cells);
