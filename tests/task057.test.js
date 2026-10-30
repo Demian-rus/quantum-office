@@ -40,7 +40,7 @@ test('TASK057: one-click chart autodetects local data or clamps wider selections
   ['A3','Юг'],['B3','22'],['A4','Восток'],['B4','50']].forEach(([key,value])=>setCell(sheet,key,value));
  assert.deepEqual(suggestChartRange(sheet,'A1','A1'),{from:'A1',to:'B4',mode:'detected'});
  assert.deepEqual(suggestChartRange(sheet,'B3','B3'),{from:'A1',to:'B4',mode:'detected'});
- assert.deepEqual(suggestChartRange(sheet,'A1','D4'),{from:'A1',to:'B4',mode:'selection'});
+ assert.deepEqual(suggestChartRange(sheet,'A1','D4'),{from:'A1',to:'D4',mode:'selection'});
  assert.deepEqual(suggestChartRange(sheet,'A2','B3'),{from:'A2',to:'B3',mode:'selection'});
 });
 
@@ -50,7 +50,7 @@ test('TASK057: source updates reject malformed range atomically and preserve cha
  changeChart(sheet,chart.id,{from:'c2',to:'d4'});
  assert.equal(chart.from,'C2');assert.equal(chart.to,'D4');
  const snap=JSON.stringify(sheet.charts);
- assert.throws(()=>changeChart(sheet,chart.id,{from:'A1',to:'C9'}),/два столбца/);
+ assert.throws(()=>changeChart(sheet,chart.id,{from:'A1',to:'F9'}),/2–5 столбцов/);
  assert.equal(JSON.stringify(sheet.charts),snap);
  assert.throws(()=>changeChart(sheet,chart.id,{from:'Z1',to:'Z2'}),/два столбца/);
  assert.equal(JSON.stringify(sheet.charts),snap);
