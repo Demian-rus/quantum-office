@@ -144,3 +144,7 @@ Select a range covering **2–100 adjacent rows or columns**, then use the compa
 ### TASK 026 — inter-sheet formulas (experimental)
 
 `=График!A1` and `='Учёт оплаты'!B2`, plus supported functions over same-sheet ranges, recalculate from the current workbook. Exported XLSX retains formulas. Renaming or deleting a referenced sheet and inserting/deleting its rows and columns are blocked until cross-sheet reference rewriting is implemented. External workbooks, 3D ranges and Excel named references are unsupported.
+
+### TASK 071 — autofill in all directions and dates
+
+Drag the green selection corner up, down, left or right to continue arithmetic sequences, copy formulas with relative references, or repeat text and formatting. Hold near or beyond a viewport edge to scroll farther while dragging; Escape cancels. A single date advances by one day; two equally spaced dates retain their interval. Dates remain numeric values with date formatting in QBOOK/XLSX. Monthly/yearly inference is not included. Operations stay atomic, undoable and bounded to 10,000 destination cells, and refuse hidden/merged destinations or invalid values.
