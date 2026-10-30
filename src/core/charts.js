@@ -6,19 +6,20 @@ export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;
 export const CHART_MAX_SERIES=4;
 const COLORS=['#277c58','#397eb9','#e5a43b','#8a60b7','#dc7775','#42a8aa','#7e9e4a','#d58e4b'];
 export const CHART_COLORS=Object.freeze([...COLORS]);
-const STYLE_KEYS=['labels','legend','grid','colors','min','max','trendline','trendEquation','trendR2'];
+const STYLE_KEYS=['labels','legend','grid','colors','min','max','trendline','trendEquation','trendR2','trendType'];
 export function chartOptions(chart){
  const o=chart?.options||{};
  return {labels:o.labels??false,legend:o.legend??(chart?.type==='pie'?'right':chart?.from&&chart?.to&&chartRect(chart).c2-chartRect(chart).c1===1?'none':'bottom'),
    grid:o.grid??true,colors:o.colors??[],min:o.min??null,max:o.max??null,
-   ...(o.trendline!==undefined||o.trendEquation!==undefined||o.trendR2!==undefined?
-    {trendline:o.trendline??false,trendEquation:o.trendEquation??false,trendR2:o.trendR2??false}:{})};
+   ...(o.trendline!==undefined||o.trendEquation!==undefined||o.trendR2!==undefined||o.trendType!==undefined?
+    {trendline:o.trendline??false,trendEquation:o.trendEquation??false,trendR2:o.trendR2??false,trendType:o.trendType??'linear'}:{})};
 }
 export function validateChartOptions(o){
  if(!o||typeof o!=='object'||Array.isArray(o)||Object.keys(o).some(k=>!STYLE_KEYS.includes(k))||
     (o.labels!==undefined&&typeof o.labels!=='boolean')||
     (o.grid!==undefined&&typeof o.grid!=='boolean')||
     ['trendline','trendEquation','trendR2'].some(k=>o[k]!==undefined&&typeof o[k]!=='boolean')||
+    (o.trendType!==undefined&&!['linear','quadratic'].includes(o.trendType))||
     (o.legend!==undefined&&!['bottom','right','none'].includes(o.legend))||
     (o.colors!==undefined&&(!Array.isArray(o.colors)||o.colors.length>CHART_MAX_SERIES||
        o.colors.some(c=>typeof c!=='string'||!/^#[0-9a-f]{6}$/i.test(c))))||
@@ -53,6 +54,62 @@ export function linearRegression(points){
  return {slope,intercept,r2,n};
 }
 /** Clip fitted y=m*x+b to the visible numeric plot rectangle. */
+/** Centered/scaled least squares for y=a*x²+b*x+c; rank-deficient fits return null. */
+export function quadraticRegression(points){
+ if(!Array.isArray(points)||points.length<3||points.length>50||
+    points.some(p=>!Number.isFinite(p?.x)||!Number.isFinite(p?.value)||
+      Math.abs(p.x)>1e12||Math.abs(p.value)>1e12))return null;
+ const n=points.length,meanX=points.reduce((a,p)=>a+p.x,0)/n,
+  meanY=points.reduce((a,p)=>a+p.value,0)/n,
+  scale=Math.max(...points.map(p=>Math.abs(p.x-meanX)));
+ if(!(scale>0))return null;
+ const z=points.map(p=>(p.x-meanX)/scale),meanZ=z.reduce((a,v)=>a+v,0)/n,
+  meanZ2=z.reduce((a,v)=>a+v*v,0)/n;
+ let s11=0,s12=0,s22=0,t1=0,t2=0,syy=0;
+ for(let i=0;i<n;i++){
+  const u=z[i]-meanZ,v=z[i]*z[i]-meanZ2,dy=points[i].value-meanY;
+  s11+=u*u;s12+=u*v;s22+=v*v;t1+=u*dy;t2+=v*dy;syy+=dy*dy;
+ }
+ const det=s11*s22-s12*s12;
+ if(!Number.isFinite(det)||det<=1e-12*s11*s22||s11===0||s22===0)return null;
+ const bz=(t1*s22-t2*s12)/det,az=(s11*t2-s12*t1)/det,
+  cz=meanY-bz*meanZ-az*meanZ2,
+  a=az/(scale*scale),b=bz/scale-2*a*meanX,
+  c=cz-bz*meanX/scale+a*meanX*meanX;
+ if(![a,b,c,az,bz,cz].every(Number.isFinite))return null;
+ let sse=0;
+ for(let i=0;i<n;i++){
+  const e=(az*z[i]*z[i]+bz*z[i]+cz)-points[i].value;
+  sse+=e*e;
+ }
+ if(!Number.isFinite(sse))return null;
+ return {a,b,c,r2:syy===0?1:Math.max(0,Math.min(1,1-sse/syy)),n,
+  center:meanX,scale,normalizedA:az,normalizedB:bz,normalizedC:cz};
+}
+export function predictQuadratic(fit,x){
+ const z=(x-fit.center)/fit.scale;
+ return (fit.normalizedA*z+fit.normalizedB)*z+fit.normalizedC;
+}
+export function quadraticLabel(fit){
+ const n=v=>{
+  if(v!==0&&(Math.abs(v)>=1e7||Math.abs(v)<1e-4))return v.toExponential(3);
+  return new Intl.NumberFormat('ru-RU',{maximumSignificantDigits:5}).format(v);
+ };
+ return 'y = '+n(fit.a)+'x² '+(fit.b<0?'− ':'+ ')+n(Math.abs(fit.b))+
+  'x '+(fit.c<0?'− ':'+ ')+n(Math.abs(fit.c));
+}
+/** Liang–Barsky clipping for an XY segment to a plot rectangle. */
+function clipTrendLine(xa,ya,xb,yb,x0,x1,y0,y1){
+ let lo=0,hi=1;
+ const dx=xb-xa,dy=yb-ya;
+ for(const [p,q] of [[-dx,xa-x0],[dx,x1-xa],[-dy,ya-y0],[dy,y1-ya]]){
+  if(p===0){if(q<0)return null;continue;}
+  const r=q/p;
+  if(p<0)lo=Math.max(lo,r);else hi=Math.min(hi,r);
+  if(lo>hi)return null;
+ }
+ return [xa+lo*dx,ya+lo*dy,xa+hi*dx,ya+hi*dy];
+}
 function clippedTrendSegment(fit,xMin,xMax,yMin,yMax){
  const {slope,intercept}=fit;
  let a=xMin,b=xMax;
@@ -117,7 +174,7 @@ export function validateCharts(sheet){
     throw Error('Повреждена диаграмма');
   const rect=chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined){validateChartOptions(chart.options);
    if(chart.type==='stacked100'&&(chart.options.min!=null||chart.options.max!=null))throw Error('У процентной диаграммы ось всегда 0–100%');
-   if(chart.type!=='scatter'&&(chart.options.trendline||chart.options.trendEquation||chart.options.trendR2))
+   if(chart.type!=='scatter'&&(chart.options.trendline||chart.options.trendEquation||chart.options.trendR2||chart.options.trendType==='quadratic'))
     throw Error('Линейная регрессия доступна только для XY-диаграмм');if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
  }
 }
@@ -247,8 +304,8 @@ export function changeChart(sheet,id,patch){
   next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
  }
  const sourceRect=chartRect(next);
- if(next.type!=='scatter'&&next.options&&(next.options.trendline||next.options.trendEquation||next.options.trendR2))
-  next.options={...next.options,trendline:false,trendEquation:false,trendR2:false};
+ if(next.type!=='scatter'&&next.options&&(next.options.trendline||next.options.trendEquation||next.options.trendR2||next.options.trendType==='quadratic'))
+  next.options={...next.options,trendline:false,trendEquation:false,trendR2:false,trendType:'linear'};
  if(next.type==='stacked100'){
   const previous={...(next.options||{})};
   if(previous.min!=null||previous.max!=null)next.options={...previous,min:null,max:null};
@@ -261,7 +318,7 @@ export function changeChart(sheet,id,patch){
   const opts={...(next.options||{}),...patch.options};
   if(patch.options.colors!==undefined)opts.colors=[...patch.options.colors];
   validateChartOptions(opts);
-  if(next.type!=='scatter'&&(opts.trendline||opts.trendEquation||opts.trendR2))
+  if(next.type!=='scatter'&&(opts.trendline||opts.trendEquation||opts.trendR2||opts.trendType==='quadratic'))
    throw Error('Линейная регрессия доступна только для XY-диаграмм');
   if(next.type==='stacked100'&&(opts.min!=null||opts.max!=null))
    throw Error('У процентной диаграммы ось всегда 0–100%');
@@ -328,21 +385,37 @@ export function chartSVG(data,type,settings={}){
   series.forEach((item,k)=>{
    const color=colorAt(k);
    if(settings.trendline){
-    const fit=linearRegression(item.points);
+    const quadratic=settings.trendType==='quadratic',
+     fit=quadratic?quadraticRegression(item.points):linearRegression(item.points);
     if(fit){
-     const visible=clippedTrendSegment(fit,xMin,xMax,yMin,yMax);
-     if(visible)svg+='<line class="qo-xy-trendline" data-series="'+k+
-      '" x1="'+sx(visible[0].x)+'" y1="'+sy(visible[0].y)+
-      '" x2="'+sx(visible[1].x)+'" y2="'+sy(visible[1].y)+
-      '" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" />';
+     if(quadratic){
+      let segments='',previous=null;
+      for(let t=0;t<=96;t++){
+       const X=xMin+(xMax-xMin)*t/96,Y=predictQuadratic(fit,X);
+       if(previous){
+        const visible=clipTrendLine(previous.x,previous.y,X,Y,xMin,xMax,yMin,yMax);
+        if(visible)segments+='M'+sx(visible[0])+','+sy(visible[1])+
+          'L'+sx(visible[2])+','+sy(visible[3])+' ';
+       }
+       previous={x:X,y:Y};
+      }
+      if(segments)svg+='<path class="qo-xy-trendline qo-xy-quadratic" data-series="'+k+
+       '" d="'+segments.trim()+'" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" fill="none"/>';
+     }else{
+      const visible=clippedTrendSegment(fit,xMin,xMax,yMin,yMax);
+      if(visible)svg+='<line class="qo-xy-trendline" data-series="'+k+
+       '" x1="'+sx(visible[0].x)+'" y1="'+sy(visible[0].y)+
+       '" x2="'+sx(visible[1].x)+'" y2="'+sy(visible[1].y)+
+       '" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" />';
+     }
      if(settings.trendEquation||settings.trendR2){
-      const label=(settings.trendEquation?regressionLabel(fit):'')+
+      const label=(settings.trendEquation?(quadratic?quadraticLabel(fit):regressionLabel(fit)):'')+
        (settings.trendR2?(settings.trendEquation?' · ':'')+'R² = '+fmt(fit.r2):'');
-      svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,label.slice(0,55),
+      svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,label.slice(0,67),
        'font-size="11" fill="'+color+'" text-anchor="'+(legendRight?'start':'middle')+'"');
      }
     }else svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,
-     'Ряд '+(k+1)+': X одинаковы','font-size="11" fill="#a34b4b"');
+     'Ряд '+(k+1)+(quadratic?': недостаточно разных X':': X одинаковы'),'font-size="11" fill="#a34b4b"');
    }
    item.points.forEach((p,i)=>{
     const X=sx(p.x),Y=sy(p.value);

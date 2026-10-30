@@ -1,5 +1,5 @@
 /** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
-import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS,linearRegression} from './charts.js';
+import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS,linearRegression,quadraticRegression} from './charts.js';
 import {uid,parseCell,cellName,getCell,gridGeometry,firstVisibleIndex} from './workbook.js';
 
 const DRAW='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
@@ -39,9 +39,11 @@ const chartDataLabels=o=>o.labels?'<c:dLbls><c:showLegendKey val="0"/><c:showVal
 const chartLegend=o=>o.legend==='none'?'':'<c:legend><c:legendPos val="'+(o.legend==='right'?'r':'b')+'"/><c:overlay val="0"/></c:legend>';
 const xlsxTrendline=(chart,entry)=>{
  if(!chart.options?.trendline)return '';
- // Refuse a flat-X series rather than writing an Excel chart that cannot have a linear fit.
- if(!linearRegression(entry.points))throw Error('Линия тренда: для каждого ряда нужны минимум два различных значения X');
- return '<c:trendline><c:trendlineType val="linear"/>'+
+ const quadratic=chart.options.trendType==='quadratic',
+  fit=quadratic?quadraticRegression(entry.points):linearRegression(entry.points);
+ if(!fit)throw Error(quadratic?'Полиномиальному тренду нужны минимум три различных X':'Линия тренда: для каждого ряда нужны минимум два различных значения X');
+ return '<c:trendline><c:trendlineType val="'+(quadratic?'poly':'linear')+'"/>'+
+  (quadratic?'<c:order val="2"/>':'')+
   '<c:dispRSqr val="'+(chart.options.trendR2?'1':'0')+'"/>'+
   '<c:dispEq val="'+(chart.options.trendEquation?'1':'0')+'"/></c:trendline>';
 };
@@ -222,8 +224,11 @@ function parseChart(book,sheet,chartRoot){
   if(withTrend){
    const settings=trendlines.map(items=>{
     const tr=items[0];
-    if(direct(tr,'trendlineType')?.getAttribute('val')!=='linear')return null;
-    return {trendline:true,trendEquation:direct(tr,'dispEq')?.getAttribute('val')==='1',
+    const kind=direct(tr,'trendlineType')?.getAttribute('val');
+    if(kind!=='linear'&&kind!=='poly')return null;
+    if(kind==='poly'&&direct(tr,'order')?.getAttribute('val')!=='2'||kind==='linear'&&direct(tr,'order'))return null;
+    return {trendline:true,trendType:kind==='poly'?'quadratic':'linear',
+      trendEquation:direct(tr,'dispEq')?.getAttribute('val')==='1',
       trendR2:direct(tr,'dispRSqr')?.getAttribute('val')==='1'};
    });
    if(settings.some(x=>!x||JSON.stringify(x)!==JSON.stringify(settings[0])))return null;
@@ -268,6 +273,7 @@ function parseChart(book,sheet,chartRoot){
  if(type==='scatter'&&trendlines.some(items=>items.length)){
   const tr=trendlines[0][0];
   opts.trendline=true;
+  opts.trendType=direct(tr,'trendlineType')?.getAttribute('val')==='poly'?'quadratic':'linear';
   opts.trendEquation=direct(tr,'dispEq')?.getAttribute('val')==='1';
   opts.trendR2=direct(tr,'dispRSqr')?.getAttribute('val')==='1';
  }
