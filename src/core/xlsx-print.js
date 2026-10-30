@@ -2,18 +2,18 @@
 import {rectangle,parseCell,cellName,LIMITS} from './workbook.js';
 import {changePrintSettings,printSettings} from './printing.js';
 
-const PAPERS={A4:'9',Letter:'1'};
-const PAPER_IDS={'9':'A4','1':'Letter'};
-const SCALES=new Set([60,75,90,100,125]);
-const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
-const child=(node,tag)=>Array.from(node?.children||[]).find(c=>c.localName===tag)||null;
-const children=(node,tag)=>Array.from(node?.children||[]).filter(c=>c.localName===tag);
-const asInteger=s=>/^\d+$/.test(String(s??''))?Number(s):NaN;
-const truthy=x=>x==='1'||x==='true';
+const XP_PAPERS={A4:'9',Letter:'1'};
+const XP_PAPER_IDS={'9':'A4','1':'Letter'};
+const XP_SCALES=new Set([60,75,90,100,125]);
+const xpEscape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));
+const xpChild=(node,tag)=>Array.from(node?.xpChildren||[]).find(c=>c.localName===tag)||null;
+const xpChildren=(node,tag)=>Array.from(node?.xpChildren||[]).filter(c=>c.localName===tag);
+const xpAsInteger=s=>/^\d+$/.test(String(s??''))?Number(s):NaN;
+const xpTruthy=x=>x==='1'||x==='true';
 /** Print settings are exported as Excel-native paper size, orientation and page scaling. */
 export function xlsxPrintSettings(sheet){
  const cfg=printSettings(sheet);
- const setup='<pageSetup paperSize="'+PAPERS[cfg.paper]+'" orientation="'+cfg.orientation+
+ const setup='<pageSetup paperSize="'+XP_PAPERS[cfg.paper]+'" orientation="'+cfg.orientation+
   '" scale="'+cfg.scale+'" fitToWidth="'+(cfg.fitWidth?'1':'0')+'" fitToHeight="0"/>';
  return {sheetPr:'<sheetPr><pageSetUpPr fitToPage="'+(cfg.fitWidth?'1':'0')+'"/></sheetPr>',
   // Consistent static margins, since Quantum does not expose configurable margins.
@@ -27,7 +27,7 @@ export function xlsxPrintArea(sheet,sheetNumber,name){
  const canonical=ref=>{const p=parseCell(ref);return '$'+cellName(0,p.col).replace(/\d+$/,'')+'$'+(p.row+1);};
  const sheetName="'"+name.replaceAll("'","''")+"'";
  return '<definedName name="_xlnm.Print_Area" localSheetId="'+(sheetNumber-1)+'">'+
-   escape(sheetName+'!'+canonical(area.from)+':'+canonical(area.to))+'</definedName>';
+   xpEscape(sheetName+'!'+canonical(area.from)+':'+canonical(area.to))+'</definedName>';
 }
 /** Accept only ONE local rectangular area scoped to its existing worksheet. */
 export function parseXLSXPrintArea(value,sheetName){
@@ -47,27 +47,27 @@ export function parseXLSXPrintArea(value,sheetName){
  return {from:cellName(a.row,a.col),to:cellName(b.row,b.col)};
 }
 export function workbookPrintAreaNodes(root){
- const groups=child(root,'definedNames');
- return children(groups,'definedName').filter(n=>n.getAttribute('name')==='_xlnm.Print_Area');
+ const groups=xpChild(root,'definedNames');
+ return xpChildren(groups,'definedName').filter(n=>n.getAttribute('name')==='_xlnm.Print_Area');
 }
 /** Invalid or advanced Excel settings are surfaced as skipped rather than silently invented. */
 export function importXLSXPrintSettings(sheet,sheetXml,workbookPrintAreas,sheetIndex,report=null){
- const patch={},setup=child(sheetXml,'pageSetup'),top=child(child(sheetXml,'sheetPr'),'pageSetUpPr');
+ const patch={},setup=xpChild(sheetXml,'pageSetup'),top=xpChild(xpChild(sheetXml,'sheetPr'),'pageSetUpPr');
  let imported=0,skipped=0;
  if(setup){
   const paper=setup.getAttribute('paperSize');
-  if(paper!==null){if(PAPER_IDS[paper]){patch.paper=PAPER_IDS[paper];imported++;}else skipped++;}
+  if(paper!==null){if(XP_PAPER_IDS[paper]){patch.paper=XP_PAPER_IDS[paper];imported++;}else skipped++;}
   const orientation=setup.getAttribute('orientation');
   if(orientation!==null){if(['portrait','landscape'].includes(orientation)){patch.orientation=orientation;imported++;}else skipped++;}
   const rawScale=setup.getAttribute('scale');
   if(rawScale!==null){
-   const scale=asInteger(rawScale);
-   if(SCALES.has(scale)){patch.scale=scale;imported++;}else skipped++;
+   const scale=xpAsInteger(rawScale);
+   if(XP_SCALES.has(scale)){patch.scale=scale;imported++;}else skipped++;
   }
   const fit=top?.getAttribute('fitToPage');
   const width=setup.getAttribute('fitToWidth'),height=setup.getAttribute('fitToHeight');
   if(fit!==null&&fit!==undefined){
-   if(truthy(fit)&&width==='1'&&(height==='0'||height===null)){patch.fitWidth=true;imported++;}
+   if(xpTruthy(fit)&&width==='1'&&(height==='0'||height===null)){patch.fitWidth=true;imported++;}
    else if((fit==='0'||fit==='false')&&(width==='0'||width===null)&&(height==='0'||height===null)){patch.fitWidth=false;imported++;}
    else skipped++;
   }else if(width!==null||height!==null){
