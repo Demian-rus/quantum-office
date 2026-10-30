@@ -1,5 +1,5 @@
 /** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
-import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS} from './charts.js';
+import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS,linearRegression} from './charts.js';
 import {uid,parseCell,cellName,getCell,gridGeometry,firstVisibleIndex} from './workbook.js';
 
 const DRAW='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
@@ -37,6 +37,14 @@ const xyScatterAxes=(xId,yId,opts={})=>
  '<c:crossBetween val="midCat"/></c:valAx>';
 const chartDataLabels=o=>o.labels?'<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/></c:dLbls>':'';
 const chartLegend=o=>o.legend==='none'?'':'<c:legend><c:legendPos val="'+(o.legend==='right'?'r':'b')+'"/><c:overlay val="0"/></c:legend>';
+const xlsxTrendline=(chart,entry)=>{
+ if(!chart.options?.trendline)return '';
+ // Refuse a flat-X series rather than writing an Excel chart that cannot have a linear fit.
+ if(!linearRegression(entry.points))throw Error('Линия тренда: для каждого ряда нужны минимум два различных значения X');
+ return '<c:trendline><c:trendlineType val="linear"/>'+
+  '<c:dispRSqr val="'+(chart.options.trendR2?'1':'0')+'"/>'+
+  '<c:dispEq val="'+(chart.options.trendEquation?'1':'0')+'"/></c:trendline>';
+};
 const seriesPaint=(chart,k)=>{
  const hex=chart.options?.colors?.[k];
  if(!hex)return '';
@@ -62,7 +70,7 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
    return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+
     '<c:marker><c:symbol val="circle"/><c:size val="6"/>'+
     (chart.options?.colors?.[k]?'<c:spPr><a:solidFill><a:srgbClr val="'+chart.options.colors[k].slice(1).toUpperCase()+'"/></a:solidFill></c:spPr>':'')+
-    '</c:marker>'+
+    '</c:marker>'+xlsxTrendline(chart,entry)+
     '<c:xVal><c:numRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(xPoints,'x','num')+'</c:numRef></c:xVal>'+
     '<c:yVal><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:yVal></c:ser>';
   }
@@ -207,6 +215,20 @@ function parseChart(book,sheet,chartRoot){
     all(plot,'valAx').length!==2))return null;
  const series=all(body,'ser');
  if(!series.length||series.length>4||type==='pie'&&series.length!==1)return null;
+ const trendlines=series.map(ser=>all(ser,'trendline'));
+ if(type==='scatter'){
+  const withTrend=trendlines.filter(items=>items.length).length;
+  if(withTrend&&withTrend!==series.length||trendlines.some(items=>items.length>1))return null;
+  if(withTrend){
+   const settings=trendlines.map(items=>{
+    const tr=items[0];
+    if(direct(tr,'trendlineType')?.getAttribute('val')!=='linear')return null;
+    return {trendline:true,trendEquation:direct(tr,'dispEq')?.getAttribute('val')==='1',
+      trendR2:direct(tr,'dispRSqr')?.getAttribute('val')==='1'};
+   });
+   if(settings.some(x=>!x||JSON.stringify(x)!==JSON.stringify(settings[0])))return null;
+  }
+ }else if(trendlines.some(items=>items.length))return null;
  let cats=null,valsFirst=null;
  for(let k=0;k<series.length;k++){
   const item=series[k],cat=type==='scatter'?direct(direct(item,'xVal'),'numRef'):
@@ -243,6 +265,12 @@ function parseChart(book,sheet,chartRoot){
  const legendNode=direct(node,'legend'),legendPos=direct(legendNode,'legendPos')?.getAttribute('val');
  const opts={legend:legendNode?(legendPos==='r'?'right':'bottom'):'none',
   labels:direct(direct(body,'dLbls'),'showVal')?.getAttribute('val')==='1',grid:true};
+ if(type==='scatter'&&trendlines.some(items=>items.length)){
+  const tr=trendlines[0][0];
+  opts.trendline=true;
+  opts.trendEquation=direct(tr,'dispEq')?.getAttribute('val')==='1';
+  opts.trendR2=direct(tr,'dispRSqr')?.getAttribute('val')==='1';
+ }
  if(type!=='pie'){
   const valueAxis=type==='scatter'?all(plot,'valAx')[1]:direct(plot,'valAx'),scaling=direct(valueAxis,'scaling');
   if(valueAxis)opts.grid=!!direct(valueAxis,'majorGridlines');
