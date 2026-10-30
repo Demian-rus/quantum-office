@@ -702,7 +702,7 @@ function startChartPointerDrag(e){
  const id=handle.dataset.chartDrag||handle.dataset.chartResize,chart=(sheet().charts||[]).find(c=>c.id===id);
  if(!chart)return;
  e.preventDefault();e.stopPropagation();mouseSelecting=false;commitEditor();
- const layout=chartLayout(sheet(),chart);
+ const layout=chartLayout(sheet(),chart,(sheet().charts||[]).indexOf(chart));
  const element=[...document.querySelectorAll('.qo-sheet-chart')].find(node=>node.dataset.id===id);
  chartDrag={id,sheetId:sheet().id,kind:handle.dataset.chartResize?'resize':'move',originX:e.clientX,originY:e.clientY,
   initial:layout,next:layout,element,moved:false};
