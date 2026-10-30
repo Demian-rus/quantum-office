@@ -31,6 +31,10 @@ test('TASK061: chart settings validate, persist and survive QBOOK without alteri
  assert.match(ooxml,/<c:min val="4"\/>/);
  assert.match(ooxml,/<c:max val="30"\/>/);
  assert.doesNotMatch(ooxml,/<c:majorGridlines\/>/);
+ changeChart(sheet,chart.id,{from:'A1',to:'B4'});
+ assert.equal(chart.options.colors.length,1);
+ validateWorkbook(book);
+ changeChart(sheet,chart.id,{from:'A1',to:'C4'});
  assert.match(ooxml,/<a:srgbClr val="AA2233"\/>/);
  assert.match(ooxml,/<a:srgbClr val="3366CC"\/>/);
  assert.ok(ooxml.indexOf('<c:spPr>')<ooxml.indexOf('<c:cat>'),'OOXML chart series style must precede data references');
