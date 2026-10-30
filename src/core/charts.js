@@ -87,6 +87,7 @@ export function addChart(book,sheet,type,from,to){
  if(!rect)throw Error('Выделите диапазон с категориями и числами');
  const chart={id:uid(),type,title:'Диаграмма '+((sheet.charts?.length||0)+1),
    from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2)};
+ chartRect(chart);
  if((sheet.charts?.length||0)>=30)throw Error('Лимит: 30 диаграмм на лист');
  (sheet.charts??=[]).push(chart);
  return chart;
