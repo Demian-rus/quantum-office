@@ -112,8 +112,12 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
   const values=Array.from({length:rect.c2-rect.c1},(_,i)=>String(resultOf(sheet,cellName(r,rect.c1+i+1),raw,ctx)));
   rows.push({label,values});
  }
- const header=rows[0].values.every(v=>v.trim()!==''&&numeric(v)===null);
- const body=rows.slice(header?1:0),count=rect.c2-rect.c1;
+ const count=rect.c2-rect.c1;
+ const yearHeaders=count>1&&rows[0].label.trim()!==''&&rows[1]?.label.trim()!==''&&
+  rows[0].values.every(v=>/^(?:19|20)\d{2}$/.test(v.trim()))&&
+  rows[1].values.every(v=>numeric(v)!==null);
+ const header=rows[0].values.every(v=>v.trim()!==''&&numeric(v)===null)||yearHeaders;
+ const body=rows.slice(header?1:0);
  const names=Array.from({length:count},(_,k)=>header?rows[0].values[k]:'Ряд '+(k+1));
  const empty=body.every(p=>!p.label.trim()&&p.values.every(v=>!v.trim()));
  if(allowEmpty&&empty)return {points:[],series:names.map(name=>({name,points:[]})),axis:names[0],header,empty:true};
