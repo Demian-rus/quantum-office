@@ -41,6 +41,7 @@ let conditionalPanelOpen=false;
 let validationPanelOpen=false;
 let printOpen=false;
 let dataTool=null;
+let extraRanges=[],extraRangeSheetId=null,sizeContext=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
 function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
@@ -179,8 +180,34 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
  if(name.endsWith('.xlsx')){const warnings=importSummary||{},missed=(warnings.skippedDataValidations||0)+(warnings.skippedConditionalFormatting||0)+(warnings.skippedCharts||0)+(warnings.skippedPrintSettings||0);status(`XLSX открыт: проверка данных — ${warnings.importedDataValidations||0}, условное форматирование — ${warnings.importedConditionalFormatting||0}, диаграммы — ${warnings.importedCharts||0}, параметры печати — ${warnings.importedPrintSettings||0}; пропущено неподдерживаемых объектов: ${missed}. Другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
  }catch(e){status(e.message||'Не удалось открыть файл',true);}
 }
-function paintSelection(){const rect=rectangle(activeCell,rangeEnd);if(!rect)return;document.querySelectorAll(".grid-cell").forEach(el=>{const p=parseCell(el.dataset.ref),chosen=p.row>=rect.r1&&p.row<=rect.r2&&p.col>=rect.c1&&p.col<=rect.c2;el.classList.toggle("is-selected",chosen);el.classList.toggle("is-active",el.dataset.ref===activeCell);el.setAttribute("aria-selected",String(chosen));});}
-function setSelection(a,b=a){if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;const slot=document.querySelector('#validation-choice-slot');if(slot)slot.innerHTML=validationDropdown();document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
+function selectedRects(){
+ const active=rectangle(activeCell,rangeEnd);
+ if(!active)return [];
+ return [...(extraRangeSheetId===sheet()?.id?extraRanges:[]).map(r=>rectangle(r.from,r.to)).filter(Boolean),active];
+}
+function inAnySelection(row,col){return selectedRects().some(r=>row>=r.r1&&row<=r.r2&&col>=r.c1&&col<=r.c2);}
+function requireSingleRange(message='Для этой операции выделите один непрерывный диапазон'){
+ if(selectedRects().length<=1)return true;
+ status(message,true);return false;
+}
+function addSelection(a,b=a){
+ if(!sheet())return;
+ const current={from:activeCell,to:rangeEnd};
+ if(extraRangeSheetId!==sheet().id)extraRanges=[];
+ if(extraRanges.length>=24){status('Можно выделить до 25 отдельных диапазонов',true);return;}
+ extraRangeSheetId=sheet().id;
+ extraRanges.push(current);
+ setSelection(a,b,true);
+}
+function paintSelection(){
+ document.querySelectorAll('.grid-cell').forEach(el=>{
+  const p=parseCell(el.dataset.ref),chosen=inAnySelection(p.row,p.col);
+  el.classList.toggle('is-selected',chosen);
+  el.classList.toggle('is-active',el.dataset.ref===activeCell);
+  el.setAttribute('aria-selected',String(chosen));
+ });
+}
+function setSelection(a,b=a,keepExtra=false){if(!keepExtra){extraRanges=[];extraRangeSheetId=null;}if(a===b&&sheet()){const merged=mergeAt(sheet(),a);if(merged)a=merged.from,b=merged.from;}activeCell=a;rangeEnd=b;const box=document.querySelector('#name-box');if(box)box.value=a===b?a:`${a}:${b}`;const input=document.querySelector('#formula-input');if(input)input.value=getCell(sheet(),a).value;const slot=document.querySelector('#validation-choice-slot');if(slot)slot.innerHTML=validationDropdown();document.querySelector('#selection-info')?.replaceChildren(document.createTextNode(selectedRects().length>1?`${a} · ${selectedRects().length} области`:a===b?a:`${a}:${b}`));drawGrid();updateSelectionStats();}
 function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:activeCell);if(!p)return;let r=Math.min(Math.max(p.row+dr,0),LIMITS.rows-1),c=Math.min(Math.max(p.col+dc,0),LIMITS.columns-1);
  if(dr){while(r>=0&&r<LIMITS.rows&&!rowVisible(sheet(),r))r+=Math.sign(dr);r=Math.min(Math.max(r,0),LIMITS.rows-1);}
  if(dc){while(c>=0&&c<LIMITS.columns&&!columnVisible(sheet(),c))c+=Math.sign(dc);c=Math.min(Math.max(c,0),LIMITS.columns-1);}
@@ -226,7 +253,8 @@ function editCell(seed=null){if(!sheet())return;if(!rowVisible(sheet(),parseCell
  node.addEventListener('keydown',event=>{if(event.key==='Enter'&&(event.ctrlKey||event.metaKey)){event.preventDefault();event.stopPropagation();commitSelectedEntry();}else if(event.key==='Enter'){event.preventDefault();if(commitEditor())moveSelection(event.shiftKey?-1:1,0);}else if(event.key==='Tab'){event.preventDefault();if(commitEditor())moveSelection(0,event.shiftKey?-1:1);}else if(event.key==='Escape'){event.preventDefault();commitEditor(true);}});
  node.addEventListener('blur',()=>{if(editing?.node===node)commitEditor();});}
 function selectionContainsHiddenRows(){
- const rect=rectangle(activeCell,rangeEnd),s=sheet();if(!rect||!s)return false;
+ const rects=selectedRects(),s=sheet();if(!rects.length||!s)return false;
+ for(const rect of rects){
  // A range spanning 100k rows is not intrinsically expensive: first inspect
  // explicit sparse hide maps. Only an active filter needs individual row checks.
  if(Object.keys(s.hiddenRows||{}).some(i=>+i>=rect.r1&&+i<=rect.r2))return true;
@@ -236,11 +264,20 @@ function selectionContainsHiddenRows(){
   for(let r=Math.max(rect.r1,filter.r1+1);r<=Math.min(rect.r2,filter.r2);r++)
    if(!rowVisible(s,r))return true;
  }
+ }
  return false;
 }
 function refuseHiddenSelection(){if(!selectionContainsHiddenRows())return false;status('Выделение содержит скрытые строки или столбцы. Отобразите их перед массовым изменением.',true);return true;}
 function clearSelected(){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  try{
+   const draft=structuredClone(sheet());let count=0;
+   for(const a of selectedRects())count+=clearCellValues(draft,cellName(a.r1,a.c1),cellName(a.r2,a.c2));
+   if(!count){status('В выделении нет содержимого для очистки');return;}
+   transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status('Очищено: '+count+' ячеек');return;
+  }catch(err){status(err.message,true);return;}
+ }
  try{
   const count=clearCellValues(sheet(),activeCell,rangeEnd,true);
   if(!count){status('В выделении нет содержимого для очистки');return;}
@@ -250,6 +287,14 @@ function clearSelected(){
 }
 function clearSelectedFormat(){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  try{
+   const draft=structuredClone(sheet());let count=0;
+   for(const a of selectedRects())count+=clearFormatting(draft,cellName(a.r1,a.c1),cellName(a.r2,a.c2));
+   if(!count){status('Оформление уже сброшено');return;}
+   transact(()=>{sheet().cells=draft.cells;});drawGrid();status('Оформление сброшено: '+count);return;
+  }catch(err){status(err.message,true);return;}
+ }
  try{
   const count=clearFormatting(sheet(),activeCell,rangeEnd,true);
   if(!count){status('Оформление уже сброшено');return;}
@@ -257,10 +302,26 @@ function clearSelectedFormat(){
   drawGrid();status(`Сброшено оформление: ${count} элементов`);
  }catch(err){status(err.message,true);}
 }
-function autoSum(){commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
-function fillSelected(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
-function updateSelectionStats(){const node=document.querySelector('#selection-stats');if(!node||!sheet())return;const rect=rectangle(activeCell,rangeEnd);if(!rect)return;const n=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);if(n>10000){node.textContent=`Выделено: ${n} ячеек`;return;}const {raw,ctx}=recalculator.view(book(),sheet());let count=0,sum=0;for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){const value=resultOf(sheet(),cellName(r,c),raw,ctx);const number=Number(value);if(value!==''&&Number.isFinite(number)){count++;sum+=number;}}node.textContent=count?`Чисел: ${count} · Сумма: ${Number(sum.toFixed(8))} · Среднее: ${Number((sum/count).toFixed(8))}`:`Выделено: ${n}`;}
+function autoSum(){if(!requireSingleRange())return;commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
+function fillSelected(direction){if(!requireSingleRange())return;if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
+function updateSelectionStats(){
+ const node=document.querySelector('#selection-stats');if(!node||!sheet())return;
+ const rects=selectedRects();if(!rects.length)return;
+ const total=rects.reduce((n,r)=>n+(r.r2-r.r1+1)*(r.c2-r.c1+1),0),
+  prefix=rects.length>1?'Областей: '+rects.length+' · ':'';
+ if(total>10000){node.textContent=prefix+'Выделено: до '+total+' ячеек';return;}
+ const visited=new Set(),{raw,ctx}=recalculator.view(book(),sheet());
+ let count=0,sum=0;
+ for(const area of rects)for(let r=area.r1;r<=area.r2;r++)for(let c=area.c1;c<=area.c2;c++){
+  const ref=cellName(r,c);if(visited.has(ref))continue;visited.add(ref);
+  const value=resultOf(sheet(),ref,raw,ctx),number=Number(value);
+  if(value!==''&&Number.isFinite(number)){count++;sum+=number;}
+ }
+ node.textContent=count?prefix+'Чисел: '+count+' · Сумма: '+Number(sum.toFixed(8))+
+  ' · Среднее: '+Number((sum/count).toFixed(8)):prefix+'Выделено: '+visited.size;
+}
 function structuralAction(axis,mode){
+ if(!requireSingleRange())return;
  commitEditor();if(!sheet())return;
  const pos=parseCell(activeCell);if(!pos)return;
  const rect=rectangle(activeCell,rangeEnd);
@@ -297,6 +358,19 @@ function visibilityAction(axis,show){
  }catch(err){status(err.message||'Не удалось скрыть',true);}
 }
 function applyStyle(patch,selection=null){
+ const all=selection?.ranges||selectedRects();
+ if(all.length>1){
+  if(selection&&(selection.bookId!==book()?.id||selection.sheetId!==sheet()?.id)){status('Исходный лист изменился',true);return;}
+  try{
+   if(refuseHiddenSelection())return;
+   let total=0;for(const r of all)total+=(r.r2-r.r1+1)*(r.c2-r.c1+1);
+   if(total>10000)throw Error('Множественное оформление ограничено 10 000 ячейками');
+   const refs=new Set();
+   for(const r of all)for(let row=r.r1;row<=r.r2;row++)for(let col=r.c1;col<=r.c2;col++)refs.add(cellName(row,col));
+   transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();status('Оформлено областей: '+all.length);
+  }catch(err){status(err.message,true);}
+  return;
+ }
  const a=selection?.start||activeCell,b=selection?.end||rangeEnd;
  // A color picker may dispatch change only after focus moved to another cell.
  // Do not ever apply a stale snapshot to a different document or worksheet.
@@ -322,15 +396,22 @@ function applyStyle(patch,selection=null){
  const refs=refsBetween(a,b);
  transact(()=>{for(const ref of refs)setStyle(sheet(),ref,patch);});drawGrid();
 }
-function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd};}
+function recordColorSelection(){if(!book()||!sheet())return;pendingColorSelection={bookId:book().id,sheetId:sheet().id,start:activeCell,end:rangeEnd,ranges:selectedRects()};}
 function applySelectedColor(kind,value){const captured=pendingColorSelection;pendingColorSelection=null;applyStyle({[kind]:value},captured);}
 function setCellBorders(mode){
  commitEditor();if(refuseHiddenSelection())return;
+ if(selectedRects().length>1){
+  const draft=structuredClone(sheet());
+  try{
+   for(const r of selectedRects())applyBorderPreset(draft,cellName(r.r1,r.c1),cellName(r.r2,r.c2),mode);
+   transact(()=>{sheet().cells=draft.cells;});borderMenuOpen=false;render();status('Границы применены ко всем областям');
+  }catch(err){status(err.message,true);}return;
+ }
  const draft=structuredClone(sheet());try{applyBorderPreset(draft,activeCell,rangeEnd,mode);
   transact(()=>applyBorderPreset(sheet(),activeCell,rangeEnd,mode));borderMenuOpen=false;render();status('Границы обновлены');
  }catch(err){status(err.message,true);}
 }
-function updateMerge(mode){
+function updateMerge(mode){if(!requireSingleRange())return;
  commitEditor();if(!sheet())return;
  try{const draft=structuredClone(sheet());if(mode==='merge')mergeCells(draft,activeCell,rangeEnd);else if(!unmergeCells(draft,activeCell)){status('Выбранная ячейка не объединена');return;}
   transact(()=>{if(mode==='merge')mergeCells(sheet(),activeCell,rangeEnd);else unmergeCells(sheet(),activeCell);});
@@ -347,7 +428,7 @@ function bordersPopup(){if(!borderMenuOpen)return '';
  const items=[['outline','Внешние границы','borderOutline'],['all','Все границы','borderAll'],['bottom','Нижняя граница','borderBottom'],['top','Верхняя граница','borderTop'],['left','Левая граница','borderLeft'],['right','Правая граница','borderRight'],['none','Без границ','borderNone']];
  return `<div class="format-popover border-popover" role="menu" aria-label="Варианты границ"><div class="popup-header"><strong>Границы выделения</strong><button data-action="popup-close" aria-label="Закрыть">×</button></div><div class="border-hint">Рамка вокруг диапазона не объединяет ячейки</div>${items.map(([id,label,icon])=>`<button class="border-choice" role="menuitem" data-action="border-mode" data-value="${id}"><span class="border-glyph">${toolIcon(id==='none'?'border-none':id==='all'?'border-all':'border-'+id,'')}</span>${label}</button>`).join('')}</div>`;
 }
-function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
+function toggleWrap(){if(!requireSingleRange())return;const next=!getEffectiveStyle(sheet(),activeCell).wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
  if(rect.r1===0&&rect.r2===LIMITS.rows-1){
   try{
    transact(()=>setBulkColumnStyle(sheet(),activeCell,rangeEnd,{wrap:next}));drawGrid();
@@ -374,7 +455,7 @@ function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;con
    } if(need>rowHeight(sheet(),r))setRowHeight(sheet(),r,need);}}
  });drawGrid();}
 
-function sortRange(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
+function sortRange(direction){if(!requireSingleRange())return;if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
  const count=sortSelectedRows(candidate,activeCell,rangeEnd,direction);
  transact(()=>{sheet().cells=candidate.cells;});drawGrid();updateSelectionStats();status(`Отсортировано ${count} строк по первому столбцу выделения`);
  }catch(error){status(error.message,true);}}
@@ -445,12 +526,66 @@ function homepage(){
  <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Скачать резервную копию всех черновиков">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
 }
 function placeholder(kind){const writer=kind==='writer';return `<main class="soon"><div class="soon-icon">${writer?'▤':'▣'}</div><span class="eyebrow">РАЗДЕЛ ЗАПЛАНИРОВАН</span><h1>${writer?'Quantum Writer':'Quantum Slides'}</h1><p>${writer?'Редактор текстов':'Редактор презентаций'} будет разработан после стабилизации таблиц. Мы не выдаём пустую имитацию за работающий редактор.</p><button class="primary-btn" data-action="route" data-target="sheet">Перейти к таблицам →</button></main>`;}
-function changeSize(kind){commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
+function sizeTargets(kind,index){
+ const full=kind==='col'?LIMITS.rows-1:LIMITS.columns-1,which=kind==='col'?'c':'r';
+ const selected=selectedRects().filter(a=>kind==='col'?
+  a.r1===0&&a.r2===full:a.c1===0&&a.c2===full);
+ const contains=selected.some(a=>kind==='col'?
+  index>=a.c1&&index<=a.c2:index>=a.r1&&index<=a.r2);
+ if(!contains)return [index];
+ const indices=new Set();
+ for(const a of selected)for(let j=a[which+'1'];j<=a[which+'2'];j++){
+  indices.add(j);if(indices.size>500)throw Error('За один раз можно изменить не более 500 строк или столбцов');
+ }
+ return [...indices].sort((a,b)=>a-b);
+}
+function sizeContextPanel(){
+ if(!sizeContext||!sheet())return '';
+ const m=sizeContext,style='left:'+m.x+'px;top:'+m.y+'px;',title=m.kind==='row'?'Высота строки':'Ширина столбца';
+ if(m.kind==='cell')return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="menu">'+
+  '<button data-action="size-context-mode" data-kind="row" role="menuitem">Высота строки…</button>'+
+  '<button data-action="size-context-mode" data-kind="col" role="menuitem">Ширина столбца…</button></div>';
+ let targets;try{targets=sizeTargets(m.kind,m.index);}catch(err){return '<div id="size-context-menu" class="size-context-menu" style="'+style+'">'+esc(err.message)+'</div>';}
+ const min=m.kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn,
+  max=m.kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn;
+ const initial=m.kind==='row'?rowHeight(sheet(),m.index):columnWidth(sheet(),m.index);
+ return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="dialog" aria-label="'+title+'">'+
+  '<label>'+title+(targets.length>1?' ('+targets.length+')':'')+
+  '<input id="size-context-number" type="number" step="1" min="'+min+'" max="'+max+'" value="'+initial+'" aria-label="'+title+' в пикселях"></label>'+
+  '<small>Допустимо: '+min+'–'+max+' пикселей</small>'+
+  '<div class="size-context-actions"><button data-action="size-context-close">Отмена</button>'+
+  '<button class="size-context-confirm" data-action="size-context-apply">Применить</button></div></div>';
+}
+function openSizeContext(kind,index,x,y){
+ commitEditor();
+ sizeContext={kind,index,x:Math.max(6,Math.min(x,window.innerWidth-268)),y:Math.max(6,Math.min(y,window.innerHeight-200))};
+ const existing=document.getElementById('size-context-menu');existing?.remove();
+ const holder=document.createElement('div');holder.innerHTML=sizeContextPanel();
+ if(holder.firstElementChild)app.append(holder.firstElementChild);
+ if(kind!=='cell'){const input=document.getElementById('size-context-number');input?.focus();input?.select();}
+}
+function applyContextSize(){
+ if(!sizeContext||!['row','col'].includes(sizeContext.kind))return;
+ const {kind,index}=sizeContext,value=Number(document.getElementById('size-context-number')?.value);
+ try{
+  if(!Number.isInteger(value))throw Error('Введите целое число пикселей');
+  const targets=sizeTargets(kind,index);
+  if(value<(kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn)||
+     value>(kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn))
+   throw Error('Размер вне допустимых границ');
+  if(targets.every(i=>(kind==='row'?rowHeight(sheet(),i):columnWidth(sheet(),i))===value)){
+   sizeContext=null;document.getElementById('size-context-menu')?.remove();return;
+  }
+  transact(()=>{for(const i of targets)if(kind==='row')setRowHeight(sheet(),i,value);else setColumnWidth(sheet(),i,value);});
+  sizeContext=null;render();status('Размер '+(kind==='row'?'строк':'столбцов')+': '+value+' px ('+targets.length+')');
+ }catch(err){status(err.message,true);}
+}
+function changeSize(kind){if(sizeContext){sizeContext=null;document.getElementById('size-context-menu')?.remove();}commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
  try{if(!Number.isInteger(value))throw Error('Введите целое число');transact(()=>{if(kind==='col')setColumnWidth(sheet(),p.col,value);else setRowHeight(sheet(),p.row,value);});drawGrid();status(`Размер изменён: ${value} пикселей`);}catch(err){status(err.message,true);}}
 function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const {raw,ctx}=recalculator.view(book(),sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,raw,ctx));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
  transact(()=>setColumnWidth(sheet(),c,width));drawGrid();status(`Столбец ${cellName(0,c).replace(/\d+$/,'')}: ${width} пикселей`);}
 function resetRowHeight(index=null){const p=parseCell(activeCell);if(!p)return;transact(()=>setRowHeight(sheet(),index??p.row,DIMENSIONS.defaultRow));drawGrid();}
-function toggleAutoFilter(){commitEditor();if(sheet().autoFilter){transact(()=>{sheet().autoFilter=null});filterColumn=null;render();status('Автофильтр выключен — данные не изменены');return;}
+function toggleAutoFilter(){if(!requireSingleRange())return;commitEditor();if(sheet().autoFilter){transact(()=>{sheet().autoFilter=null});filterColumn=null;render();status('Автофильтр выключен — данные не изменены');return;}
  const rect=rectangle(activeCell,rangeEnd);try{const draft=structuredClone(sheet());setAutoFilter(draft,cellName(rect.r1,rect.c1),cellName(rect.r2,rect.c2));transact(()=>{sheet().autoFilter=draft.autoFilter});render();status('Автофильтр включён — выберите столбец в его заголовке');}catch(e){status(e.message,true);}}
 function updateFreeze(rows,cols){commitEditor();try{transact(()=>setFreeze(sheet(),rows,cols));render();status(rows||cols?`Закреплено строк: ${rows}, столбцов: ${cols}`:'Закрепление снято');}catch(e){status(e.message,true);}}
 function filterPopup(){const f=sheet()?.autoFilter,rect=filterRange(sheet());if(filterColumn===null||!f||!rect)return '';
@@ -781,7 +916,7 @@ function finishChartPointerDrag(commit){
  try{transact(()=>changeChart(sheet(),d.id,{layout:d.next}));refreshSheetCharts();status('Положение диаграммы сохранено (Ctrl+Z — отменить)');}
  catch(err){refreshSheetCharts();status(err.message,true);}
 }
-function createSelectedChart(type){
+function createSelectedChart(type){if(!requireSingleRange())return;
  if(!sheet())return;
  commitEditor();
  try{
@@ -886,13 +1021,13 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-2),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+2);
  const rows=[...new Set([...Array.from({length:lastR-firstR+1},(_,i)=>firstR+i),...Array.from({length:freezeR},(_,i)=>i)])].sort((a,b)=>a-b);
  const cols=[...new Set([...Array.from({length:lastC-firstC+1},(_,i)=>firstC+i),...Array.from({length:freezeC},(_,i)=>i)])].sort((a,b)=>a-b);
- const rect=rectangle(activeCell,rangeEnd),filter=filterRange(s);const {raw,ctx}=recalculator.view(book(),s);const scaleStats=prepareConditionalScales(s,raw,ctx);let html='',pinnedRowsHtml='',pinnedColsHtml='';
+ const rect=rectangle(activeCell,rangeEnd),allSelection=selectedRects(),filter=filterRange(s);const {raw,ctx}=recalculator.view(book(),s);const scaleStats=prepareConditionalScales(s,raw,ctx);let html='',pinnedRowsHtml='',pinnedColsHtml='';
  for(const m of s.merges||[]){const bounds=rectangle(m.from,m.to);if(bounds.r2>=firstR&&bounds.r1<=lastR&&bounds.c2>=firstC&&bounds.c1<=lastC){if(!rows.includes(bounds.r1))rows.push(bounds.r1);if(!cols.includes(bounds.c1))cols.push(bounds.c1);}}
  rows.sort((a,b)=>a-b);cols.sort((a,b)=>a-b);
  for(const r of rows)for(const c of cols){
   if(!rowVisible(s,r)||!columnVisible(s,c))continue;
   const ref=cellName(r,c),merged=mergeAt(s,ref);if(merged&&merged.from!==ref)continue;const bounds=merged?rectangle(merged.from,merged.to):null;
-  const item=getCell(s,ref),selected=r>=rect.r1&&r<=rect.r2&&c>=rect.c1&&c<=rect.c2,active=ref===activeCell,style={...getEffectiveStyle(s,ref)};
+  const item=getCell(s,ref),selected=allSelection.some(a=>r>=a.r1&&r<=a.r2&&c>=a.c1&&c<=a.c2),active=ref===activeCell,style={...getEffectiveStyle(s,ref)};
   if(s.conditionalRules?.length){const fill=conditionalFill(s,ref,resultOf(s,ref,raw,ctx),scaleStats);if(fill)style.bg=fill;}
   const boundary={
    top:bounds?[...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1,bounds.c1+j)),'top')).find(Boolean):resolveBorderSide(style,'top'),
@@ -913,10 +1048,10 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  const rowOverlay=document.getElementById('grid-row-overlay'),colOverlay=document.getElementById('grid-col-overlay');
  let rowHtml='',colHtml='';
  for(const r of rows){if(!rowVisible(s,r))continue;const pinned=r<freezeR;
-  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${rect.r1<=r&&r<=rect.r2?'header-selected':''} ${parseCell(activeCell)?.row===r?'header-active':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
+  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${allSelection.some(a=>a.r1<=r&&r<=a.r2)?'header-selected':''} ${parseCell(activeCell)?.row===r?'header-active':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
  }
  for(const c of cols){if(!columnVisible(s,c))continue;const pinned=c<freezeC;
-  colHtml+=`<div class="colhead ${pinned?'frozen-col':''} ${rect.c1<=c&&c<=rect.c2?'header-selected':''} ${parseCell(activeCell)?.col===c?'header-active':''}" data-action="select-col" data-index="${c}" title="Выделить столбец ${cellName(0,c).replace(/\d+$/,'')}" style="top:0;left:${x[c]-rowW-(pinned?0:view.scrollLeft)}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
+  colHtml+=`<div class="colhead ${pinned?'frozen-col':''} ${allSelection.some(a=>a.c1<=c&&c<=a.c2)?'header-selected':''} ${parseCell(activeCell)?.col===c?'header-active':''}" data-action="select-col" data-index="${c}" title="Выделить столбец ${cellName(0,c).replace(/\d+$/,'')}" style="top:0;left:${x[c]-rowW-(pinned?0:view.scrollLeft)}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
  }
  rowOverlay.innerHTML=rowHtml;colOverlay.innerHTML=colHtml;
  canvas.innerHTML=html;
@@ -926,11 +1061,15 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
- switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index);setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));break;}case 'select-col':{const index=Number(target.dataset.index);setSelection(cellName(0,index),cellName(LIMITS.rows-1,index));break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
+ switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
+ case 'size-context-mode':if(sizeContext)openSizeContext(target.dataset.kind,parseCell(activeCell)?.[target.dataset.kind==='col'?'col':'row']??sizeContext.index,sizeContext.x,sizeContext.y);break;
+ case 'size-context-apply':applyContextSize();break;
  case 'text-to-columns':case 'remove-duplicates':
+  if(!requireSingleRange())break;
   commitEditor();chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=false;printOpen=false;
   dataTool={kind:action==='text-to-columns'?'split':'dedup',from:activeCell,to:rangeEnd,
    delimiter:';',overwrite:false,header:true,key:'all'};render();break;
@@ -1011,6 +1150,29 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
+app.addEventListener('contextmenu',e=>{
+ const header=e.target.closest('.rowhead,.colhead'),cell=e.target.closest('.grid-cell');
+ if(!header&&!cell)return; // keep browser context menu outside the spreadsheet grid
+ e.preventDefault();e.stopPropagation();
+ if(header){
+  const kind=header.classList.contains('colhead')?'col':'row',index=Number(header.dataset.index);
+  const fullSelected=selectedRects().some(r=>kind==='col'?
+   r.r1===0&&r.r2===LIMITS.rows-1&&index>=r.c1&&index<=r.c2:
+   r.c1===0&&r.c2===LIMITS.columns-1&&index>=r.r1&&index<=r.r2);
+  if(!fullSelected)kind==='col'?setSelection(cellName(0,index),cellName(LIMITS.rows-1,index)):
+   setSelection(cellName(index,0),cellName(index,LIMITS.columns-1));
+  openSizeContext(kind,index,e.clientX,e.clientY);
+ }else{
+  const ref=cell.dataset.ref;
+  if(!inAnySelection(parseCell(ref).row,parseCell(ref).col))setSelection(ref);
+  openSizeContext('cell',0,e.clientX,e.clientY);
+ }
+},true);
+app.addEventListener('pointerdown',e=>{
+ if(sizeContext&&!e.target.closest('#size-context-menu')&&!e.target.closest('.rowhead,.colhead,.grid-cell')){
+  sizeContext=null;document.getElementById('size-context-menu')?.remove();
+ }
+},true);
 app.addEventListener('pointerdown',startChartPointerDrag,true);
 window.addEventListener('pointermove',previewChartPointerDrag);
 window.addEventListener('pointerup',()=>finishChartPointerDrag(true));
@@ -1039,7 +1201,7 @@ app.addEventListener('change',e=>{const t=e.target;
   catch(err){status(err.message,true);}return;
  }
  if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
-app.addEventListener('keydown',e=>{if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
+app.addEventListener('keydown',e=>{if(e.target.id==='size-context-number'&&e.key==='Enter'){e.preventDefault();applyContextSize();return;}if(e.target.id==='size-context-number'&&e.key==='Escape'){e.preventDefault();sizeContext=null;document.getElementById('size-context-menu')?.remove();return;}if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});
 window.addEventListener('pointermove',e=>{if(!resizeDrag||!sheet()||sheet().id!==resizeDrag.sheetId)return;const d=resizeDrag;const offset=(d.axis==='col'?e.clientX:e.clientY)-d.start;const min=d.axis==='col'?DIMENSIONS.minColumn:DIMENSIONS.minRow,max=d.axis==='col'?DIMENSIONS.maxColumn:DIMENSIONS.maxRow;const next=Math.min(max,Math.max(min,Math.round(d.original+offset)));
@@ -1049,11 +1211,11 @@ window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDra
  if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
 window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
 app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
-app.addEventListener('mousedown',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
-app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref);});
+app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)addSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
+app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref,true);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;setSelection(cell.dataset.ref);editCell();}});
-function captureSelection(){if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
+function captureSelection(){if(!requireSingleRange())return null;if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
 async function cutSelection(){
  const clip=captureSelection();if(!clip)return false;
  clip.mode='cut';clip.bookId=book().id;clip.sheetId=sheet().id;
@@ -1066,6 +1228,7 @@ async function copySelection(){const clip=captureSelection();if(!clip)return fal
  try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
  return true;}
 function pasteOnlyValues(){
+ if(!requireSingleRange())return false;
  if(!sheet())return false;
  if(!internalClipboard){status('Сначала скопируйте диапазон через Ctrl+C',true);return false;}
  if(refuseHiddenSelection())return false;
@@ -1076,7 +1239,7 @@ function pasteOnlyValues(){
   status(`Вставлены только значения: ${info.rows} × ${info.cols}`);return true;
  }catch(error){status(error.message||'Вставка значений отменена',true);return false;}
 }
-function pasteIntoCells(text,clip=null){if(!sheet()||refuseHiddenSelection())return false;
+function pasteIntoCells(text,clip=null){if(!requireSingleRange())return false;if(!sheet()||refuseHiddenSelection())return false;
  try{
   if(!clip&&typeof text!=='string')throw Error('Буфер обмена пуст');
   if(!clip&&text.length===0)throw Error('Буфер обмена пуст');
