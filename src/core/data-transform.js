@@ -2,13 +2,13 @@
 import {LIMITS,cellName,rectangle,getCell,parseCell} from './workbook.js';
 import {checkValidatedInput} from './validation.js';
 
-const MAX_ROWS=2000,MAX_COLUMNS=20,MAX_CELLS=10000;
+const DATA_MAX_ROWS=2000,DATA_MAX_COLUMNS=20,DATA_MAX_CELLS=10000;
 const dataAreasOverlap=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 function safeArea(sheet,area,{wide=false}={}){
  if(!area||area.r1<0||area.c1<0||area.r2>=LIMITS.rows||area.c2>=LIMITS.columns)
   throw Error('Диапазон выходит за границы листа');
  const rows=area.r2-area.r1+1,cols=area.c2-area.c1+1;
- if(rows>MAX_ROWS||cols>MAX_COLUMNS||rows*cols>MAX_CELLS)
+ if(rows>DATA_MAX_ROWS||cols>DATA_MAX_COLUMNS||rows*cols>DATA_MAX_CELLS)
   throw Error('Обработка ограничена 2 000 строками, 20 столбцами и 10 000 ячейками');
  if(sheet.autoFilter)throw Error('Сначала выключите автофильтр');
  if((sheet.rectangleStyles||[]).length)throw Error('Сначала уберите крупные области оформления для этой операции');
@@ -54,7 +54,7 @@ export function planTextToColumns(sheet,from,to=from,{delimiter=';',overwrite=fa
   if(text.startsWith('='))throw Error('Формулы в исходном столбце не разделяются');
   const values=text?splitDelimited(text,delimiter):[''];
   width=Math.max(width,values.length);
-  if(values.length>MAX_COLUMNS)throw Error('Строка содержит больше 20 полей');
+  if(values.length>DATA_MAX_COLUMNS)throw Error('Строка содержит больше 20 полей');
   if(text)sourceCount++;
   parsed.push(values);
  }
@@ -78,7 +78,7 @@ export function planTextToColumns(sheet,from,to=from,{delimiter=';',overwrite=fa
   preview:parsed.slice(0,6).map((fields,i)=>({row:source.r1+i+1,fields})),changes};
 }
 export function applyTextToColumns(sheet,plan){
- if(!plan||!Array.isArray(plan.changes)||plan.changes.length>MAX_CELLS)
+ if(!plan||!Array.isArray(plan.changes)||plan.changes.length>DATA_MAX_CELLS)
   throw Error('Не задан корректный план обработки');
  // Validate entire plan against the current workbook state again before any mutation.
  const original=planTextToColumns(sheet,plan.from.split(':')[0],cellName(parseCell(plan.to).row,parseCell(plan.from).col),
@@ -127,7 +127,7 @@ export function planRemoveDuplicates(sheet,from,to,{header=true,key='all'}={}){
   duplicateRows:duplicates.slice(0,10),sourceSnapshot,changes};
 }
 export function applyRemoveDuplicates(sheet,plan){
- if(!plan||!Array.isArray(plan.changes)||plan.changes.length>MAX_CELLS)
+ if(!plan||!Array.isArray(plan.changes)||plan.changes.length>DATA_MAX_CELLS)
   throw Error('Не задан корректный план удаления дублей');
  const fresh=planRemoveDuplicates(sheet,plan.from,plan.to,{header:plan.header,key:plan.key});
  if(JSON.stringify(fresh.sourceSnapshot)!==JSON.stringify(plan.sourceSnapshot)||
