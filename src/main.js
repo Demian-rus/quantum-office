@@ -1,4 +1,4 @@
-import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange} from './core/charts.js';
+import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,chartLayout,CHART_MIN_WIDTH,CHART_MIN_HEIGHT} from './core/charts.js';
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
@@ -35,7 +35,7 @@ const directFiles=new Map(),dirtyFiles=new Set(),savingBooks=new Set();
 let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
 let resizeDrag=null, filterColumn=null;
 let internalClipboard=null;
-let chartDrawerOpen=false,selectedChartId=null;
+let chartDrawerOpen=false,selectedChartId=null,chartDrag=null;
 let conditionalPanelOpen=false;
 let validationPanelOpen=false;
 let printOpen=false;
@@ -49,7 +49,7 @@ function updateSaveIndicator(){const n=document.querySelector('#storage-indicato
  n.title=storeWarning?'Локальная память браузера недоступна. Прямые сохранения на диск и резервные копии проверяйте отдельно.':'Черновики браузера не заменяют отдельные резервные копии.';
 }
 function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
-function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}persist();if(page==='sheet'&&chartDrawerOpen)refreshChartPreview();}
+function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}persist();if(page==='sheet'){if(chartDrawerOpen)refreshChartPreview();refreshSheetCharts();}}
 /** Failed operations must not leave partially written cells, a bogus Undo step
  * or a cleared Redo stack. A single snapshot serves both undo and rollback. */
 function transact(callback){
@@ -671,6 +671,69 @@ function refreshChartPreview(){
  try{el.innerHTML=chartSVG(chartData(book(),sheet(),c,{allowEmpty:true}),c.type);}
  catch(err){el.innerHTML='<div class="chart-error">'+esc(err.message)+'</div>';}
 }
+/** Charts are sheet children, not side-panel previews. The overlay lives beside the
+ * virtualized grid canvas, so scroll does not rebuild or detach it. */
+function refreshSheetCharts(){
+ const layer=document.getElementById('grid-charts-layer');
+ if(!layer||!book()||!sheet())return;
+ const view=document.getElementById('grid-scroll'),s=sheet();
+ layer.style.width=document.getElementById('grid-canvas')?.style.width||'100%';
+ layer.style.height=document.getElementById('grid-canvas')?.style.height||'100%';
+ layer.innerHTML=(s.charts||[]).map((chart,i)=>{
+  const layout=chartLayout(s,chart,i);
+  let content='';
+  try{content=chartSVG(chartData(book(),s,chart,{allowEmpty:true}),chart.type);}
+  catch(err){content='<div class="chart-error">'+esc(err.message)+'</div>';}
+  return '<section class="qo-sheet-chart'+(chart.id===selectedChartId?' is-chart-selected':'')+
+   '" data-id="'+esc(chart.id)+'" style="left:'+layout.x+'px;top:'+layout.y+
+   'px;width:'+layout.width+'px;height:'+layout.height+'px" role="group" aria-label="Диаграмма: '+esc(chart.title)+'">'+
+   '<div class="qo-chart-toolbar"><span class="qo-chart-move" data-chart-drag="'+esc(chart.id)+
+   '" title="Перетащите, чтобы переместить диаграмму">⋮⋮ '+esc(chart.title)+'</span>'+
+   '<button data-action="chart-open" data-id="'+esc(chart.id)+'" title="Настройки диаграммы" aria-label="Настройки диаграммы">⚙</button></div>'+
+   '<div class="qo-chart-body">'+content+'</div>'+
+   '<span class="qo-chart-resize" data-chart-resize="'+esc(chart.id)+'" role="button" tabindex="0" aria-label="Изменить размер диаграммы" title="Потяните для изменения размера"></span></section>';
+ }).join('');
+}
+/** Every drag is one Undo transaction; preview positions are never persisted until release. */
+function startChartPointerDrag(e){
+ if(e.button!==0||!sheet()||!book()||resizeDrag)return;
+ const handle=e.target.closest('[data-chart-drag],[data-chart-resize]');
+ if(!handle)return;
+ const id=handle.dataset.chartDrag||handle.dataset.chartResize,chart=(sheet().charts||[]).find(c=>c.id===id);
+ if(!chart)return;
+ e.preventDefault();e.stopPropagation();mouseSelecting=false;commitEditor();
+ const layout=chartLayout(sheet(),chart);
+ const element=[...document.querySelectorAll('.qo-sheet-chart')].find(node=>node.dataset.id===id);
+ chartDrag={id,sheetId:sheet().id,kind:handle.dataset.chartResize?'resize':'move',originX:e.clientX,originY:e.clientY,
+  initial:layout,next:layout,element,moved:false};
+ selectedChartId=id;
+}
+function previewChartPointerDrag(e){
+ if(!chartDrag||!sheet()||sheet().id!==chartDrag.sheetId)return;
+ const d=chartDrag,dx=Math.round(e.clientX-d.originX),dy=Math.round(e.clientY-d.originY);
+ if(Math.abs(dx)+Math.abs(dy)<2&&!d.moved)return;
+ const {x,y}=gridGeometry(sheet()),maxX=x.at(-1),maxY=y.at(-1)-headerH;
+ const v={...d.initial};
+ if(d.kind==='move'){
+  v.x=Math.max(rowW,Math.min(maxX-v.width,v.x+dx));
+  v.y=Math.max(0,Math.min(maxY-v.height,v.y+dy));
+ }else{
+  v.width=Math.max(CHART_MIN_WIDTH,Math.min(1000,maxX-v.x,v.width+dx));
+  v.height=Math.max(CHART_MIN_HEIGHT,Math.min(700,maxY-v.y,v.height+dy));
+ }
+ d.next=v;d.moved=Object.keys(v).some(k=>v[k]!==d.initial[k]);
+ if(d.element){
+  d.element.style.left=v.x+'px';d.element.style.top=v.y+'px';
+  d.element.style.width=v.width+'px';d.element.style.height=v.height+'px';
+ }
+ e.preventDefault();
+}
+function finishChartPointerDrag(commit){
+ const d=chartDrag;chartDrag=null;
+ if(!d||!commit||!d.moved||sheet()?.id!==d.sheetId)return;
+ try{transact(()=>changeChart(sheet(),d.id,{layout:d.next}));refreshSheetCharts();status('Положение диаграммы сохранено (Ctrl+Z — отменить)');}
+ catch(err){refreshSheetCharts();status(err.message,true);}
+}
 function createSelectedChart(type){
  if(!sheet())return;
  commitEditor();
@@ -728,9 +791,9 @@ function printNow(){
  }catch(error){status(error.message||'Не удалось открыть печать',true);}
 }
 
-function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}</main>`;}
+function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button></div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}</main>`;}
 function render(){app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
- if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();updateSelectionStats();}updateSaveIndicator();}
+ if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;drawGrid(true);},{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
 function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
  const s=sheet(),{x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
@@ -794,7 +857,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'chart-bar':createSelectedChart('bar');break;case 'chart-line':createSelectedChart('line');break;case 'chart-pie':createSelectedChart('pie');break;
  case 'charts-open':chartDrawerOpen=true;render();break;
  case 'chart-close':chartDrawerOpen=false;render();break;
- case 'chart-open':selectedChartId=id;render();break;
+ case 'chart-open':selectedChartId=id;chartDrawerOpen=true;render();break;
  case 'chart-type':try{transact(()=>changeChart(sheet(),selectedChartId,{type:target.dataset.type}));render();}catch(err){status(err.message,true);}break;
  case 'chart-source':{const value=document.getElementById('chart-range')?.value.trim().replaceAll('$','').toUpperCase();
   const match=/^([A-Z]+[1-9]\d*):([A-Z]+[1-9]\d*)$/.exec(value||'');
@@ -837,6 +900,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'insert-row':structuralAction('row','insert');break;case 'delete-row':structuralAction('row','delete');break;case 'insert-col':structuralAction('col','insert');break;case 'delete-col':structuralAction('col','delete');break;
  case 'sheet-add':addSheet();break;case 'sheet-rename':renameSheet();break;case 'sheet-delete':deleteSheet();break;case 'sheet-select':if(e.detail>=2){renameSheet(id);break;}if(book().activeSheetId===id)break;commitEditor();book().activeSheetId=id;changed();setSelection('A1');render();break;
  }});
+app.addEventListener('pointerdown',startChartPointerDrag,true);
+window.addEventListener('pointermove',previewChartPointerDrag);
+window.addEventListener('pointerup',()=>finishChartPointerDrag(true));
+window.addEventListener('pointercancel',()=>finishChartPointerDrag(false));
 app.addEventListener('pointerdown',e=>{if(e.target.closest('.ribbon-color'))recordColorSelection();},true);
 app.addEventListener('pointerdown',e=>{if((activePalette||borderMenuOpen)&&!e.target.closest('.format-popover,[data-action=fill-palette],[data-action=text-palette],[data-action=border-menu]')){activePalette=null;borderMenuOpen=false;document.querySelectorAll('.format-popover').forEach(el=>el.remove());}},true);
 app.addEventListener('focusin',e=>{if(e.target?.matches?.('input[type=color]')&&!pendingColorSelection)recordColorSelection();});
