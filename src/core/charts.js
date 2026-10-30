@@ -155,6 +155,7 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
    const value=numeric(item.values[k]),x=chart.type==='scatter'?numeric(item.label):null;
    if(chart.type==='scatter'){
     if(x===null||value===null)throw Error('Для точечной диаграммы нужны числа по обеим осям X и Y');
+    if(Math.abs(x)>1e12||Math.abs(value)>1e12)throw Error('Точечная диаграмма: слишком большие координаты X или Y');
     return {label:item.label,x,value};
    }
    if(!item.label.trim()||item.label.length>120||value===null)
@@ -257,7 +258,9 @@ export function chartSVG(data,type,settings={}){
   const allPoints=series.flatMap(s=>s.points),xValues=allPoints.map(p=>p.x),
    yValues=allPoints.map(p=>p.value),xLo=Math.min(...xValues),xHi=Math.max(...xValues),
    xSpan=xHi-xLo||1,xMin=xHi===xLo?xLo-1:xLo,xMax=xHi===xLo?xHi+1:xHi,
-   yLo=settings.min??Math.min(...yValues),yHi=settings.max??Math.max(...yValues),
+   dataMin=Math.min(...yValues),dataMax=Math.max(...yValues),
+   yLo=settings.min??(settings.max!=null?Math.min(dataMin,settings.max-1):dataMin),
+   yHi=settings.max??Math.max(dataMax,yLo+1),
    yMin=yLo===yHi?yLo-1:yLo,yMax=yLo===yHi?yHi+1:yHi,
    legendRight=legend==='right',legendBottom=legend==='bottom',
    x0=74,x1=legendRight?445:601,y0=32,y1=legendBottom&&series.length>1?233:265;
