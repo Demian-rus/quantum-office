@@ -1047,38 +1047,85 @@ function refreshFillHandle(){
  handle.hidden=false;
 }
 function showFillDragPreview(){
- const d=fillDrag;
- const cells=document.querySelectorAll('.grid-cell');
- for(const el of cells){
-  const p=parseCell(el.dataset.ref),r=d?.area;
-  const isNew=r&&d.direction==='down'?
-   p.row>d.source.r2&&p.row<=r.r2&&p.col>=r.c1&&p.col<=r.c2:
-   r&&d.direction==='right'?
-    p.col>d.source.c2&&p.col<=r.c2&&p.row>=r.r1&&p.row<=r.r2:false;
-  el.classList.toggle('fill-preview',!!isNew);
+ const d=fillDrag,source=d?.source,area=d?.area;
+ for(const el of document.querySelectorAll('.grid-cell')){
+  const p=parseCell(el.dataset.ref);
+  const inDestination=p&&area&&p.row>=area.r1&&p.row<=area.r2&&p.col>=area.c1&&p.col<=area.c2;
+  const inSource=p&&source&&p.row>=source.r1&&p.row<=source.r2&&p.col>=source.c1&&p.col<=source.c2;
+  el.classList.toggle('fill-preview',!!inDestination&&!inSource);
  }
 }
 function fillDragTargetAt(x,y){
- const d=fillDrag;if(!d||!sheet())return;
- const node=document.elementFromPoint(x,y)?.closest('.grid-cell'),p=parseCell(node?.dataset.ref);
+ const d=fillDrag,view=document.getElementById('grid-scroll');
+ if(!d||!sheet()||!view)return;
+ const box=view.getBoundingClientRect();
+ const sx=Math.max(box.left+rowW+2,Math.min(box.right-7,x));
+ const sy=Math.max(box.top+headerH+2,Math.min(box.bottom-7,y));
+ const node=document.elementFromPoint(sx,sy)?.closest('.grid-cell');
+ let p=parseCell(node?.dataset.ref);
+ // The pointer may be over a scrollbar, frozen overlay or outside the viewport.
+ // Use grid geometry in that case rather than losing the drag at the boundary.
+ if(!p){
+  const {x:gx,y:gy}=gridGeometry(sheet());
+  p={row:firstVisibleIndex(gy,view.scrollTop+sy-box.top+headerH),
+     col:firstVisibleIndex(gx,view.scrollLeft+sx-box.left)};
+ }
  if(!p||!rowVisible(sheet(),p.row)||!columnVisible(sheet(),p.col))return;
- const a=d.source,down=Math.max(0,p.row-a.r2),right=Math.max(0,p.col-a.c2);
- const direction=down&&right?(down>=right?'down':'right'):down?'down':right?'right':null;
- const target=direction==='down'?p.row:direction==='right'?p.col:null;
+ const a=d.source;
+ const candidates=[
+  {direction:'up',distance:Math.max(0,a.r1-p.row),target:p.row},
+  {direction:'down',distance:Math.max(0,p.row-a.r2),target:p.row},
+  {direction:'left',distance:Math.max(0,a.c1-p.col),target:p.col},
+  {direction:'right',distance:Math.max(0,p.col-a.c2),target:p.col}
+ ];
+ const winner=candidates.reduce((best,part)=>part.distance>best.distance?part:best);
+ const direction=winner.distance?winner.direction:null,target=direction?winner.target:null;
  if(direction===d.direction&&target===d.target)return;
- d.direction=direction;d.target=target;d.area=direction?
-  {r1:a.r1,c1:a.c1,r2:direction==='down'?target:a.r2,
-   c2:direction==='right'?target:a.c2}:null;
+ d.direction=direction;d.target=target;
+ d.area=direction?{
+  r1:direction==='up'?target:a.r1,c1:direction==='left'?target:a.c1,
+  r2:direction==='down'?target:a.r2,c2:direction==='right'?target:a.c2
+ }:null;
  showFillDragPreview();
+}
+// Scroll while a drag remains near or beyond the visible grid boundary.
+// Each frame resolves the target against the newly scrolled virtual grid.
+let fillScrollFrame=null;
+function startFillAutoScroll(){
+ if(fillScrollFrame!==null)return;
+ const frame=()=>{
+  fillScrollFrame=null;
+  const d=fillDrag,view=document.getElementById('grid-scroll');
+  if(!d||!view)return;
+  const box=view.getBoundingClientRect(),edge=25;
+  const axisSpeed=(point,min,max)=>point<min+edge?
+   -Math.min(36,Math.ceil((min+edge-point)/3)):
+   point>max-edge?Math.min(36,Math.ceil((point-(max-edge))/3)):0;
+  const dx=axisSpeed(d.pointerX,box.left+rowW,box.right-8),
+   dy=axisSpeed(d.pointerY,box.top+headerH,box.bottom-8);
+  if(dx||dy){
+   const previousX=view.scrollLeft,previousY=view.scrollTop;
+   view.scrollLeft+=dx;view.scrollTop+=dy;
+   if(previousX!==view.scrollLeft||previousY!==view.scrollTop)
+    fillDragTargetAt(d.pointerX,d.pointerY);
+  }
+  fillScrollFrame=requestAnimationFrame(frame);
+ };
+ fillScrollFrame=requestAnimationFrame(frame);
 }
 function endFillDrag(apply){
  const d=fillDrag;if(!d)return;
- fillDrag=null;document.body.classList.remove('is-fill-dragging');
+ fillDrag=null;
+ if(fillScrollFrame!==null){cancelAnimationFrame(fillScrollFrame);fillScrollFrame=null;}
+ document.body.classList.remove('is-fill-dragging');
  document.querySelectorAll('.grid-cell.fill-preview').forEach(el=>el.classList.remove('fill-preview'));
  if(apply&&d.direction&&d.target!=null&&sheet()?.id===d.sheetId){
   try{
-   const count=(d.direction==='down'?d.target-d.source.r2:d.target-d.source.c2)*
-    (d.direction==='down'?d.source.c2-d.source.c1+1:d.source.r2-d.source.r1+1);
+   const reverse=d.direction==='up'||d.direction==='left',
+    vertical=d.direction==='up'||d.direction==='down',
+    edge=vertical?(reverse?d.source.r1:d.source.r2):(reverse?d.source.c1:d.source.c2),
+    width=vertical?d.source.c2-d.source.c1+1:d.source.r2-d.source.r1+1,
+    count=Math.abs(d.target-edge)*width;
    if(count>10000)throw Error('Автозаполнение ограничено 10 000 ячеек');
    let out;transact(()=>{out=extendFillHandle(sheet(),
     cellName(d.source.r1,d.source.c1),cellName(d.source.r2,d.source.c2),d.direction,d.target);});
@@ -1131,6 +1178,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  if(top){top.style.height=`${y[freezeR]-headerH}px`;top.style.display=freezeR?'block':'none';
   if(!fromScroll||frozenRowScrollX!==view.scrollLeft||top.dataset.sheetId!==s.id){top.innerHTML=pinnedRowsHtml;frozenRowScrollX=view.scrollLeft;top.dataset.sheetId=s.id;}}
  if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
+ if(fillDrag)showFillDragPreview();
  refreshFillHandle();
 }
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
@@ -1250,11 +1298,12 @@ app.addEventListener('pointerdown',e=>{
  if(e.button!==0||!e.target.closest('#grid-fill-handle')||!sheet())return;
  e.preventDefault();e.stopPropagation();commitEditor();
  const rects=selectedRects();if(rects.length!==1)return;
- fillDrag={source:rects[0],sheetId:sheet().id,direction:null,target:null,area:null};
+ fillDrag={source:rects[0],sheetId:sheet().id,direction:null,target:null,area:null,pointerX:e.clientX,pointerY:e.clientY};
+ startFillAutoScroll();
  mouseSelecting=false;document.body.classList.add('is-fill-dragging');
  document.getElementById('grid-fill-handle').hidden=true;
 },true);
-window.addEventListener('pointermove',e=>{if(fillDrag)fillDragTargetAt(e.clientX,e.clientY);});
+window.addEventListener('pointermove',e=>{if(fillDrag){fillDrag.pointerX=e.clientX;fillDrag.pointerY=e.clientY;fillDragTargetAt(e.clientX,e.clientY);}});
 window.addEventListener('pointerup',()=>endFillDrag(true));
 window.addEventListener('pointercancel',()=>endFillDrag(false));
 app.addEventListener('pointerdown',startChartPointerDrag,true);
