@@ -199,6 +199,29 @@ function addSelection(a,b=a){
  extraRanges.push(current);
  setSelection(a,b,true);
 }
+function toggleCellSelection(ref){
+ if(!sheet())return;
+ const p=parseCell(ref);if(!p)return;
+ const areas=selectedRects(),contained=areas.some(a=>p.row>=a.r1&&p.row<=a.r2&&p.col>=a.c1&&p.col<=a.c2);
+ if(!contained){addSelection(ref);return;}
+ const fragments=[];
+ const push=(r1,c1,r2,c2)=>{
+  if(r1<=r2&&c1<=c2)fragments.push({from:cellName(r1,c1),to:cellName(r2,c2)});
+ };
+ for(const a of areas){
+  if(p.row<a.r1||p.row>a.r2||p.col<a.c1||p.col>a.c2){push(a.r1,a.c1,a.r2,a.c2);continue;}
+  push(a.r1,a.c1,p.row-1,a.c2);
+  push(p.row+1,a.c1,a.r2,a.c2);
+  push(p.row,a.c1,p.row,p.col-1);
+  push(p.row,p.col+1,p.row,a.c2);
+ }
+ // An active cell remains required when the last selected region is cleared.
+ if(!fragments.length){setSelection(ref);return;}
+ if(fragments.length>25){status('Можно выделить до 25 отдельных диапазонов',true);return;}
+ const active=fragments.pop();extraRanges=fragments;
+ extraRangeSheetId=sheet().id;
+ setSelection(active.from,active.to,true);
+}
 function paintSelection(){
  document.querySelectorAll('.grid-cell').forEach(el=>{
   const p=parseCell(el.dataset.ref),chosen=inAnySelection(p.row,p.col);
@@ -730,19 +753,19 @@ function toolIcon(action,original,extra=''){
 function ribbon(){
  const chosenFont=getEffectiveStyle(sheet(),activeCell).fontFamily||'Aptos';
  const chosenSize=getEffectiveStyle(sheet(),activeCell).fontSize||11;
- const fontTools='<select class="ribbon-font-picker" id="font-family-select" title="Гарнитура шрифта" aria-label="Шрифт">'+
+ const fontTools='<div class="font-selectors"><select class="ribbon-font-picker" id="font-family-select" title="Гарнитура шрифта" aria-label="Шрифт">'+
   FONT_FAMILIES.map(name=>'<option value="'+esc(name)+'"'+(name===chosenFont?' selected':'')+'>'+esc(name)+'</option>').join('')+
   '</select><select class="ribbon-font-size" id="font-size-select" title="Размер шрифта" aria-label="Размер шрифта">'+
-  [8,9,10,11,12,14,16,18,20,24,28,32,36,48,72].map(value=>'<option value="'+value+'"'+(value===chosenSize?' selected':'')+'>'+value+'</option>').join('')+'</select>';
+  [8,9,10,11,12,14,16,18,20,24,28,32,36,48,72].map(value=>'<option value="'+value+'"'+(value===chosenSize?' selected':'')+'>'+value+'</option>').join('')+'</select></div>';
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
  const labeled=new Set();
  const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
- const group=(name,buttons)=>`<section class="ribbon-group" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
+ const group=(name,buttons)=>`<section class="ribbon-group ${name==='Шрифт'?'font-group':''}" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
  let contents='';
  if(activeRibbon==='home')contents=
  group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫'))+
- group('Шрифт',fontTools+button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools)+
+ group('Шрифт',fontTools+'<div class="font-action-row">'+button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools+'</div>')+
  group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"')+button('format','Дата','📅','data-value="date"')+button('format','Время','⏱','data-value="time"')+button('format','Дата и время','◷','data-value="datetime"')+button('format','Длительность','◴','data-value="duration"'))+
  group('Вычисления',button('autosum','Автосумма','Σ'))+
@@ -1073,7 +1096,12 @@ function render(){
   scrollLeft=previousGrid.scrollLeft;scrollTop=previousGrid.scrollTop;
  }
  app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
- if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.dataset.sheetId=sheet().id;view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;
+ if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.dataset.sheetId=sheet().id;
+ // Materialize virtual canvas before restoring scrollTop to avoid Chromium clamp to 0.
+ const canvas=view.querySelector('#grid-canvas'),geometry=gridGeometry(sheet());
+ canvas.style.width=geometry.x[geometry.x.length-1]+'px';
+ canvas.style.height=(geometry.y[geometry.y.length-1]-headerH)+'px';
+ view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;
  view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
   if(view._gridFrame)return;
   view._gridFrame=requestAnimationFrame(()=>{view._gridFrame=null;if(view.isConnected)drawGrid(true);});
@@ -1400,7 +1428,7 @@ window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDra
  if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
 window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
 app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
-app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)addSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2){mouseSelecting=false;editCell();}else{mouseSelecting=true;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
+app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)toggleCellSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2&&!e.ctrlKey&&!e.metaKey){mouseSelecting=false;editCell();}else{mouseSelecting=!e.ctrlKey&&!e.metaKey;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
 app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref,true);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;setSelection(cell.dataset.ref);editCell();}});
