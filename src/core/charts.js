@@ -336,5 +336,5 @@ export function chartSVG(data,type,settings={}){
   });
  }
  return '<svg class="qo-chart-svg" viewBox="0 0 640 320" role="img" aria-label="'+
-  (type==='pie'?'Круговая':type==='line'?'Линейная':'Столбчатая')+' диаграмма">'+svg+'</svg>';
+  (type==='pie'?'Круговая':type==='line'?'Линейная':type==='stacked100'?'Столбчатая 100% с накоплением':type==='stacked'?'Столбчатая с накоплением':'Столбчатая')+' диаграмма">'+svg+'</svg>';
 }
