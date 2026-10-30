@@ -1,6 +1,6 @@
 /** Offline, data-linked charts. No third-party scripts or remote services. */
 import {uid,rectangle,cellName,LIMITS,formulaContext,resultOf,gridGeometry} from './workbook.js';
-export const CHART_TYPES=['bar','line','pie','stacked','stacked100'];
+export const CHART_TYPES=['bar','line','pie','stacked','stacked100','scatter'];
 export const STACKED_TYPES=['stacked','stacked100'];
 export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;
 export const CHART_MAX_SERIES=4;
@@ -141,7 +141,10 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
  const mixedHeaders=rows[0].values.every(v=>v.trim()!==''&&
    (numeric(v)===null||count>1&&/^(?:19|20)\d{2}$/.test(v.trim())))&&
   rows[0].values.some(v=>numeric(v)===null);
- const header=mixedHeaders||yearHeaders;
+ const header=chart.type==='scatter'?
+   (rows[0].label.trim()!==''&&numeric(rows[0].label)===null&&
+    rows[0].values.every(v=>v.trim()!==''&&(numeric(v)===null||/^(?:19|20)\d{2}$/.test(v.trim())))):
+   mixedHeaders||yearHeaders;
  const body=rows.slice(header?1:0);
  const names=Array.from({length:count},(_,k)=>header?rows[0].values[k]:'Ряд '+(k+1));
  const empty=body.every(p=>!p.label.trim()&&p.values.every(v=>!v.trim()));
@@ -149,7 +152,12 @@ export function chartData(book,sheet,chart,{allowEmpty=false}={}){
  if(body.length<2)throw Error('Диаграмме нужны минимум два числовых значения');
  const pointsBySeries=names.map((name,k)=>({
   name,points:body.map(item=>{
-   const value=numeric(item.values[k]);
+   const value=numeric(item.values[k]),x=chart.type==='scatter'?numeric(item.label):null;
+   if(chart.type==='scatter'){
+    if(x===null||value===null)throw Error('Для точечной диаграммы нужны числа по обеим осям X и Y');
+    if(Math.abs(x)>1e12||Math.abs(value)>1e12)throw Error('Точечная диаграмма: слишком большие координаты X или Y');
+    return {label:item.label,x,value};
+   }
    if(!item.label.trim()||item.label.length>120||value===null)
     throw Error('Для диаграммы нужны названия категорий и числа');
    return {label:item.label,value};
@@ -246,7 +254,47 @@ export function chartSVG(data,type,settings={}){
   txt(320,140,'Диаграмма создана','font-size="22" text-anchor="middle" fill="#244b3e" font-weight="600"')+
   txt(320,177,'Добавьте категории и числовые значения','font-size="15" text-anchor="middle" fill="#6b8291"')+'</svg>';
  let svg='<rect width="640" height="320" rx="10" fill="#fff"/>';
- if(type==='pie'){
+ if(type==='scatter'){
+  const allPoints=series.flatMap(s=>s.points),xValues=allPoints.map(p=>p.x),
+   yValues=allPoints.map(p=>p.value),xLo=Math.min(...xValues),xHi=Math.max(...xValues),
+   xSpan=xHi-xLo||1,xMin=xHi===xLo?xLo-1:xLo,xMax=xHi===xLo?xHi+1:xHi,
+   dataMin=Math.min(...yValues),dataMax=Math.max(...yValues),
+   yLo=settings.min??(settings.max!=null?Math.min(dataMin,settings.max-1):dataMin),
+   yHi=settings.max??Math.max(dataMax,yLo+1),
+   yMin=yLo===yHi?yLo-1:yLo,yMax=yLo===yHi?yHi+1:yHi,
+   legendRight=legend==='right',legendBottom=legend==='bottom',
+   x0=74,x1=legendRight?445:601,y0=32,y1=legendBottom&&series.length>1?233:265;
+  const sx=v=>x0+(v-xMin)/(xMax-xMin)*(x1-x0),sy=v=>y1-(v-yMin)/(yMax-yMin)*(y1-y0);
+  for(let tick=0;tick<=4;tick++){
+   const Y=y0+(y1-y0)*tick,X=x0+(x1-x0)*tick,
+    yy=yMax-(yMax-yMin)*tick/4,xx=xMin+(xMax-xMin)*tick/4;
+   svg+=(showGrid?'<line x1="'+x0+'" y1="'+Y+'" x2="'+x1+'" y2="'+Y+'" stroke="#e3eaf0"/>':'')+
+    txt(x0-9,Y+4,fmt(yy),'font-size="10" text-anchor="end" fill="#64748b"');
+   svg+=(showGrid?'<line x1="'+X+'" y1="'+y0+'" x2="'+X+'" y2="'+y1+'" stroke="#e3eaf0"/>':'')+
+    txt(X,y1+17,fmt(xx),'font-size="10" text-anchor="middle" fill="#64748b"');
+  }
+  svg+=txt(x1,y1+35,'X','font-size="11" text-anchor="end" fill="#516578"')+
+   txt(x0-26,y0+4,'Y','font-size="11" text-anchor="end" fill="#516578"');
+  series.forEach((item,k)=>{
+   const color=colorAt(k);
+   item.points.forEach((p,i)=>{
+    const X=sx(p.x),Y=sy(p.value);
+    if(X<x0||X>x1||Y<y0||Y>y1)return;
+    svg+='<circle class="qo-scatter-point" cx="'+X+'" cy="'+Y+'" r="4.5" fill="'+color+
+     '" stroke="#fff" stroke-width="1"/>';
+    if(showValues&&i%Math.max(1,Math.ceil(item.points.length/12))===0)
+     svg+=txt(Math.round(X),Math.max(14,Y-9),fmt(p.value),
+      'font-size="10" text-anchor="middle" fill="#30465b"');
+   });
+  });
+  if(legend!=='none')series.forEach((item,k)=>{
+   const col=k%2,row=Math.floor(k/2),X=legendRight?466:80+col*250,
+    Y=legendRight?68+k*30:278+row*17;
+   svg+='<circle cx="'+(X+5)+'" cy="'+(Y-4)+'" r="5" fill="'+colorAt(k)+'"/>'+
+    txt(X+17,Y,item.name.slice(0,legendRight?17:28),
+    'font-size="11" fill="#43536b"');
+  });
+ }else if(type==='pie'){
   const total=pts.reduce((n,p)=>n+p.value,0),cx=200,cy=154,r=99,c=2*Math.PI*r;let offset=0;
   pts.forEach((p,i)=>{
    const len=p.value/total*c;
@@ -336,5 +384,5 @@ export function chartSVG(data,type,settings={}){
   });
  }
  return '<svg class="qo-chart-svg" viewBox="0 0 640 320" role="img" aria-label="'+
-  (type==='pie'?'Круговая':type==='line'?'Линейная':type==='stacked100'?'Столбчатая 100% с накоплением':type==='stacked'?'Столбчатая с накоплением':'Столбчатая')+' диаграмма">'+svg+'</svg>';
+  (type==='pie'?'Круговая':type==='line'?'Линейная':type==='stacked100'?'Столбчатая 100% с накоплением':type==='stacked'?'Столбчатая с накоплением':type==='scatter'?'Точечная XY':'Столбчатая')+' диаграмма">'+svg+'</svg>';
 }
