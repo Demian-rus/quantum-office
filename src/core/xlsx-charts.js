@@ -178,7 +178,9 @@ function parseChart(book,sheet,chartRoot){
  let row=cats.start.row;
  if(row>0){
   const heads=series.map((_,k)=>String(getCell(sheet,cellName(row-1,valsFirst.start.col+k)).value||'').trim());
-  const textHeaders=heads.every(v=>v!==''&&Number.isNaN(Number(v)));
+  const textHeaders=heads.every(v=>v!==''&&
+    (Number.isNaN(Number(v))||series.length>1&&/^(?:19|20)\d{2}$/.test(v)))&&
+    heads.some(v=>Number.isNaN(Number(v)));
   const yearHeaders=series.length>1&&heads.every(v=>/^(?:19|20)\d{2}$/.test(v))&&
     String(getCell(sheet,cellName(row-1,cats.start.col)).value||'').trim()!=='';
   if(textHeaders||yearHeaders)row--;
