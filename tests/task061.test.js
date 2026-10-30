@@ -33,6 +33,7 @@ test('TASK061: chart settings validate, persist and survive QBOOK without alteri
  assert.doesNotMatch(ooxml,/<c:majorGridlines\/>/);
  assert.match(ooxml,/<a:srgbClr val="AA2233"\/>/);
  assert.match(ooxml,/<a:srgbClr val="3366CC"\/>/);
+ assert.ok(ooxml.indexOf('<c:spPr>')<ooxml.indexOf('<c:cat>'),'OOXML chart series style must precede data references');
 });
 test('TASK061: invalid UI-like changes are atomic; no unsafe color strings',()=>{
  const {book,sheet,chart}=setup();
