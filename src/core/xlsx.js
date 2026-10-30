@@ -1,6 +1,7 @@
 import '../vendor/jszip.min.js';
 import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
 import {validateDataRules} from './validation.js';
+import {validateConditionalRules} from './conditional.js';
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -141,7 +142,8 @@ export async function importXLSX(data,filename='Таблица',report=null){
  const themeRel=[...rels.values()].find(r=>r.getAttribute('Type')?.endsWith('/theme')&&r.getAttribute('TargetMode')!=='External');
  const themePath=themeRel?zipPath(themeRel.getAttribute('Target')):'xl/theme/theme1.xml';
  const theme=zip.file(themePath)?themeColorsFromXML(await readXML(zip,themePath)):DEFAULT_THEME;
- const fmt=zip.file('xl/styles.xml')?stylesFromXML(await readXML(zip,'xl/styles.xml'),theme):[{}];
+ const styleRoot=zip.file('xl/styles.xml')?await readXML(zip,'xl/styles.xml'):null;
+ const fmt=stylesFromXML(styleRoot,theme),dxfs=xlsxDifferentialFills(styleRoot,theme);
  const book=newWorkbook(filename.replace(/\.xlsx$/i,''));book.sheets=[];let count=0;
  for(const sh of sheets){const rid=sh.getAttributeNS(relNS,'id')||sh.getAttribute('r:id');const rel=rels.get(rid);if(!rel||rel.getAttribute('TargetMode')==='External')throw Error('Нет локального листа в XLSX');
   const path=zipPath(rel.getAttribute('Target'));const xml=await readXML(zip,path);const sheet=newSheet(sh.getAttribute('name')||'Лист');
@@ -263,6 +265,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
   if(merges.length>500)throw Error('Слишком много объединённых диапазонов');
   for(const merged of merges){const pieces=String(merged.getAttribute('ref')||'').toUpperCase().split(':');if(pieces.length!==2)throw Error('Повреждённый диапазон объединения');mergeCells(sheet,pieces[0],pieces[1]);}
   importXLSXValidations(sheet,xml,report);
+  importXLSXConditionalFormatting(sheet,xml,dxfs,report,theme);
   book.sheets.push(sheet);
  }
  book.activeSheetId=book.sheets[0].id;return validateWorkbook(book);
@@ -326,6 +329,106 @@ export function importXLSXValidations(sheet,root,report=null){
  return {imported,skipped};
 }
 
+
+/** Differential formatting is intentionally limited to unambiguous solid fills.
+ * Font, border, number-format and mixed DXFs are skipped with a warning. */
+export function xlsxDifferentialFills(root,themes=DEFAULT_THEME){
+ return elements(element(root,'dxfs'),'dxf').map(dxf=>{
+  if(Array.from(dxf.children).some(n=>n.localName!=='fill'))return null;
+  const fill=element(dxf,'fill'),pattern=element(fill,'patternFill');
+  if(!fill||!pattern||pattern.getAttribute('patternType')!=='solid')return null;
+  return resolveXLSXColor(element(pattern,'fgColor'),themes)||null;
+ });
+}
+const CF_NUMBER=/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
+const CF_COLOR=/^#[0-9a-f]{6}$/i;
+/** Excel priorities run ascending, whereas Quantum's last matching fill wins. */
+export function importXLSXConditionalFormatting(sheet,root,dxfs=[],report=null,themes=DEFAULT_THEME){
+ const candidates=[];
+ for(const group of elements(root,'conditionalFormatting')){
+  const refs=String(group.getAttribute('sqref')||'').trim().split(/\s+/);
+  for(const node of elements(group,'cfRule')){
+   const priority=Number(node.getAttribute('priority'));
+   candidates.push({node,refs,priority:Number.isInteger(priority)&&priority>0?priority:Number.MAX_SAFE_INTEGER});
+  }
+ }
+ candidates.sort((a,b)=>b.priority-a.priority);
+ let imported=0,skipped=0;
+ for(const {node,refs} of candidates){
+  const type=node.getAttribute('type'),op=node.getAttribute('operator'),formula=text(node,'formula').trim();
+  let spec=null;
+  if(['1','true'].includes(node.getAttribute('stopIfTrue'))) {skipped++;continue;}
+  if(type==='colorScale'){
+   const scale=element(node,'colorScale'),points=elements(scale,'cfvo'),colors=elements(scale,'color');
+   if(points.length===2&&colors.length===2&&points[0].getAttribute('type')==='min'&&points[1].getAttribute('type')==='max'){
+    const lowColor=resolveXLSXColor(colors[0],themes),highColor=resolveXLSXColor(colors[1],themes);
+    if(CF_COLOR.test(lowColor||'')&&CF_COLOR.test(highColor||''))spec={kind:'scale',lowColor,highColor};
+   }
+  }else{
+   const dxfId=Number(node.getAttribute('dxfId'));
+   const fill=node.hasAttribute('dxfId')&&Number.isInteger(dxfId)&&dxfId>=0?dxfs[dxfId]:null;
+   if(CF_COLOR.test(fill||'')){
+    if(type==='cellIs'){
+     const ops={greaterThan:'gt',lessThan:'lt',equal:'eq'},kind=ops[op];
+     const quoted=/^"(?:[^"]|"")*"$/.test(formula);
+     const target=kind==='eq'&&quoted?formula.slice(1,-1).replaceAll('""','"'):formula;
+     if(kind&&target&&((kind==='eq'&&quoted)||CF_NUMBER.test(target)))spec={kind,target,color:fill};
+    }else if(type==='containsText'){
+     const target=node.getAttribute('text');
+     if(typeof target==='string'&&target.length>0&&target.length<=150)spec={kind:'contains',target,color:fill};
+    }
+   }
+  }
+  if(!spec||!refs.length||refs.length>24||refs.some(x=>!x)){skipped++;continue;}
+  const draft=structuredClone(sheet.conditionalRules||[]);
+  let ok=true;
+  for(const range of refs){
+   const parts=range.replaceAll('$','').toUpperCase().split(':');
+   if(parts.length>2){ok=false;break;}
+   const rect=rectangle(parts[0],parts[1]||parts[0]);
+   if(!rect){ok=false;break;}
+   draft.push({id:uid(),from:cellName(rect.r1,rect.c1),to:cellName(rect.r2,rect.c2),...spec});
+   try{validateConditionalRules({...sheet,conditionalRules:draft});}catch{ok=false;break;}
+  }
+  if(!ok){skipped++;continue;}
+  sheet.conditionalRules=draft;imported+=refs.length;
+ }
+ if(report&&typeof report==='object'){
+  report.importedConditionalFormatting=(report.importedConditionalFormatting||0)+imported;
+  report.skippedConditionalFormatting=(report.skippedConditionalFormatting||0)+skipped;
+ }
+ return {imported,skipped};
+}
+/** Standard OOXML: simple cell comparisons, text contains, and two-color min/max. */
+export function xlsxConditionalFormatting(sheet,styles){
+ const rules=sheet.conditionalRules||[];
+ if(!rules.length)return '';
+ validateConditionalRules(sheet);
+ return rules.map((rule,index)=>{
+  const priority=rules.length-index,range=rule.from===rule.to?rule.from:rule.from+':'+rule.to;
+  let body='';
+  if(rule.kind==='scale'){
+   const low=(rule.lowColor||'#f7e2dc').slice(1).toUpperCase(),high=(rule.highColor||'#5fb486').slice(1).toUpperCase();
+   body='<cfRule type="colorScale" priority="'+priority+'"><colorScale><cfvo type="min"/><cfvo type="max"/><color rgb="FF'+low+'"/><color rgb="FF'+high+'"/></colorScale></cfRule>';
+  }else{
+   const id=styles.dxfIds.get(rule.color.toLowerCase());
+   if(id===undefined)throw Error('Не найден стиль условного форматирования XLSX');
+   const meta=' dxfId="'+id+'" priority="'+priority+'"';
+   if(rule.kind==='contains'){
+    const quoted=rule.target.replaceAll('"','""');
+    const formula='NOT(ISERROR(SEARCH("'+quoted+'",'+rule.from+')))';
+    body='<cfRule type="containsText"'+meta+' text="'+xmlEscape(rule.target)+'"><formula>'+xmlEscape(formula)+'</formula></cfRule>';
+   }else{
+    const op={gt:'greaterThan',lt:'lessThan',eq:'equal'}[rule.kind];
+    if(!op)throw Error('Неподдерживаемое условие XLSX');
+    const expression=rule.kind==='eq'&&!CF_NUMBER.test(rule.target)?'"'+rule.target.replaceAll('"','""')+'"':rule.target;
+    body='<cfRule type="cellIs" operator="'+op+'"'+meta+'><formula>'+xmlEscape(expression)+'</formula></cfRule>';
+   }
+  }
+  return '<conditionalFormatting sqref="'+xmlEscape(range)+'">'+body+'</conditionalFormatting>';
+ }).join('');
+}
+
 export function styleCatalog(book){
  const unique=[{}],lookup=new Map([['{}',0]]);
  const keyOf=s=>JSON.stringify(Object.keys(s||{}).sort().reduce((x,k)=>(x[k]=s[k],x),{}));
@@ -335,7 +438,13 @@ export function styleCatalog(book){
   for(const rowStyle of Object.values(sheet.rowStyles||{}))register(rowStyle);
   for(const ref of Object.keys(sheet.cells))register(getEffectiveStyle(sheet,ref));
  }
- return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0};
+ const dxfColors=[],dxfIds=new Map();
+ for(const sheet of book.sheets)for(const rule of sheet.conditionalRules||[]){
+  if(rule.kind==='scale')continue;
+  const key=rule.color.toLowerCase();
+  if(!dxfIds.has(key)){dxfIds.set(key,dxfColors.length);dxfColors.push(key);}
+ }
+ return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0,dxfColors,dxfIds};
 }
 export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([[JSON.stringify([null,null,null,null]),0]]);const cells=styles.unique.map(s=>{
  const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'',s.fontSize||11]);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
@@ -349,7 +458,8 @@ export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[
  const key=JSON.stringify(['left','right','top','bottom'].map(side=>perSide[side]||null));
  if(!borderIds.has(key)){borderIds.set(key,borderDefs.length);borderDefs.push({edges:perSide});}
  return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,wrap:!!s.wrap,border:borderIds.get(key)};});
- let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>`;return xml;
+ const dxfs=(styles.dxfColors||[]).map(c=>'<dxf><fill><patternFill patternType="solid"><fgColor rgb="FF'+c.slice(1).toUpperCase()+'"/><bgColor indexed="64"/></patternFill></fill></dxf>').join('');
+ let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${(styles.dxfColors||[]).length}">${dxfs}</dxfs></styleSheet>`;return xml;
 }
 export async function exportXLSX(book){validateWorkbook(book);
  const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
@@ -398,7 +508,7 @@ export async function exportXLSX(book){validateWorkbook(book);
   const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...Object.keys(s.rowStyles||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxDataValidations(s)}</worksheet>`;
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });
