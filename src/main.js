@@ -302,8 +302,8 @@ function clearSelectedFormat(){
   drawGrid();status(`Сброшено оформление: ${count} элементов`);
  }catch(err){status(err.message,true);}
 }
-function autoSum(){commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
-function fillSelected(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
+function autoSum(){if(!requireSingleRange())return;commitEditor();if(refuseHiddenSelection())return;try{const changes=planAutoSum(sheet(),activeCell,rangeEnd);transact(()=>{for(const x of changes)setCell(sheet(),x.ref,x.value);});setSelection(changes[0].ref,changes.at(-1).ref);status(`Автосумма: ${changes.length} формул`);}catch(err){status(err.message,true);}}
+function fillSelected(direction){if(!requireSingleRange())return;if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const draft=structuredClone(sheet());try{const count=fillSelection(draft,activeCell,rangeEnd,direction);transact(()=>{sheet().cells=draft.cells;});drawGrid();updateSelectionStats();status(`Заполнено ${count} ячеек`);}catch(e){status(e.message,true);}}
 function updateSelectionStats(){
  const node=document.querySelector('#selection-stats');if(!node||!sheet())return;
  const rects=selectedRects();if(!rects.length)return;
@@ -321,6 +321,7 @@ function updateSelectionStats(){
   ' · Среднее: '+Number((sum/count).toFixed(8)):prefix+'Выделено: '+visited.size;
 }
 function structuralAction(axis,mode){
+ if(!requireSingleRange())return;
  commitEditor();if(!sheet())return;
  const pos=parseCell(activeCell);if(!pos)return;
  const rect=rectangle(activeCell,rangeEnd);
@@ -410,7 +411,7 @@ function setCellBorders(mode){
   transact(()=>applyBorderPreset(sheet(),activeCell,rangeEnd,mode));borderMenuOpen=false;render();status('Границы обновлены');
  }catch(err){status(err.message,true);}
 }
-function updateMerge(mode){
+function updateMerge(mode){if(!requireSingleRange())return;
  commitEditor();if(!sheet())return;
  try{const draft=structuredClone(sheet());if(mode==='merge')mergeCells(draft,activeCell,rangeEnd);else if(!unmergeCells(draft,activeCell)){status('Выбранная ячейка не объединена');return;}
   transact(()=>{if(mode==='merge')mergeCells(sheet(),activeCell,rangeEnd);else unmergeCells(sheet(),activeCell);});
@@ -427,7 +428,7 @@ function bordersPopup(){if(!borderMenuOpen)return '';
  const items=[['outline','Внешние границы','borderOutline'],['all','Все границы','borderAll'],['bottom','Нижняя граница','borderBottom'],['top','Верхняя граница','borderTop'],['left','Левая граница','borderLeft'],['right','Правая граница','borderRight'],['none','Без границ','borderNone']];
  return `<div class="format-popover border-popover" role="menu" aria-label="Варианты границ"><div class="popup-header"><strong>Границы выделения</strong><button data-action="popup-close" aria-label="Закрыть">×</button></div><div class="border-hint">Рамка вокруг диапазона не объединяет ячейки</div>${items.map(([id,label,icon])=>`<button class="border-choice" role="menuitem" data-action="border-mode" data-value="${id}"><span class="border-glyph">${toolIcon(id==='none'?'border-none':id==='all'?'border-all':'border-'+id,'')}</span>${label}</button>`).join('')}</div>`;
 }
-function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
+function toggleWrap(){if(!requireSingleRange())return;const next=!getEffectiveStyle(sheet(),activeCell).wrap;const rect=rectangle(activeCell,rangeEnd);if(!rect||refuseHiddenSelection())return;
  if(rect.r1===0&&rect.r2===LIMITS.rows-1){
   try{
    transact(()=>setBulkColumnStyle(sheet(),activeCell,rangeEnd,{wrap:next}));drawGrid();
@@ -454,7 +455,7 @@ function toggleWrap(){const next=!getEffectiveStyle(sheet(),activeCell).wrap;con
    } if(need>rowHeight(sheet(),r))setRowHeight(sheet(),r,need);}}
  });drawGrid();}
 
-function sortRange(direction){if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
+function sortRange(direction){if(!requireSingleRange())return;if(!sheet())return;commitEditor();if(refuseHiddenSelection())return;const candidate=structuredClone(sheet());try{
  const count=sortSelectedRows(candidate,activeCell,rangeEnd,direction);
  transact(()=>{sheet().cells=candidate.cells;});drawGrid();updateSelectionStats();status(`Отсортировано ${count} строк по первому столбцу выделения`);
  }catch(error){status(error.message,true);}}
@@ -543,7 +544,7 @@ function sizeContextPanel(){
  if(m.kind==='cell')return '<div id="size-context-menu" class="size-context-menu" style="'+style+'" role="menu">'+
   '<button data-action="size-context-mode" data-kind="row" role="menuitem">Высота строки…</button>'+
   '<button data-action="size-context-mode" data-kind="col" role="menuitem">Ширина столбца…</button></div>';
- const targets=sizeTargets(m.kind,m.index);
+ let targets;try{targets=sizeTargets(m.kind,m.index);}catch(err){return '<div id="size-context-menu" class="size-context-menu" style="'+style+'">'+esc(err.message)+'</div>';}
  const min=m.kind==='row'?DIMENSIONS.minRow:DIMENSIONS.minColumn,
   max=m.kind==='row'?DIMENSIONS.maxRow:DIMENSIONS.maxColumn;
  const initial=m.kind==='row'?rowHeight(sheet(),m.index):columnWidth(sheet(),m.index);
@@ -578,12 +579,12 @@ function applyContextSize(){
   sizeContext=null;render();status('Размер '+(kind==='row'?'строк':'столбцов')+': '+value+' px ('+targets.length+')');
  }catch(err){status(err.message,true);}
 }
-function changeSize(kind){commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
+function changeSize(kind){if(sizeContext){sizeContext=null;document.getElementById('size-context-menu')?.remove();}commitEditor();const p=parseCell(activeCell);if(!p)return;const current=kind==='col'?columnWidth(sheet(),p.col):rowHeight(sheet(),p.row);const input=prompt(kind==='col'?'Ширина столбца (48–520 пикселей)':'Высота строки (22–160 пикселей)',String(current));if(input===null)return;const value=Number(input);
  try{if(!Number.isInteger(value))throw Error('Введите целое число');transact(()=>{if(kind==='col')setColumnWidth(sheet(),p.col,value);else setRowHeight(sheet(),p.row,value);});drawGrid();status(`Размер изменён: ${value} пикселей`);}catch(err){status(err.message,true);}}
 function autoFitColumn(index=null){commitEditor();const p=parseCell(activeCell);if(!p||!sheet())return;const c=index??p.col;let chars=0;const {raw,ctx}=recalculator.view(book(),sheet());for(const ref of Object.keys(sheet().cells)){const cell=parseCell(ref);if(cell?.col===c){const str=String(displayedValue(sheet(),ref,raw,ctx));for(const line of str.split('\n'))chars=Math.max(chars,line.length);}}const width=Math.max(DIMENSIONS.minColumn,Math.min(DIMENSIONS.maxColumn,Math.ceil(chars*7.2+20)));
  transact(()=>setColumnWidth(sheet(),c,width));drawGrid();status(`Столбец ${cellName(0,c).replace(/\d+$/,'')}: ${width} пикселей`);}
 function resetRowHeight(index=null){const p=parseCell(activeCell);if(!p)return;transact(()=>setRowHeight(sheet(),index??p.row,DIMENSIONS.defaultRow));drawGrid();}
-function toggleAutoFilter(){commitEditor();if(sheet().autoFilter){transact(()=>{sheet().autoFilter=null});filterColumn=null;render();status('Автофильтр выключен — данные не изменены');return;}
+function toggleAutoFilter(){if(!requireSingleRange())return;commitEditor();if(sheet().autoFilter){transact(()=>{sheet().autoFilter=null});filterColumn=null;render();status('Автофильтр выключен — данные не изменены');return;}
  const rect=rectangle(activeCell,rangeEnd);try{const draft=structuredClone(sheet());setAutoFilter(draft,cellName(rect.r1,rect.c1),cellName(rect.r2,rect.c2));transact(()=>{sheet().autoFilter=draft.autoFilter});render();status('Автофильтр включён — выберите столбец в его заголовке');}catch(e){status(e.message,true);}}
 function updateFreeze(rows,cols){commitEditor();try{transact(()=>setFreeze(sheet(),rows,cols));render();status(rows||cols?`Закреплено строк: ${rows}, столбцов: ${cols}`:'Закрепление снято');}catch(e){status(e.message,true);}}
 function filterPopup(){const f=sheet()?.autoFilter,rect=filterRange(sheet());if(filterColumn===null||!f||!rect)return '';
@@ -914,7 +915,7 @@ function finishChartPointerDrag(commit){
  try{transact(()=>changeChart(sheet(),d.id,{layout:d.next}));refreshSheetCharts();status('Положение диаграммы сохранено (Ctrl+Z — отменить)');}
  catch(err){refreshSheetCharts();status(err.message,true);}
 }
-function createSelectedChart(type){
+function createSelectedChart(type){if(!requireSingleRange())return;
  if(!sheet())return;
  commitEditor();
  try{
@@ -1067,6 +1068,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'size-context-mode':if(sizeContext)openSizeContext(target.dataset.kind,parseCell(activeCell)?.[target.dataset.kind==='col'?'col':'row']??sizeContext.index,sizeContext.x,sizeContext.y);break;
  case 'size-context-apply':applyContextSize();break;
  case 'text-to-columns':case 'remove-duplicates':
+  if(!requireSingleRange())break;
   commitEditor();chartDrawerOpen=false;conditionalPanelOpen=false;validationPanelOpen=false;printOpen=false;
   dataTool={kind:action==='text-to-columns'?'split':'dedup',from:activeCell,to:rangeEnd,
    delimiter:';',overwrite:false,header:true,key:'all'};render();break;
@@ -1212,7 +1214,7 @@ app.addEventListener('mousedown',e=>{const cell=e.target.closest('.grid-cell');i
 app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref,true);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head'))return;setSelection(cell.dataset.ref);editCell();}});
-function captureSelection(){if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
+function captureSelection(){if(!requireSingleRange())return null;if(!sheet()||refuseHiddenSelection())return null;const rect=rectangle(activeCell,rangeEnd);if(rect&&(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1)>10000){status('Копирование ограничено 10 000 ячеек',true);return null;}try{internalClipboard=copyCells(sheet(),activeCell,rangeEnd,book());return internalClipboard;}catch(error){status(error.message,true);return null;}}
 async function cutSelection(){
  const clip=captureSelection();if(!clip)return false;
  clip.mode='cut';clip.bookId=book().id;clip.sheetId=sheet().id;
@@ -1225,6 +1227,7 @@ async function copySelection(){const clip=captureSelection();if(!clip)return fal
  try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
  return true;}
 function pasteOnlyValues(){
+ if(!requireSingleRange())return false;
  if(!sheet())return false;
  if(!internalClipboard){status('Сначала скопируйте диапазон через Ctrl+C',true);return false;}
  if(refuseHiddenSelection())return false;
@@ -1235,7 +1238,7 @@ function pasteOnlyValues(){
   status(`Вставлены только значения: ${info.rows} × ${info.cols}`);return true;
  }catch(error){status(error.message||'Вставка значений отменена',true);return false;}
 }
-function pasteIntoCells(text,clip=null){if(!sheet()||refuseHiddenSelection())return false;
+function pasteIntoCells(text,clip=null){if(!requireSingleRange())return false;if(!sheet()||refuseHiddenSelection())return false;
  try{
   if(!clip&&typeof text!=='string')throw Error('Буфер обмена пуст');
   if(!clip&&text.length===0)throw Error('Буфер обмена пуст');
