@@ -6,16 +6,19 @@ export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;
 export const CHART_MAX_SERIES=4;
 const COLORS=['#277c58','#397eb9','#e5a43b','#8a60b7','#dc7775','#42a8aa','#7e9e4a','#d58e4b'];
 export const CHART_COLORS=Object.freeze([...COLORS]);
-const STYLE_KEYS=['labels','legend','grid','colors','min','max'];
+const STYLE_KEYS=['labels','legend','grid','colors','min','max','trendline','trendEquation','trendR2'];
 export function chartOptions(chart){
  const o=chart?.options||{};
  return {labels:o.labels??false,legend:o.legend??(chart?.type==='pie'?'right':chart?.from&&chart?.to&&chartRect(chart).c2-chartRect(chart).c1===1?'none':'bottom'),
-   grid:o.grid??true,colors:o.colors??[],min:o.min??null,max:o.max??null};
+   grid:o.grid??true,colors:o.colors??[],min:o.min??null,max:o.max??null,
+   ...(o.trendline!==undefined||o.trendEquation!==undefined||o.trendR2!==undefined?
+    {trendline:o.trendline??false,trendEquation:o.trendEquation??false,trendR2:o.trendR2??false}:{})};
 }
 export function validateChartOptions(o){
  if(!o||typeof o!=='object'||Array.isArray(o)||Object.keys(o).some(k=>!STYLE_KEYS.includes(k))||
     (o.labels!==undefined&&typeof o.labels!=='boolean')||
     (o.grid!==undefined&&typeof o.grid!=='boolean')||
+    ['trendline','trendEquation','trendR2'].some(k=>o[k]!==undefined&&typeof o[k]!=='boolean')||
     (o.legend!==undefined&&!['bottom','right','none'].includes(o.legend))||
     (o.colors!==undefined&&(!Array.isArray(o.colors)||o.colors.length>CHART_MAX_SERIES||
        o.colors.some(c=>typeof c!=='string'||!/^#[0-9a-f]{6}$/i.test(c))))||
@@ -24,6 +27,47 @@ export function validateChartOptions(o){
     o.min!=null&&o.max!=null&&o.min>=o.max)
   throw Error('Недопустимые параметры оформления диаграммы');
  return o;
+}
+/** Centered least-squares fit. Null is an explicit degenerate-X result, not a fake horizontal trend. */
+export function linearRegression(points){
+ if(!Array.isArray(points)||points.length<2||points.length>50||
+    points.some(p=>!Number.isFinite(p?.x)||!Number.isFinite(p?.value)||Math.abs(p.x)>1e12||Math.abs(p.value)>1e12))
+  return null;
+ const n=points.length,meanX=points.reduce((v,p)=>v+p.x,0)/n,
+  meanY=points.reduce((v,p)=>v+p.value,0)/n;
+ let sxx=0,sxy=0,syy=0;
+ for(const p of points){
+  const dx=p.x-meanX,dy=p.value-meanY;
+  sxx+=dx*dx;sxy+=dx*dy;syy+=dy*dy;
+ }
+ if(sxx<=0||!Number.isFinite(sxx)||!Number.isFinite(sxy)||!Number.isFinite(syy))return null;
+ const slope=sxy/sxx,intercept=meanY-slope*meanX;
+ if(!Number.isFinite(slope)||!Number.isFinite(intercept))return null;
+ let sse=0;
+ for(const p of points){
+  const error=(meanY+slope*(p.x-meanX))-p.value;
+  sse+=error*error;
+ }
+ if(!Number.isFinite(sse))return null;
+ const r2=syy===0?1:Math.min(1,Math.max(0,1-sse/syy));
+ return {slope,intercept,r2,n};
+}
+/** Clip fitted y=m*x+b to the visible numeric plot rectangle. */
+function clippedTrendSegment(fit,xMin,xMax,yMin,yMax){
+ const {slope,intercept}=fit;
+ let a=xMin,b=xMax;
+ if(slope===0){
+  if(intercept<yMin||intercept>yMax)return null;
+ }else{
+  const cross1=(yMin-intercept)/slope,cross2=(yMax-intercept)/slope;
+  a=Math.max(a,Math.min(cross1,cross2));b=Math.min(b,Math.max(cross1,cross2));
+ }
+ if(!(b>a))return null;
+ return [{x:a,y:slope*a+intercept},{x:b,y:slope*b+intercept}];
+}
+export function regressionLabel(fit){
+ const n=v=>new Intl.NumberFormat('ru-RU',{maximumSignificantDigits:5}).format(v);
+ return 'y = '+n(fit.slope)+'x '+(fit.intercept<0?'− ':'+ ')+n(Math.abs(fit.intercept));
 }
 const escapeSVG=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const numeric=s=>{const v=String(s??'').trim();return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(v)&&Number.isFinite(+v)?+v:null;};
@@ -72,7 +116,9 @@ export function validateCharts(sheet){
     Object.keys(chart).some(k=>!['id','type','title','from','to','layout','options'].includes(k)))
     throw Error('Повреждена диаграмма');
   const rect=chartRect(chart);if(chart.layout!==undefined)validateChartLayout(sheet,chart.layout);if(chart.options!==undefined){validateChartOptions(chart.options);
-   if(chart.type==='stacked100'&&(chart.options.min!=null||chart.options.max!=null))throw Error('У процентной диаграммы ось всегда 0–100%');if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
+   if(chart.type==='stacked100'&&(chart.options.min!=null||chart.options.max!=null))throw Error('У процентной диаграммы ось всегда 0–100%');
+   if(chart.type!=='scatter'&&(chart.options.trendline||chart.options.trendEquation||chart.options.trendR2))
+    throw Error('Линейная регрессия доступна только для XY-диаграмм');if(chart.options.colors?.length>rect.c2-rect.c1)throw Error('Слишком много цветов для текущих рядов диаграммы');}seen.add(chart.id);
  }
 }
 /** Find a useful nearby table when the user clicks Insert Chart without selecting a range.
@@ -201,6 +247,8 @@ export function changeChart(sheet,id,patch){
   next.from=patch.from.toUpperCase();next.to=patch.to.toUpperCase();
  }
  const sourceRect=chartRect(next);
+ if(next.type!=='scatter'&&next.options&&(next.options.trendline||next.options.trendEquation||next.options.trendR2))
+  next.options={...next.options,trendline:false,trendEquation:false,trendR2:false};
  if(next.type==='stacked100'){
   const previous={...(next.options||{})};
   if(previous.min!=null||previous.max!=null)next.options={...previous,min:null,max:null};
@@ -213,6 +261,8 @@ export function changeChart(sheet,id,patch){
   const opts={...(next.options||{}),...patch.options};
   if(patch.options.colors!==undefined)opts.colors=[...patch.options.colors];
   validateChartOptions(opts);
+  if(next.type!=='scatter'&&(opts.trendline||opts.trendEquation||opts.trendR2))
+   throw Error('Линейная регрессия доступна только для XY-диаграмм');
   if(next.type==='stacked100'&&(opts.min!=null||opts.max!=null))
    throw Error('У процентной диаграммы ось всегда 0–100%');
   next.options=opts;
@@ -277,6 +327,23 @@ export function chartSVG(data,type,settings={}){
    txt(x0-26,y0+4,'Y','font-size="11" text-anchor="end" fill="#516578"');
   series.forEach((item,k)=>{
    const color=colorAt(k);
+   if(settings.trendline){
+    const fit=linearRegression(item.points);
+    if(fit){
+     const visible=clippedTrendSegment(fit,xMin,xMax,yMin,yMax);
+     if(visible)svg+='<line class="qo-xy-trendline" data-series="'+k+
+      '" x1="'+sx(visible[0].x)+'" y1="'+sy(visible[0].y)+
+      '" x2="'+sx(visible[1].x)+'" y2="'+sy(visible[1].y)+
+      '" stroke="'+color+'" stroke-width="2.5" stroke-dasharray="7 4" />';
+     if(settings.trendEquation||settings.trendR2){
+      const label=(settings.trendEquation?regressionLabel(fit):'')+
+       (settings.trendR2?(settings.trendEquation?' · ':'')+'R² = '+fmt(fit.r2):'');
+      svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,label.slice(0,55),
+       'font-size="11" fill="'+color+'" text-anchor="'+(legendRight?'start':'middle')+'"');
+     }
+    }else svg+=txt(legendRight?466:350,legendRight?198+k*32:20+k*15,
+     'Ряд '+(k+1)+': X одинаковы','font-size="11" fill="#a34b4b"');
+   }
    item.points.forEach((p,i)=>{
     const X=sx(p.x),Y=sy(p.value);
     if(X<x0||X>x1||Y<y0||Y>y1)return;
