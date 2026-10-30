@@ -932,7 +932,7 @@ app.addEventListener('input',e=>{if(e.target.id==='find-term')searchTerm=e.targe
 app.addEventListener('change',e=>{const t=e.target;
  if(['chart-labels','chart-legend','chart-grid'].includes(t.id)||t.dataset.chartColor!==undefined){
   const patch=t.id==='chart-labels'?{labels:t.checked}:t.id==='chart-legend'?{legend:t.value}:
-   t.id==='chart-grid'?{grid:t.checked}:(()=>{const chart=(sheet()?.charts||[]).find(c=>c.id===selectedChartId),colors=[...(chartOptions(chart).colors)];
+   t.id==='chart-grid'?{grid:t.checked}:(()=>{const chart=(sheet()?.charts||[]).find(c=>c.id===selectedChartId),colors=Array.from({length:4},(_,i)=>chartOptions(chart).colors[i]||CHART_COLORS[i]);
      colors[Number(t.dataset.chartColor)]=t.value;return {colors};})();
   try{transact(()=>changeChart(sheet(),selectedChartId,{options:patch}));render();}
   catch(err){status(err.message,true);}return;
