@@ -46,9 +46,9 @@ export function xlsxChartXML(book,sheet,chart,ordinal=0){
    '<c:tx><c:strRef><c:f>'+escape(titleCell)+'</c:f>'+
     chartSeriesValue([{name:entry.name}],'name','str')+'</c:strRef></c:tx>':
    '<c:tx><c:v>'+escape(entry.name)+'</c:v></c:tx>';
-  return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+
+  return '<c:ser><c:idx val="'+k+'"/><c:order val="'+k+'"/>'+title+seriesPaint(chart,k)+
    '<c:cat><c:strRef><c:f>'+escape(cat)+'</c:f>'+chartSeriesValue(entry.points,'label','str')+'</c:strRef></c:cat>'+
-   '<c:val><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:val>'+seriesPaint(chart,k)+'</c:ser>';
+   '<c:val><c:numRef><c:f>'+escape(valueRef)+'</c:f>'+chartSeriesValue(entry.points,'value','num')+'</c:numRef></c:val></c:ser>';
  }).join('');
  const catAxis=100000+ordinal*2,valAxis=catAxis+1;
  const plot=chart.type==='pie'?
