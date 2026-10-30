@@ -443,19 +443,22 @@ export function fillAreasDirection(sheet,areas,direction){
  * Numeric sequences (2+ evenly spaced entries) continue; formulas translate;
  * all other entries cycle, preserving cell styles. One atomic staged write. */
 export function extendFillHandle(sheet,from,to,direction,targetIndex){
- if(!['down','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
+ if(!['up','down','left','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
  if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон для автозаполнения');
- const a=rectangle(from,to),last=direction==='down'?a.r2:a.c2,
-  bound=direction==='down'?LIMITS.rows:LIMITS.columns;
- if(!Number.isInteger(targetIndex)||targetIndex<=last||targetIndex>=bound)
-  throw Error('Перетащите маркер ниже или правее выделения');
- const length=direction==='down'?a.r2-a.r1+1:a.c2-a.c1+1,
-  width=direction==='down'?a.c2-a.c1+1:a.r2-a.r1+1,
-  steps=targetIndex-last;
+ const a=rectangle(from,to),vertical=direction==='up'||direction==='down',
+  reverse=direction==='up'||direction==='left',
+  first=vertical?a.r1:a.c1,last=vertical?a.r2:a.c2,
+  edge=reverse?first:last,bound=vertical?LIMITS.rows:LIMITS.columns;
+ if(!Number.isInteger(targetIndex)||targetIndex<0||targetIndex>=bound||
+    (reverse?targetIndex>=edge:targetIndex<=edge))
+  throw Error(reverse?'Перетащите маркер выше или левее выделения':'Перетащите маркер ниже или правее выделения');
+ const length=last-first+1,
+  width=vertical?a.c2-a.c1+1:a.r2-a.r1+1,
+  steps=Math.abs(targetIndex-edge);
  if((a.r2-a.r1+1)*(a.c2-a.c1+1)>10000||steps*width>10000)
   throw Error('Автозаполнение ограничено 10 000 ячеек');
- const affected={r1:a.r1,c1:a.c1,r2:direction==='down'?targetIndex:a.r2,
-  c2:direction==='right'?targetIndex:a.c2};
+ const affected={r1:direction==='up'?targetIndex:a.r1,c1:direction==='left'?targetIndex:a.c1,
+  r2:direction==='down'?targetIndex:a.r2,c2:direction==='right'?targetIndex:a.c2};
  if((sheet.merges||[]).some(m=>{
   const b=rectangle(m.from,m.to);
   return b.r1<=affected.r2&&b.r2>=affected.r1&&b.c1<=affected.c2&&b.c2>=affected.c1;
@@ -467,31 +470,42 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
  const prepared=[];
  const numeric=v=>typeof v==='string'&&v.trim()!==''&&
   /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(v.trim())&&Number.isFinite(Number(v));
+ let hasDateSeries=false;
  for(let cross=0;cross<width;cross++){
   const source=Array.from({length},(_,i)=>{
-   const row=direction==='down'?a.r1+i:a.r1+cross,col=direction==='down'?a.c1+cross:a.c1+i;
-   return {row,col,cell:structuredClone(getCell(sheet,cellName(row,col)))};
+   const row=vertical?a.r1+i:a.r1+cross,col=vertical?a.c1+cross:a.c1+i;
+   const ref=cellName(row,col);
+   return {row,col,cell:structuredClone(getCell(sheet,ref)),format:getEffectiveStyle(sheet,ref).format};
   });
   const nums=source.map(e=>numeric(e.cell.value)?Number(e.cell.value):null),
-   numericSeries=length>=2&&nums.every(v=>v!==null),
-   step=numericSeries?nums[1]-nums[0]:null,
-   arithmetic=numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
-    1e-9*Math.max(1,Math.abs(v)));
+   allNumbers=nums.every(v=>v!==null),
+   dateFormat=source[0].format,
+   dateSeries=allNumbers&&['date','datetime'].includes(dateFormat)&&
+    source.every((e,i)=>e.format===dateFormat&&nums[i]>=1&&nums[i]<=2958465),
+   numericSeries=length>=2&&allNumbers,
+   step=numericSeries?nums[1]-nums[0]:dateSeries?1:null,
+   arithmetic=(numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
+    1e-9*Math.max(1,Math.abs(v))))||(dateSeries&&length===1);
+  if(dateSeries&&arithmetic)hasDateSeries=true;
   for(let i=0;i<steps;i++){
-   const sourceIndex=i%length,origin=source[sourceIndex],
-    row=direction==='down'?last+1+i:a.r1+cross,
-    col=direction==='right'?last+1+i:a.c1+cross;
+   const sequenceIndex=reverse?-1-i:length+i,
+    sourceIndex=((sequenceIndex%length)+length)%length,origin=source[sourceIndex],
+    row=vertical?(reverse?a.r1-1-i:a.r2+1+i):a.r1+cross,
+    col=vertical?a.c1+cross:(reverse?a.c1-1-i:a.c2+1+i);
    let value=origin.cell.value;
    if(arithmetic){
-    const result=nums[0]+step*(length+i);
+    const result=nums[0]+step*sequenceIndex;
     if(!Number.isFinite(result)||Math.abs(result)>1e15)
      throw Error('Числовая последовательность выходит за пределы допустимых значений');
+    if(dateSeries&&(result<1||result>2958465))
+     throw Error('Дата выходит за допустимые пределы календаря');
     value=String(Number(result.toPrecision(14)));
    }else if(value.startsWith('='))
     value=translateFormula(value,row-origin.row,col-origin.col);
    prepared.push({ref:cellName(row,col),value,style:structuredClone(origin.cell.style||{})});
   }
  }
+ // Validate the full result on an isolated copy before changing the original sheet.
  const staged=structuredClone(sheet);
  for(const item of prepared){
   checkValidatedInput(staged,item.ref,item.value);
@@ -501,10 +515,10 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
  if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
  sheet.cells=staged.cells;
  if(sheet.autoFilter)invalidateGridGeometry(sheet);
- return {count:prepared.length,from:cellName(a.r1,a.c1),
-  to:cellName(affected.r2,affected.c2),mode:prepared.some(x=>x.value.startsWith('='))?'formula':'values'};
+ return {count:prepared.length,from:cellName(affected.r1,affected.c1),
+  to:cellName(affected.r2,affected.c2),
+  mode:prepared.some(x=>x.value.startsWith('='))?'formula':hasDateSeries?'date':'values'};
 }
-
 export function fillSelection(sheet, from, to, direction){
  if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
  const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
