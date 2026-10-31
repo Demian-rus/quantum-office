@@ -19,7 +19,7 @@ export function validateStudioProject(value){
  const finite=(x,min=-100000,max=100000)=>typeof x==='number'&&Number.isFinite(x)&&x>=min&&x<=max;
  const color=x=>typeof x==='string'&&/^#[\da-f]{6}$/i.test(x);
  const image=x=>typeof x==='string'&&(!x||/^data:image\/(png|jpeg|webp);base64,[\da-z+/=\s]+$/i.test(x));
- if(value.bg!==undefined&&!color(value.bg))fail();if(value.imageSrc!==undefined&&!image(value.imageSrc))fail();
+ if(value.bg!==undefined&&!color(value.bg))fail();if(value.backgroundOpacity!==undefined&&!finite(value.backgroundOpacity,0,1))fail();if(value.imageSrc!==undefined&&!image(value.imageSrc))fail();
  const checkAdjust=a=>{if(a===undefined)return;if(!a||typeof a!=='object')fail();for(const [key,min,max] of [['brightness',0,200],['contrast',0,200],['saturation',0,200],['exposure',-3,3],['blur',0,20],['intensity',0,100]])if(a[key]!==undefined&&!finite(a[key],min,max))fail();for(const [key,[min,max]]of Object.entries(PHOTO_LIMITS))if(a[key]!==undefined&&!finite(a[key],min,max))fail();if(a.filter!==undefined&&!['none','mono','sepia','vivid'].includes(a.filter))fail();};
  checkAdjust(value.adjust);const ids=new Set();let points=0;
  for(const o of value.strokes){
@@ -28,7 +28,13 @@ export function validateStudioProject(value){
   for(const p of o.points)if(!Array.isArray(p)||p.length!==2||!p.every(x=>finite(x)))fail();
   if(o.name!==undefined&&(typeof o.name!=='string'||!o.name.trim()||o.name.length>120))fail();if(o.mask!==undefined&&!['none','rect','round','circle','ellipse'].includes(o.mask))fail();if(o.roundness!==undefined&&!finite(o.roundness,0,.5))fail();if(o.size!==undefined&&!finite(o.size,.1,1000))fail();if(o.opacity!==undefined&&!finite(o.opacity,0,1))fail();if(o.rotation!==undefined&&!finite(o.rotation,-36000,36000))fail();if(o.color!==undefined&&!color(o.color))fail();
   if(o.tool==='image'){if(o.frame!==undefined&&(!o.frame||typeof o.frame!=='object'||Array.isArray(o.frame)||!finite(o.frame.zoom,1,10)||!finite(o.frame.panX,-1,1)||!finite(o.frame.panY,-1,1)))fail();if(!image(o.src)||!o.src||!finite(o.w,1,100000)||!finite(o.h,1,100000))fail();checkAdjust(o.adjust);if(o.crop){const c=o.crop;if(!['x','y','w','h'].every(k=>finite(c[k],0,1))||c.w<.05||c.h<.05||c.x+c.w>1.00001||c.y+c.h>1.00001)fail();}}
-  if(o.tool==='text'&&(typeof o.text!=='string'||o.text.length>10000))fail();
+  if(o.tool==='text'){
+   if(typeof o.text!=='string'||o.text.length>10000)fail();
+   if(o.textBox!==undefined&&(!o.textBox||!finite(o.textBox.width,16,4096)||!finite(o.textBox.height,8,10000)))fail();
+   for(const [k,min,max]of [['spacing',-3,30],['lineHeight',.7,3],['outlineWidth',0,20],['shadowX',-100,100],['shadowY',-100,100],['shadowBlur',0,50],['textBackgroundOpacity',0,1]])if(o[k]!==undefined&&!finite(o[k],min,max))fail();
+   for(const k of ['italic','underline','shadow','textBackground'])if(o[k]!==undefined&&typeof o[k]!=='boolean')fail();
+   for(const k of ['outlineColor','shadowColor','textBackgroundColor'])if(o[k]!==undefined&&!color(o[k]))fail();
+  }
  }
  return structuredClone(value);
 }
