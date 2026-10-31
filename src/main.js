@@ -472,7 +472,7 @@ function toggleCellCheckbox(ref){
  if(current!=='☐'&&current!=='☑')return;
  try{
   transact(()=>setCell(sheet(),ref,current==='☐'?'☑':'☐'));
-  setSelection(ref);
+  drawGrid();
  }catch(err){status(err.message,true);}
 }
 function updateMerge(mode){if(!requireSingleRange())return;
@@ -745,6 +745,12 @@ const icons={
 
 };
 function toolIcon(action,original,extra=''){
+ if(['bold','italic','underline','strike'].includes(action))return original;
+ if(action==='valign'){
+  const where=/data-value="(top|center|bottom)"/.exec(extra)?.[1]||'center';
+  const y=where==='top'?7:where==='bottom'?17:12;
+  return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 3h16M4 21h16" opacity=".25"/><path d="M6 ${y-3}h12M6 ${y}h12M6 ${y+3}h12"/></svg>`;
+ }
  const direction=/data-value="(left|center|right)"/.exec(extra)?.[1];
  const name=action==='align'?'align'+({left:'Left',center:'Center',right:'Right'}[direction]||'Left'):action==='format'?({general:'num',currency:'currency',percent:'percent',integer:'integer',date:'date',time:'time',datetime:'datetime',duration:'duration'}[/data-value="([^"]+)"/.exec(extra)?.[1]]||'num'):
  ({'print-open':'print','validation-open':'validation','conditional-open':'conditional','chart-bar':'charts','chart-stacked':'charts','chart-stacked100':'charts','chart-line':'chartLine','chart-scatter':'chartLine','chart-pie':'chartPie','charts-open':'charts','copy':'copy','paste-values':'pasteValues','clear':'clear','clear-format':'eraser','bold':'bold','italic':'italic','autosum':'autosum','undo':'undo','redo':'redo','fill-down':'down','fill-right':'right','sort-asc':'sortAsc','sort-desc':'sortDesc','find-open':'search','filter-toggle':'filter','import':'fileOpen','csv':'csv','xlsx':'xlsx','save':'save','save-as':'save','open-disk':'fileOpen','backup':'backup','sheet-add':'plus','sheet-rename':'edit','freeze-row':'freezeRow','freeze-col':'freezeCol','freeze-at':'freezeAt','freeze-clear':'freezeOff','column-width':'width','column-fit':'columns','row-height':'height','row-reset':'refresh','goto':'home','insert-row':'insertRow','delete-row':'deleteRow','insert-col':'insertColumn','delete-col':'deleteColumn','border-all':'borderAll','border-none':'borderNone','border-menu':'borderOutline','border-outline':'borderOutline','border-bottom':'borderBottom','border-top':'borderTop','border-left':'borderLeft','border-right':'borderRight','merge-cells':'merge','unmerge-cells':'unmerge','text-palette':'textPalette','fill-palette':'fillPalette','wrap':'wrap','hide-row':'hideRow','show-rows':'showRows','hide-col':'hideCol','show-cols':'showCols'})[action];
@@ -765,8 +771,8 @@ function ribbon(){
  let contents='';
  if(activeRibbon==='home')contents=
  group('Буфер',button('undo','Отменить','↶')+button('redo','Повторить','↷')+button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫'))+
- group('Шрифт',fontTools+'<div class="font-action-row">'+button('bold','Жирный','<b>Ж</b>')+button('italic','Курсив','<i>К</i>')+colorTools+'</div>')+
- group('Выравнивание',button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"'))+
+ group('Шрифт',fontTools+'<div class="font-action-row">'+button('bold','Жирный','<b class="font-letter">Ж</b>')+button('italic','Курсив','<i class="font-letter">К</i>')+button('underline','Подчёркнутый','<span class="font-letter underlined">Ч</span>')+button('strike','Зачёркнутый','<span class="font-letter struck">З</span>')+colorTools+'</div>')+
+ group('Выравнивание','<div class="align-rows"><div class="align-row vertical">'+button('valign','По верхнему краю ячейки','▔','data-value="top"')+button('valign','По вертикальному центру','≡','data-value="center"')+button('valign','По нижнему краю ячейки','▁','data-value="bottom"')+'</div><div class="align-row horizontal">'+button('align','По левому краю','≡','data-value="left"')+button('align','По центру','≡','data-value="center"')+button('align','По правому краю','≡','data-value="right"')+'</div></div>')+
  group('Число',button('format','Общий','123','data-value="general"')+button('format','Рубли','₽','data-value="currency"')+button('format','Проценты','%','data-value="percent"')+button('format','Целое число','0','data-value="integer"')+button('format','Дата','📅','data-value="date"')+button('format','Время','⏱','data-value="time"')+button('format','Дата и время','◷','data-value="datetime"')+button('format','Длительность','◴','data-value="duration"'))+
  group('Вычисления',button('autosum','Автосумма','Σ'))+
  group('Оформление',button('border-menu','Границы','□')+button('merge-cells','Объединить ячейки','▣')+button('unmerge-cells','Разъединить','▤')+button('wrap','Перенос текста','↵')+button('conditional-open','Условное форматирование','▦')+button('clear-format','Сбросить формат','⟲'));
@@ -1244,7 +1250,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
    right:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)),'right')).find(Boolean):resolveBorderSide(style,'right')
   };
   const val=displayedValue(s,ref,raw,ctx),align=style.align||s.defaultAlign||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.fontFamily&&FONT_FAMILIES.includes(style.fontFamily)?`font-family:'${style.fontFamily}',sans-serif;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
+  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.underline||style.strike?`text-decoration-line:${style.underline&&style.strike?'underline line-through':style.underline?'underline':'line-through'};text-decoration-thickness:1px;text-underline-offset:2px;`:''}${style.verticalAlign?`align-items:${style.verticalAlign==='top'?'flex-start':style.verticalAlign==='bottom'?'flex-end':'center'};`:''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.fontFamily&&FONT_FAMILIES.includes(style.fontFamily)?`font-family:'${style.fontFamily}',sans-serif;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   const destination=pinnedR?'row':pinnedC?'col':'main';
@@ -1354,7 +1360,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'insert-checkbox':insertCheckboxes();break;case 'checkbox-toggle':e.preventDefault();toggleCellCheckbox(ref);break;
  case 'merge-cells':updateMerge('merge');break;case 'unmerge-cells':updateMerge('unmerge');break;
  case 'border-all':setCellBorders('all');break;case 'border-none':setCellBorders('none');break;case 'wrap':toggleWrap();break;
- case 'bold':applyStyle({bold:!getEffectiveStyle(sheet(),activeCell).bold});break;case 'italic':applyStyle({italic:!getEffectiveStyle(sheet(),activeCell).italic});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
+ case 'bold':applyStyle({bold:!getEffectiveStyle(sheet(),activeCell).bold});break;case 'italic':applyStyle({italic:!getEffectiveStyle(sheet(),activeCell).italic});break;
+ case 'underline':applyStyle({underline:!getEffectiveStyle(sheet(),activeCell).underline});break;
+ case 'strike':applyStyle({strike:!getEffectiveStyle(sheet(),activeCell).strike});break;
+ case 'valign':applyStyle({verticalAlign:value});break;case 'align':applyStyle({align:value});break;case 'format':applyStyle({format:value});break;
  case 'formula-fn':{const p=parseCell(activeCell);const from=p.row>0?cellName(0,p.col):cellName(1,p.col),to=p.row>0?cellName(p.row-1,p.col):cellName(9,p.col);const field=document.querySelector('#formula-input');if(field){field.value=`=${fn}(${from}:${to})`;field.focus();status('Проверьте диапазон, затем нажмите Enter');}break;}
  case 'copy':await copySelection();break;case 'paste-values':pasteOnlyValues();break;case 'goto':setSelection(ref);ensureVisible(parseCell(ref).row,parseCell(ref).col);break;
  case 'hide-row':visibilityAction('row',false);break;case 'show-rows':visibilityAction('row',true);break;case 'hide-col':visibilityAction('col',false);break;case 'show-cols':visibilityAction('col',true);break;
