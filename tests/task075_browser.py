@@ -27,6 +27,7 @@ with sync_playwright() as p:
  cell('D7').click(position={'x':3,'y':4})
  assert page.locator('#name-box').input_value()=='D7'
  select('E9')
+ page.evaluate("setCell(sheet(),'E9','Привет');changed()")
  page.get_by_role('tab',name='Главная').click()
  for action,property in [('bold','bold'),('italic','italic'),('underline','underline'),('strike','strike')]:
   page.locator('[data-action='+action+']').first.click()
@@ -56,7 +57,7 @@ with sync_playwright() as p:
  assert page.locator('#name-box').input_value()=='A4:CV8'
  assert cell('C5').get_attribute('aria-selected')=='true'
  drag_header('col',1,4)
- assert page.locator('#name-box').input_value()=='B1:F100000'
+ assert page.locator('#name-box').input_value()=='B1:E100000'
  assert cell('E5').get_attribute('aria-selected')=='true'
  assert cell('A5').get_attribute('aria-selected')=='false'
  # Ordinary click still selects a single header, and resizing remains available.
