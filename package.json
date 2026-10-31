@@ -12,7 +12,8 @@
     "check": "npm test && npm run build",
     "test:studio": "node tests/task095_browser.cjs",
     "test:design-system": "node tests/task096_browser.cjs",
-    "test:photo-tools": "node tests/task097_browser.cjs"
+    "test:photo-tools": "node tests/task097_browser.cjs",
+    "test:creative-tools": "node tests/task098_browser.cjs"
   },
   "license": "MIT",
   "devDependencies": {
