@@ -23,7 +23,7 @@ with sync_playwright() as p:
    selected:e.classList.contains('is-selected')})""")
  write('B2','Документ');select('B2:D4')
  page.get_by_role('button',name='Заливка ячеек').click()
- page.locator('[data-action=palette-pick][data-value="#ffffff"]').click()
+ page.locator('[data-action=palette-pick][data-value="#FFFFFF"]').click()
  assert style('B2')['fill']=='rgb(255, 255, 255)'
  assert style('C3')['fill']=='rgb(255, 255, 255)'
  assert style('B2')['width']=='1px',style('B2')

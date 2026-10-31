@@ -1,7 +1,8 @@
+import {uid,rectangle,cellName,parseCell,LIMITS} from './workbook.js';
 /** Bounded, offline Data Validation: dropdown list or inclusive numeric interval.
  * Deliberately validates direct raw writes, not formula results or source imports.
  */
-import {uid,rectangle,cellName,parseCell,LIMITS} from './workbook.js';
+
 const VLD_MAX=32,VLD_CELLS=4000;
 function vldArea(rule){
  const rect=rule&&typeof rule.from==='string'&&typeof rule.to==='string'?rectangle(rule.from,rule.to):null;

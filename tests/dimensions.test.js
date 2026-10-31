@@ -15,8 +15,8 @@ test('column/row geometry is non-uniform and searchable',()=>{
 });
 test('invalid size and malicious archive metadata rejected',()=>{
  const b=newWorkbook(),s=currentSheet(b);
- for(const n of [0,47,521,Infinity,45.5])assert.throws(()=>setColumnWidth(s,0,n));
- for(const n of [0,21,161,33.5])assert.throws(()=>setRowHeight(s,0,n));
+ for(const n of [0,47,3001,Infinity,45.5])assert.throws(()=>setColumnWidth(s,0,n));
+ for(const n of [0,21,2001,33.5])assert.throws(()=>setRowHeight(s,0,n));
  s.columnWidths={'-1':116};assert.throws(()=>validateWorkbook(b));
  s.columnWidths={};s.rowHeights={'100000':50};assert.throws(()=>validateWorkbook(b));
 });

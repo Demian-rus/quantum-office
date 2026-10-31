@@ -1,17 +1,24 @@
+export {cellName,parseCell};
 import { cellName,parseCell,colLabel,evaluateCell,createCalculationSession,csvEncode,csvDecode } from './formulas.js';
 import {formatTemporal,parseTemporalInput} from './dates.js';
 import {validateCharts} from './charts.js';
 import {validateConditionalRules} from './conditional.js';
 import {validateDataRules,checkValidatedInput} from './validation.js';
 import {validatePrintSettings} from './printing.js';
+
+
+
+
+
+
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,smartTable:null,merges:[],hyperlinks:{},defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
-export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
+export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:3000,minRow:22,maxRow:2000,maxDefaultRow:300};
 const geometryCache=new WeakMap();
 export function invalidateGridGeometry(sheet){if(sheet&&typeof sheet==='object')geometryCache.delete(sheet);}
 export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??sheet.defaultColumnWidth??DIMENSIONS.defaultColumn;}
@@ -46,17 +53,111 @@ export function showAllHidden(sheet,axis){
 }
 /** Filters never move or delete source cells. Only row visibility is changed. */
 export function filterRange(sheet){const value=sheet.autoFilter;return value?rectangle(value.from,value.to):null;}
+const QO_FILTER_OPS=new Set(['contains','notContains','startsWith','endsWith','equals','notEquals','empty','notEmpty','gt','gte','lt','lte','numEq','numNe']);
+const QO_FILTER_NUMERIC=new Set(['gt','gte','lt','lte','numEq','numNe']);
+export function validFilterRule(rule){
+ if(typeof rule==='string')return rule.length<=50000;
+ if(Array.isArray(rule))return rule.length>0&&rule.length<=200&&rule.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(rule).size===rule.length;
+ return !!rule&&typeof rule==='object'&&!Array.isArray(rule)&&rule.kind==='condition'&&
+  Object.keys(rule).every(k=>['kind','op','value'].includes(k))&&QO_FILTER_OPS.has(rule.op)&&
+  typeof rule.value==='string'&&rule.value.length<=200&&
+  (['empty','notEmpty'].includes(rule.op)||rule.value.trim().length>0)&&
+  (!QO_FILTER_NUMERIC.has(rule.op)||Number.isFinite(Number(rule.value)));
+}
+export function filterConditionMatches(raw,rule){
+ const value=String(raw??''),test=rule.value.toLocaleLowerCase('ru-RU'),text=value.toLocaleLowerCase('ru-RU');
+ switch(rule.op){
+  case 'empty':return value==='';case 'notEmpty':return value!=='';
+  case 'contains':return text.includes(test);case 'notContains':return !text.includes(test);
+  case 'startsWith':return text.startsWith(test);case 'endsWith':return text.endsWith(test);
+  case 'equals':return text===test;case 'notEquals':return text!==test;
+  default:{if(!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(value.trim()))return false;
+   const a=Number(value),b=Number(rule.value);if(!Number.isFinite(a)||!Number.isFinite(b))return false;
+   return rule.op==='gt'?a>b:rule.op==='gte'?a>=b:rule.op==='lt'?a<b:rule.op==='lte'?a<=b:rule.op==='numEq'?a===b:a!==b;
+  }
+ }
+}
 export function filterRowVisible(sheet,row){
  const rect=filterRange(sheet),rules=sheet.autoFilter?.rules||{};
  if(!rect||row<=rect.r1||row>rect.r2)return true;
  return Object.entries(rules).every(([col,needles])=>{
-   const value=getCell(sheet,cellName(row,Number(col))).value;
-   return Array.isArray(needles)?needles.includes(value):value===needles;
-  });
+  const value=getCell(sheet,cellName(row,Number(col))).value;
+  return Array.isArray(needles)?needles.includes(value):typeof needles==='string'?value===needles:filterConditionMatches(value,needles);
+ });
 }
 export function setFreeze(sheet,rows,cols){
  if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<0||rows>10||cols<0||cols>10)throw Error('Закрепить можно не более 10 строк и столбцов');
  sheet.freeze={rows,cols};
+}
+export function smartTableRange(sheet){return sheet?.smartTable?rectangle(sheet.smartTable.from,sheet.smartTable.to):null;}
+export function createSmartTable(sheet,from,to){
+ const r=rectangle(from,to);
+ if(!r||!validRef(from)||!validRef(to)||r.r2<=r.r1||r.r2-r.r1+1>5000)
+  throw Error('Диапазон должен содержать заголовок и минимум одну строку данных (до 5000 строк)');
+ const old=smartTableRange(sheet),same=old&&old.r1===r.r1&&old.r2===r.r2&&old.c1===r.c1&&old.c2===r.c2;
+ if(same)return 'existing';
+ if(old){
+  const encloses=old.r1>=r.r1&&old.r2<=r.r2&&old.c1>=r.c1&&old.c2<=r.c2;
+  const subset=old.r1<=r.r1&&old.r2>=r.r2&&old.c1<=r.c1&&old.c2>=r.c2;
+  if(subset)throw Error('Выделение входит в существующую умную таблицу. Отдельная таблица внутри неё не создаётся');
+  if(!encloses)throw Error('На листе поддерживается одна умная таблица. Для отдельного списка используется другой лист');
+  if(sheet.autoFilter&&(
+    sheet.autoFilter.from!==cellName(old.r1,old.c1)||sheet.autoFilter.to!==cellName(old.r2,old.c2)))
+   throw Error('Выключите автофильтр другого диапазона перед расширением умной таблицы');
+ }else if(sheet.autoFilter&&(
+  sheet.autoFilter.from!==cellName(r.r1,r.c1)||sheet.autoFilter.to!==cellName(r.r2,r.c2)))
+  throw Error('Автофильтр установлен для другого диапазона. Сначала отключите его');
+ const conflictingMerges=(sheet.merges||[]).filter(m=>{const q=rectangle(m.from,m.to);return q&&q.r1<=r.r2&&q.r2>=r.r1&&q.c1<=r.c2&&q.c2>=r.c1;});
+ if(conflictingMerges.length)
+  throw Error('Объединённые ячейки не поддерживаются: '+conflictingMerges.slice(0,3).map(m=>m.from+':'+m.to).join(', '));
+ for(let c=r.c1;c<=r.c2;c++){
+  if(!getCell(sheet,cellName(r.r1,c)).value.trim())throw Error('Не заполнен заголовок столбца '+colLabel(c));
+ }
+ // Headers may repeat: filters use fixed column indices, not header text.
+ // Expansion is safe when it encloses the prior table and preserves all cells.
+ const oldFilter=sheet.autoFilter;
+ if(old&&oldFilter&&oldFilter.from===sheet.smartTable.from&&oldFilter.to===sheet.smartTable.to){sheet.autoFilter=null;}
+ sheet.smartTable={from:cellName(r.r1,r.c1),to:cellName(r.r2,r.c2)};
+ if(!sheet.autoFilter)setAutoFilter(sheet,sheet.smartTable.from,sheet.smartTable.to);
+ for(let c=r.c1;c<=r.c2;c++){
+  const ref=cellName(r.r1,c),prior=getEffectiveStyle(sheet,ref);
+  const patch={bold:true};
+  if(!prior.bg)patch.bg='#E6F2EB';
+  if(!prior.color)patch.color='#174F3A';
+  setStyle(sheet,ref,patch);
+ }
+ return old?'expanded':'created';
+}
+export function appendSmartTableRow(sheet,editedRef=null){
+ const r=smartTableRange(sheet);
+ if(!r)throw Error('Умная таблица не найдена');
+ if(r.r2+1>=LIMITS.rows||r.r2-r.r1+1>=5000)throw Error('Лимит умной таблицы: 5000 строк');
+ const next=r.r2+1,edited=editedRef?.toUpperCase();
+ for(let col=r.c1;col<=r.c2;col++){
+  const dest=cellName(next,col),src=cellName(r.r2,col),existing=getCell(sheet,dest),previous=getCell(sheet,src);
+  if(mergeAt(sheet,dest))throw Error('Нельзя расширить таблицу на объединённые ячейки');
+  const style=structuredClone(previous.style||{});
+  // Inherit the previous row's explicit cell formatting without replacing user-entered values.
+  if(!Object.keys(existing.style||{}).length&&Object.keys(style).length)setStyle(sheet,dest,style);
+  if(dest!==edited&&!existing.value&&previous.value.startsWith('='))
+   setCell(sheet,dest,translateFormula(previous.value,1,0));
+ }
+ sheet.smartTable={...sheet.smartTable,to:cellName(next,r.c2)};
+ if(sheet.autoFilter?.from===cellName(r.r1,r.c1)&&sheet.autoFilter?.to===cellName(r.r2,r.c2))
+  sheet.autoFilter={...sheet.autoFilter,to:cellName(next,r.c2)};
+ invalidateGridGeometry(sheet);
+ return next;
+}
+export function extendSmartTableAfterEntry(sheet,ref,input){
+ const r=smartTableRange(sheet),p=parseCell(ref);
+ if(r&&p&&p.row===r.r2+1&&p.col>=r.c1&&p.col<=r.c2&&String(input??'').trim())
+  appendSmartTableRow(sheet,ref);
+}
+export function removeSmartTable(sheet){
+ if(!sheet.smartTable)throw Error('На листе нет умной таблицы');
+ if(sheet.autoFilter?.from===sheet.smartTable.from&&sheet.autoFilter?.to===sheet.smartTable.to)
+  sheet.autoFilter=null;
+ sheet.smartTable=null;invalidateGridGeometry(sheet);
 }
 export function setAutoFilter(sheet,from,to){
  const rect=rectangle(from,to);
@@ -67,10 +168,7 @@ export function setAutoFilter(sheet,from,to){
 export function setFilterValue(sheet,col,value){
  const rect=filterRange(sheet);
  if(!rect||!Number.isInteger(col)||col<rect.c1||col>rect.c2)throw Error('Столбец не входит в фильтр');
- if(value!==null){
-   const validString=v=>typeof v==='string'&&v.length<=50000;
-   if(!(validString(value)||(Array.isArray(value)&&value.length>0&&value.length<=200&&value.every(validString)&&new Set(value).size===value.length)))throw Error('Недопустимое значение фильтра');
-  }
+ if(value!==null&&!validFilterRule(value))throw Error('Недопустимое значение фильтра');
  const rules={...(sheet.autoFilter.rules||{})};
  if(value===null)delete rules[col];else rules[col]=value;
  sheet.autoFilter={...sheet.autoFilter,rules};invalidateGridGeometry(sheet);
@@ -130,7 +228,7 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
-export const FONT_FAMILIES=['Aptos','Calibri','Arial','Segoe UI','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Cambria','Constantia','Candara','Corbel','Consolas','Courier New','Palatino Linotype','Garamond','PT Sans','PT Serif','Roboto','Noto Sans','Noto Serif','Open Sans','DejaVu Sans','Liberation Sans','Liberation Serif'];
+export const FONT_FAMILIES=['Aptos','Calibri','Arial','Segoe UI','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Cambria','Constantia','Candara','Corbel','Consolas','Courier New','Palatino Linotype','Garamond','Book Antiqua','Century Gothic','Franklin Gothic Medium','Arial Black','Impact','Comic Sans MS','Segoe Print','Gabriola','Lucida Handwriting','Brush Script MT','Copperplate','Old English Text MT','PT Sans','PT Serif','Roboto','Noto Sans','Noto Serif','Open Sans','DejaVu Sans','Liberation Sans','Liberation Serif'];
 const bulkStyleProps=new Set(['bg','color','bold','italic','underline','strike','wrap','format','align','verticalAlign','fontSize','fontFamily']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -211,7 +309,44 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  sheet.defaultStyle=next;sheet.columnStyles=columns;sheet.rectangleStyles=remainingRectangleStyles;
 }
 
-export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');checkValidatedInput(sheet,ref,String(value??'').slice(0,50000));const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
+// External hyperlinks are data, not HTML: never accept script, data or file schemes.
+export function safeHyperlink(value){
+ if(typeof value!=='string'||value.length>2048||/[\x00-\x1f\x7f]/.test(value))return null;
+ const input=value.trim();if(input!==value||!input)return null;
+ try{
+  const url=new URL(input);
+  if(!['https:','http:','mailto:'].includes(url.protocol))return null;
+  if(url.protocol==='mailto:'&&!url.pathname)return null;
+  if(['http:','https:'].includes(url.protocol)&&!url.hostname)return null;
+  return input;
+ }catch{return null;}
+}
+export function cellHyperlink(sheet,ref){
+ const stored=sheet.hyperlinks?.[ref];if(stored)return safeHyperlink(stored);
+ const value=getCell(sheet,ref).value;
+ return /^https?:\/\//i.test(value)?safeHyperlink(value):null;
+}
+export function setHyperlink(sheet,ref,url,label){
+ if(!validRef(ref))throw Error('Некорректная ячейка для гиперссылки');
+ const normalized=safeHyperlink(String(url||'').trim());
+ if(!normalized)throw Error('Разрешены только ссылки https://, http:// и mailto:');
+ const caption=String(label||'').trim()||normalized;
+ if(caption.length>50000)throw Error('Слишком длинная подпись гиперссылки');
+ setCell(sheet,ref,caption);
+ (sheet.hyperlinks??={})[ref]=normalized;
+}
+export function removeHyperlink(sheet,ref){
+ if(sheet.hyperlinks)delete sheet.hyperlinks[ref];
+}
+export function exportedHyperlinks(sheet){
+ const entries=new Map();
+ for(const [ref,url] of Object.entries(sheet.hyperlinks||{}))if(safeHyperlink(url)&&getCell(sheet,ref).value)entries.set(ref,url);
+ for(const [ref,cell] of Object.entries(sheet.cells))if(!entries.has(ref)&&/^https?:\/\//i.test(cell.value)){
+  const link=safeHyperlink(cell.value);if(link)entries.set(ref,link);
+ }
+ return [...entries].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
+}
+export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');checkValidatedInput(sheet,ref,String(value??'').slice(0,50000));const key=ref.toUpperCase();if(sheet.hyperlinks&&sheet.cells[key]?.value!==String(value??'').slice(0,50000))delete sheet.hyperlinks[key];if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value){if(sheet.hyperlinks)delete sheet.hyperlinks[key];if(!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}if(sheet.autoFilter)invalidateGridGeometry(sheet);}
 /** Convert explicit calendar/time input to serial values only for direct user entry.
  * All file import, clipboard and formula editing outside the UI preserve their raw values. */
 export function setTypedCell(sheet,ref,input){
@@ -220,6 +355,7 @@ export function setTypedCell(sheet,ref,input){
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
  else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'date'});
  else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'time'});
+ extendSmartTableAfterEntry(sheet,ref,input);
 }
 /** Full-sheet alignment is one property, not 200,000 styled cells.
  * Existing per-cell alignments are reset so this action truly affects all cells.
@@ -280,6 +416,7 @@ export function clearCellValues(sheet,from,to,inspectOnly=false){
   if(!entry.value)continue;
   count++;
   if(!inspectOnly){
+   if(sheet.hyperlinks)delete sheet.hyperlinks[ref];
    if(Object.keys(entry.style||{}).length)sheet.cells[ref]={...entry,value:''};
    else delete sheet.cells[ref];
   }
@@ -621,37 +758,60 @@ export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!va
 }
 /** Sorts whole selected rows, keeping each cell style with its value. Formula cells are
  * rejected until reference-rewriting semantics for row moves are implemented. */
-export function sortSelectedRows(sheet,start,end,direction='asc'){
+export function sortSelectedRows(sheet,start,end,direction='asc',options={}){
  const rect=rectangle(start,end);
- if(!rect||rect.r1===rect.r2)throw Error('Выделите минимум две строки');
+ if(!rect||rect.r1===rect.r2)throw Error('Выделите минимум две строки для сортировки');
  const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
- if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
+ if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек. Выделите меньший диапазон');
  if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
- if((sheet.rectangleStyles||[]).length)throw Error('Сортировка с крупными диапазонами оформления пока недоступна');
- if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
+ const keyCol=options.keyColumn??rect.c1,header=!!options.header;
+ if(!Number.isInteger(keyCol)||keyCol<rect.c1||keyCol>rect.c2)
+  throw Error('Столбец сортировки должен быть внутри выделенного диапазона');
+ const first=rect.r1+(header?1:0),last=rect.r2;
+ if(first>=last)throw Error('Для сортировки нужны минимум две строки данных');
+ const touches=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
+ const moving={...rect,r1:first};
+ if((sheet.rectangleStyles||[]).some(rule=>{
+  const part=rectangle(rule.from,rule.to);return part&&touches(part,moving);
+ }))throw Error('Сортировка пересекает диапазон общего оформления. Используйте обычное оформление ячеек');
+ if((sheet.merges||[]).some(m=>{const part=rectangle(m.from,m.to);return part&&touches(part,moving);}))
+  throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
+ for(let row=first;row<=last;row++)if(!rowVisible(sheet,row))
+  throw Error('Нельзя сортировать скрытые или отфильтрованные строки');
+ for(let col=rect.c1;col<=rect.c2;col++)if(!columnVisible(sheet,col))
+  throw Error('Нельзя сортировать диапазон со скрытыми столбцами');
  const rows=[];
- for(let r=rect.r1;r<=rect.r2;r++){
+ for(let r=first;r<=last;r++){
   const cells=[];
   for(let c=rect.c1;c<=rect.c2;c++){
-   const cell=getCell(sheet,cellName(r,c));
-   if(cell.value.startsWith('='))throw Error('Сортировка диапазона с формулами пока не поддерживается');
-   cells.push(structuredClone(cell));
+   const ref=cellName(r,c),cell=getCell(sheet,ref);
+   if(cell.value.startsWith('='))throw Error('В выделении есть формулы. Сортировка перемещённых формул пока недоступна');
+   cells.push({cell:structuredClone(cell),hyperlink:sheet.hyperlinks?.[ref]||null});
   }
-  rows.push(cells);
+  rows.push({cells,index:r-first});
  }
- const collator=new Intl.Collator('ru-RU',{numeric:true,sensitivity:'base'});
- const sorted=rows.map((row,index)=>({row,index})).sort((a,b)=>{
-  const av=a.row[0].value.trim(),bv=b.row[0].value.trim();
-  if(!av||!bv)return av? -1:bv? 1:a.index-b.index;
-  const an=Number(av.replace(',','.')),bn=Number(bv.replace(',','.'));
-  const result=Number.isFinite(an)&&Number.isFinite(bn)?Math.sign(an-bn):collator.compare(av,bv);
-  return (direction==='desc'?-result:result)||a.index-b.index;
+ const keyIndex=keyCol-rect.c1,collator=new Intl.Collator('ru-RU',{numeric:true,sensitivity:'base'});
+ const numberValue=value=>{
+  const trimmed=value.replace(/\s/g,'').replace(',', '.');
+  return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)?Number(trimmed):null;
+ };
+ const sorted=rows.sort((a,b)=>{
+  const av=a.cells[keyIndex].cell.value.trim(),bv=b.cells[keyIndex].cell.value.trim();
+  if(!av||!bv)return av? -1:bv? 1:a.index-b.index; // Empty values always last.
+  const an=numberValue(av),bn=numberValue(bv);
+  const order=an!==null&&bn!==null?Math.sign(an-bn):collator.compare(av,bv);
+  return (direction==='desc'?-order:order)||a.index-b.index;
  });
- for(let i=0;i<sorted.length;i++)for(let j=0;j<sorted[i].row.length;j++){
-  const ref=cellName(rect.r1+i,rect.c1+j),cell=sorted[i].row[j];
-  if(cell.value||Object.keys(cell.style).length)sheet.cells[ref]=cell;
+ const nextLinks={...(sheet.hyperlinks||{})};
+ for(let i=0;i<sorted.length;i++)for(let j=0;j<sorted[i].cells.length;j++){
+  const ref=cellName(first+i,rect.c1+j),item=sorted[i].cells[j],cell=item.cell;
+  if(cell.value||Object.keys(cell.style||{}).length)sheet.cells[ref]=cell;
   else delete sheet.cells[ref];
+  if(item.hyperlink)nextLinks[ref]=item.hyperlink;
+  else delete nextLinks[ref];
  }
+ sheet.hyperlinks=nextLinks;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
  return sorted.length;
 }
 
@@ -695,6 +855,20 @@ export function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
  let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
   validateCharts(sheet);
+  if(sheet.hyperlinks!==undefined){
+   if(!sheet.hyperlinks||typeof sheet.hyperlinks!=='object'||Array.isArray(sheet.hyperlinks)||Object.keys(sheet.hyperlinks).length>5000||
+    Object.entries(sheet.hyperlinks).some(([ref,url])=>!validRef(ref)||!safeHyperlink(url)||!sheet.cells?.[ref]?.value))
+    throw Error('Повреждены гиперссылки книги');
+  }
+  if(sheet.smartTable!==undefined&&sheet.smartTable!==null){
+   const t=sheet.smartTable,r=t?.from&&t?.to?rectangle(t.from,t.to):null;
+   if(!t||typeof t!=='object'||Array.isArray(t)||Object.keys(t).some(k=>!['from','to'].includes(k))||
+      !r||!validRef(t.from)||!validRef(t.to)||r.r2<=r.r1||r.r2>=LIMITS.rows||
+      r.c2>=LIMITS.columns||r.r2-r.r1+1>5000||t.from!==cellName(r.r1,r.c1)||t.to!==cellName(r.r2,r.c2))
+    throw Error('Повреждена умная таблица');
+   if((sheet.merges||[]).some(m=>{const q=rectangle(m.from,m.to);return q&&q.r1<=r.r2&&q.r2>=r.r1&&q.c1<=r.c2&&q.c2>=r.c1;}))
+    throw Error('Объединённые ячейки в умной таблице');
+  }
   validateConditionalRules(sheet);
   validateDataRules(sheet);
   validatePrintSettings(sheet);
@@ -739,7 +913,7 @@ export function validateWorkbook(book){
       Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
     throw Error(name==='columnStyles'?'Повреждено оформление столбцов':'Повреждено оформление строк');
   }
-  for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
+  for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxDefaultRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
    for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,12,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,12,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
@@ -756,7 +930,7 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
    if(sheet.autoFilter!==undefined&&sheet.autoFilter!==null){
     const f=sheet.autoFilter,rect=rectangle(f?.from,f?.to);
     if(!f||!rect||!validRef(f.from)||!validRef(f.to)||rect.r2<=rect.r1||!f.rules||typeof f.rules!=='object'||Array.isArray(f.rules))throw Error('Повреждён автофильтр');
-    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!(typeof val==='string'&&val.length<=50000||Array.isArray(val)&&val.length>0&&val.length<=200&&val.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(val).size===val.length)))throw Error('Некорректные условия фильтра');
+    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!validFilterRule(val)))throw Error('Некорректные условия фильтра');
    }
  if(sheet.merges!==undefined){
    if(!Array.isArray(sheet.merges)||sheet.merges.length>500)throw Error('Некорректные объединения');
@@ -847,7 +1021,7 @@ export function planAutoSum(sheet,from,to){
  return entries;
 }
 
-export {cellName,parseCell};
+{cellName,parseCell};
 
 /** Reusable polished template helpers. Schema remains compatible with .qbook/XLSX. */
 const tColor={ink:'#20354a',navy:'#25415d',blue:'#315e7c',pale:'#e9f1f8',green:'#28664e',mint:'#e7f4ec',gold:'#a36a1a',cream:'#fff0d4',white:'#ffffff',soft:'#f5f8fb',muted:'#617589'};

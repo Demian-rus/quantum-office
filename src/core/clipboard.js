@@ -1,8 +1,10 @@
-/** In-app clipboard: preserves formulas, styles and complete merged regions.
- * All edits are prevalidated before mutating a sheet; no eval or network. */
-import {rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,formulaContext,resultOf,mergeAt,mergeCells,validRef,getEffectiveStyle,setCell} from './workbook.js';
+import {safeHyperlink,rectangle,cellName,parseCell,getCell,translateFormula,LIMITS,formulaContext,resultOf,mergeAt,mergeCells,validRef,getEffectiveStyle,setCell} from './workbook.js';
 import {rebaseMovedFormula} from './reference-move.js';
 import {checkValidatedInput} from './validation.js';
+/** In-app clipboard: preserves formulas, styles and complete merged regions.
+ * All edits are prevalidated before mutating a sheet; no eval or network. */
+
+
 
 const inside=(inner,outer)=>inner.r1>=outer.r1&&inner.r2<=outer.r2&&inner.c1>=outer.c1&&inner.c2<=outer.c2;
 const overlaps=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
@@ -31,7 +33,7 @@ export function copyCells(sheet,start,end,book=null){
   cells:Array.from({length:rows},(_,r)=>Array.from({length:cols},(_,c)=>{
    const ref=cellName(rect.r1+r,rect.c1+c),item=getCell(sheet,ref);
    const effective=getEffectiveStyle(sheet,ref);
-   return {value:item.value,style:structuredClone(effective)};
+   return {value:item.value,style:structuredClone(effective),hyperlink:sheet.hyperlinks?.[ref]||null};
   }))};
 }
 
@@ -59,18 +61,19 @@ export function pasteCells(sheet,target,clip){
    const item=clip.cells[r][c];if(typeof item?.value!=='string'||item.value.length>50000||!item.style||typeof item.style!=='object'||Array.isArray(item.style))throw Error('Повреждённые данные буфера');
    const value=translateFormula(item.value,at.row-from.row,at.col-from.col);
    checkValidatedInput(sheet,cellName(at.row+r,at.col+c),value);
-   changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style)}]);
+   if(item.hyperlink!=null&&!safeHyperlink(item.hyperlink))throw Error('Недопустимая гиперссылка в буфере');
+   changes.push([cellName(at.row+r,at.col+c),{value,style:structuredClone(item.style),hyperlink:item.hyperlink||null}]);
   }
  }
  // Apply all changes to a draft when copying merges. The merge validator checks
  // covered cells, frozen panes, hidden rows/columns and active auto-filters.
  if(merges.length){
   const trial=structuredClone(sheet);
-  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)trial.cells[ref]=item;else delete trial.cells[ref];}
+  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)trial.cells[ref]={value:item.value,style:item.style};else delete trial.cells[ref];if(item.hyperlink)(trial.hyperlinks??={})[ref]=item.hyperlink;else if(trial.hyperlinks)delete trial.hyperlinks[ref];}
   for(const m of merges)mergeCells(trial,cellName(at.row+m.r1,at.col+m.c1),cellName(at.row+m.r2,at.col+m.c2));
-  sheet.cells=trial.cells;sheet.merges=trial.merges;
+  sheet.cells=trial.cells;sheet.merges=trial.merges;sheet.hyperlinks=trial.hyperlinks||{};
  }else{
-  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)sheet.cells[ref]=item;else delete sheet.cells[ref];}
+  for(const [ref,item] of changes){if(item.value||Object.keys(item.style).length)sheet.cells[ref]={value:item.value,style:item.style};else delete sheet.cells[ref];if(item.hyperlink)(sheet.hyperlinks??={})[ref]=item.hyperlink;else if(sheet.hyperlinks)delete sheet.hyperlinks[ref];}
  }
  return {rows:clip.rows,cols:clip.cols,end:cellName(at.row+clip.rows-1,at.col+clip.cols-1)};
 }
@@ -152,7 +155,7 @@ export function moveCells(book,sheet,target,cutClip){
  // Remove only individually stored entries, not the sparse sheet defaults.
  for(const ref of Object.keys(draft.cells)){
   const p=parseCell(ref);
-  if(p.row>=src.r1&&p.row<=src.r2&&p.col>=src.c1&&p.col<=src.c2)delete draft.cells[ref];
+  if(p.row>=src.r1&&p.row<=src.r2&&p.col>=src.c1&&p.col<=src.c2){delete draft.cells[ref];if(draft.hyperlinks)delete draft.hyperlinks[ref];}
  }
  // The captured visible formatting must move with values. Snapshot-first
  // staging also handles overlapping source/destination rectangles correctly.
@@ -164,6 +167,7 @@ export function moveCells(book,sheet,target,cutClip){
   checkValidatedInput(sheet,ref,item.value);
   if(item.value||Object.keys(item.style).length)draft.cells[ref]={value:item.value,style:structuredClone(item.style)};
   else delete draft.cells[ref];
+  if(item.hyperlink)(draft.hyperlinks??={})[ref]=item.hyperlink;else if(draft.hyperlinks)delete draft.hyperlinks[ref];
  }
  for(const m of cutClip.merges||[])
   mergeCells(draft,cellName(dst.r1+m.r1,dst.c1+m.c1),cellName(dst.r1+m.r2,dst.c1+m.c2));
@@ -184,7 +188,7 @@ export function moveCells(book,sheet,target,cutClip){
  }
  // Commit only after every formula has been safely checked. There are no
  // external awaits between this point and completion of the transaction.
- sheet.cells=draft.cells;sheet.merges=draft.merges;
+ sheet.cells=draft.cells;sheet.merges=draft.merges;sheet.hyperlinks=draft.hyperlinks||{};
  for(const entry of pending){
   const destination=entry.current===sheet?sheet:entry.current;
   destination.cells[entry.ref].value=entry.value;

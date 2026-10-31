@@ -1,5 +1,5 @@
-/** Bounded, browser-native printing of spreadsheet ranges. No external renderer. */
 import {rectangle,cellName,parseCell,LIMITS,columnWidth,rowHeight,rowVisible,columnVisible,getEffectiveStyle,displayedValue,rawMap,formulaContext} from './workbook.js';
+/** Bounded, browser-native printing of spreadsheet ranges. No external renderer. */
 
 const PRINT_DEFAULTS={paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null};
 const PRINT_PAPERS={A4:[794,1123],Letter:[816,1056]};

@@ -1,5 +1,6 @@
-/** Offline, data-linked charts. No third-party scripts or remote services. */
 import {uid,rectangle,cellName,LIMITS,formulaContext,resultOf,gridGeometry} from './workbook.js';
+/** Offline, data-linked charts. No third-party scripts or remote services. */
+
 export const CHART_TYPES=['bar','line','pie','stacked','stacked100','scatter'];
 export const STACKED_TYPES=['stacked','stacked100'];
 export const CHART_MIN_WIDTH=280,CHART_MIN_HEIGHT=190;

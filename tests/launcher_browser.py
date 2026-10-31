@@ -8,8 +8,8 @@ with sync_playwright() as p:
     page.set_default_timeout(4500)
     errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
     page.set_content((root/'dist/index.html').read_text(encoding='utf-8'))
-    assert page.locator('.launcher-tile').count()==3
-    assert page.locator('.launcher-tile svg').count()==3
+    assert page.locator('.launcher-tile').count()==4
+    assert page.locator('.launcher-tile svg').count()==4
     assert page.locator('.home-top h1').count()==0
     page.screenshot(path=str(root/'tests/launcher-new.png'))
     page.get_by_role('button',name='Шаблоны таблиц').click()
@@ -41,8 +41,8 @@ with sync_playwright() as p:
     assert page.locator('.sheet-tab').count()==5
     assert page.locator('.sheet-tab').last.inner_text()=='Лист 1'
     page.get_by_role('button',name='Обзор').click()
-    assert page.locator('.launcher-tile').count()==3
+    assert page.locator('.launcher-tile').count()==4
     assert page.locator('.file-card').count()==1
     assert not errors,errors
-    print('PASS launcher 3 icon cards, timetable, new sheets, inline doubleclick rename, content preserved')
+    print('PASS launcher 4 icon cards, timetable, new sheets, inline doubleclick rename, content preserved')
     browser.close()
