@@ -1376,7 +1376,7 @@ function fillTypedAreas(sheet,areas,input,origin){
  * Reject overlaps: otherwise the fill source could be modified by another selected area. */
 function fillAreasDirection(sheet,areas,direction){
  if(!Array.isArray(areas)||areas.length<1||areas.length>25||
-    !['down','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
+    !['up','down','left','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
  const rects=areas.map(a=>{
   if(!validRef(a.from)||!validRef(a.to))throw Error('Недопустимый диапазон');
   return rectangle(a.from,a.to);
@@ -1482,28 +1482,38 @@ function extendFillHandle(sheet,from,to,direction,targetIndex){
   to:cellName(affected.r2,affected.c2),
   mode:prepared.some(x=>x.value.startsWith('='))?'formula':hasDateSeries?'date':'values'};
 }
-function fillSelection(sheet, from, to, direction){
- if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
- const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
- if(direction==='down'&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
- if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
+function fillSelection(sheet,from,to,direction){
+ if(!['up','down','left','right'].includes(direction))throw Error('Неподдерживаемое направление');
+ if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон');
+ const rect=rectangle(from,to),vertical=['up','down'].includes(direction);
+ if(vertical&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
+ if(!vertical&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
  const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(total>10000)throw Error('Выделено больше 10 000 ячеек');
- if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Заполнение объединённых ячеек пока не поддерживается');
+ if((sheet.merges||[]).some(m=>{
+  const x=rectangle(m.from,m.to);
+  return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;
+ }))throw Error('Заполнение объединённых ячеек пока не поддерживается');
  const changes=[];
  for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
-   if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
-   const originR=direction==='down'?rect.r1:r,originC=direction==='right'?rect.c1:c;
-   const original=getCell(sheet,cellName(originR,originC));
-   changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),structuredClone(original.style||{})]);
+  if(direction==='down'&&r===rect.r1||direction==='up'&&r===rect.r2||
+     direction==='right'&&c===rect.c1||direction==='left'&&c===rect.c2)continue;
+  const originR=direction==='down'?rect.r1:direction==='up'?rect.r2:r,
+   originC=direction==='right'?rect.c1:direction==='left'?rect.c2:c;
+  const original=getCell(sheet,cellName(originR,originC));
+  changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),
+   structuredClone(original.style||{})]);
  }
- // Precheck validation for the entire fill to preserve atomicity.
- for(const [ref,value] of changes)checkValidatedInput(sheet,ref,value);
- // Do not corrupt existing data if even one translated reference is out of bounds.
+ const staged=structuredClone(sheet);
  for(const [ref,value,style] of changes){
-   if(value||Object.keys(style).length)sheet.cells[ref]={value,style};
-   else delete sheet.cells[ref];
+  checkValidatedInput(staged,ref,value);
+  if(value||Object.keys(style).length)staged.cells[ref]={value,style};
+  else delete staged.cells[ref];
  }
+ if(Object.keys(staged.cells).length>LIMITS.cells)
+  throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=staged.cells;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
  return changes.length;
 }
 
@@ -5198,7 +5208,7 @@ function ribbon(){
  if(activeRibbon==='edit')contents=
  group('История',button('undo','Отменить','↶')+button('redo','Повторить','↷'))+
  group('Ячейки',button('copy','Копировать','▢')+button('paste-values','Вставить значения','123')+button('clear','Очистить содержимое','⌫')+button('clear-format','Сбросить формат','⟲'))+
- group('Заполнение',button('fill-down','Заполнить вниз','↓')+button('fill-right','Заполнить вправо','→'))+
+ group('Заполнение',button('fill-down','Заполнить вниз','↓')+button('fill-up','Заполнить вверх','↑')+button('fill-right','Заполнить вправо','→')+button('fill-left','Заполнить влево','←'))+
  group('Поиск',button('find-open','Найти / заменить','⌕'));
  if(activeRibbon==='formula')contents=group('Быстрые функции',button('autosum','Автосумма','Σ')+['SUM','AVERAGE','MIN','MAX','COUNT'].map(fn=>button('formula-fn',fn,'ƒx',`data-fn="${fn}"`)).join(''));
  if(activeRibbon==='data')contents=group('Сортировка',button('sort-asc','А → Я','↑')+button('sort-desc','Я → А','↓'))+group('Фильтр',button('filter-toggle','Автофильтр','⏷'))+group('Очистка данных',button('text-to-columns','Текст по столбцам','⇥')+button('remove-duplicates','Удалить дубликаты','≡'))+group('Проверка',button('validation-open','Проверка данных','✓'))+group('Импорт и экспорт',button('import','Открыть','↥')+button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'));
@@ -5749,7 +5759,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'print-use-selection':printSettingChange({area:selectedPrintArea(activeCell,rangeEnd)});break;
  case 'print-use-used':printSettingChange({area:null});break;
  case 'print-now':printNow();break;
- case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':showFind=false;render();break;case 'find-next':nextMatch();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-right':fillSelected('right');break;
+ case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':showFind=false;render();break;case 'find-next':nextMatch();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-up':fillSelected('up');break;case 'fill-right':fillSelected('right');break;case 'fill-left':fillSelected('left');break;
  case 'filter-toggle':toggleAutoFilter();break;
  case 'filter-menu':filterColumn=Number(target.dataset.col);render();break;
  case 'filter-close':filterColumn=null;render();break;
@@ -5853,7 +5863,10 @@ window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDra
  if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
 window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
 app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
-app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();if(e.ctrlKey||e.metaKey)toggleCellSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);if(e.detail>=2&&!e.ctrlKey&&!e.metaKey){mouseSelecting=false;editCell();}else{mouseSelecting=!e.ctrlKey&&!e.metaKey;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
+app.addEventListener('mousedown',e=>{if(e.button!==0)return;const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;e.preventDefault();const ref=cell.dataset.ref;window.getSelection()?.removeAllRanges();const additive=e.ctrlKey||e.metaKey,alreadySelected=additive&&inAnySelection(parseCell(ref).row,parseCell(ref).col);
+ if(additive)toggleCellSelection(ref);else setSelection(e.shiftKey?activeCell:ref,ref);
+ if(e.detail>=2&&!additive){mouseSelecting=false;editCell();}
+ else{mouseSelecting=!additive||!alreadySelected;document.getElementById('grid-scroll')?.focus({preventScroll:true});}}});
 app.addEventListener('mouseover',e=>{if(!mouseSelecting)return;const cell=e.target.closest('.grid-cell');if(cell&&cell.dataset.ref!==rangeEnd)setSelection(activeCell,cell.dataset.ref,true);});
 window.addEventListener('mouseup',()=>{mouseSelecting=false;});
 app.addEventListener('dblclick',e=>{const cell=e.target.closest('.grid-cell');if(cell){if(e.target.closest('.filter-head,.cell-checkbox'))return;setSelection(cell.dataset.ref);editCell();}});
