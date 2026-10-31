@@ -88,7 +88,15 @@ let dataTool=null;
 let extraRanges=[],extraRangeSheetId=null,sizeContext=null,fillDrag=null;
 function book(){return workspace.books.find(b=>b.id===workspace.active)||null;}
 function sheet(){return book()?currentSheet(book()):null;}
-function status(message,bad=false){statusMessage=message;const node=document.getElementById('toast');if(node){node.textContent=message;node.className=bad?'toast bad active':'toast active';clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);}}
+// Keep the legacy boolean error argument; new callers can choose a semantic tone.
+function status(message,tone=false){
+ const severity=tone===true?'error':['error','warning','success'].includes(tone)?tone:'info';
+ statusMessage=message;const node=document.getElementById('toast');if(!node)return;
+ node.textContent=message;node.className='toast'+(severity==='error'?' bad':severity==='info'?'':' '+severity)+' active';
+ node.dataset.tone=severity;node.setAttribute('role',severity==='error'?'alert':'status');
+ node.setAttribute('aria-live',severity==='error'?'assertive':'polite');node.setAttribute('aria-atomic','true');
+ clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);
+}
 function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
  const linked=b&&directFiles.has(b.id);
  n.textContent=linked?(dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+(storeWarning?' · нет автосохранения браузера':''):
@@ -187,7 +195,7 @@ async function saveBook(asNew=false){
    const upToDate=encodeBook(current)===serialized;
    if(upToDate)dirtyFiles.delete(id);else dirtyFiles.add(id);
    updateSaveIndicator();
-   status(upToDate?'Файл сохранён и проверен на диске':'Предыдущая версия сохранена. Есть новые несохранённые изменения.',!upToDate);
+   status(upToDate?'Файл сохранён и проверен на диске':'Предыдущая версия сохранена. Есть новые несохранённые изменения.',upToDate?'success':'warning');
   }
  }catch(error){if(error.name!=='AbortError')status(error.message||'Запись не удалась. Проверьте файл на диске.',true);}
  finally{savingBooks.delete(id);updateSaveIndicator();}
@@ -222,7 +230,7 @@ async function importFile(file){if(!file)return;if(file.size>15_000_000){status(
  else if(name.endsWith('.xlsx')){importSummary={};imported=await importXLSX(await file.arrayBuffer(),file.name,importSummary);}
  else throw Error('Поддерживаются .qbook, .qbackup, .csv и .xlsx.');
  workspace.books.unshift(imported);workspace.active=imported.id;page='sheet';persist();render();
- if(name.endsWith('.xlsx')){const warnings=importSummary||{},missed=(warnings.skippedDataValidations||0)+(warnings.skippedConditionalFormatting||0)+(warnings.skippedCharts||0)+(warnings.skippedPrintSettings||0);status(`XLSX открыт: проверка данных — ${warnings.importedDataValidations||0}, условное форматирование — ${warnings.importedConditionalFormatting||0}, диаграммы — ${warnings.importedCharts||0}, параметры печати — ${warnings.importedPrintSettings||0}; пропущено неподдерживаемых объектов: ${missed}. Другие сложные возможности могут не переноситься.`);}else status('Импорт завершён. Для записи на диск используйте «Сохранить».');
+ if(name.endsWith('.xlsx')){const warnings=importSummary||{},missed=(warnings.skippedDataValidations||0)+(warnings.skippedConditionalFormatting||0)+(warnings.skippedCharts||0)+(warnings.skippedPrintSettings||0);status(`XLSX открыт: проверка данных — ${warnings.importedDataValidations||0}, условное форматирование — ${warnings.importedConditionalFormatting||0}, диаграммы — ${warnings.importedCharts||0}, параметры печати — ${warnings.importedPrintSettings||0}; пропущено неподдерживаемых объектов: ${missed}. Другие сложные возможности могут не переноситься.`,missed?'warning':'success');}else status('Импорт завершён. Для записи на диск используйте «Сохранить».','success');
  }catch(e){status(e.message||'Не удалось открыть файл',true);}
 }
 function selectedRects(){
@@ -2714,7 +2722,7 @@ async function cutSelection(){
  return true;
 }
 async function copySelection(){const clip=captureSelection();if(!clip)return false;
- try{await navigator.clipboard.writeText(clip.text);status('Скопировано');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)');}
+ try{await navigator.clipboard.writeText(clip.text);status('Скопировано','success');}catch{status('Скопировано внутри Quantum Sheets (буфер браузера недоступен)','warning');}
  return true;}
 function pasteOnlyValues(){
  if(!requireSingleRange())return false;

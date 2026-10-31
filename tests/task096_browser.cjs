@@ -2,7 +2,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES?process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES+'/playwright':'playwright'));
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{pathToFileURL}=require('node:url');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task096');fs.mkdirSync(out,{recursive:true});
-const url=pathToFileURL(path.join(root,'Quantum-Office.html')).href,results=[],matrix=[],contrast=[],errors=[];
+const url=pathToFileURL(path.join(root,'Quantum-Office.html')).href,results=[],matrix=[],contrast=[],notifications=[],errors=[];
 const check=(name,data={})=>{results.push({name,pass:true,...data});console.log('PASS',name)};
 function rgb(s){const a=s.match(/[\d.]+/g).map(Number);return a.slice(0,3)}
 function lum(c){return c.map(x=>{x/=255;return x<=.04045?x/12.92:((x+.055)/1.055)**2.4}).reduce((a,x,i)=>a+x*[.2126,.7152,.0722][i],0)}
@@ -39,7 +39,15 @@ async function colors(p,selector){return p.locator(selector).first().evaluate(el
   const palette=await p.evaluate(()=>{const s=getComputedStyle(document.documentElement);return Object.fromEntries(['text','muted','surface','surface-alt','surface-raised','bg','accent','accent-soft','accent-border','accent-fill','on-accent','focus','selected-hover','hover','pressed','shell','shell-text','shell-muted','shell-accent','border-strong','danger','danger-soft','success','success-soft','warning','warning-soft'].map(n=>{const el=document.createElement('i');el.style.color=`var(--qo-${n})`;document.body.append(el);const v=getComputedStyle(el).color;el.remove();return [n,v]}))});
   const pairs=[...['surface','surface-alt','surface-raised','bg'].flatMap(bg=>[['text',bg,4.5],['muted',bg,4.5]]),['accent','accent-soft',4.5],['accent','selected-hover',4.5],['on-accent','accent-fill',4.5],['accent-border','accent-soft',3],['focus','surface',3],['shell-text','shell',4.5],['shell-muted','shell',4.5],['shell-accent','shell',3],['border-strong','surface',3],['danger','danger-soft',4.5],['success','success-soft',4.5],['warning','warning-soft',4.5]];
   for(const [fg,bg,min]of pairs){const r=ratio(palette[fg],palette[bg]);contrast.push({theme,accent,fg,bg,ratio:+r.toFixed(2),min});assert.ok(r>=min,`${theme}/${accent} ${fg}/${bg}: ${r}`)}
-  await p.evaluate(()=>status('Проверка сообщения об ошибке',true));await p.waitForTimeout(200);const errorToast=await colors(p,'#toast');assert.ok(ratio(errorToast.fg,errorToast.bg)>=4.5);assert.equal(errorToast.fg,palette.danger);assert.equal(errorToast.bg,palette['danger-soft']);await p.evaluate(()=>document.getElementById('toast').classList.remove('active'));
+  for(const [tone,role,label] of [['error','danger','Ошибка: операция не выполнена'],['warning','warning','Предупреждение: проверьте параметры'],['success','success','Операция выполнена успешно']]){
+   // Exercise the real notification controller; true also protects old error callers.
+   await p.evaluate(({tone,label})=>status(label,tone==='error'?true:tone),{tone,label});await p.waitForTimeout(200);
+   const actual=await colors(p,'#toast');assert.ok(ratio(actual.fg,actual.bg)>=4.5);assert.equal(actual.fg,palette[role]);assert.equal(actual.bg,palette[role+'-soft']);
+   assert.equal(await p.locator('#toast').getAttribute('data-tone'),tone);assert.equal(await p.locator('#toast').getAttribute('role'),tone==='error'?'alert':'status');
+   notifications.push({theme,accent,tone,...actual,ratio:+ratio(actual.fg,actual.bg).toFixed(2)});
+   if(accent==='blue')await p.screenshot({path:path.join(out,`notification-${theme}-${tone}.png`)});
+  }
+  await p.evaluate(()=>document.getElementById('toast').classList.remove('active'));
   for(const module of ['sheet','writer','slides','photo']){
    await p.evaluate(m=>route(m),module);await settle(p);
    const selector={sheet:'.ribbon-tabs button.chosen',writer:'.qo-work-tab.active',slides:'.qo-work-tab.active',photo:'[data-action="photo-select-tool"]'}[module];
@@ -110,5 +118,5 @@ async function colors(p,selector){return p.locator(selector).first().evaluate(el
  const download=q.waitForEvent('download');await q.locator('#export-tokens').click();const d=await download;await d.saveAs(path.join(out,'catalog-tokens.json'));assert.equal(Object.keys(JSON.parse(fs.readFileSync(path.join(out,'catalog-tokens.json'))).tokens).length,16);
  check('live production component catalog: states, menus, modal and token JSON export');await c.close();
  assert.deepEqual(errors,[]);check('no Chromium runtime errors');await browser.close();
- fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({results,matrix,contrast,errors,zoomMethod:'physical viewport / zoom, matching deviceScaleFactor; headless layout equivalent, not OS browser chrome'},null,2));console.log('COMPLETE',results.length,'checks;',matrix.length,'layouts;',contrast.length,'contrast pairs');
+ fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({results,matrix,contrast,notifications,errors,zoomMethod:'physical viewport / zoom, matching deviceScaleFactor; headless layout equivalent, not OS browser chrome'},null,2));console.log('COMPLETE',results.length,'checks;',matrix.length,'layouts;',contrast.length,'contrast pairs');
 })().catch(e=>{console.error(e);process.exitCode=1});

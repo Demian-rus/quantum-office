@@ -386,8 +386,9 @@ button {
   position: fixed;
   bottom: 65px;
   right: 24px;
-  background: var(--qo-bg);
-  color: var(--qo-muted);
+  background: var(--qo-surface);
+  color: var(--qo-text);
+  border: 1px solid var(--qo-border-strong);
   z-index: 999;
   border-radius: 10px;
   padding: 14px 19px;
@@ -403,6 +404,18 @@ button {
 .toast.active {
   opacity: 1;
   transform: translateY(0);
+}
+
+.toast.success {
+  background: var(--qo-success-soft);
+  color: var(--qo-success);
+  border-color: var(--qo-success);
+}
+
+.toast.warning {
+  background: var(--qo-warning-soft);
+  color: var(--qo-warning);
+  border-color: var(--qo-warning);
 }
 
 .toast.bad {
