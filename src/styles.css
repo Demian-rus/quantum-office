@@ -725,3 +725,8 @@ i.font-letter{font-style:italic;font-weight:650}
  .ribbon-tabs button,.ribbon-group select,.format-popover button,
  .size-context-menu button,.palette-swatch{transition:none!important;transform:none!important}
 }
+
+.qo-chart-100{position:relative;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.qo-chart-100 i{position:absolute;right:-6px;bottom:-3px;font-style:normal;font-size:6.5px;line-height:10px;
+ font-weight:900;letter-spacing:-.4px;color:#0e6546;background:#e3f7ec;
+ border:1px solid #9ccfb1;border-radius:3px;padding:0 1px}
