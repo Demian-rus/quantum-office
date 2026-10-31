@@ -587,6 +587,149 @@ i.font-letter{font-style:italic;font-weight:650}
 .rowhead.header-selected,.colhead.header-selected{background:#dcece4;color:#166447}
 .rowhead.header-active,.colhead.header-active{color:#0c523b;font-weight:800}
 .rowhead:has(.grid-resizer:hover),.colhead:has(.grid-resizer:hover){cursor:inherit}
+
+
+/* TASK 076 — premium interactive desktop controls. Lucide SVGs are bundled offline.
+   Restrained jade/slate palette, physical depth, keyboard-visible focus and reduced motion. */
+:root{
+ --qo-control-ink:#244439;--qo-control-accent:#187455;
+ --qo-control-active:#dcefe5;--qo-control-edge:#bfd8cc;
+ --qo-control-shadow:0 2px 8px rgba(15,51,38,.07);
+}
+.ribbon{
+ background:linear-gradient(180deg,#fdfefd 0%,#f7faf8 100%);
+ border-bottom:1px solid #d5dfd9;
+ box-shadow:0 2px 14px rgba(16,48,38,.075),inset 0 1px 0 #fff;
+}
+.ribbon-tabs{
+ background:linear-gradient(180deg,#f8faf9,#eef3f0);
+ border-bottom:1px solid #dce5df;
+}
+.ribbon-tabs button{
+ transition:background-color .16s ease,color .16s ease,box-shadow .16s ease;
+ border-radius:6px 6px 0 0;
+}
+.ribbon-tabs button:hover:not(.chosen){background:#e1eee7;color:#155a43}
+.ribbon-tabs button.chosen{
+ color:#145b43;background:#fff;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 -1px 7px rgba(16,56,41,.055);
+}
+.ribbon-tabs button.chosen:after{
+ height:3px;background:linear-gradient(90deg,#26a371,#0f7255);
+ left:9px;right:9px;border-radius:6px 6px 0 0;
+}
+.ribbon-controls{background:linear-gradient(180deg,#fff,#f6faf7)}
+.ribbon-group{border-right-color:#dce6df;position:relative}
+.ribbon-group .group-name{color:#607a6c;letter-spacing:.055em;font-weight:750}
+.ribbon-group button.tool-btn{
+ position:relative;isolation:isolate;overflow:visible;
+ color:var(--qo-control-ink);
+ background:transparent;border:1px solid transparent;
+ border-radius:7px;box-shadow:none;
+ transition:background-color .17s ease,border-color .17s ease,
+  box-shadow .17s ease,transform .15s cubic-bezier(.2,.85,.25,1),color .17s ease;
+}
+.ribbon-group button.tool-btn .tool-symbol{
+ color:inherit;background:transparent;
+ transition:transform .15s cubic-bezier(.2,.85,.25,1),color .17s ease;
+}
+.ribbon-group button.tool-btn .tool-symbol svg.qo-lucide{
+ width:18px;height:18px;display:block;flex:none;
+ stroke:currentColor;stroke-width:1.95;
+ filter:drop-shadow(0 .4px .2px rgba(0,0,0,.06));
+}
+.ribbon-group button.tool-btn:hover{
+ color:#116548;
+ background:linear-gradient(180deg,#f1faf5,#e3f1e9);
+ border-color:#b9d9c8;
+ box-shadow:0 2px 8px rgba(31,92,62,.13),inset 0 1px 0 rgba(255,255,255,.95);
+ transform:translateY(-1px);
+}
+.ribbon-group button.tool-btn:hover .tool-symbol{transform:scale(1.08)}
+.ribbon-group button.tool-btn:active{
+ color:#0e593e;background:#cfe8dc;border-color:#8dbba6;
+ box-shadow:inset 0 2px 4px rgba(8,65,42,.12);
+ transform:translateY(0) scale(.97);
+}
+.ribbon-group button.tool-btn.is-active,
+.ribbon-group button.tool-btn[aria-pressed="true"]{
+ color:#09603f;
+ background:linear-gradient(180deg,#e5f4eb,#d3e9dc);
+ border-color:#8fc7a8;
+ box-shadow:inset 0 0 0 1px #f6fff9,inset 0 -2px 0 rgba(35,143,91,.18),
+  0 1px 4px rgba(15,79,49,.085);
+}
+.ribbon-group button.tool-btn.is-active::after{
+ content:"";position:absolute;left:23%;right:23%;bottom:0;height:2px;
+ background:#15885c;border-radius:4px 4px 0 0;
+}
+.ribbon-group button.tool-btn.is-active:hover{
+ background:linear-gradient(180deg,#ddf3e6,#c7e5d5);
+ border-color:#6cae8d;transform:translateY(-1px);
+}
+.ribbon-group button.tool-btn:focus-visible{
+ outline:2px solid #147a61;outline-offset:2px;
+ box-shadow:0 0 0 4px rgba(27,138,98,.15);
+}
+.ribbon-group.font-group{min-width:316px;width:316px;max-width:316px}
+.ribbon-group.font-group .font-action-row .tool-btn{min-width:34px;height:26px;max-width:none;flex:1}
+.ribbon-group.font-group .font-action-row .tool-symbol{width:23px;height:23px}
+.ribbon-group.font-group .font-action-row .font-letter{font-size:15px;line-height:1.1;color:inherit}
+.ribbon-group.font-group .font-action-row .font-letter.underlined{text-underline-offset:3px}
+.ribbon-group.font-group .font-action-row .font-letter.struck{text-decoration-thickness:2px}
+.ribbon-group.font-group .font-action-row .tool-btn[data-action="text-palette"],
+.ribbon-group.font-group .font-action-row .tool-btn[data-action="fill-palette"]{
+ flex:1.1;min-width:37px;
+}
+.qo-text-color{width:22px;height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.qo-text-color strong{
+ font:800 16px/16px "Segoe UI",Arial,sans-serif;
+ color:#1c3531;text-shadow:0 1px 0 #fff;
+}
+.qo-text-color .qo-swatch{
+ width:18px;height:4px;display:block;border-radius:2px;
+ background:#151515;border:1px solid rgba(0,0,0,.08);
+ box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+.qo-paint-icon{width:21px;height:22px;display:flex;align-items:center;justify-content:center;position:relative}
+.qo-paint-icon svg.qo-lucide{width:20px;height:20px}
+.qo-paint-icon .qo-swatch{
+ position:absolute;right:0;bottom:0;width:8px;height:5px;border-radius:2px;
+ background:#258662;border:1px solid rgba(255,255,255,.85);
+ box-shadow:0 0 0 1px rgba(9,59,37,.18);
+}
+.ribbon-group button.tool-btn[data-action="text-palette"]:hover .qo-text-color strong{color:#0b704c}
+.ribbon-group select{
+ transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease;
+}
+.ribbon-group select:hover{border-color:#8bbb9f;background:#fbfffc}
+.ribbon-group select:focus-visible{outline:2px solid #0d7a57;outline-offset:2px}
+.ribbon-group.alignment-group .align-row .tool-btn{min-width:32px}
+.ribbon-group.alignment-group .align-row .qo-lucide{width:19px;height:19px}
+.format-popover,.size-context-menu,.filter-popup{
+ background:linear-gradient(180deg,#fff,#fcfefc);
+ border:1px solid #d1e0d7;
+ box-shadow:0 14px 38px rgba(15,40,29,.18),0 2px 8px rgba(16,68,39,.07);
+}
+.format-popover button,.size-context-menu button{
+ transition:background-color .13s ease,border-color .13s ease,color .13s ease,transform .13s ease;
+}
+.format-popover button:hover,.size-context-menu button:hover{
+ color:#135b41;background:#e8f3ed;border-color:#badbc9;
+}
+.palette-swatch:hover{
+ transform:scale(1.09);box-shadow:0 2px 9px rgba(22,70,45,.17);
+}
+@media(prefers-reduced-motion:reduce){
+ .ribbon-group button.tool-btn,.ribbon-group button.tool-btn .tool-symbol,
+ .ribbon-tabs button,.ribbon-group select,.format-popover button,
+ .size-context-menu button,.palette-swatch{transition:none!important;transform:none!important}
+}
+
+.qo-chart-100{position:relative;width:22px;height:22px;display:flex;align-items:center;justify-content:center}
+.qo-chart-100 i{position:absolute;right:-6px;bottom:-3px;font-style:normal;font-size:6.5px;line-height:10px;
+ font-weight:900;letter-spacing:-.4px;color:#0e6546;background:#e3f7ec;
+ border:1px solid #9ccfb1;border-radius:3px;padding:0 1px}
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -5215,7 +5358,79 @@ const icons={
  unmerge:'<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M12 5v14M5 12h14"/>'
 
 };
+// Lucide SVG icons: https://lucide.dev — ISC license; see docs/THIRD_PARTY_NOTICES.md.
+const QO_LUCIDE={"paint-bucket":"<path d=\"M11 7 6 2\" />\n  <path d=\"M18.992 12H2.041\" />\n  <path d=\"M21.145 18.38A3.34 3.34 0 0 1 20 16.5a3.3 3.3 0 0 1-1.145 1.88c-.575.46-.855 1.02-.855 1.595A2 2 0 0 0 20 22a2 2 0 0 0 2-2.025c0-.58-.285-1.13-.855-1.595\" />\n  <path d=\"m8.5 4.5 2.148-2.148a1.205 1.205 0 0 1 1.704 0l7.296 7.296a1.205 1.205 0 0 1 0 1.704l-7.592 7.592a3.615 3.615 0 0 1-5.112 0l-3.888-3.888a3.615 3.615 0 0 1 0-5.112L5.67 7.33\" />","undo-2":"<path d=\"M9 14 4 9l5-5\" />\n  <path d=\"M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5a5.5 5.5 0 0 1-5.5 5.5H11\" />","redo-2":"<path d=\"m15 14 5-5-5-5\" />\n  <path d=\"M20 9H9.5A5.5 5.5 0 0 0 4 14.5A5.5 5.5 0 0 0 9.5 20H13\" />","copy":"<rect width=\"14\" height=\"14\" x=\"8\" y=\"8\" rx=\"2\" ry=\"2\" />\n  <path d=\"M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2\" />","clipboard-paste":"<path d=\"M11 14h10\" />\n  <path d=\"M16 4h2a2 2 0 0 1 2 2v1.344\" />\n  <path d=\"m17 18 4-4-4-4\" />\n  <path d=\"M8 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 1.793-1.113\" />\n  <rect x=\"8\" y=\"2\" width=\"8\" height=\"4\" rx=\"1\" />","eraser":"<path d=\"M21 21H8a2 2 0 0 1-1.42-.587l-3.994-3.999a2 2 0 0 1 0-2.828l10-10a2 2 0 0 1 2.829 0l5.999 6a2 2 0 0 1 0 2.828L12.834 21\" />\n  <path d=\"m5.082 11.09 8.828 8.828\" />","type":"<path d=\"M12 4v16\" />\n  <path d=\"M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2\" />\n  <path d=\"M9 20h6\" />","grid-2x2":"<path d=\"M12 3v18\" />\n  <path d=\"M3 12h18\" />\n  <rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" />","combine":"<path d=\"M14 3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1\" />\n  <path d=\"M19 3a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1\" />\n  <path d=\"m7 15 3 3\" />\n  <path d=\"m7 21 3-3H5a2 2 0 0 1-2-2v-2\" />\n  <rect x=\"14\" y=\"14\" width=\"7\" height=\"7\" rx=\"1\" />\n  <rect x=\"3\" y=\"3\" width=\"7\" height=\"7\" rx=\"1\" />","split":"<path d=\"M16 3h5v5\" />\n  <path d=\"M8 3H3v5\" />\n  <path d=\"M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3\" />\n  <path d=\"m15 9 6-6\" />","align-vertical-justify-start":"<rect width=\"14\" height=\"6\" x=\"5\" y=\"16\" rx=\"2\" />\n  <rect width=\"10\" height=\"6\" x=\"7\" y=\"6\" rx=\"2\" />\n  <path d=\"M2 2h20\" />","align-vertical-justify-center":"<rect width=\"14\" height=\"6\" x=\"5\" y=\"16\" rx=\"2\" />\n  <rect width=\"10\" height=\"6\" x=\"7\" y=\"2\" rx=\"2\" />\n  <path d=\"M2 12h20\" />","align-vertical-justify-end":"<rect width=\"14\" height=\"6\" x=\"5\" y=\"12\" rx=\"2\" />\n  <rect width=\"10\" height=\"6\" x=\"7\" y=\"2\" rx=\"2\" />\n  <path d=\"M2 22h20\" />","sigma":"<path d=\"M18 7V5a1 1 0 0 0-1-1H6.5a.5.5 0 0 0-.4.8l4.5 6a2 2 0 0 1 0 2.4l-4.5 6a.5.5 0 0 0 .4.8H17a1 1 0 0 0 1-1v-2\" />","russian-ruble":"<path d=\"M4 16h6\" />\n  <path d=\"M7 20V5a1 1 0 011-1h6a4 4 0 010 8H4\" />","percent":"<line x1=\"19\" x2=\"5\" y1=\"5\" y2=\"19\" />\n  <circle cx=\"6.5\" cy=\"6.5\" r=\"2.5\" />\n  <circle cx=\"17.5\" cy=\"17.5\" r=\"2.5\" />","hash":"<line x1=\"4\" x2=\"20\" y1=\"9\" y2=\"9\" />\n  <line x1=\"4\" x2=\"20\" y1=\"15\" y2=\"15\" />\n  <line x1=\"10\" x2=\"8\" y1=\"3\" y2=\"21\" />\n  <line x1=\"16\" x2=\"14\" y1=\"3\" y2=\"21\" />","calendar-days":"<path d=\"M8 2v3\" />\n  <path d=\"M16 2v3\" />\n  <rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\" />\n  <path d=\"M3 9h18\" />\n  <path d=\"M8 13h.01\" />\n  <path d=\"M12 13h.01\" />\n  <path d=\"M16 13h.01\" />\n  <path d=\"M8 17h.01\" />\n  <path d=\"M12 17h.01\" />\n  <path d=\"M16 17h.01\" />","clock-3":"<circle cx=\"12\" cy=\"12\" r=\"10\" />\n  <path d=\"M12 6v6h4\" />","calendar-clock":"<path d=\"M16 14v2.2l1.6 1\" />\n  <path d=\"M16 2v3\" />\n  <path d=\"M21 7.338V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2h2.338\" />\n  <path d=\"M3 9h5.859\" />\n  <path d=\"M8 2v3\" />\n  <circle cx=\"16\" cy=\"16\" r=\"6\" />","timer":"<line x1=\"10\" x2=\"14\" y1=\"2\" y2=\"2\" />\n  <line x1=\"12\" x2=\"15\" y1=\"14\" y2=\"11\" />\n  <circle cx=\"12\" cy=\"14\" r=\"8\" />","printer":"<path d=\"M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2\" />\n  <path d=\"M6 9V3a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v6\" />\n  <rect x=\"6\" y=\"14\" width=\"12\" height=\"8\" rx=\"1\" />","chart-column":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />\n  <path d=\"M18 17V9\" />\n  <path d=\"M13 17V5\" />\n  <path d=\"M8 17v-3\" />","chart-column-stacked":"<path d=\"M11 13H7\" />\n  <path d=\"M19 9h-4\" />\n  <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />\n  <rect x=\"15\" y=\"5\" width=\"4\" height=\"12\" rx=\"1\" />\n  <rect x=\"7\" y=\"8\" width=\"4\" height=\"9\" rx=\"1\" />","chart-line":"<path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />\n  <path d=\"m19 9-5 5-4-4-3 3\" />","chart-scatter":"<circle cx=\"7.5\" cy=\"7.5\" r=\".5\" fill=\"currentColor\" />\n  <circle cx=\"18.5\" cy=\"5.5\" r=\".5\" fill=\"currentColor\" />\n  <circle cx=\"11.5\" cy=\"11.5\" r=\".5\" fill=\"currentColor\" />\n  <circle cx=\"7.5\" cy=\"16.5\" r=\".5\" fill=\"currentColor\" />\n  <circle cx=\"17.5\" cy=\"14.5\" r=\".5\" fill=\"currentColor\" />\n  <path d=\"M3 3v16a2 2 0 0 0 2 2h16\" />","chart-pie":"<path d=\"M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z\" />\n  <path d=\"M21.21 15.89A10 10 0 1 1 8 2.83\" />","chart-no-axes-combined":"<path d=\"M12 16v5\" />\n  <path d=\"M16 14.639V21\" />\n  <path d=\"M20 10.656V21\" />\n  <path d=\"m22 3-8.646 8.646a.5.5 0 0 1-.708 0L9.354 8.354a.5.5 0 0 0-.707 0L2 15\" />\n  <path d=\"M4 18.463V21\" />\n  <path d=\"M8 14.656V21\" />","rows-3":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />\n  <path d=\"M21 9H3\" />\n  <path d=\"M21 15H3\" />","columns-3":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />\n  <path d=\"M9 3v18\" />\n  <path d=\"M15 3v18\" />","search":"<path d=\"m21 21-4.34-4.34\" />\n  <circle cx=\"11\" cy=\"11\" r=\"8\" />","list-filter":"<path d=\"M2 5h20\" />\n  <path d=\"M6 12h12\" />\n  <path d=\"M9 19h6\" />","arrow-down-a-z":"<path d=\"m3 16 4 4 4-4\" />\n  <path d=\"M7 20V4\" />\n  <path d=\"M20 8h-5\" />\n  <path d=\"M15 10V6.5a2.5 2.5 0 0 1 5 0V10\" />\n  <path d=\"M15 14h5l-5 6h5\" />","arrow-up-z-a":"<path d=\"m3 8 4-4 4 4\" />\n  <path d=\"M7 4v16\" />\n  <path d=\"M15 4h5l-5 6h5\" />\n  <path d=\"M15 20v-3.5a2.5 2.5 0 0 1 5 0V20\" />\n  <path d=\"M20 18h-5\" />","folder-open":"<path d=\"m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2\" />","file-spreadsheet":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" />\n  <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" />\n  <path d=\"M8 13h2\" />\n  <path d=\"M14 13h2\" />\n  <path d=\"M8 17h2\" />\n  <path d=\"M14 17h2\" />","file-text":"<path d=\"M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z\" />\n  <path d=\"M14 2v5a1 1 0 0 0 1 1h5\" />\n  <path d=\"M10 9H8\" />\n  <path d=\"M16 13H8\" />\n  <path d=\"M16 17H8\" />","save":"<path d=\"M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z\" />\n  <path d=\"M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7\" />\n  <path d=\"M7 3v4a1 1 0 0 0 1 1h7\" />","archive":"<rect width=\"20\" height=\"5\" x=\"2\" y=\"3\" rx=\"1\" />\n  <path d=\"M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8\" />\n  <path d=\"M10 12h4\" />","panel-top":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />\n  <path d=\"M3 9h18\" />","panel-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />\n  <path d=\"M9 3v18\" />","panels-top-left":"<rect width=\"18\" height=\"18\" x=\"3\" y=\"3\" rx=\"2\" />\n  <path d=\"M3 9h18\" />\n  <path d=\"M9 21V9\" />","move-horizontal":"<path d=\"m18 8 4 4-4 4\" />\n  <path d=\"M2 12h20\" />\n  <path d=\"m6 8-4 4 4 4\" />","move-vertical":"<path d=\"M12 2v20\" />\n  <path d=\"m8 18 4 4 4-4\" />\n  <path d=\"m8 6 4-4 4 4\" />","arrow-down-to-line":"<path d=\"M12 17V3\" />\n  <path d=\"m6 11 6 6 6-6\" />\n  <path d=\"M19 21H5\" />","arrow-up-to-line":"<path d=\"M5 3h14\" />\n  <path d=\"m18 13-6-6-6 6\" />\n  <path d=\"M12 7v14\" />","arrow-left-to-line":"<path d=\"M3 19V5\" />\n  <path d=\"m13 6-6 6 6 6\" />\n  <path d=\"M7 12h14\" />","arrow-right-to-line":"<path d=\"M17 12H3\" />\n  <path d=\"m11 18 6-6-6-6\" />\n  <path d=\"M21 5v14\" />","pencil":"<path d=\"M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z\" />\n  <path d=\"m15 5 4 4\" />","arrow-right-left":"<path d=\"m16 3 4 4-4 4\" />\n  <path d=\"M20 7H4\" />\n  <path d=\"m8 21-4-4 4-4\" />\n  <path d=\"M4 17h16\" />","trash":"<path d=\"M10 11v6\" />\n  <path d=\"M14 11v6\" />\n  <path d=\"M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6\" />\n  <path d=\"M3 6h18\" />\n  <path d=\"M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\" />","list-plus":"<path d=\"M16 5H3\" />\n  <path d=\"M11 12H3\" />\n  <path d=\"M16 19H3\" />\n  <path d=\"M18 9v6\" />\n  <path d=\"M21 12h-6\" />","list-minus":"<path d=\"M16 5H3\" />\n  <path d=\"M11 12H3\" />\n  <path d=\"M16 19H3\" />\n  <path d=\"M21 12h-6\" />","paintbrush":"<path d=\"m14.622 17.897-10.68-2.913\" />\n  <path d=\"M18.376 2.622a1 1 0 1 1 3.002 3.002L17.36 9.643a.5.5 0 0 0 0 .707l.944.944a2.41 2.41 0 0 1 0 3.408l-.944.944a.5.5 0 0 1-.707 0L8.354 7.348a.5.5 0 0 1 0-.707l.944-.944a2.41 2.41 0 0 1 3.408 0l.944.944a.5.5 0 0 0 .707 0z\" />\n  <path d=\"M9 8c-1.804 2.71-3.97 3.46-6.583 3.948a.507.507 0 0 0-.302.819l7.32 8.883a1 1 0 0 0 1.185.204C12.735 20.405 16 16.792 16 15\" />"};
+
+const QO_ICON_ACTION={
+ 'undo':'undo-2','redo':'redo-2','copy':'copy','paste-values':'clipboard-paste',
+ 'clear':'trash','clear-format':'eraser','border-menu':'grid-2x2','fill-palette':'paint-bucket',
+ 'merge-cells':'combine','unmerge-cells':'split','wrap':'arrow-right-left',
+ 'conditional-open':'paintbrush','validation-open':'list-plus',
+ 'autosum':'sigma','print-open':'printer','find-open':'search',
+ 'sort-asc':'arrow-down-a-z','sort-desc':'arrow-up-z-a','filter-toggle':'list-filter',
+ 'import':'folder-open','open-disk':'folder-open','csv':'file-text','xlsx':'file-spreadsheet',
+ 'save':'save','save-as':'save','backup':'archive','sheet-add':'list-plus',
+ 'sheet-rename':'pencil','insert-row':'rows-3','delete-row':'list-minus',
+ 'insert-col':'columns-3','delete-col':'list-minus',
+ 'column-width':'move-horizontal','row-height':'move-vertical',
+ 'column-fit':'columns-3','row-reset':'undo-2',
+ 'freeze-row':'panel-top','freeze-col':'panel-left','freeze-at':'panels-top-left',
+ 'freeze-clear':'split','hide-row':'rows-3','hide-col':'columns-3',
+ 'show-rows':'rows-3','show-cols':'columns-3',
+ 'chart-bar':'chart-column','chart-stacked':'chart-column-stacked',
+ 'chart-stacked100':'chart-column-stacked','chart-line':'chart-line',
+ 'chart-scatter':'chart-scatter','chart-pie':'chart-pie','charts-open':'chart-no-axes-combined',
+ 'fill-up':'arrow-up-to-line','fill-down':'arrow-down-to-line',
+ 'fill-left':'arrow-left-to-line','fill-right':'arrow-right-to-line',
+ 'text-to-columns':'columns-3','remove-duplicates':'list-filter',
+ 'goto':'search','border-all':'grid-2x2'
+};
+const QO_FORMAT_ICON={general:'type',currency:'russian-ruble',percent:'percent',
+ integer:'hash',date:'calendar-days',time:'clock-3',
+ datetime:'calendar-clock',duration:'timer'};
+const QO_VERTICAL_ICON={top:'align-vertical-justify-start',
+ center:'align-vertical-justify-center',bottom:'align-vertical-justify-end'};
+function qoButtonValue(extra){return /data-value="([^"]+)"/.exec(extra)?.[1]||'';}
+function qoToolState(action,value=''){
+ if(!sheet())return null;
+ const style=getEffectiveStyle(sheet(),activeCell);
+ if(['bold','italic','underline','strike','wrap'].includes(action))return !!style[action];
+ if(action==='align')return (style.align||'left')===value;
+ if(action==='valign')return (style.verticalAlign||'center')===value;
+ if(action==='format')return (style.format||'general')===value;
+ if(action==='border-menu')return !!borderMenuOpen;
+ if(action==='text-palette')return activePalette==='color';
+ if(action==='fill-palette')return activePalette==='bg';
+ if(action==='filter-toggle')return !!sheet().autoFilter;
+ return null;
+}
+function qoSyncRibbonState(){
+ if(page!=='sheet'||!sheet())return;
+ for(const el of document.querySelectorAll('.ribbon .tool-btn')){
+  const state=qoToolState(el.dataset.action,el.dataset.value||'');
+  el.classList.toggle('is-active',state===true);
+  if(state!==null)el.setAttribute('aria-pressed',String(state));
+ }
+ const style=getEffectiveStyle(sheet(),activeCell);
+ for(const [action,value] of [['text-palette',style.color||'#151515'],['fill-palette',style.bg||'#2b946c']]){
+  const swatch=document.querySelector('.ribbon [data-action="'+action+'"] .qo-swatch');
+  if(swatch)swatch.style.backgroundColor=value;
+ }
+}
 function toolIcon(action,original,extra=''){
+ if(['bold','italic','underline','strike'].includes(action))return original;
+ if(action==='text-palette')return '<span class="qo-text-color"><strong>А</strong><i class="qo-swatch"></i></span>';
+ const value=qoButtonValue(extra);
+ const lucideName=action==='valign'?QO_VERTICAL_ICON[value]:
+  action==='format'?QO_FORMAT_ICON[value]:QO_ICON_ACTION[action];
+ const lucide=QO_LUCIDE[lucideName];
+ if(lucide){
+  const svg='<svg class="qo-lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+lucide+'</svg>';
+  if(action==='fill-palette')return '<span class="qo-paint-icon">'+svg+'<i class="qo-swatch"></i></span>';
+  if(action==='chart-stacked100')return '<span class="qo-chart-100">'+svg+'<i>100%</i></span>';
+  return svg;
+ }
+
  if(['bold','italic','underline','strike'].includes(action))return original;
  if(action==='valign'){
   const where=/data-value="(top|center|bottom)"/.exec(extra)?.[1]||'center';
@@ -5236,7 +5451,7 @@ function ribbon(){
   [8,9,10,11,12,14,16,18,20,24,28,32,36,48,72].map(value=>'<option value="'+value+'"'+(value===chosenSize?' selected':'')+'>'+value+'</option>').join('')+'</select></div>';
  const tabs=[['home','Главная'],['edit','Правка'],['insert','Вставка'],['formula','Формулы'],['data','Данные'],['view','Вид'],['file','Файл']];
  const labeled=new Set();
- const button=(action,label,icon='',extra='')=>`<button class="tool-btn ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}" ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;
+ const button=(action,label,icon='',extra='')=>{const value=qoButtonValue(extra),pressed=qoToolState(action,value);return `<button type="button" class="tool-btn ${pressed===true?'is-active':''} ${labeled.has(action)?'is-labeled':''}" data-action="${action}" aria-label="${esc(label)}" title="${esc(label)}"${pressed!==null?` aria-pressed="${pressed}"`:''} ${extra}><span class="tool-symbol" aria-hidden="true">${toolIcon(action,icon,extra)}</span><span class="tool-label">${esc(label)}</span></button>`;};
  const group=(name,buttons)=>`<section class="ribbon-group ${name==='Шрифт'?'font-group':name==='Выравнивание'?'alignment-group':''}" aria-label="${esc(name)}"><div class="ribbon-group-content">${buttons}</div><div class="group-name">${esc(name)}</div></section>`;
  const colorTools=button('text-palette','Цвет текста','A')+button('fill-palette','Заливка ячеек','▰');
  let contents='';
@@ -5746,6 +5961,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
  if(fillDrag)showFillDragPreview();
  refreshFillHandle();
+ qoSyncRibbonState();
 }
 // Selecting a row/column header by dragging should work like Excel.
 let headerSelectionDrag=null,headerIgnoreClick=null;
