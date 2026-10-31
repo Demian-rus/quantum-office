@@ -749,7 +749,7 @@ const QO_LUCIDE={"paint-bucket":"<path d=\"M11 7 6 2\" />\n  <path d=\"M18.992 1
 
 const QO_ICON_ACTION={
  'undo':'undo-2','redo':'redo-2','copy':'copy','paste-values':'clipboard-paste',
- 'clear':'trash','clear-format':'eraser','border-menu':'grid-2x2',
+ 'clear':'trash','clear-format':'eraser','border-menu':'grid-2x2','fill-palette':'paint-bucket',
  'merge-cells':'combine','unmerge-cells':'split','wrap':'arrow-right-left',
  'conditional-open':'paintbrush','validation-open':'list-plus',
  'autosum':'sigma','print-open':'printer','find-open':'search',
@@ -812,7 +812,9 @@ function toolIcon(action,original,extra=''){
  const lucide=QO_LUCIDE[lucideName];
  if(lucide){
   const svg='<svg class="qo-lucide" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.85" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+lucide+'</svg>';
-  return action==='fill-palette'?'<span class="qo-paint-icon">'+svg+'<i class="qo-swatch"></i></span>':svg;
+  if(action==='fill-palette')return '<span class="qo-paint-icon">'+svg+'<i class="qo-swatch"></i></span>';
+  if(action==='chart-stacked100')return '<span class="qo-chart-100">'+svg+'<i>100%</i></span>';
+  return svg;
  }
 
  if(['bold','italic','underline','strike'].includes(action))return original;
