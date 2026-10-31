@@ -1102,9 +1102,15 @@ function render(){
  canvas.style.width=geometry.x[geometry.x.length-1]+'px';
  canvas.style.height=(geometry.y[geometry.y.length-1]-headerH)+'px';
  view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;
- view.addEventListener('scroll',()=>{scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
+ view.addEventListener('scroll',()=>{
+  // Detached views can still dispatch queued scroll events after switching books.
+  if(!view.isConnected||view.dataset.sheetId!==sheet()?.id)return;
+  scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
   if(view._gridFrame)return;
-  view._gridFrame=requestAnimationFrame(()=>{view._gridFrame=null;if(view.isConnected)drawGrid(true);});
+  view._gridFrame=requestAnimationFrame(()=>{
+   view._gridFrame=null;
+   if(view.isConnected&&view.dataset.sheetId===sheet()?.id)drawGrid(true);
+  });
  },{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();}
 let frozenRowScrollX=null;
 function refreshFillHandle(){
@@ -1214,7 +1220,10 @@ function endFillDrag(apply){
  }else refreshFillHandle();
 }
 function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const view=document.getElementById('grid-scroll'),canvas=document.getElementById('grid-canvas');if(!view||!canvas||editing)return;
- const s=sheet(),{x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
+ const s=sheet();if(view.dataset.sheetId!==s.id)return;
+ // Use the live viewport offsets, not values left by another disposed view.
+ scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
+ const {x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
  canvas.style.width=`${x.at(-1)}px`;canvas.style.height=`${y.at(-1)-headerH}px`;
  const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop+headerH)-16),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight+headerH)+16);
  const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-3),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+3);
