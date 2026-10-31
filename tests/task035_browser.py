@@ -83,7 +83,8 @@ with sync_playwright() as p:
  }""")
  assert status['spans']==2,status
  assert 'Quantum Sheets' not in status['text'] and 'строк ×' not in status['text'],status
- assert status['color']=='rgb(32, 43, 56)' and status['px']>=11,status
+ # TASK096: status follows the semantic text role, rather than a historical RGB.
+ assert status['color']==page.evaluate("()=>{const e=document.createElement('i');e.style.color='var(--qo-text)';document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c}") and status['px']>=11,status
  assert not errors,errors
  print('PASS TASK035: Russian/Latin Ctrl+Z/Y, fill/delete, dirty formula guard, slider below headings, status contrast')
  browser.close()

@@ -144,3 +144,7 @@ Select a range covering **2–100 adjacent rows or columns**, then use the compa
 ### TASK 026 — inter-sheet formulas (experimental)
 
 `=График!A1` and `='Учёт оплаты'!B2`, plus supported functions over same-sheet ranges, recalculate from the current workbook. Exported XLSX retains formulas. Renaming or deleting a referenced sheet and inserting/deleting its rows and columns are blocked until cross-sheet reference rewriting is implemented. External workbooks, 3D ranges and Excel named references are unsupported.
+
+### TASK 096 — дизайн-система
+
+Стили разделены на семантические палитры, общие состояния, шапку и рабочие области. Руководство: [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md), аудит: [docs/TASK096.md](docs/TASK096.md). После `npm run build` живой автономный каталог доступен в `dist/components.html`; проверка: `npm run test:design-system`.

@@ -1,0 +1,52 @@
+/* Layout: fixed geometry shared by every editor. No document-content selectors. */
+.global-bar.qo-unified-shell {
+  display:grid; grid-template-columns:167px auto minmax(90px,1fr) auto;
+  align-items:center; gap:8px; height:40px; min-height:40px; max-height:40px;
+  padding:0 10px; flex:none; overflow:hidden; background:var(--qo-shell);
+  color:var(--qo-shell-text); border-bottom:1px solid var(--qo-shell-border);
+  user-select:none;
+}
+.qo-unified-shell .logo { display:flex; align-items:center; gap:7px; width:167px; padding:0; background:transparent; color:inherit; white-space:nowrap; text-align:left; }
+.qo-unified-shell .logo-mark { width:28px; height:28px; flex:none; display:grid; place-items:center; }
+.qo-unified-shell .shell-brand { width:28px; height:28px; display:block; }
+.qo-unified-shell .logo-wordmark { display:flex; align-items:baseline; gap:4px; font-size:11px; letter-spacing:.025em; font-weight:650; }
+.qo-unified-shell .modules { height:40px; display:flex; align-items:stretch; min-width:0; gap:1px; }
+.qo-unified-shell .module { position:relative; height:40px; display:inline-flex; align-items:center; justify-content:center; gap:5px; padding:0 11px; border:0; background:transparent; color:var(--qo-shell-muted); font:600 11px/1.2 "Segoe UI",sans-serif; white-space:nowrap; }
+.qo-unified-shell .module:hover { background:var(--qo-shell-hover); color:var(--qo-shell-text); }
+.qo-unified-shell .module.active { background:var(--qo-shell-hover); color:var(--qo-shell-text); }
+.qo-unified-shell .module.active::after { content:""; position:absolute; bottom:0; height:2px; left:9px; right:9px; border-radius:2px; background:var(--qo-shell-accent); }
+.qo-unified-shell .qo-top-icon { display:block; width:16px; height:16px; flex:none; }
+.qo-unified-shell .shell-document { min-width:0; height:34px; overflow:hidden; }
+.qo-unified-shell .shell-doc-wrap { width:100%; height:34px; display:grid; grid-template-rows:17px 11px; align-content:center; justify-items:center; gap:1px; padding:2px 6px; overflow:hidden; }
+.qo-unified-shell :is(#book-name,.qo-shell-title-input,.qo-shell-placeholder) { width:100%; min-width:0; max-width:100%; height:17px; margin:0; padding:0 5px; border:1px solid transparent; border-radius:4px; background:transparent; color:var(--qo-shell-text); font:650 11px/15px "Segoe UI",Arial,sans-serif; text-align:center; text-overflow:ellipsis; white-space:nowrap; overflow:hidden; }
+.qo-unified-shell :is(#book-name,.qo-shell-title-input):hover { background:var(--qo-shell-hover); border-color:var(--qo-shell-border); }
+.qo-unified-shell .shell-save { max-width:100%; height:11px; color:var(--qo-shell-muted); font:500 8px/11px "Segoe UI",sans-serif; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
+.qo-unified-shell .global-right { display:flex; align-items:center; height:40px; gap:6px; }
+.qo-unified-shell :is(.shell-action,.icon-button,.qo-theme-toggle) { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-width:31px; height:30px; padding:4px 8px; background:transparent; color:var(--qo-shell-text); border:1px solid var(--qo-shell-border); border-radius:var(--qo-radius); font:600 11px/1.2 "Segoe UI",sans-serif; white-space:nowrap; }
+.qo-unified-shell :is(.icon-button,.qo-theme-toggle) { width:31px; padding:0; flex:none; }
+.qo-unified-shell .shell-btn-icon { display:flex; width:16px; height:16px; flex:none; }
+.qo-unified-shell :is(.shell-action,.icon-button,.qo-theme-toggle):hover { background:var(--qo-shell-hover); }
+.qo-unified-shell .shell-action.primary { background:var(--qo-accent-fill); color:var(--qo-on-accent); border-color:transparent; }
+.qo-unified-shell .shell-action.primary:hover { background:var(--qo-accent-fill-hover); }
+.qo-unified-shell .shell-action.primary:active { background:var(--qo-accent-fill-pressed); }
+.qo-unified-shell :is(button,input):focus-visible { outline:2px solid var(--qo-shell-text); outline-offset:-3px; }
+.qo-unified-shell button:disabled { opacity:.45; cursor:default; }
+@media(max-width:1230px) {
+  .global-bar.qo-unified-shell { grid-template-columns:30px auto minmax(90px,1fr) auto; }
+  .qo-unified-shell .logo { width:30px; }
+  .qo-unified-shell .logo-wordmark { display:none; }
+  .qo-unified-shell .module { padding-inline:8px; }
+}
+@media(max-width:800px) {
+  .qo-unified-shell .module span { display:none; }
+  .qo-unified-shell .module { min-width:35px; padding-inline:7px; }
+  .qo-unified-shell .shell-action>span:last-child { display:none; }
+  .qo-unified-shell .global-right { gap:4px; }
+}
+@media(max-width:550px) {
+  .global-bar.qo-unified-shell { grid-template-columns:28px auto minmax(50px,1fr) auto; padding-inline:5px; gap:4px; }
+  .qo-unified-shell .module { min-width:29px; padding-inline:5px; }
+  .qo-unified-shell .module:first-child { font-size:9px; }
+  .qo-unified-shell .shell-doc-wrap { padding-inline:0; }
+}
+@media print { .global-bar.qo-unified-shell { display:none; } }
