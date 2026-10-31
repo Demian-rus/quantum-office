@@ -92,6 +92,20 @@
 .qs-photo-properties summary { cursor:pointer; font-size:11px; font-weight:650; }
 .qs-photo-properties .qs-original-note { font-size:10px; margin:0; line-height:1.5; }
 .qs-inline-text { z-index:1000; background:#ffffffeb; color:#17253b; border:2px solid var(--qo-focus); padding:4px; box-shadow:var(--qo-shadow); resize:both; outline:none; line-height:1.25; color-scheme:light; }
+.qs-adjust { position:relative; padding-right:27px; }
+.qs-adjust .qs-param-reset { position:absolute; right:0; top:-5px; width:24px; min-height:24px; padding:4px; }
+/* Contextual crop controls; shared button/field states come from controls.css. */
+.qs-crop-bar { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:6px 12px; flex:none; background:var(--qo-surface-alt); border-bottom:1px solid var(--qo-border); font-size:11px; }
+.qs-crop-bar label { display:flex; align-items:center; gap:5px; }
+.qs-crop-bar select { min-height:30px; border:1px solid var(--qo-border-strong); border-radius:var(--qo-radius); padding:4px; }
+.qs-crop-bar small { margin-left:auto; color:var(--qo-muted); }
+.qs-crop-bar .qs-btn span { display:inline; }
+.qs-layer-name { width:100%; min-width:0; font-size:11px; }
+.qs-layer-row.qs-drop-above { box-shadow:0 -2px var(--qo-accent); }
+.qs-layer-row.qs-drop-below { box-shadow:0 2px var(--qo-accent); }
+.qs-context-menu { position:fixed; z-index:var(--qo-z-menu); display:grid; min-width:190px; padding:5px; border:1px solid var(--qo-border-strong); border-radius:var(--qo-radius); background:var(--qo-surface); box-shadow:var(--qo-shadow); }
+.qs-context-menu .qs-btn { justify-content:flex-start; }
+.qs-context-menu .qs-btn span { display:inline; }
 @media(max-width:1250px) {
   .qs-saved-indicator { display:none; }
   .qs-left-open .qs-editor-layout { grid-template-columns:58px 220px minmax(0,1fr) 0; }
