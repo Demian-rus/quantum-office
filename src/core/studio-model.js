@@ -1,5 +1,6 @@
+import {PHOTO_ADVANCED,PHOTO_LIMITS} from './studio-photo.js';
 /** TASK095: pure, version-one-compatible Studio geometry and project validation. */
-export const PHOTO_DEFAULTS=Object.freeze({brightness:100,contrast:100,saturation:100,exposure:0,blur:0,intensity:100,filter:'none'});
+export const PHOTO_DEFAULTS=Object.freeze({brightness:100,contrast:100,saturation:100,exposure:0,blur:0,intensity:100,filter:'none',...PHOTO_ADVANCED});
 export function photoFilter(adjust={}){
  const a={...PHOTO_DEFAULTS,...adjust},strength=a.intensity/100;
  const fx=a.filter==='mono'?` grayscale(${strength})`:a.filter==='sepia'?` sepia(${strength})`:a.filter==='vivid'?` saturate(${1+strength}) contrast(${1+.15*strength})`:'';
@@ -19,14 +20,14 @@ export function validateStudioProject(value){
  const color=x=>typeof x==='string'&&/^#[\da-f]{6}$/i.test(x);
  const image=x=>typeof x==='string'&&(!x||/^data:image\/(png|jpeg|webp);base64,[\da-z+/=\s]+$/i.test(x));
  if(value.bg!==undefined&&!color(value.bg))fail();if(value.imageSrc!==undefined&&!image(value.imageSrc))fail();
- const checkAdjust=a=>{if(a===undefined)return;if(!a||typeof a!=='object')fail();for(const [key,min,max] of [['brightness',0,200],['contrast',0,200],['saturation',0,200],['exposure',-3,3],['blur',0,20],['intensity',0,100]])if(a[key]!==undefined&&!finite(a[key],min,max))fail();if(a.filter!==undefined&&!['none','mono','sepia','vivid'].includes(a.filter))fail();};
+ const checkAdjust=a=>{if(a===undefined)return;if(!a||typeof a!=='object')fail();for(const [key,min,max] of [['brightness',0,200],['contrast',0,200],['saturation',0,200],['exposure',-3,3],['blur',0,20],['intensity',0,100]])if(a[key]!==undefined&&!finite(a[key],min,max))fail();for(const [key,[min,max]]of Object.entries(PHOTO_LIMITS))if(a[key]!==undefined&&!finite(a[key],min,max))fail();if(a.filter!==undefined&&!['none','mono','sepia','vivid'].includes(a.filter))fail();};
  checkAdjust(value.adjust);const ids=new Set();let points=0;
  for(const o of value.strokes){
   if(!o||typeof o.id!=='string'||!o.id||ids.has(o.id)||!['rect','ellipse','line','brush','text','image','triangle'].includes(o.tool)||!Array.isArray(o.points)||!o.points.length)fail();ids.add(o.id);
   points+=o.points.length;if(points>300000)fail();
   for(const p of o.points)if(!Array.isArray(p)||p.length!==2||!p.every(x=>finite(x)))fail();
-  if(o.size!==undefined&&!finite(o.size,.1,1000))fail();if(o.opacity!==undefined&&!finite(o.opacity,0,1))fail();if(o.rotation!==undefined&&!finite(o.rotation,-36000,36000))fail();if(o.color!==undefined&&!color(o.color))fail();
-  if(o.tool==='image'){if(!image(o.src)||!o.src||!finite(o.w,1,100000)||!finite(o.h,1,100000))fail();checkAdjust(o.adjust);if(o.crop){const c=o.crop;if(!['x','y','w','h'].every(k=>finite(c[k],0,1))||c.w<.05||c.h<.05||c.x+c.w>1.00001||c.y+c.h>1.00001)fail();}}
+  if(o.name!==undefined&&(typeof o.name!=='string'||!o.name.trim()||o.name.length>120))fail();if(o.mask!==undefined&&!['none','rect','round','circle','ellipse'].includes(o.mask))fail();if(o.roundness!==undefined&&!finite(o.roundness,0,.5))fail();if(o.size!==undefined&&!finite(o.size,.1,1000))fail();if(o.opacity!==undefined&&!finite(o.opacity,0,1))fail();if(o.rotation!==undefined&&!finite(o.rotation,-36000,36000))fail();if(o.color!==undefined&&!color(o.color))fail();
+  if(o.tool==='image'){if(o.frame!==undefined&&(!o.frame||typeof o.frame!=='object'||Array.isArray(o.frame)||!finite(o.frame.zoom,1,10)||!finite(o.frame.panX,-1,1)||!finite(o.frame.panY,-1,1)))fail();if(!image(o.src)||!o.src||!finite(o.w,1,100000)||!finite(o.h,1,100000))fail();checkAdjust(o.adjust);if(o.crop){const c=o.crop;if(!['x','y','w','h'].every(k=>finite(c[k],0,1))||c.w<.05||c.h<.05||c.x+c.w>1.00001||c.y+c.h>1.00001)fail();}}
   if(o.tool==='text'&&(typeof o.text!=='string'||o.text.length>10000))fail();
  }
  return structuredClone(value);

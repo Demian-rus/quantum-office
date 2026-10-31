@@ -51,6 +51,8 @@
   --qo-on-accent: #ffffff;
   --qo-focus: #17694f;
   --qo-paper-accent: #207455;
+  --qo-crop-shade: #10172499;
+  --qo-crop-line: #ffffff;
   --qo-guide: #b24091;
   --qo-shell-accent: #93dabb;
   --qo-control-ink: var(--qo-text);
