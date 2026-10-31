@@ -565,3 +565,25 @@ body.is-fill-dragging,body.is-fill-dragging *{cursor:crosshair!important;user-se
 .format-popover,.size-context-menu,.filter-popup,.chart-panel,.validation-panel,.conditional-panel{box-shadow:var(--qo-shadow);border-color:#cbdcd2;border-radius:10px}
 .format-popover button:hover,.size-context-menu button:hover{background:#e6f1eb}
 @media(max-width:730px){.ribbon-controls{height:78px;min-height:78px}.ribbon-group{height:73px}}
+
+
+/* TASK075: refined two-level editing ribbon, accessible Cyrillic text-format controls. */
+.ribbon-group.font-group{width:315px;min-width:315px;max-width:315px}
+.ribbon-group.font-group .font-action-row{width:100%;gap:5px;justify-content:space-between}
+.ribbon-group.font-group .font-action-row .tool-btn{flex:1 1 0;min-width:0;max-width:none;padding:0}
+.ribbon-group.font-group .font-action-row .tool-symbol{display:flex;align-items:center;justify-content:center;overflow:visible}
+.font-letter{display:inline-block;font-size:14px;font-family:"Segoe UI",Arial,sans-serif;font-weight:780;font-style:normal;color:inherit;line-height:1.05}
+i.font-letter{font-style:italic;font-weight:650}
+.font-letter.underlined{text-decoration:underline;text-decoration-thickness:2px;text-underline-offset:2px}
+.font-letter.struck{text-decoration:line-through;text-decoration-thickness:2px}
+.ribbon-group.alignment-group{min-width:141px;width:141px;max-width:141px}
+.ribbon-group.alignment-group .ribbon-group-content{display:flex;align-items:stretch;justify-content:center;height:54px;flex:none}
+.ribbon-group.alignment-group .align-rows{display:flex;flex-direction:column;gap:3px;height:54px;width:100%;justify-content:center}
+.ribbon-group.alignment-group .align-row{height:25px;display:flex;align-items:center;gap:4px;justify-content:space-between}
+.ribbon-group.alignment-group .align-row .tool-btn{min-width:0;max-width:none;flex:1 1 0;padding:0;height:25px}
+.ribbon-group.alignment-group .align-row.vertical{padding-bottom:1px;border-bottom:1px solid #e7ece9}
+.ribbon-group.alignment-group .tool-symbol svg{width:17px;height:17px}
+.rowhead,.colhead{cursor:cell;touch-action:none}
+.rowhead.header-selected,.colhead.header-selected{background:#dcece4;color:#166447}
+.rowhead.header-active,.colhead.header-active{color:#0c523b;font-weight:800}
+.rowhead:has(.grid-resizer:hover),.colhead:has(.grid-resizer:hover){cursor:inherit}
