@@ -1276,8 +1276,51 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  if(fillDrag)showFillDragPreview();
  refreshFillHandle();
 }
+// Selecting a row/column header by dragging should work like Excel.
+let headerSelectionDrag=null,headerIgnoreClick=null;
+function headerRange(axis,start,end){
+ const lo=Math.min(start,end),hi=Math.max(start,end);
+ return axis==='row'?
+  [cellName(lo,0),cellName(hi,LIMITS.columns-1)]:
+  [cellName(0,lo),cellName(LIMITS.rows-1,hi)];
+}
+app.addEventListener('pointerdown',e=>{
+ if(e.button!==0||!sheet()||e.target.closest('.grid-resizer'))return;
+ const header=e.target.closest('.rowhead,.colhead');
+ if(!header)return;
+ const axis=header.classList.contains('rowhead')?'row':'col',index=Number(header.dataset.index);
+ if(!Number.isInteger(index))return;
+ headerSelectionDrag={axis,start:index,end:index,moved:false,additive:e.ctrlKey||e.metaKey};
+ // Prevent native text selection in the header; the regular click still selects one row/column.
+ e.preventDefault();
+},true);
+window.addEventListener('pointermove',e=>{
+ const drag=headerSelectionDrag;
+ if(!drag||!(e.buttons&1)||!sheet())return;
+ const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.rowhead,.colhead');
+ if(!target||target.classList.contains('rowhead')!==(drag.axis==='row'))return;
+ const index=Number(target.dataset.index);
+ if(!Number.isInteger(index)||index===drag.end)return;
+ drag.end=index;
+ if(!drag.moved){
+  drag.moved=true;
+  const [a,b]=headerRange(drag.axis,drag.start,index);
+  if(drag.additive)addSelection(a,b);
+  else setSelection(a,b);
+ }else{
+  const [a,b]=headerRange(drag.axis,drag.start,index);
+  setSelection(a,b,drag.additive);
+ }
+});
+window.addEventListener('pointerup',()=>{
+ if(headerSelectionDrag?.moved){
+  headerIgnoreClick={axis:headerSelectionDrag.axis,until:performance.now()+120};
+ }
+ headerSelectionDrag=null;
+});
+window.addEventListener('pointercancel',()=>{headerSelectionDrag=null;});
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
- switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
+ switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':createBook(target.dataset.template==='new'?false:target.dataset.template);break;case 'select-row':{if(headerIgnoreClick?.axis==='row'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{if(headerIgnoreClick?.axis==='col'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
