@@ -587,3 +587,141 @@ i.font-letter{font-style:italic;font-weight:650}
 .rowhead.header-selected,.colhead.header-selected{background:#dcece4;color:#166447}
 .rowhead.header-active,.colhead.header-active{color:#0c523b;font-weight:800}
 .rowhead:has(.grid-resizer:hover),.colhead:has(.grid-resizer:hover){cursor:inherit}
+
+
+/* TASK 076 — premium interactive desktop controls. Lucide SVGs are bundled offline.
+   Restrained jade/slate palette, physical depth, keyboard-visible focus and reduced motion. */
+:root{
+ --qo-control-ink:#244439;--qo-control-accent:#187455;
+ --qo-control-active:#dcefe5;--qo-control-edge:#bfd8cc;
+ --qo-control-shadow:0 2px 8px rgba(15,51,38,.07);
+}
+.ribbon{
+ background:linear-gradient(180deg,#fdfefd 0%,#f7faf8 100%);
+ border-bottom:1px solid #d5dfd9;
+ box-shadow:0 2px 14px rgba(16,48,38,.075),inset 0 1px 0 #fff;
+}
+.ribbon-tabs{
+ background:linear-gradient(180deg,#f8faf9,#eef3f0);
+ border-bottom:1px solid #dce5df;
+}
+.ribbon-tabs button{
+ transition:background-color .16s ease,color .16s ease,box-shadow .16s ease;
+ border-radius:6px 6px 0 0;
+}
+.ribbon-tabs button:hover:not(.chosen){background:#e1eee7;color:#155a43}
+.ribbon-tabs button.chosen{
+ color:#145b43;background:#fff;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.95),0 -1px 7px rgba(16,56,41,.055);
+}
+.ribbon-tabs button.chosen:after{
+ height:3px;background:linear-gradient(90deg,#26a371,#0f7255);
+ left:9px;right:9px;border-radius:6px 6px 0 0;
+}
+.ribbon-controls{background:linear-gradient(180deg,#fff,#f6faf7)}
+.ribbon-group{border-right-color:#dce6df;position:relative}
+.ribbon-group .group-name{color:#607a6c;letter-spacing:.055em;font-weight:750}
+.ribbon-group button.tool-btn{
+ position:relative;isolation:isolate;overflow:visible;
+ color:var(--qo-control-ink);
+ background:transparent;border:1px solid transparent;
+ border-radius:7px;box-shadow:none;
+ transition:background-color .17s ease,border-color .17s ease,
+  box-shadow .17s ease,transform .15s cubic-bezier(.2,.85,.25,1),color .17s ease;
+}
+.ribbon-group button.tool-btn .tool-symbol{
+ color:inherit;background:transparent;
+ transition:transform .15s cubic-bezier(.2,.85,.25,1),color .17s ease;
+}
+.ribbon-group button.tool-btn .tool-symbol svg.qo-lucide{
+ width:18px;height:18px;display:block;flex:none;
+ stroke:currentColor;stroke-width:1.95;
+ filter:drop-shadow(0 .4px .2px rgba(0,0,0,.06));
+}
+.ribbon-group button.tool-btn:hover{
+ color:#116548;
+ background:linear-gradient(180deg,#f1faf5,#e3f1e9);
+ border-color:#b9d9c8;
+ box-shadow:0 2px 8px rgba(31,92,62,.13),inset 0 1px 0 rgba(255,255,255,.95);
+ transform:translateY(-1px);
+}
+.ribbon-group button.tool-btn:hover .tool-symbol{transform:scale(1.08)}
+.ribbon-group button.tool-btn:active{
+ color:#0e593e;background:#cfe8dc;border-color:#8dbba6;
+ box-shadow:inset 0 2px 4px rgba(8,65,42,.12);
+ transform:translateY(0) scale(.97);
+}
+.ribbon-group button.tool-btn.is-active,
+.ribbon-group button.tool-btn[aria-pressed="true"]{
+ color:#09603f;
+ background:linear-gradient(180deg,#e5f4eb,#d3e9dc);
+ border-color:#8fc7a8;
+ box-shadow:inset 0 0 0 1px #f6fff9,inset 0 -2px 0 rgba(35,143,91,.18),
+  0 1px 4px rgba(15,79,49,.085);
+}
+.ribbon-group button.tool-btn.is-active::after{
+ content:"";position:absolute;left:23%;right:23%;bottom:0;height:2px;
+ background:#15885c;border-radius:4px 4px 0 0;
+}
+.ribbon-group button.tool-btn.is-active:hover{
+ background:linear-gradient(180deg,#ddf3e6,#c7e5d5);
+ border-color:#6cae8d;transform:translateY(-1px);
+}
+.ribbon-group button.tool-btn:focus-visible{
+ outline:2px solid #147a61;outline-offset:2px;
+ box-shadow:0 0 0 4px rgba(27,138,98,.15);
+}
+.ribbon-group.font-group{min-width:316px;width:316px;max-width:316px}
+.ribbon-group.font-group .font-action-row .tool-btn{min-width:34px;height:26px;max-width:none;flex:1}
+.ribbon-group.font-group .font-action-row .tool-symbol{width:23px;height:23px}
+.ribbon-group.font-group .font-action-row .font-letter{font-size:15px;line-height:1.1;color:inherit}
+.ribbon-group.font-group .font-action-row .font-letter.underlined{text-underline-offset:3px}
+.ribbon-group.font-group .font-action-row .font-letter.struck{text-decoration-thickness:2px}
+.ribbon-group.font-group .font-action-row .tool-btn[data-action="text-palette"],
+.ribbon-group.font-group .font-action-row .tool-btn[data-action="fill-palette"]{
+ flex:1.1;min-width:37px;
+}
+.qo-text-color{width:22px;height:22px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+.qo-text-color strong{
+ font:800 16px/16px "Segoe UI",Arial,sans-serif;
+ color:#1c3531;text-shadow:0 1px 0 #fff;
+}
+.qo-text-color .qo-swatch{
+ width:18px;height:4px;display:block;border-radius:2px;
+ background:#151515;border:1px solid rgba(0,0,0,.08);
+ box-shadow:0 1px 2px rgba(0,0,0,.08);
+}
+.qo-paint-icon{width:21px;height:22px;display:flex;align-items:center;justify-content:center;position:relative}
+.qo-paint-icon svg.qo-lucide{width:20px;height:20px}
+.qo-paint-icon .qo-swatch{
+ position:absolute;right:0;bottom:0;width:8px;height:5px;border-radius:2px;
+ background:#258662;border:1px solid rgba(255,255,255,.85);
+ box-shadow:0 0 0 1px rgba(9,59,37,.18);
+}
+.ribbon-group button.tool-btn[data-action="text-palette"]:hover .qo-text-color strong{color:#0b704c}
+.ribbon-group select{
+ transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease;
+}
+.ribbon-group select:hover{border-color:#8bbb9f;background:#fbfffc}
+.ribbon-group select:focus-visible{outline:2px solid #0d7a57;outline-offset:2px}
+.ribbon-group.alignment-group .align-row .tool-btn{min-width:32px}
+.ribbon-group.alignment-group .align-row .qo-lucide{width:19px;height:19px}
+.format-popover,.size-context-menu,.filter-popup{
+ background:linear-gradient(180deg,#fff,#fcfefc);
+ border:1px solid #d1e0d7;
+ box-shadow:0 14px 38px rgba(15,40,29,.18),0 2px 8px rgba(16,68,39,.07);
+}
+.format-popover button,.size-context-menu button{
+ transition:background-color .13s ease,border-color .13s ease,color .13s ease,transform .13s ease;
+}
+.format-popover button:hover,.size-context-menu button:hover{
+ color:#135b41;background:#e8f3ed;border-color:#badbc9;
+}
+.palette-swatch:hover{
+ transform:scale(1.09);box-shadow:0 2px 9px rgba(22,70,45,.17);
+}
+@media(prefers-reduced-motion:reduce){
+ .ribbon-group button.tool-btn,.ribbon-group button.tool-btn .tool-symbol,
+ .ribbon-tabs button,.ribbon-group select,.format-popover button,
+ .size-context-menu button,.palette-swatch{transition:none!important;transform:none!important}
+}
