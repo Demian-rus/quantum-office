@@ -433,7 +433,7 @@ export function fillAreasDirection(sheet,areas,direction){
  const staged=structuredClone(sheet);
  let filled=0;
  for(const a of rects)
-  filled+=fillSelection(staged,cellName(a.r1,a.c1),cellName(a.r2,a.c2),direction);
+  filled+=fillSelectionInto(staged,cellName(a.r1,a.c1),cellName(a.r2,a.c2),direction);
  if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
  sheet.cells=staged.cells;
  if(sheet.autoFilter)invalidateGridGeometry(sheet);
@@ -524,7 +524,7 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
  * Up/left use the bottom/right edge. This is not the fill-handle series tool:
  * formulas adjust, but literal values repeat exactly (Excel Ctrl+D/R semantics).
  * Stage all cells before mutation so validation and capacity failures are atomic. */
-export function fillSelection(sheet,from,to,direction){
+function fillSelectionInto(sheet,from,to,direction){
  if(!['up','down','left','right'].includes(direction))throw Error('Неподдерживаемое направление');
  if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон');
  const rect=rectangle(from,to),vertical=['up','down'].includes(direction);
@@ -546,7 +546,7 @@ export function fillSelection(sheet,from,to,direction){
   changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),
    structuredClone(original.style||{})]);
  }
- const staged=structuredClone(sheet);
+ const staged=sheet;
  for(const [ref,value,style] of changes){
   checkValidatedInput(staged,ref,value);
   if(value||Object.keys(style).length)staged.cells[ref]={value,style};
@@ -554,9 +554,15 @@ export function fillSelection(sheet,from,to,direction){
  }
  if(Object.keys(staged.cells).length>LIMITS.cells)
   throw Error('Превышен лимит заполненных ячеек (50 000)');
+ return changes.length;
+}
+
+export function fillSelection(sheet,from,to,direction){
+ const staged=structuredClone(sheet);
+ const count=fillSelectionInto(staged,from,to,direction);
  sheet.cells=staged.cells;
  if(sheet.autoFilter)invalidateGridGeometry(sheet);
- return changes.length;
+ return count;
 }
 
 export function rawMap(sheet){return Object.fromEntries(Object.entries(sheet.cells).map(([k,v])=>[k,v.value]));}
