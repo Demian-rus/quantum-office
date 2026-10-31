@@ -1,9 +1,11 @@
-/** UI-local incremental workbook calculations. Never serialize a calculation cache.
- * Reconciliation is called ONLY after a successful workbook transaction.
- * A changed workbook object, sheet schema, clock day or unsafe batch forces a rebuild. */
 import {dateSerial} from './dates.js';
 import {formulaContext} from './workbook.js';
 import {updateCalculationValue} from './formulas.js';
+/** UI-local incremental workbook calculations. Never serialize a calculation cache.
+ * Reconciliation is called ONLY after a successful workbook transaction.
+ * A changed workbook object, sheet schema, clock day or unsafe batch forces a rebuild. */
+
+
 
 export const MAX_INCREMENTAL_CHANGES=512;
 const upper=name=>name.toLocaleUpperCase('ru-RU');

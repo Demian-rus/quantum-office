@@ -1,9 +1,13 @@
-/** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
 import {LIMITS,cellName,parseCell,invalidateGridGeometry} from './workbook.js';
 import {shiftCharts} from './charts.js';
 import {shiftConditionalRules} from './conditional.js';
 import {shiftDataRules} from './validation.js';
 import {shiftPrintArea} from './printing.js';
+/** Bounded, atomic sheet structure operations. No silent clipping of populated cells. */
+
+
+
+
 
 const MAX_BATCH=100;
 const CELL_REF=/(?<![A-Z0-9_.$])(\$?)([A-Z]+)(\$?)([1-9]\d*)(?![A-Z0-9_.])/gi;
@@ -32,6 +36,7 @@ export function changeSheetStructure(sheet,axis,mode,index,count=1){
  if(!['row','col'].includes(axis)||!['insert','delete'].includes(mode))throw Error('Неизвестная структурная операция');
  const limit=axis==='row'?LIMITS.rows:LIMITS.columns;
  if(!Number.isInteger(index)||!Number.isInteger(count)||count<1||count>MAX_BATCH||index<0||index+count>limit)throw Error('Диапазон вне таблицы или больше 100');
+ if(sheet.smartTable)throw Error('Для вставки/удаления строк сначала преобразуйте умную таблицу в обычный диапазон');
  if(sheet.autoFilter)throw Error('Сначала отключите автофильтр, затем изменяйте структуру');
  if((sheet.rectangleStyles||[]).length)throw Error('Сначала сбросьте крупные области оформления: перенос границ при вставке и удалении пока не поддерживается');
  // Validate the projected geometry before mutating any cell. Insertions may
@@ -67,6 +72,13 @@ export function changeSheetStructure(sheet,axis,mode,index,count=1){
   const value=rewriteStructureFormula(cell.value,axis,mode,index,count);
   cells[cellName(r,c)]={value,style:structuredClone(cell.style||{})};
  }
+ const shiftedHyperlinks={};for(const [ref,url] of Object.entries(sheet.hyperlinks||{})){
+  const p=parseCell(ref),old=axis==='row'?p.row:p.col;
+  if(mode==='delete'&&old>=index&&old<=last)continue;
+  const destination=mode==='insert'?(old>=index?old+count:old):(old>last?old-count:old);
+  if(destination>=limit)throw Error('Нельзя перенести гиперссылку за пределы листа');
+  shiftedHyperlinks[cellName(axis==='row'?destination:p.row,axis==='col'?destination:p.col)]=url;
+ }
  const key=axis==='row'?'rowHeights':'columnWidths';
  const shiftedDimensions={};
  for(const [k,v] of Object.entries(sheet[key]||{})){
@@ -94,7 +106,7 @@ export function changeSheetStructure(sheet,axis,mode,index,count=1){
  const nextValidationRules=shiftDataRules(sheet,axis,mode,index,count);
  const nextPrintSettings=shiftPrintArea(sheet,axis,mode,index,count);
  // Existing data and schema remain unchanged if even one step above failed.
- sheet.printSettings=nextPrintSettings;sheet.validations=nextValidationRules;sheet.conditionalRules=nextConditions;sheet.charts=nextCharts;sheet.cells=cells;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
+ sheet.printSettings=nextPrintSettings;sheet.validations=nextValidationRules;sheet.conditionalRules=nextConditions;sheet.charts=nextCharts;sheet.cells=cells;sheet.hyperlinks=shiftedHyperlinks;sheet[key]=shiftedDimensions;sheet[hiddenKey]=hidden;sheet.freeze=freeze;sheet.merges=newMerges;
  invalidateGridGeometry(sheet);
  return {axis,mode,index,count,changed:Object.keys(cells).length};
 }

@@ -15,13 +15,16 @@ with sync_playwright() as p:
  write('B2','Занятия')
  select('B2')
  page.get_by_role('button',name='Заливка ячеек').click()
- assert page.get_by_role('dialog',name='Заливка').is_visible()
+ assert page.get_by_role('dialog',name='Цвет заливки').is_visible()
  assert page.locator('[data-action=palette-pick]').count()>=24
- page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
- assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>getComputedStyle(el).backgroundColor')=='rgb(250, 204, 21)'
+ page.locator('[data-action=palette-pick][data-value="#FFFF00"]').click()
+ assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>getComputedStyle(el).backgroundColor')=='rgb(255, 255, 0)'
  select('B2')
  page.get_by_role('button',name='Цвет текста').click()
- page.locator('#palette-custom-color').evaluate("e=>{e.value='#aabbcc';e.dispatchEvent(new Event('change',{bubbles:true}));}")
+ page.locator('[data-action=palette-more]').click()
+ page.locator('#palette-hex').fill('#aabbcc')
+ page.locator('#palette-hex').dispatch_event('input')
+ page.locator('[data-action=palette-custom-apply]').click()
  assert page.locator('.grid-cell[data-ref=B2]').evaluate('el=>el.style.color')=='rgb(170, 187, 204)'
  select('B2:D4');page.get_by_role('button',name='Границы').click()
  assert page.get_by_role('menuitem',name='Внешние границы').is_visible()

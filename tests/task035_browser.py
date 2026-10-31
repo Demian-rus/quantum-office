@@ -27,14 +27,14 @@ with sync_playwright() as p:
  write('A1','Исходное значение')
  assert cell('A1')['value']=='Исходное значение'
  page.get_by_role('button',name='Заливка ячеек').click()
- page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
- assert cell('A1')['style']['bg']=='#facc15'
+ page.locator('[data-action=palette-pick][data-value="#FFFF00"]').click()
+ assert cell('A1')['style']['bg']=='#FFFF00'
  shortcut('я','KeyZ')
  assert cell('A1')['style']=={},cell('A1')
  assert cell('A1')['value']=='Исходное значение'
  assert 'отменено' in page.locator('#toast').inner_text().lower()
  shortcut('н','KeyY')
- assert cell('A1')['style']['bg']=='#facc15'
+ assert cell('A1')['style']['bg']=='#FFFF00'
  # Physical keyboard and clipboard editing must share the same workbook history.
  select('A1');page.locator('#grid-scroll').focus();page.keyboard.press('Delete')
  assert cell('A1')['value']==''

@@ -16,11 +16,11 @@ with sync_playwright() as p:
   assert pg.locator('.filter-popup').is_visible()
   choices=pg.locator('.filter-choices label').all_text_contents()
   assert 'Транспорт' in choices,choices
-  pg.get_by_role('button',name='Снять все').click()
+  pg.get_by_role('button',name='Снять найденные').click()
   assert pg.locator('.filter-choices input:checked').count()==0
   pg.locator('.filter-choices label',has_text='Транспорт').locator('input').check()
   pg.locator('.filter-choices label',has_text='Оборудование').locator('input').check()
-  pg.get_by_role('button',name='Применить').click()
+  pg.locator('[data-action=filter-apply]').click()
   assert pg.locator('.rowhead').get_by_text('4',exact=True).count()==1
   assert pg.locator('.rowhead').get_by_text('2',exact=True).count()==1
   assert pg.locator('.rowhead').get_by_text('3',exact=True).count()==0
