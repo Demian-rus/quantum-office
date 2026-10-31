@@ -131,7 +131,7 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  return style;
 }
 export const FONT_FAMILIES=['Aptos','Calibri','Arial','Segoe UI','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Cambria','Constantia','Candara','Corbel','Consolas','Courier New','Palatino Linotype','Garamond','PT Sans','PT Serif','Roboto','Noto Sans','Noto Serif','Open Sans','DejaVu Sans','Liberation Sans','Liberation Serif'];
-const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize','fontFamily']);
+const bulkStyleProps=new Set(['bg','color','bold','italic','underline','strike','wrap','format','align','verticalAlign','fontSize','fontFamily']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 /** Pure subtraction, splits a rectangle into up to four untouched fragments. */
@@ -705,6 +705,7 @@ export function validateWorkbook(book){
    Object.keys(style).every(k=>bulkStyleProps.has(k))&&Object.entries(style).every(([k,v])=>{
     if(v===null)return allowNull;
     if(k==='align')return ['left','center','right'].includes(v);
+    if(k==='verticalAlign')return ['top','center','bottom'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
      if(k==='fontSize')return typeof v==='number'&&Number.isFinite(v)&&v>=6&&v<=72;
     if(k==='fontFamily')return typeof v==='string'&&FONT_FAMILIES.includes(v);
@@ -771,8 +772,8 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
   }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderEdges','borderColor','fontSize','fontFamily','wrap'].includes(k))||
-       ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
+    if(Object.keys(style).some(k=>!['bold','italic','underline','strike','bg','color','align','verticalAlign','format','border','borders','borderEdges','borderColor','fontSize','fontFamily','wrap'].includes(k))||
+       ['bold','italic','underline','strike','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color','borderColor'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
        ('fontSize' in style&&(!Number.isFinite(style.fontSize)||style.fontSize<6||style.fontSize>72))||
        ('fontFamily' in style&&!FONT_FAMILIES.includes(style.fontFamily))||
@@ -780,6 +781,7 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
         ('borderEdges' in style&&!validBorderEdges(style.borderEdges))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
+       ('verticalAlign' in style&&!['top','center','bottom'].includes(style.verticalAlign))||
        ('format' in style&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
 }
