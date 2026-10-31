@@ -1,4 +1,4 @@
-"""TASK076: premium Lucide toolbar, real pressed states, hover motion and color icons."""
+"""TASK076: premium Lucide toolbar, real pressed states, calm hover feedback and color icons."""
 from pathlib import Path
 from shutil import which
 from playwright.sync_api import sync_playwright
@@ -24,14 +24,18 @@ with sync_playwright() as p:
  bold=icon('bold')
  assert bold.get_attribute('aria-pressed')=='false'
  assert bold.locator('.font-letter').inner_text()=='Ж'
+ normal_bg=bold.evaluate("e=>getComputedStyle(e).backgroundColor")
  bold.hover();page.wait_for_timeout(190)
- assert bold.evaluate("e=>getComputedStyle(e).transform")!='none'
- assert 'gradient' in bold.evaluate("e=>getComputedStyle(e).backgroundImage")
+ assert bold.evaluate("e=>getComputedStyle(e).transform")=='none'
+ assert bold.evaluate("e=>getComputedStyle(e).backgroundColor")!=normal_bg
+ assert bold.evaluate("e=>getComputedStyle(e).backgroundImage")=='none'
  assert bold.get_attribute('title')=='Жирный'
  bold.click();scroll()
  assert bold.get_attribute('aria-pressed')=='true'
  assert 'is-active' in bold.get_attribute('class')
- assert bold.evaluate("e=>getComputedStyle(e).backgroundImage")!='none'
+ selected_bg=bold.evaluate("e=>getComputedStyle(e).backgroundColor")
+ assert selected_bg!=normal_bg
+ assert bold.evaluate("e=>getComputedStyle(e).backgroundImage")=='none'
  bold.click();scroll()
  assert bold.get_attribute('aria-pressed')=='false'
  for act in ['italic','underline','strike']:

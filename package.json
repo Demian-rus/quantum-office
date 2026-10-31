@@ -10,7 +10,8 @@
     "preview": "node scripts/serve.mjs dist",
     "test": "node --test --test-concurrency=4 tests/*.test.js",
     "check": "npm test && npm run build",
-    "test:studio": "node tests/task095_browser.cjs"
+    "test:studio": "node tests/task095_browser.cjs",
+    "test:design-system": "node tests/task096_browser.cjs"
   },
   "license": "MIT",
   "devDependencies": {

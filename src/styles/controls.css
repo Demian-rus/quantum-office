@@ -1,0 +1,33 @@
+/* Shared controls. State order: default → hover → selected → selected+hover → pressed → disabled → focus.
+   Editor modules own geometry; this file owns interactive color and feedback. */
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-preset,.qs-element,.qs-text-template,.qs-primary,.qs-secondary,.qs-layer,.qs-layer-control,.font-picker-trigger,.font-item,.border-option,.chart-kinds button,.chart-choice,.size-context-menu button,.qo-control) {
+  background:var(--qo-control-bg,transparent); color:var(--qo-text); border-color:var(--qo-control-border,transparent); box-shadow:none;
+  transition:background-color var(--qo-motion),border-color var(--qo-motion),color var(--qo-motion);
+}
+:is(.qs-preset,.qs-element,.qs-text-template,.qs-secondary,.qs-layer,.font-picker-trigger,.qo-control) { --qo-control-bg:var(--qo-surface-alt); --qo-control-border:var(--qo-border); }
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-preset,.qs-element,.qs-text-template,.qs-primary,.qs-secondary,.qs-layer,.qs-layer-control,.font-picker-trigger,.font-item,.border-option,.chart-kinds button,.chart-choice,.size-context-menu button,.qo-control):hover:not(:disabled):not([aria-disabled=true]) { background:var(--qo-hover); color:var(--qo-text); border-color:var(--qo-border-strong); }
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-layer,.font-item,.border-option,.chart-kinds button,.chart-choice,.qo-control):is(.is-active,.active,.selected,[aria-pressed=true],[aria-selected=true],.qo-accent-tool) { background:var(--qo-accent-soft); color:var(--qo-accent); border-color:var(--qo-accent-border); }
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-layer,.font-item,.border-option,.chart-kinds button,.chart-choice,.qo-control):is(.is-active,.active,.selected,[aria-pressed=true],[aria-selected=true],.qo-accent-tool):hover:not(:disabled):not([aria-disabled=true]) { background:var(--qo-selected-hover); color:var(--qo-accent); border-color:var(--qo-accent-border); }
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-preset,.qs-element,.qs-text-template,.qs-secondary,.qs-layer,.qs-layer-control,.font-picker-trigger,.font-item,.border-option,.chart-kinds button,.chart-choice,.size-context-menu button,.qo-control):active:not(:disabled):not([aria-disabled=true]),
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qo-style-line button,.qo-work-mini-actions button,.qs-btn,.qs-rail-btn,.qs-layer,.font-item,.border-option,.chart-kinds button,.chart-choice,.qo-control):is(.is-active,.active,.selected,[aria-pressed=true],[aria-selected=true],.qo-accent-tool):active:not(:disabled):not([aria-disabled=true]) { background:var(--qo-pressed); border-color:var(--qo-border-strong); color:var(--qo-text); }
+:is(.qs-primary,.qo-control-primary,.qs-toolbar-right .qs-btn:last-child) { background:var(--qo-accent-fill); border-color:transparent; color:var(--qo-on-accent); }
+:is(.qs-primary,.qo-control-primary,.qs-toolbar-right .qs-btn:last-child):hover:not(:disabled) { background:var(--qo-accent-fill-hover); color:var(--qo-on-accent); border-color:transparent; }
+:is(.qs-primary,.qo-control-primary,.qs-toolbar-right .qs-btn:last-child):active:not(:disabled) { background:var(--qo-accent-fill-pressed); color:var(--qo-on-accent); }
+:is(.ribbon-group button.tool-btn,.qo-work-btn,.qs-btn,.qs-rail-btn,.qs-primary,.qs-secondary,.qs-layer,.qo-control):is(:disabled,[aria-disabled=true]) { opacity:.45; cursor:default; color:var(--qo-muted); background:var(--qo-surface-alt); border-color:transparent; box-shadow:none; }
+:is(.ribbon-tabs button,.qo-work-tab) { background:transparent; color:var(--qo-muted); border-color:transparent; box-shadow:none; }
+:is(.ribbon-tabs button,.qo-work-tab):hover { background:var(--qo-hover); color:var(--qo-text); }
+:is(.ribbon-tabs button,.qo-work-tab):is(.chosen,.active) { background:var(--qo-accent-soft); color:var(--qo-accent); border-bottom-color:var(--qo-accent-border); }
+:is(.ribbon-tabs button,.qo-work-tab):is(.chosen,.active):hover { background:var(--qo-selected-hover); }
+.ribbon-tabs button.chosen::after { background:var(--qo-accent-border); }
+:is(button,input,select,textarea,summary,[tabindex]):focus-visible { outline:2px solid var(--qo-focus); outline-offset:2px; }
+:is(.qs-studio,.qo-office-toolbar,.qo-slide-properties,.ribbon,.format-popover,.font-menu,.size-context-menu,.filter-popup,.chart-panel,.qo-appearance-menu,.qo-help-backdrop,.qo-component-catalog) :is(input:not([type=color]):not([type=range]):not([type=checkbox]),select,textarea) { background:var(--qo-surface); color:var(--qo-text); border-color:var(--qo-border-strong); }
+:is(.qs-studio,.qo-office-toolbar,.qo-slide-properties,.ribbon,.format-popover,.font-menu,.size-context-menu,.filter-popup,.chart-panel,.qo-component-catalog) :is(input,select,textarea):hover:not(:disabled) { border-color:var(--qo-accent-border); }
+input:is([type=range],[type=checkbox],[type=radio]),progress { accent-color:var(--qo-accent-fill); }
+input[type=range] { cursor:pointer; padding:0; min-height:20px; }
+input[type=checkbox] { width:15px; height:15px; flex:none; }
+:where(.ribbon,.qo-office-toolbar,.qs-studio,.qo-slide-properties,.qo-appearance-menu) { scrollbar-color:var(--qo-scrollbar) var(--qo-surface-alt); scrollbar-width:thin; }
+.qo-control { min-height:var(--qo-control); padding:6px 12px; border:1px solid var(--qo-border-strong); border-radius:var(--qo-radius); font:600 12px "Segoe UI",sans-serif; }
+.qo-control[aria-busy=true] { cursor:progress; }
+.qo-control[aria-busy=true]::before { content:""; display:inline-block; width:10px; height:10px; margin-right:7px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:qo-spin 800ms linear infinite; }
+@keyframes qo-spin { to { transform:rotate(360deg); } }
+@media(prefers-reduced-motion:reduce) { .qo-control[aria-busy=true]::before { animation:none; } }
