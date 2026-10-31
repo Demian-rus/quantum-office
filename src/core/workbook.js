@@ -414,7 +414,7 @@ export function fillTypedAreas(sheet,areas,input,origin){
  * Reject overlaps: otherwise the fill source could be modified by another selected area. */
 export function fillAreasDirection(sheet,areas,direction){
  if(!Array.isArray(areas)||areas.length<1||areas.length>25||
-    !['down','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
+    !['up','down','left','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
  const rects=areas.map(a=>{
   if(!validRef(a.from)||!validRef(a.to))throw Error('Недопустимый диапазон');
   return rectangle(a.from,a.to);
@@ -520,28 +520,42 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
   to:cellName(affected.r2,affected.c2),
   mode:prepared.some(x=>x.value.startsWith('='))?'formula':hasDateSeries?'date':'values'};
 }
-export function fillSelection(sheet, from, to, direction){
- if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
- const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
- if(direction==='down'&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
- if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
+/** Fill the entire selected rectangle from its leading edge. 
+ * Up/left use the bottom/right edge. This is not the fill-handle series tool:
+ * formulas adjust, but literal values repeat exactly (Excel Ctrl+D/R semantics).
+ * Stage all cells before mutation so validation and capacity failures are atomic. */
+export function fillSelection(sheet,from,to,direction){
+ if(!['up','down','left','right'].includes(direction))throw Error('Неподдерживаемое направление');
+ if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон');
+ const rect=rectangle(from,to),vertical=['up','down'].includes(direction);
+ if(vertical&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
+ if(!vertical&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
  const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(total>10000)throw Error('Выделено больше 10 000 ячеек');
- if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Заполнение объединённых ячеек пока не поддерживается');
+ if((sheet.merges||[]).some(m=>{
+  const x=rectangle(m.from,m.to);
+  return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;
+ }))throw Error('Заполнение объединённых ячеек пока не поддерживается');
  const changes=[];
  for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
-   if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
-   const originR=direction==='down'?rect.r1:r,originC=direction==='right'?rect.c1:c;
-   const original=getCell(sheet,cellName(originR,originC));
-   changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),structuredClone(original.style||{})]);
+  if(direction==='down'&&r===rect.r1||direction==='up'&&r===rect.r2||
+     direction==='right'&&c===rect.c1||direction==='left'&&c===rect.c2)continue;
+  const originR=direction==='down'?rect.r1:direction==='up'?rect.r2:r,
+   originC=direction==='right'?rect.c1:direction==='left'?rect.c2:c;
+  const original=getCell(sheet,cellName(originR,originC));
+  changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),
+   structuredClone(original.style||{})]);
  }
- // Precheck validation for the entire fill to preserve atomicity.
- for(const [ref,value] of changes)checkValidatedInput(sheet,ref,value);
- // Do not corrupt existing data if even one translated reference is out of bounds.
+ const staged=structuredClone(sheet);
  for(const [ref,value,style] of changes){
-   if(value||Object.keys(style).length)sheet.cells[ref]={value,style};
-   else delete sheet.cells[ref];
+  checkValidatedInput(staged,ref,value);
+  if(value||Object.keys(style).length)staged.cells[ref]={value,style};
+  else delete staged.cells[ref];
  }
+ if(Object.keys(staged.cells).length>LIMITS.cells)
+  throw Error('Превышен лимит заполненных ячеек (50 000)');
+ sheet.cells=staged.cells;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
  return changes.length;
 }
 
