@@ -25,7 +25,7 @@
   border-color:var(--qo-accent);
   background:var(--qo-surface);color:var(--qo-text)
 }
-#qo-diag-root .qd-group-table-wrap{width:100%;min-width:0;overflow-x:auto;border-radius:9px;border:1px solid var(--qo-border)}
+#qo-diag-root .qd-group-table-wrap{width:100%;min-width:0;overflow-x:auto;contain:paint;border-radius:9px;border:1px solid var(--qo-border)}
 #qo-diag-root .qd-group-table{width:100%;border-collapse:collapse;background:var(--qo-surface);font-size:12px;line-height:1.45}
 #qo-diag-root .qd-group-table th{
   color:var(--qo-muted);font-size:11px;font-weight:700;
