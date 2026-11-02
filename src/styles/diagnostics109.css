@@ -1,0 +1,60 @@
+/* TASK109 — fast teacher authoring inside each section */
+#qo-diag-root .qd-section-head .qd-section-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#qo-diag-root .qd-section-head .qd-section-actions button{
+  min-height:32px;padding:6px 10px;font-size:11px;white-space:nowrap
+}
+#qo-diag-root .qd-quick-entry{
+  display:grid;gap:10px;
+  margin:12px 0 6px;padding:14px;
+  background:var(--qo-surface-alt);
+  border:1px dashed var(--qo-border);
+  border-radius:10px
+}
+#qo-diag-root .qd-quick-header{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap
+}
+#qo-diag-root .qd-quick-header strong{font-size:13px;color:var(--qo-text)}
+#qo-diag-root .qd-quick-header span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-quick-fields{
+  display:grid;grid-template-columns:minmax(170px,1.4fr) minmax(170px,1.6fr) minmax(125px,.65fr) auto;
+  gap:10px;align-items:end
+}
+#qo-diag-root .qd-quick-fields label{
+  display:grid;gap:5px;min-width:0;font-size:11px;font-weight:700;color:var(--qo-muted)
+}
+#qo-diag-root .qd-quick-fields input,
+#qo-diag-root .qd-quick-fields textarea,
+#qo-diag-root .qd-quick-fields select{
+  width:100%;min-height:39px;box-sizing:border-box;
+  border:1px solid var(--qo-border);
+  border-radius:8px;background:var(--qo-surface);color:var(--qo-text);
+  padding:8px 10px;font:500 12px/1.4 "Segoe UI",Arial,sans-serif
+}
+#qo-diag-root .qd-quick-fields textarea{height:39px;resize:vertical}
+#qo-diag-root .qd-quick-fields input:focus-visible,
+#qo-diag-root .qd-quick-fields textarea:focus-visible,
+#qo-diag-root .qd-quick-fields select:focus-visible{
+  outline:2px solid var(--qo-focus);outline-offset:1px
+}
+#qo-diag-root .qd-quick-fields>button{
+  min-height:39px;padding:8px 12px;font-size:12px;white-space:nowrap
+}
+#qo-diag-root .qd-quick-entry>.qd-hint{margin:0;font-size:11px;line-height:1.5}
+#qo-diag-root .qd-editor-section.qd-section-collapsed>.qd-question-list,
+#qo-diag-root .qd-editor-section.qd-section-collapsed>.qd-quick-entry,
+#qo-diag-root .qd-editor-section.qd-section-collapsed>[data-qd-action="add-question"]{
+  display:none!important
+}
+#qo-diag-root .qd-editor-section.qd-section-collapsed .qd-section-head{
+  margin-bottom:0
+}
+@media(max-width:1000px){
+  #qo-diag-root .qd-quick-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+  #qo-diag-root .qd-quick-fields>button{justify-self:start}
+}
+@media(max-width:540px){
+  #qo-diag-root .qd-quick-entry{padding:11px}
+  #qo-diag-root .qd-quick-fields{grid-template-columns:minmax(0,1fr)}
+  #qo-diag-root .qd-quick-fields>button{width:100%}
+  #qo-diag-root .qd-section-head .qd-section-actions button{font-size:11px;padding:6px 8px}
+}
