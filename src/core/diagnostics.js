@@ -721,6 +721,55 @@ function qdApplyFilterUI(){
     button.disabled=!qdSelected.size;
 }
 
+
+/* TASK119 — save and update the *question template* right from the builder.
+   A template deliberately excludes pupils, sessions, marks and result history. */
+function qdBuilderTemplateDefaults(d){
+  const my=qdLibraryRead(),existing=my.find(x=>qdPromptKey(x.title)===qdPromptKey(d.title));
+  const preset=QD_PRESETS.find(p=>qdPromptKey(qdTemplate(p.id)?.title)===qdPromptKey(d.title));
+  const subject=existing?.subject||preset?.subject||
+    Object.entries(QD_SUBJECTS).find(([,label])=>d.title.startsWith(label))?.[0]||'other';
+  const grade=existing?.grade||preset?.grade||d.title.match(/(?:^|\D)([5-9])\s*класс/i)?.[1]||'8';
+  return {my,existing,subject,grade,purpose:existing?.purpose||preset?.purpose||'diagnostic'};
+}
+function qdBuilderTemplateMarkup(d){
+  const meta=qdBuilderTemplateDefaults(d);
+  const options=(values,selected)=>values.map(([key,label])=>'<option value="'+qdEsc(key)+
+    '" '+(key===selected?'selected':'')+'>'+qdEsc(label)+'</option>').join('');
+  return '<section class="qd-panel qd-builder-save" aria-label="Сохранение шаблона диагностики">'+
+    '<div class="qd-builder-save-head"><div><h2>Сохранить изменения в шаблон</h2>'+
+    '<p>Исправленные вопросы и ответы можно сохранить как свой шаблон или обновить ранее созданный.</p></div>'+
+    '<span>'+qdQuestionList(d).length+' заданий</span></div>'+
+    '<div class="qd-builder-save-fields">'+
+      '<label>Предмет<select id="qd-builder-template-subject">'+
+        options(Object.entries(QD_SUBJECTS),meta.subject)+'</select></label>'+
+      '<label>Класс<input id="qd-builder-template-grade" maxlength="18" value="'+qdEsc(meta.grade)+'"></label>'+
+      '<label>Цель<select id="qd-builder-template-purpose">'+
+        options(Object.entries(QD_PURPOSES),meta.purpose)+'</select></label>'+
+      '<label>Мой шаблон для обновления<select id="qd-builder-template-target">'+
+        '<option value="">Выберите сохранённый шаблон</option>'+
+        meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+
+          '>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
+    '</div>'+
+    '<div class="qd-builder-save-actions">'+
+      '<button type="button" class="qd-primary" data-qd-action="builder-template-save">Сохранить как новый шаблон</button>'+
+      '<button type="button" data-qd-action="builder-template-update" '+(!meta.my.length?'disabled':'')+
+        '>Обновить мой шаблон</button>'+
+      '<button type="button" data-qd-action="builder-template-export" '+(!meta.my.length?'disabled':'')+
+        '>Скачать библиотеку .qtpl</button></div>'+
+    '<p class="qd-hint">Встроенные шаблоны не перезаписываются: исправленную версию сохраните как собственную. '+
+      'Шаблон содержит только задания, без учеников и результатов. Для переноса на другое устройство скачайте .qtpl.</p>'+
+    '</section>';
+}
+function qdBuilderSaveTemplate(d,mode,target,fields){
+  if(mode==='new')return qdLibrarySaveCurrent(d,fields.subject,fields.grade,fields.purpose);
+  if(mode!=='update'||!target)return {ok:false,message:'Выберите свой шаблон для обновления'};
+  return qdLibraryUpdate(target,{
+    title:d.title,description:d.description,subject:fields.subject,
+    grade:fields.grade,purpose:fields.purpose
+  },d,true);
+}
+
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
@@ -820,6 +869,7 @@ function qdBuilder(){
         <button type="button" data-qd-action="remove-student" data-student-id="${qdEsc(student.id)}" aria-label="Удалить ученика">Удалить</button>
       </div>`).join('')||'<p class="qd-hint">Добавьте ученика, чтобы вести его историю.</p>'}</div>
     </section>
+    ${qdBuilderTemplateMarkup(d)}
     <div class="qd-panel qd-bottom-actions">
       <button data-qd-action="add-section" type="button">+ Новый раздел</button>
       <button type="button" data-qd-action="preview-chat">Просмотреть карточки как в чате</button>
@@ -2151,6 +2201,27 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdRefresh();status('Создана копия: '+result.title);return;
   }
+  if(action==='builder-template-save'||action==='builder-template-update'){
+    const fields={
+      subject:document.getElementById('qd-builder-template-subject')?.value||'other',
+      grade:document.getElementById('qd-builder-template-grade')?.value||'',
+      purpose:document.getElementById('qd-builder-template-purpose')?.value||'diagnostic'
+    };
+    const mode=action==='builder-template-save'?'new':'update';
+    const target=document.getElementById('qd-builder-template-target')?.value||'';
+    if(mode==='update'){
+      const item=qdLibraryRead().find(x=>x.id===target);
+      if(!item){status('Выберите свой шаблон для обновления',true);return;}
+      if(!confirm('Перезаписать сохранённый шаблон «'+item.title+'» текущими заданиями? Для резервной копии сначала скачайте .qtpl.'))return;
+    }
+    const result=qdBuilderSaveTemplate(d,mode,target,fields);
+    if(!result.ok){status(result.message||'Не удалось сохранить шаблон',true);return;}
+    qdStore();qdRefresh();
+    status(mode==='new'?'Создан новый шаблон в локальной библиотеке':
+      'Обновлён мой шаблон: '+result.questions+' заданий');
+    return;
+  }
+  if(action==='builder-template-export'){qdLibraryExport();return;}
   if(action==='library-save'){
     const subject=document.getElementById('qd-library-save-subject')?.value||'other';
     const grade=document.getElementById('qd-library-save-grade')?.value||'';
@@ -2689,6 +2760,18 @@ function qdOnChange(event){
     else selected=selected.filter(x=>x!==i);
     d.session.responses[q.id]={selected};delete d.session.marks[q.id];
     qdStore();return;
+  }
+  if(event.target.id==='qd-builder-template-target'){
+    const item=qdLibraryRead().find(x=>x.id===event.target.value);
+    if(item){
+      const subject=document.getElementById('qd-builder-template-subject');
+      const grade=document.getElementById('qd-builder-template-grade');
+      const purpose=document.getElementById('qd-builder-template-purpose');
+      if(subject)subject.value=item.subject;
+      if(grade)grade.value=item.grade;
+      if(purpose)purpose.value=item.purpose;
+    }
+    return;
   }
   if(event.target.dataset.qdField==='history-filter'){
     qdStudentFilter=event.target.value;qdHistoryComparisonFrom='';qdHistoryComparisonTo='';
