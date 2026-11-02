@@ -573,7 +573,7 @@ function qdVariantsMarkup(d){
       '" placeholder="Например, ноябрь-2026"></label><label class="qd-variant-checkbox">'+
       '<input type="checkbox" id="qd-var-choices" '+(opts.shuffleChoices?'checked':'')+'>'+
       'Перемешивать варианты ответов</label></div>'+
-      '<div id="qd-variant-preview" aria-live="polite">'+qdVariantPreview(d)+'</div></div></details>';
+      '<div id="qd-variant-preview" aria-live="polite">'+(qdVariantsOpen?qdVariantPreview(d):'<p class="qd-hint">Откройте панель для настройки вариантов.</p>')+'</div></div></details>';
 }
 function qdVariantPreviewRefresh(){
   const preview=document.getElementById('qd-variant-preview');
@@ -1565,7 +1565,7 @@ function qdRibbonSync(){
 
 function qdSidebarTopics(d,mode){
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
-    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+
+    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
     '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
       const graded=qdScores(section.questions,d.session.marks);
       const share=graded.total?Math.round(graded.rated/graded.total*100):0;
@@ -1667,7 +1667,9 @@ function qoDiagnosticMount(){
 function qdOnBuilderToggle(event){
   if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
   if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
-  if(event.target.dataset?.qdPane==='variants')qdVariantsOpen=event.target.open;
+  if(event.target.dataset?.qdPane==='variants'){
+    qdVariantsOpen=event.target.open;if(qdVariantsOpen)qdVariantPreviewRefresh();
+  }
 }
 function qdJumpToEdit(qid,field='prompt'){
   const root=document.getElementById('qo-diag-root');
@@ -1848,11 +1850,9 @@ function qdOnClick(event){
       JSON.stringify(variant.document,null,2),'application/json;charset=utf-8');
     return;
   }
-  if(action==='collapse-all-sections'){
-    qdCollapsedSections=new Set(d.sections.map(s=>s.id));qdRefresh();return;
-  }
-  if(action==='expand-all-sections'){
-    qdCollapsedSections.clear();qdRefresh();return;
+  if(action==='toggle-all-sections'){
+    qdCollapsedSections=qdCollapsedSections.size?new Set():new Set(d.sections.map(s=>s.id));
+    qdRefresh();return;
   }
   if(action==='compact-mode'){
     qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
