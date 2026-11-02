@@ -732,7 +732,7 @@ const qoWriterDefaults=()=>({margin:20,font:'Georgia',size:16,line:1.55,pageNumb
 function qoWriterLayout(){
  const x=qoWriter.layout&&typeof qoWriter.layout==='object'?qoWriter.layout:{};
  return {margin:[12,15,20,25,30].includes(+x.margin)?+x.margin:20,
-  font:['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New'].includes(x.font)?x.font:'Georgia',
+  font:['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].includes(x.font)?x.font:'Georgia',
   size:Number.isInteger(+x.size)&&+x.size>=8&&+x.size<=96?+x.size:16,
   line:[1.2,1.4,1.55,1.8,2].includes(+x.line)?+x.line:1.55,
   pageNumber:x.pageNumber!==false};
@@ -889,7 +889,7 @@ function qoWriterPage(){
  const f=qoWriterLayout();
  const sel=(options,v)=>options.map(([val,label])=>`<option value="${esc(String(val))}" ${String(val)===String(v)?'selected':''}>${esc(label)}</option>`).join('');
  const main=qoWorkGroup('Шрифт',`
- <div class="qo-work-stack"><div class="qo-work-inline"><label class="qo-work-field"><span>Семейство</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New'].map(x=>[x,x]),f.font)}</select></label>
+ <div class="qo-work-stack"><div class="qo-work-inline"><label class="qo-work-field"><span>Семейство</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].map(x=>[x,x]),f.font)}</select></label>
  <label class="qo-work-field"><span>Размер</span><input id="qo-writer-size" class="qo-writer-mini" type="number" min="8" max="96" step="1" value="${f.size}" title="Размер шрифта, пиксели" aria-label="Размер шрифта в пикселях"></label></div>
  <div class="qo-work-inline qo-style-line" role="group" aria-label="Форматирование текста"><button data-action="writer-cmd" data-command="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button><button data-action="writer-cmd" data-command="italic" title="Курсив (Ctrl+I)"><i>К</i></button><button data-action="writer-cmd" data-command="underline" title="Подчёркивание"><u>Ч</u></button><button data-action="writer-cmd" data-command="strikeThrough" title="Зачёркивание"><s>З</s></button><label class="qo-compact-color" title="Цвет текста"><input id="qo-writer-text-color" type="color" value="#263b31" aria-label="Цвет текста"></label><label class="qo-compact-color" title="Маркер текста"><input id="qo-writer-highlight" type="color" value="#fff49b" aria-label="Выделение маркером"></label></div></div>`);
  const paragraphs=qoWorkGroup('Абзац',`<div class="qo-work-stack"><div class="qo-work-inline">
