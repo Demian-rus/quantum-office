@@ -1,0 +1,26 @@
+/* TASK111: one compact set of paper-export controls per variant, no duplicated global commands. */
+#qo-diag-root .qd-variant-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:7px;
+  margin-top:5px;
+}
+#qo-diag-root .qd-variant-actions button{
+  min-width:0;min-height:36px;
+  padding:7px 9px;
+  font-size:11px;
+  white-space:normal;
+  line-height:1.4;
+}
+#qo-diag-root .qd-variant-actions button[data-qd-action="variant-download"]{
+  grid-column:1/-1;
+}
+#qo-diag-root .qd-variant-card{
+  display:flex;flex-direction:column;
+}
+#qo-diag-root .qd-variant-card .qd-variant-topics{flex:1}
+@media(max-width:540px){
+  #qo-diag-root .qd-variant-actions{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
