@@ -34,7 +34,7 @@ const {pathToFileURL}=require('node:url');
     left:r('.qd-topic-navigator').left,right:r('.qd-side-insights').right,mainWidth:r('.qd-workbench-main').width};
  });
  assert.ok(desk.left<70&&desk.right>desk.viewport-70);
- assert.ok(desk.mainWidth<=1000);
+ assert.ok(desk.mainWidth>=800&&desk.mainWidth<=1400,'TASK119 uses available desktop width');
  assert.ok(desk.overflow<=desk.viewport+4);
  await page.locator('[data-qd-action="mode"][data-mode="builder"]').click();
  const first=page.locator('.qd-edit-card').first();
