@@ -41,6 +41,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('[data-qd-action="library-preview-add"]').isDisabled(),true);
  await page.locator('[data-qd-action="library-preview-close"]').click();
  assert.equal(await page.locator('.qd-library-preview').count(),0);
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').click();
  await page.locator('[data-qd-action="view"][data-view="list"]').click();
  assert.equal(await page.locator('.qd-chat-card').count(),16);
  const downloadPromise=page.waitForEvent('download');
