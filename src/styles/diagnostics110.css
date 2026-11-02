@@ -1,0 +1,180 @@
+/* TASK110: proportional diagnostic workspace, not stretched controls or redundant buttons. */
+.qo-document-workspace .qo-diag-scroll{
+  padding:17px clamp(12px,2vw,26px) 32px;
+}
+#qo-diag-root{width:100%;max-width:1380px;margin:0 auto}
+#qo-diag-root .qd-top{max-width:100%;gap:16px}
+#qo-diag-root .qd-top h1{font-size:clamp(20px,2vw,26px);line-height:1.3}
+#qo-diag-root .qd-top p{font-size:12px;line-height:1.5;max-width:640px}
+#qo-diag-root .qd-workbench{
+  display:grid;
+  grid-template-columns:minmax(176px,205px) minmax(0,880px) minmax(177px,205px);
+  gap:15px;
+  align-items:start;
+  justify-content:center;
+}
+#qo-diag-root .qd-workbench-main{min-width:0;width:100%;max-width:880px}
+#qo-diag-root .qd-workbench-main .qd-editor,
+#qo-diag-root .qd-workbench-main .qd-session{min-width:0;width:100%;max-width:none}
+#qo-diag-root .qd-workbench-main .qd-guided,
+#qo-diag-root .qd-workbench-main .qd-guided-insights,
+#qo-diag-root .qd-workbench-main .qd-session-drawer,
+#qo-diag-root .qd-workbench-main .qd-guided-status{max-width:100%;width:100%}
+#qo-diag-root .qd-workbench-main .qd-card,
+#qo-diag-root .qd-workbench-main .qd-panel{max-width:100%;box-sizing:border-box}
+#qo-diag-root .qd-workbench-main .qd-meta{display:grid;gap:10px}
+#qo-diag-root .qd-workbench-main .qd-meta>label{width:100%;max-width:none}
+#qo-diag-root .qd-workbench-main .qd-meta>label>input,
+#qo-diag-root .qd-workbench-main .qd-meta>label>textarea{max-width:100%}
+#qo-diag-root .qd-workbench-main .qd-builder-tools{gap:7px;align-items:center}
+#qo-diag-root .qd-workbench-main .qd-builder-tools button{
+  font-size:11px;min-height:33px;padding:6px 10px;
+}
+#qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-head{
+  flex-direction:row;align-items:start;gap:14px
+}
+#qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-head>.qd-question{
+  flex:1 1 auto;min-width:0;
+}
+#qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-head>.qd-chat-rating{
+  flex:0 0 auto;min-width:0;max-width:310px;justify-content:flex-end;
+}
+#qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-rating button{
+  padding:6px 9px;font-size:11px;min-width:70px
+}
+#qo-diag-root .qd-side-panel{
+  position:sticky;top:12px;align-self:start;
+  max-height:calc(100vh - 180px);overflow:auto;
+  background:var(--qo-surface);border:1px solid var(--qo-border);
+  border-radius:11px;padding:14px 12px;
+  box-sizing:border-box;min-width:0;
+}
+#qo-diag-root .qd-side-panel h2{
+  font-size:13px;line-height:1.35;margin:0 0 5px;
+  color:var(--qo-text);font-weight:750
+}
+#qo-diag-root .qd-side-panel h3{
+  font-size:11px;line-height:1.3;font-weight:700;
+  margin:16px 0 9px;color:var(--qo-text)
+}
+#qo-diag-root .qd-side-caption{
+  font-size:11px;line-height:1.5;color:var(--qo-muted);margin:0 0 12px;
+  overflow-wrap:anywhere
+}
+#qo-diag-root .qd-side-topic-list{display:grid;gap:4px}
+#qo-diag-root .qd-side-topic{
+  display:grid;text-align:left;gap:4px;
+  border:1px solid transparent;background:transparent;
+  border-radius:8px;padding:9px 8px;
+  width:100%;min-width:0;
+}
+#qo-diag-root .qd-side-topic:hover,
+#qo-diag-root .qd-side-topic:focus-visible{
+  border-color:var(--qo-border);background:var(--qo-hover)
+}
+#qo-diag-root .qd-side-topic-title{
+  display:flex;gap:6px;min-width:0;
+  font-size:12px;line-height:1.4;
+  color:var(--qo-text);overflow-wrap:anywhere
+}
+#qo-diag-root .qd-side-topic-title b{
+  color:var(--qo-muted);font-weight:650;flex:none
+}
+#qo-diag-root .qd-side-topic-meta{font-size:10px;color:var(--qo-muted)}
+#qo-diag-root .qd-side-mini-bar{
+  display:block;width:100%;height:4px;overflow:hidden;
+  border-radius:999px;background:var(--qo-border)
+}
+#qo-diag-root .qd-side-mini-bar i{
+  display:block;height:100%;background:var(--qo-accent);border-radius:inherit
+}
+#qo-diag-root .qd-side-footnote{
+  border-top:1px solid var(--qo-border);
+  padding-top:10px;margin:13px 0 0;color:var(--qo-muted);
+  line-height:1.5;font-size:10px
+}
+#qo-diag-root .qd-side-stat{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:8px;padding:8px 0;
+  border-bottom:1px solid var(--qo-border);
+}
+#qo-diag-root .qd-side-stat span{color:var(--qo-muted);font-size:11px}
+#qo-diag-root .qd-side-stat strong{font-size:13px;color:var(--qo-text);white-space:nowrap}
+#qo-diag-root .qd-side-type{display:grid;gap:5px;margin:9px 0}
+#qo-diag-root .qd-side-type>div{display:flex;justify-content:space-between;gap:8px;font-size:11px}
+#qo-diag-root .qd-side-type span{color:var(--qo-muted)}
+#qo-diag-root .qd-side-type b{color:var(--qo-text)}
+#qo-diag-root .qd-side-big-number{font-size:33px;font-weight:750;line-height:1.2;margin:8px 0 12px}
+#qo-diag-root .qd-side-main-bar{height:7px;margin-bottom:14px}
+/* Existing A4 text page, Sheets and Studio are deliberately not affected. */
+#qo-diag-root .qd-variants-tool .qd-variant-controls{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px
+}
+#qo-diag-root .qd-variants-tool .qd-variant-controls label{
+  display:grid;gap:5px;font-size:11px;font-weight:650;color:var(--qo-muted)
+}
+#qo-diag-root .qd-variants-tool .qd-variant-controls select,
+#qo-diag-root .qd-variants-tool .qd-variant-controls input[type=text]{
+  width:100%;height:36px;min-height:36px;box-sizing:border-box;
+  border-radius:8px;border:1px solid var(--qo-border);
+  background:var(--qo-surface);color:var(--qo-text);padding:6px 10px;
+  font-size:12px
+}
+#qo-diag-root .qd-variants-tool .qd-variant-controls .qd-variant-checkbox{
+  display:flex;align-items:center;gap:9px;min-height:36px
+}
+#qo-diag-root .qd-variant-checkbox input{width:17px;height:17px;min-height:17px;accent-color:var(--qo-accent)}
+#qo-diag-root .qd-variant-summary{font-size:12px;line-height:1.5;color:var(--qo-muted)}
+#qo-diag-root .qd-variant-error{
+  padding:12px;color:var(--qo-danger);background:var(--qo-surface-alt);
+  border:1px solid var(--qo-border);border-radius:8px;font-size:12px
+}
+#qo-diag-root .qd-variant-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px
+}
+#qo-diag-root .qd-variant-card{
+  display:grid;gap:10px;align-content:start;padding:13px;
+  border:1px solid var(--qo-border);border-radius:10px;
+  background:var(--qo-surface)
+}
+#qo-diag-root .qd-variant-card>div:first-child{
+  display:flex;justify-content:space-between;gap:9px;flex-wrap:wrap
+}
+#qo-diag-root .qd-variant-card>div:first-child strong{font-size:13px}
+#qo-diag-root .qd-variant-card>div:first-child span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-variant-topics{display:grid;gap:5px}
+#qo-diag-root .qd-variant-topics p{
+  margin:0;display:flex;justify-content:space-between;gap:8px;
+  font-size:11px;line-height:1.35
+}
+#qo-diag-root .qd-variant-topics b{font-weight:500;overflow-wrap:anywhere}
+#qo-diag-root .qd-variant-topics span{color:var(--qo-muted);white-space:nowrap}
+#qo-diag-root .qd-variant-card button{min-height:35px;font-size:11px}
+#qo-diag-root .qd-utility-actions .qd-utility-buttons{display:flex;gap:6px;flex-wrap:wrap}
+@media(max-width:1260px){
+ #qo-diag-root .qd-workbench{
+   grid-template-columns:minmax(166px,198px) minmax(0,880px);
+   max-width:1100px;margin-inline:auto;
+ }
+ #qo-diag-root .qd-workbench>.qd-side-insights{display:none}
+}
+@media(max-width:900px){
+ #qo-diag-root .qd-workbench{display:flex;flex-direction:column;gap:11px}
+ #qo-diag-root .qd-workbench-main{max-width:800px;order:1;margin-inline:auto}
+ #qo-diag-root .qd-topic-navigator{
+   position:static;order:0;width:100%;max-width:800px;margin-inline:auto;padding:10px 12px;
+   max-height:none
+ }
+ #qo-diag-root .qd-side-topic-list{display:flex;overflow-x:auto;gap:8px}
+ #qo-diag-root .qd-side-topic{flex:0 0 160px}
+ #qo-diag-root .qd-topic-navigator .qd-side-footnote{display:none}
+ #qo-diag-root .qd-side-insights{display:none}
+}
+@media(max-width:680px){
+ #qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-head{flex-direction:column;gap:9px}
+ #qo-diag-root .qd-workbench-main .qd-chat-card .qd-chat-head>.qd-chat-rating{
+  justify-content:start;width:100%;max-width:100%;flex-wrap:wrap
+ }
+ #qo-diag-root .qd-variants-tool .qd-variant-controls,
+ #qo-diag-root .qd-variant-grid{grid-template-columns:1fr}
+}
