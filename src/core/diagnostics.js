@@ -1029,6 +1029,7 @@ function qdRun(){
         ${d.students.map(student=>`<option value="${qdEsc(student.id)}" ${qdStudentFilter===student.id?'selected':''}>${qdEsc(student.name)}</option>`).join('')}
         </select>
       </label>
+      ${!qdStudentFilter?qdGroupJournalMarkup(d):''}
       ${profile?`<div class="qd-profile-insight"><strong>${qdEsc(profile.name)}</strong>
          <span>Занятий: ${history.length}</span>
          <span>Средний результат: ${average===null?'—':average+'%'}</span>
@@ -1131,6 +1132,99 @@ function qdHistoryComparisonCSV(d,studentId,fromId,toId){
     result.delta,result.equalScope?'Да':'Нет'],
     ...result.topics.map(t=>[t.name,fromDate,t.from,toDate,t.to,t.delta,t.countsMatch?'Да':'Нет'])];
   return {ok:true,rows,content:'\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n')};
+}
+
+
+/* TASK115 — a group snapshot from the latest SAVED result for each roster pupil.
+   Averages across different exercises are not treated as directly comparable. */
+let qdGroupJournalFilter='all';
+function qdGroupSnapshot(d){
+  const rows=d.students.map(student=>{
+    const entries=qdStudentResults(d,student.id)
+      .filter(h=>h.summary&&h.summary.rated>0&&Number.isFinite(h.summary.percent)&&
+        h.summary.percent>=0&&h.summary.percent<=100&&Number.isFinite(Date.parse(h.date)))
+      .sort((a,b)=>Date.parse(a.date)-Date.parse(b.date));
+    const last=entries.at(-1)||null,previous=entries.at(-2)||null;
+    const topics=(Array.isArray(last?.topics)?last.topics:[])
+      .filter(t=>t.rated>0&&t.percent>=0&&t.percent<60)
+      .sort((a,b)=>a.percent-b.percent);
+    const low=!!last&&(last.summary.percent<60||topics.length>0);
+    const delta=previous?last.summary.percent-previous.summary.percent:null;
+    const sameSize=!!previous&&last.summary.rated===previous.summary.rated&&
+      last.summary.total===previous.summary.total;
+    return {student,entries,last,previous,topics,low,delta,sameSize};
+  });
+  const unassigned=d.history.filter(h=>!d.students.some(p=>h.studentId===p.id||
+    (!h.studentId&&qdPromptKey(h.student)===qdPromptKey(p.name)))).length;
+  return {rows,withResults:rows.filter(r=>!!r.last).length,
+    flagged:rows.filter(r=>r.low).length,unassigned};
+}
+function qdGroupVisibleRows(snapshot,filter=qdGroupJournalFilter){
+  return filter==='attention'?snapshot.rows.filter(r=>r.low):snapshot.rows;
+}
+function qdGroupJournalMarkup(d){
+  const snapshot=qdGroupSnapshot(d),rows=qdGroupVisibleRows(snapshot);
+  const delta=r=>r.delta===null?'—':(r.delta>0?'+':'')+r.delta+' п.п.'+
+    (r.sameSize?'':' *');
+  return '<section class="qd-group-journal" id="qd-group-journal" aria-label="Сводный журнал учеников">'+
+    '<div class="qd-group-head"><div><h3>Сводка по ученикам</h3>'+
+      '<p>Последняя сохранённая проверка каждого ученика. Не рейтинг и не средняя оценка класса.</p></div>'+
+      '<button type="button" data-qd-action="group-export" '+(!snapshot.rows.length?'disabled':'')+
+      '>Скачать сводку CSV</button></div>'+
+    '<div class="qd-group-metrics">'+
+      '<div><strong>'+snapshot.rows.length+'</strong><span>В списке</span></div>'+
+      '<div><strong>'+snapshot.withResults+'</strong><span>Есть результаты</span></div>'+
+      '<div><strong>'+snapshot.flagged+'</strong><span>Обратить внимание</span></div>'+
+    '</div>'+
+    '<div class="qd-group-filters" role="group" aria-label="Фильтр сводного журнала">'+
+      '<button type="button" data-qd-action="group-filter" data-filter="all" aria-pressed="'+
+        (qdGroupJournalFilter==='all')+'">Все ученики</button>'+
+      '<button type="button" data-qd-action="group-filter" data-filter="attention" aria-pressed="'+
+        (qdGroupJournalFilter==='attention')+'">Нужна проверка знаний</button></div>'+
+    '<div class="qd-group-table-wrap"><table class="qd-group-table"><thead><tr>'+
+      '<th scope="col">Ученик</th><th scope="col">Последняя проверка</th>'+
+      '<th scope="col">Изменение</th><th scope="col">Темы для повторения</th>'+
+      '<th scope="col"><span class="qd-sr-only">Открыть историю</span></th>'+
+      '</tr></thead><tbody>'+
+      (rows.length?rows.map(r=>'<tr>'+
+        '<td><strong>'+qdEsc(r.student.name)+'</strong><small>'+r.entries.length+' занятий</small></td>'+
+        '<td>'+(r.last?'<strong>'+r.last.summary.percent+'%</strong>'+
+          '<small>'+qdEsc(qdDateLabel(r.last.date))+'</small>':'<span class="qd-group-muted">Нет результатов</span>')+'</td>'+
+        '<td class="'+(r.delta>0?'qd-group-up':r.delta<0?'qd-group-down':'')+'">'+
+          qdEsc(delta(r))+'</td>'+
+        '<td>'+(r.topics.length?
+            r.topics.slice(0,2).map(t=>'<span class="qd-group-topic">'+qdEsc(t.name)+
+              ' · '+t.percent+'%</span>').join('')+
+            (r.topics.length>2?'<small>И ещё '+(r.topics.length-2)+'</small>':''):
+            r.last?'<span class="qd-group-muted">Нет тем ниже 60%</span>':
+            '<span class="qd-group-muted">Нет сохранённой проверки</span>')+'</td>'+
+        '<td><button type="button" data-qd-action="group-open-student" data-student="'+qdEsc(r.student.id)+
+          '">История</button></td></tr>').join(''):
+         '<tr><td colspan="5" class="qd-group-empty">'+
+          (qdGroupJournalFilter==='attention'?'По выбранному порогу учеников нет.':
+            'Добавьте учеников в настройках занятия.')+'</td></tr>')+
+      '</tbody></table></div>'+
+    (snapshot.unassigned?'<p class="qd-group-note">Проверок без привязанного профиля: '+
+      snapshot.unassigned+'. Они остаются в общем журнале, но не включены в сводку учеников.</p>':'')+
+    '<p class="qd-group-note">«Обратить внимание» — условный фильтр: последний общий результат либо тема ниже 60%. '+
+      'Разные наборы заданий могут иметь разную сложность. * У сравниваемых проверок различается количество заданий.</p>'+
+    '</section>';
+}
+function qdGroupJournalRefresh(){
+  const target=document.getElementById('qd-group-journal');
+  if(target){const wrapper=document.createElement('div');wrapper.innerHTML=qdGroupJournalMarkup(qdDoc());
+    if(wrapper.firstElementChild)target.replaceWith(wrapper.firstElementChild);}
+}
+function qdGroupJournalCSV(d){
+  const snap=qdGroupSnapshot(d);
+  const rows=[['Ученик','Сохранённых проверок','Дата последней','Последний результат, %',
+    'Изменение, п.п.','Сопоставимое число вопросов','Темы ниже 60%, последний результат'],
+    ...qdGroupVisibleRows(snap).map(row=>[
+      row.student.name,row.entries.length,row.last?.date||'',
+      row.last?.summary.percent??'',row.delta??'',row.delta===null?'':row.sameSize?'Да':'Нет',
+      row.topics.map(t=>t.name+' ('+t.percent+'%)').join('; ')
+    ])];
+  return '\ufeff'+rows.map(cells=>cells.map(qdCsvCell).join(';')).join('\r\n');
 }
 
 function qdTopicSnapshot(doc,marks){
@@ -2276,6 +2370,23 @@ function qdOnClick(event){
     const student=d.students.find(x=>x.id===qdStudentFilter);
     download((typeof safeFile==='function'?safeFile(student?.name||'student'):'student')+'-динамика.csv',
       result.content,'text/csv;charset=utf-8');return;
+  }
+  if(action==='group-filter'){
+    qdGroupJournalFilter=button.dataset.filter==='attention'?'attention':'all';
+    qdGroupJournalRefresh();return;
+  }
+  if(action==='group-open-student'){
+    if(!d.students.some(x=>x.id===button.dataset.student))return;
+    qdStudentFilter=button.dataset.student;
+    qdHistoryComparisonFrom='';qdHistoryComparisonTo='';
+    qdRefresh();
+    document.getElementById('qd-history-progress')?.scrollIntoView({block:'nearest'});
+    return;
+  }
+  if(action==='group-export'){
+    const data=qdGroupJournalCSV(d);
+    download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'-ученики.csv',
+      data,'text/csv;charset=utf-8');return;
   }
   if(action==='report-saved'){
     const item=d.history.find(h=>h.id===button.dataset.hid);
