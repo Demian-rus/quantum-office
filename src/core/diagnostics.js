@@ -481,6 +481,105 @@ function qdSelectionSummary(d){
     (selected&&shown!==selected?' (в фильтре '+shown+')':'');
 }
 
+
+/* TASK110: non-destructive, reproducible parallel assessment variants. */
+let qdVariantsOpen=false;
+let qdVariantOptions={count:2,perSection:0,seed:'2026',shuffleChoices:true};
+const QD_VARIANT_NAMES=['А','Б','В','Г'];
+function qdVariantHash(value){
+  let x=2166136261;
+  for(const ch of String(value)){x^=ch.charCodeAt(0);x=Math.imul(x,16777619);}
+  return x>>>0;
+}
+function qdVariantShuffle(items,seed){
+  const copy=items.slice();let x=(seed>>>0)||0x6d2b79f5;
+  for(let i=copy.length-1;i>0;i--){
+    x^=x<<13;x^=x>>>17;x^=x<<5;
+    const j=(x>>>0)%(i+1);
+    [copy[i],copy[j]]=[copy[j],copy[i]];
+  }
+  return copy;
+}
+function qdVariantsBuild(d,opts=qdVariantOptions){
+  const count=Number(opts.count),size=Number(opts.perSection);
+  if(!Number.isInteger(count)||count<2||count>4)return {ok:false,error:'Выберите от 2 до 4 вариантов'};
+  if(!Number.isInteger(size)||size<0||size>240)return {ok:false,error:'Неверное количество вопросов на раздел'};
+  const rawSeed=String(opts.seed??'').trim();
+  if(!rawSeed||rawSeed.length>40)return {ok:false,error:'Введите короткий ключ генерации'};
+  const groups=d.sections.map(s=>({
+    title:s.title,questions:s.questions.filter(q=>qdText(q.prompt,1600).trim())
+  })).filter(s=>s.questions.length);
+  if(!groups.length)return {ok:false,error:'Сначала заполните хотя бы один вопрос'};
+  if(size&&groups.some(s=>s.questions.length<size))
+    return {ok:false,error:'Не хватает вопросов: в каждом непустом разделе должно быть не менее '+size};
+  const ignored=d.sections.reduce((sum,s)=>sum+s.questions.length,0)-
+    groups.reduce((sum,s)=>sum+s.questions.length,0);
+  const variants=[];
+  for(let v=0;v<count;v++){
+    const sections=[];
+    for(let si=0;si<groups.length;si++){
+      const section=groups[si],pool=qdVariantShuffle(section.questions,qdVariantHash(rawSeed+'|'+si));
+      const amount=size||pool.length;
+      const picked=size?
+        Array.from({length:amount},(_,i)=>pool[(v*amount+i)%pool.length]):
+        pool.slice();
+      const shuffled=qdVariantShuffle(picked,qdVariantHash(rawSeed+'|order|'+v+'|'+si));
+      sections.push({id:qdNewId(),title:section.title,questions:shuffled.map((q,qi)=>{
+        const copy=qdCopyCard(q);
+        if(opts.shuffleChoices&&['single','multiple'].includes(copy.type))
+          copy.choices=qdVariantShuffle(copy.choices,qdVariantHash(rawSeed+'|options|'+v+'|'+si+'|'+qi));
+        return copy;
+      })});
+    }
+    const title=qdText(d.title,98)+' — Вариант '+QD_VARIANT_NAMES[v];
+    const doc=qdNormalize({title,description:d.description,sections,
+      session:{student:'',studentId:'',marks:{},responses:{}},students:[],history:[],
+      display:{mode:'list',activeId:''}});
+    const questions=qdQuestionList(doc);
+    variants.push({label:QD_VARIANT_NAMES[v],document:doc,
+      count:questions.length,maxPoints:questions.reduce((sum,q)=>sum+qdPoints(q.points),0)});
+  }
+  return {ok:true,variants,ignored,sectionCount:groups.length,seed:rawSeed};
+}
+function qdVariantPreview(d){
+  const result=qdVariantsBuild(d);
+  if(!result.ok)return '<p class="qd-variant-error" role="status">'+qdEsc(result.error)+'</p>';
+  return '<div class="qd-variant-summary">Вопросы распределены по '+result.sectionCount+
+    ' темам · пропущено незаполненных: '+result.ignored+
+    ' · источник остаётся без изменений</div><div class="qd-variant-grid">'+
+    result.variants.map((v,i)=>'<article class="qd-variant-card"><div>'+
+      '<strong>Вариант '+v.label+'</strong><span>'+v.count+' вопросов · '+v.maxPoints+' баллов</span></div>'+
+      '<div class="qd-variant-topics">'+v.document.sections.map(s=>
+        '<p><b>'+qdEsc(s.title)+'</b><span>'+s.questions.length+' вопросов</span></p>').join('')+'</div>'+
+      '<button type="button" data-qd-action="variant-download" data-variant-index="'+i+
+      '" class="qd-primary">Скачать вариант '+v.label+' .qdiag</button></article>').join('')+
+    '</div><p class="qd-hint">При одинаковом ключе генерации распределение вопросов повторяется; '+
+    'при разных баллах у заданий сумма баллов между вариантами может отличаться. '+
+    'Каждый файл создаётся без учеников, оценок и истории.</p>';
+}
+function qdVariantsMarkup(d){
+  const opts=qdVariantOptions;
+  return '<details class="qd-utility-details qd-variants-tool" data-qd-pane="variants" '+(qdVariantsOpen?'open':'')+'>'+
+    '<summary>Варианты проверочной работы <span>А / Б / В / Г</span></summary>'+
+    '<div class="qd-utility-content"><p class="qd-hint">Соберите несколько вариантов из текущих тем. '+
+      'Варианты можно открывать как отдельные диагностики. Исходный документ не изменяется.</p>'+
+      '<div class="qd-variant-controls"><label>Количество вариантов<select id="qd-var-count">'+
+        [2,3,4].map(n=>'<option value="'+n+'" '+(opts.count===n?'selected':'')+'>'+n+'</option>').join('')+
+      '</select></label><label>Вопросов из каждого раздела<select id="qd-var-per-section">'+
+        '<option value="0" '+(opts.perSection===0?'selected':'')+'>Все вопросы</option>'+
+        Array.from({length:12},(_,i)=>i+1).map(n=>
+          '<option value="'+n+'" '+(opts.perSection===n?'selected':'')+'>'+n+'</option>').join('')+
+      '</select></label><label>Ключ вариантов<input type="text" maxlength="40" id="qd-var-seed" value="'+qdEsc(opts.seed)+
+      '" placeholder="Например, ноябрь-2026"></label><label class="qd-variant-checkbox">'+
+      '<input type="checkbox" id="qd-var-choices" '+(opts.shuffleChoices?'checked':'')+'>'+
+      'Перемешивать варианты ответов</label></div>'+
+      '<div id="qd-variant-preview" aria-live="polite">'+qdVariantPreview(d)+'</div></div></details>';
+}
+function qdVariantPreviewRefresh(){
+  const preview=document.getElementById('qd-variant-preview');
+  if(preview)preview.innerHTML=qdVariantPreview(qdDoc());
+}
+
 function qdBuilderUtilities(d){
   const issues=qdAudit(d);
   return '<div class="qd-panel qd-builder-utilities">'+
