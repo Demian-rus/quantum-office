@@ -732,7 +732,7 @@ function qdBuilder(){
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
         <label class="qd-template-selector">Готовые диагностики
           <select id="qd-template-pick" aria-label="Выбрать готовую диагностику">
-            \u0024{QD_PRESETS.map(p=>'<option value="'+qdEsc(p.id)+'">'+qdEsc(QD_SUBJECTS[p.subject]||'Другое')+
+            ${QD_PRESETS.map(p=>'<option value="'+qdEsc(p.id)+'">'+qdEsc(QD_SUBJECTS[p.subject]||'Другое')+
               ' · '+qdEsc(p.grade)+' класс · '+qdEsc(p.label)+'</option>').join('')}
           </select></label>
         <button data-qd-action="use-template" type="button">Создать из шаблона</button>
