@@ -32,7 +32,8 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.evaluate(()=>qdQuestionList()[0].partialCredit),25);
 
   const before=await page.evaluate(()=>qdDoc().sections[0].questions.map(q=>q.id));
-  await page.locator('.qd-drag-handle').first().dragTo(page.locator('.qd-edit-card').nth(1),{targetPosition:{x:15,y:100}});
+  const targetBox=await page.locator('.qd-edit-card').nth(1).boundingBox();
+  await page.locator('.qd-drag-handle').first().dragTo(page.locator('.qd-edit-card').nth(1),{targetPosition:{x:15,y:targetBox.height-12}});
   const after=await page.evaluate(()=>qdDoc().sections[0].questions.map(q=>q.id));
   assert.notDeepEqual(before,after,'drag and drop must reorder actual model');
 
