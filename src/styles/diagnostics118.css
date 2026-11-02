@@ -1,0 +1,17 @@
+/* TASK118: the 19 longer preset titles must not inflate the builder selector. */
+#qo-diag-root .qd-builder-tools>.qd-count-pill{
+  flex:0 0 100%;width:max-content;max-width:100%;
+  align-self:flex-start;
+}
+#qo-diag-root .qd-builder-tools>.qd-template-selector{
+  flex:0 0 200px;width:200px;min-width:0;
+}
+#qo-diag-root .qd-builder-tools>.qd-template-selector select{
+  box-sizing:border-box;width:100%;min-width:0;max-width:100%;
+  text-overflow:ellipsis;
+}
+@media(max-width:560px){
+  #qo-diag-root .qd-builder-tools>.qd-template-selector{
+    flex:0 1 200px;max-width:100%;
+  }
+}
