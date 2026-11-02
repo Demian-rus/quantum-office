@@ -105,7 +105,7 @@ function qdType(value){
 }
 function qdAuto(type){return QD_AUTO_TYPES.includes(type);}
 function qdChoices(raw){
-  const values=Array.isArray(raw)?raw.slice(0,6):[];
+  const values=Array.isArray(raw)?raw.slice(0,6):Array.from({length:4},()=>({text:'',correct:false}));
   const result=values.map(item=>({text:qdText(item?.text,240),correct:item?.correct===true}));
   while(result.length<2)result.push({text:'',correct:false});
   return result;
@@ -242,6 +242,9 @@ function qdBuilder(){
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
             <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
             <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option>
+            <option value="single" ${q.type==='single'?'selected':''}>Выбор одного</option>
+            <option value="multiple" ${q.type==='multiple'?'selected':''}>Несколько ответов</option>
+            <option value="numeric" ${q.type==='numeric'?'selected':''}>Число</option>
           </select>
           <button type="button" data-qd-action="question-up" data-qid="${qdEsc(q.id)}" ${qi===0?'disabled':''} aria-label="Поднять вопрос" title="Поднять вопрос">↑</button>
           <button type="button" data-qd-action="question-down" data-qid="${qdEsc(q.id)}" ${qi===s.questions.length-1?'disabled':''} aria-label="Опустить вопрос" title="Опустить вопрос">↓</button>
@@ -250,6 +253,27 @@ function qdBuilder(){
         </div>
         <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
         <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        ${['single','multiple'].includes(q.type)?`<div class="qd-choices-editor">
+          <strong>Варианты ответов · отметьте правильные</strong>
+          ${qdChoices(q.choices).map((choice,i)=>`<div class="qd-choice-edit">
+            <input type="${q.type==='single'?'radio':'checkbox'}" name="qd-correct-${qdEsc(q.id)}" data-qd-field="choice-correct"
+              data-qid="${qdEsc(q.id)}" data-index="${i}" ${choice.correct?'checked':''}
+              title="Правильный вариант ${i+1}" aria-label="Правильный вариант ${i+1}">
+            <input data-qd-field="choice-text" data-qid="${qdEsc(q.id)}" data-index="${i}" maxlength="240"
+              value="${qdEsc(choice.text)}" placeholder="Вариант ${i+1}" aria-label="Текст варианта ${i+1}">
+            <button type="button" data-qd-action="remove-choice" data-qid="${qdEsc(q.id)}" data-index="${i}"
+              ${q.choices.length<=2?'disabled':''} aria-label="Удалить вариант ${i+1}">×</button>
+          </div>`).join('')}
+          <button type="button" data-qd-action="add-choice" data-qid="${qdEsc(q.id)}"
+            ${q.choices.length>=6?'disabled':''}>+ Вариант</button>
+          <p class="qd-hint">Автопроверка работает, когда все варианты заполнены и указан правильный ответ.</p>
+        </div>`:''}
+        ${q.type==='numeric'?`<div class="qd-numeric-editor">
+          <label>Правильное числовое значение<input data-qd-field="numericAnswer" data-qid="${qdEsc(q.id)}"
+            type="text" maxlength="60" inputmode="decimal" value="${qdEsc(q.numericAnswer||'')}" placeholder="Например, 84 или 84,5"></label>
+          <label>Допустимая абсолютная погрешность<input data-qd-field="tolerance" data-qid="${qdEsc(q.id)}"
+            type="number" min="0" max="1000000000" step="any" value="${qdTolerance(q.tolerance)}"></label>
+        </div>`:''}
         <div class="qd-settings">
           <label>Баллы за ответ<input data-qd-field="points" data-qid="${qdEsc(q.id)}" type="number" min="1" max="10" step="1" value="${qdPoints(q.points)}"></label>
           <label>За частичный ответ, %<input data-qd-field="partialCredit" data-qid="${qdEsc(q.id)}" type="number" min="0" max="100" step="5" value="${qdPartialCredit(q.partialCredit)}"></label>
@@ -606,9 +630,12 @@ function qdOnChange(event){
     qdStore();qdRefresh();return;
   }
   if(event.target.dataset.qdField==='type'){
-    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
-    if(q)q.type=event.target.value==='practice'?'practice':'question';
-    qdStore();return;
+    const d=qdDoc(),q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.type=qdType(event.target.value);
+    if(qdAuto(q.type))q.choices=qdChoices(q.choices);
+    delete d.session.marks[q.id];delete d.session.responses[q.id];
+    qdStore();qdRefresh();return;
   }
   if(event.target.id!=='qo-diag-file')return;
   const file=event.target.files?.[0];event.target.value='';
