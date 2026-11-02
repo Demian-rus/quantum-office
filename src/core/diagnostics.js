@@ -1147,7 +1147,7 @@ function qdLibraryView(){
       '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
-      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
+      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
       '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
       '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
@@ -1166,7 +1166,10 @@ function qdLibraryCards(items){
     '<span>'+qdEsc(QD_PURPOSES[x.purpose]||'Диагностика')+'</span></div>'+
     '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
     '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
-    (x.source==='custom'?'<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
+    (x.source==='custom'?
+    '<button type="button" data-qd-action="library-edit" data-template="'+qdEsc(x.id)+'">Изменить</button>'+
+    '<button type="button" data-qd-action="library-clone" data-template="'+qdEsc(x.id)+'">Копировать</button>'+
+    '<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
     '<button type="button" data-qd-action="library-preview" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">Просмотреть</button>'+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
       '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
     '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
@@ -1494,6 +1497,37 @@ function qdOnClick(event){
     if(!qdLibraryLoad(d,id,source)){status('Шаблон не найден',true);return;}
     qdMode='run';qoWriter.diagnosticMode='run';qdStore();qdRefresh();status('Шаблон открыт');return;
   }
+  if(action==='library-edit'){
+    qdLibraryEditingId=button.dataset.template;
+    qdLibraryEditorRefresh();
+    document.getElementById('qd-library-editor-slot')?.scrollIntoView({block:'start',behavior:'instant'});
+    return;
+  }
+  if(action==='library-edit-cancel'){
+    qdLibraryEditingId='';qdLibraryEditorRefresh();return;
+  }
+  if(action==='library-edit-save'){
+    const fields={
+      title:document.getElementById('qd-library-edit-title')?.value,
+      description:document.getElementById('qd-library-edit-description')?.value,
+      subject:document.getElementById('qd-library-edit-subject')?.value,
+      grade:document.getElementById('qd-library-edit-grade')?.value,
+      purpose:document.getElementById('qd-library-edit-purpose')?.value
+    };
+    const replaceQuestions=!!document.getElementById('qd-library-edit-replace')?.checked;
+    if(replaceQuestions&&!confirm('Заменить все вопросы выбранного шаблона вопросами текущей диагностики? Старая версия шаблона будет перезаписана. Для резервной копии сначала экспортируйте .qtpl.'))return;
+    const result=qdLibraryUpdate(qdLibraryEditingId,fields,d,replaceQuestions);
+    if(!result.ok){status(result.message,true);return;}
+    if(qdLibraryPreviewData?.source==='custom'&&qdLibraryPreviewData.id===qdLibraryEditingId)
+      qdLibraryPreviewPick('custom',qdLibraryEditingId);
+    qdLibraryEditingId='';qdRefresh();
+    status('Шаблон обновлён: '+result.questions+' вопросов');return;
+  }
+  if(action==='library-clone'){
+    const result=qdLibraryClone(button.dataset.template);
+    if(!result.ok){status(result.message,true);return;}
+    qdRefresh();status('Создана копия: '+result.title);return;
+  }
   if(action==='library-save'){
     const subject=document.getElementById('qd-library-save-subject')?.value||'other';
     const grade=document.getElementById('qd-library-save-grade')?.value||'';
@@ -1508,6 +1542,7 @@ function qdOnClick(event){
     if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
     if(qdLibraryDelete(button.dataset.template)){
       if(qdLibraryPreviewData?.id===button.dataset.template){qdLibraryPreviewData=null;qdLibraryPreviewSelected.clear();}
+      if(qdLibraryEditingId===button.dataset.template)qdLibraryEditingId='';
       qdRefresh();status('Шаблон удалён');}
     else status('Не удалось удалить шаблон',true);
     return;
