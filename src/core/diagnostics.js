@@ -15,7 +15,7 @@ function qdHistoryResponses(raw){
   }
   return result;
 }
-const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
+const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80,templates:30});
 let qdMode = 'builder';
 let qdRevealed = new Set();
 let qdStudentFilter = '';
@@ -227,6 +227,8 @@ function qdToolbar(){
     <div><span class="qd-eyebrow">QUANTUM WRITER · ИНТЕРАКТИВНЫЙ ДОКУМЕНТ</span>
     <h1>${qdEsc(d.title)}</h1><p>${qdEsc(d.description||'Создавайте вопросы, открывайте ответы и отмечайте знания ученика.')}</p></div>
     <div class="qd-actions" role="group" aria-label="Режим работы">
+      <button type="button" data-qd-action="mode" data-mode="library" class="${qdMode==='library'?'active':''}"
+        aria-pressed="${qdMode==='library'}">Шаблоны</button>
       <button type="button" data-qd-action="mode" data-mode="builder" class="${qdMode==='builder'?'active':''}" aria-pressed="${qdMode==='builder'}">Конструктор</button>
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
     </div></div>`;
@@ -490,6 +492,10 @@ function qdBuilder(){
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
+    <div class="qd-builder-shortcuts">
+      <button type="button" data-qd-action="mode" data-mode="library">Открыть библиотеку шаблонов</button>
+      <button type="button" data-qd-action="preview-chat">Предпросмотр карточек</button>
+    </div>
     ${qdBuilderUtilities(d)}
     ${qdBatchToolbar(d)}
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
@@ -567,6 +573,7 @@ function qdBuilder(){
     </section>
     <div class="qd-panel qd-bottom-actions">
       <button data-qd-action="add-section" type="button">+ Новый раздел</button>
+      <button type="button" data-qd-action="preview-chat">Просмотреть карточки как в чате</button>
       <button data-qd-action="mode" data-mode="run" class="qd-primary" type="button">Перейти к проведению</button>
     </div>
   </div>`;
@@ -625,28 +632,26 @@ function qdAdvance(d){
 }
 function qdRunQuestion(q,number,d){
   const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
-  return `<article class="qd-card qd-run-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
-    <div class="qd-question"><span class="qd-counter">${number+1}.</span><div>
-      <span class="qd-type">${qdTypeTitle(q.type)} · ${points} ${points===1?'балл':points<=4?'балла':'баллов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
-      <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p>
-    </div></div>
-    ${qdAutoInput(q,d.session.responses[q.id])}
-    <div class="qd-card-actions">
-      ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
-      <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}"
-       aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
-      <div class="qd-rating" role="group" aria-label="Оценка ответа">
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes"
-          aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial"
-          aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no"
-          aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
-      </div>
-    </div>
-    ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
-    ${mark?`<p class="qd-card-assessed" role="status">${mark==='yes'?'Ответ зачтён':mark==='partial'?'Частично зачтён':'Ответ не зачтён'}</p>`:''}
-  </article>`;
+  const markButton=(state,title)=>'<button type="button" data-qd-action="mark" data-qid="'+qdEsc(q.id)+
+    '" data-mark="'+state+'" aria-pressed="'+(mark===state)+'" class="'+(mark===state?'selected':'')+
+    '">'+title+'</button>';
+  return '<article class="qd-card qd-run-card qd-chat-card '+(mark?'qd-mark-'+mark:'')+'" data-qid="'+qdEsc(q.id)+'">'+
+    '<div class="qd-chat-head"><div class="qd-question"><span class="qd-counter">'+(number+1)+'.</span><div>'+
+      '<span class="qd-type">'+qdEsc(qdTypeTitle(q.type))+' · '+points+' '+(points===1?'балл':points<5?'балла':'баллов')+'</span>'+
+      '<p>'+qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')+'</p></div></div>'+
+      '<div class="qd-rating qd-chat-rating" role="group" aria-label="Оценка ответа">'+
+        markButton('yes','✓ Знает')+markButton('no','× Не знает')+
+        markButton('partial','◐ Частично')+'</div></div>'+
+    qdAutoInput(q,d.session.responses[q.id])+
+    '<div class="qd-card-actions qd-chat-actions">'+
+      '<button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="'+qdEsc(q.id)+
+        '" aria-expanded="'+visible+'">'+(visible?'◉ Скрыть ответ':'◎ Показать ответ')+'</button>'+
+      (qdAuto(q.type)?'<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="'+qdEsc(q.id)+
+        '">Проверить автоматически</button>':'')+
+    '</div>'+
+    (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p></div>':'')+
+    (mark?'<p class="qd-card-assessed" role="status">'+(mark==='yes'?'Знает':mark==='partial'?'Частично':'Не знает')+'</p>':'')+
+  '</article>';
 }
 function qdListQuestions(d){
   let index=0;
@@ -838,8 +843,262 @@ function qdCSV(){
     '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
 
+
+const QD_LIBRARY_KEY='quantum-office.diagnostic-templates.v1';
+let qdLibraryQuery='',qdLibrarySubject='all',qdLibraryGrade='all',qdLibraryPurpose='all';
+const QD_PRESETS=[
+  {id:'physics8',subject:'physics',grade:'8',purpose:'diagnostic',label:'Молекулы и температура',description:'Устные вопросы, скрытые ответы, тепловые явления и задачи'},
+  {id:'physics7',subject:'physics',grade:'7',purpose:'diagnostic',label:'Введение в физику',description:'Величины, движение, измерения и плотность'},
+  {id:'physics9',subject:'physics',grade:'9',purpose:'review',label:'Законы движения',description:'Ускорение, законы Ньютона и импульс'},
+  {id:'math56',subject:'math',grade:'5–6',purpose:'diagnostic',label:'Дроби, проценты и задачи',description:'Проверка базовых навыков за 5–6 класс'},
+  {id:'math7',subject:'math',grade:'7',purpose:'review',label:'Алгебра: уравнения и функции',description:'Уравнения, графики, вычисления'},
+  {id:'informatics7',subject:'informatics',grade:'7',purpose:'diagnostic',label:'Информация и алгоритмы',description:'Кодирование, файлы, алгоритмы и логика'},
+  {id:'informatics9',subject:'informatics',grade:'9',purpose:'review',label:'Логика и программирование',description:'Булевы выражения, циклы и исполнители'}
+];
+const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',other:'Другое'};
+const QD_PURPOSES={diagnostic:'Входная диагностика',review:'Повторение',practice:'Тренировка',exam:'Контрольная'};
+function qdLibrarySafe(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const subject=Object.hasOwn(QD_SUBJECTS,value.subject)?value.subject:'other';
+  const purpose=Object.hasOwn(QD_PURPOSES,value.purpose)?value.purpose:'diagnostic';
+  const title=qdText(value.title,120).trim();
+  if(!title||!Array.isArray(value.sections))return null;
+  const model=qdNormalize({title,description:qdText(value.description,600),sections:value.sections,
+    students:[],history:[],session:{},display:{mode:'list',activeId:''}});
+  if(!model.sections.length||!qdQuestionList(model).length)return null;
+  return {id:qdText(value.id,60),title:model.title,description:model.description,
+    subject,grade:qdText(value.grade,18)||'—',purpose,sections:model.sections};
+}
+function qdLibraryRead(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(QD_LIBRARY_KEY)||'[]');
+    return Array.isArray(raw)?raw.slice(0,QD_LIMITS.templates).map(qdLibrarySafe).filter(Boolean):[];
+  }catch(_){return [];}
+}
+function qdLibraryWrite(items){
+  try{localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
+  catch(_){return false;}
+}
+function qdLibrarySaveCurrent(d,subject,grade,purpose){
+  const current=qdLibraryRead();
+  if(current.length>=QD_LIMITS.templates)return {ok:false,message:'Достигнут лимит сохранённых шаблонов'};
+  if(!qdQuestionList(d).some(q=>q.prompt.trim()))return {ok:false,message:'Заполните хотя бы один вопрос'};
+  const data=qdLibrarySafe({
+    id:qdNewId(),title:d.title,description:d.description,sections:d.sections,subject,grade,purpose
+  });
+  if(!data)return {ok:false,message:'Не удалось подготовить шаблон'};
+  const next=[data,...current];
+  if(!qdLibraryWrite(next))return {ok:false,message:'Недостаточно места в локальном хранилище. Сохраните .qdiag на диск'};
+  return {ok:true,id:data.id};
+}
+function qdLibraryDelete(id){
+  const current=qdLibraryRead();
+  if(!current.some(x=>x.id===id))return false;
+  return qdLibraryWrite(current.filter(x=>x.id!==id));
+}
+function qdLibraryItems(){
+  const builtins=QD_PRESETS.map(x=>({...x,source:'built-in',title:qdTemplate(x.id)?.title||x.label,
+    count:qdTemplate(x.id)?.sections.reduce((sum,s)=>sum+s.questions.length,0)||0}));
+  const custom=qdLibraryRead().map(x=>({id:x.id,source:'custom',subject:x.subject,grade:x.grade,purpose:x.purpose,
+    label:x.title,description:x.description,count:x.sections.reduce((sum,s)=>sum+s.questions.length,0)}));
+  const needle=qdLibraryQuery.trim().toLocaleLowerCase('ru-RU');
+  return [...custom,...builtins].filter(x=>
+    (qdLibrarySubject==='all'||x.subject===qdLibrarySubject)&&
+    (qdLibraryGrade==='all'||x.grade===qdLibraryGrade)&&
+    (qdLibraryPurpose==='all'||x.purpose===qdLibraryPurpose)&&
+    (!needle||(x.label+' '+x.description+' '+QD_SUBJECTS[x.subject]).toLocaleLowerCase('ru-RU').includes(needle))
+  );
+}
+function qdLibraryLoad(d,id,source){
+  let payload=null;
+  if(source==='custom'){
+    const x=qdLibraryRead().find(x=>x.id===id);
+    if(x)payload={title:x.title,description:x.description,sections:x.sections};
+  }else if(source==='built-in')payload=qdTemplate(id);
+  if(!payload)return false;
+  // Re-normalizing generates safe, fresh IDs so an old session cannot inherit marks.
+  const model=qdNormalize({title:payload.title,description:payload.description,sections:payload.sections,
+    students:[],history:[],session:{},display:{mode:'list'}});
+  for(const s of model.sections){
+    s.id=qdNewId();
+    for(const q of s.questions)q.id=qdNewId();
+  }
+  d.title=model.title;d.description=model.description;d.sections=model.sections;
+  d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
+  d.display={mode:'list',activeId:''};
+  qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
+  qdStore();return true;
+}
+
+function qdLibraryExport(){
+  download('QuantumOffice-templates.qtpl',JSON.stringify({format:'quantum-templates',version:1,
+    templates:qdLibraryRead()},null,2),'application/json;charset=utf-8');
+}
+function qdLibraryImport(text){
+  let payload;
+  try{payload=JSON.parse(text);}catch(_){return {ok:false,message:'Повреждённый файл'};}
+  if(payload?.format!=='quantum-templates'||payload.version!==1||!Array.isArray(payload.templates))
+    return {ok:false,message:'Файл должен содержать библиотеку .qtpl'};
+  if(payload.templates.length>QD_LIMITS.templates)return {ok:false,message:'В файле слишком много шаблонов'};
+  const current=qdLibraryRead(),room=QD_LIMITS.templates-current.length;
+  if(payload.templates.length>room)return {ok:false,message:'Недостаточно места в библиотеке — удалите лишние шаблоны'};
+  const names=new Set(current.map(x=>x.title.toLocaleLowerCase('ru-RU')));
+  const incoming=[];
+  for(const value of payload.templates){
+    const item=qdLibrarySafe(value);
+    if(!item)return {ok:false,message:'Найден повреждённый шаблон'};
+    if(names.has(item.title.toLocaleLowerCase('ru-RU')))continue;
+    item.id=qdNewId();names.add(item.title.toLocaleLowerCase('ru-RU'));incoming.push(item);
+  }
+  if(!qdLibraryWrite([...incoming,...current]))
+    return {ok:false,message:'Недостаточно памяти для импортированной библиотеки'};
+  return {ok:true,count:incoming.length};
+}
+
+function qdLibraryView(){
+  const items=qdLibraryItems(),total=QD_PRESETS.length+qdLibraryRead().length;
+  const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
+  return '<div class="qd-template-library">'+
+    '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
+      '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
+      '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
+    '<section class="qd-panel qd-library-filter"><label>Название или тема<input id="qd-library-search" type="search" maxlength="120" value="'+qdEsc(qdLibraryQuery)+'" placeholder="Найти диагностику"></label>'+
+      '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
+      '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
+      '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
+      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+
+      '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
+      '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
+      '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
+      '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
+      '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
+      '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
+      '<div class="qd-library-portable"><button type="button" data-qd-action="library-export">Скачать библиотеку .qtpl</button>'+
+      '<button type="button" data-qd-action="library-import">Импорт .qtpl</button>'+
+      '<input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden></div>'+
+      '<p class="qd-hint">Для переносимости между версиями HTML сохраняйте библиотеку в .qtpl. Локальное хранилище зависит от файла и настроек браузера.</p></section>'+
+  '</div>';
+}
+function qdLibraryCards(items){
+  return items.length?items.map(x=>'<article class="qd-library-card" data-template-id="'+qdEsc(x.id)+'">'+
+    '<div class="qd-library-tags"><span>'+qdEsc(QD_SUBJECTS[x.subject]||'Другое')+'</span><span>'+qdEsc(x.grade)+' класс</span>'+
+    '<span>'+qdEsc(QD_PURPOSES[x.purpose]||'Диагностика')+'</span></div>'+
+    '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
+    '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
+    (x.source==='custom'?'<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
+      '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
+    '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
+}
+function qdLibraryRefreshCards(){
+  const grid=document.getElementById('qd-library-items');
+  if(grid)grid.innerHTML=qdLibraryCards(qdLibraryItems());
+}
+
 function qdTemplate(key){
   const collections={
+    physics8:{
+      title:'Физика · 8 класс · Молекулы и температура',
+      description:'Диагностика понимания молекулярного строения, внутренней энергии и теплопередачи.',
+      sections:[
+        {title:'Молекулы и температура',items:[
+          ['Почему сахар быстрее растворяется в горячем чае, чем в холодной?','При более высокой температуре частицы движутся интенсивнее, поэтому диффузия и растворение обычно идут быстрее.'],
+          ['Почему воздух можно сильно сжать, а воду — почти невозможно?','Расстояния между молекулами газа намного больше, чем между молекулами жидкости.'],
+          ['Что происходит с молекулами вещества при нагревании?','Средняя кинетическая энергия их хаотического движения увеличивается.'],
+          ['Может ли большой кусок льда иметь большую внутреннюю энергию, чем маленькая чашка горячей воды?','Да. Внутренняя энергия зависит не только от температуры, но и от массы, состава и агрегатного состояния.'],
+          ['Можно ли измерить температуру тела по скорости движения одной молекулы?','Нет. Температура связана со статистическими характеристиками большого числа частиц, а скорости отдельных молекул различны.']
+        ]},
+        {title:'Теплопередача',items:[
+          ['Как тепло Солнца достигает Земли сквозь вакуум?','Электромагнитным излучением, которому не требуется вещество.'],
+          ['Почему металлическая ложка в горячем чае нагревается?','Тепло передаётся по металлу благодаря теплопроводности.'],
+          ['Почему тёплый воздух поднимается вверх?','При нагревании воздух расширяется, становится менее плотным и поднимается под действием выталкивающей силы.']
+        ]},
+        {title:'Практика',items:[
+          ['Найди количество теплоты для нагрева 2 кг воды на 10 °C, если c = 4200 Дж/(кг·°C).','Q = cmΔt = 4200 · 2 · 10 = 84 000 Дж.','practice'],
+          ['Во сколько раз изменится количество теплоты, если массу воды удвоить, а изменение температуры оставить прежним?','Увеличится в 2 раза, так как Q = cmΔt.','practice']
+        ]}
+      ]
+    },
+    physics9:{
+      title:'Физика · 9 класс · Законы движения',
+      description:'Повторение механики: ускорение, силы, импульс и анализ движения.',
+      sections:[
+        {title:'Кинематика',items:[
+          ['Что показывает ускорение?','Скорость изменения скорости тела за единицу времени.'],
+          ['Чем отличается средняя скорость от мгновенной?','Средняя характеризует движение за интервал, мгновенная — в данный момент.'],
+          ['Скорость тела выросла с 4 до 16 м/с за 6 с. Найди ускорение.','2 м/с².','practice']
+        ]},
+        {title:'Законы Ньютона',items:[
+          ['При каком условии тело сохраняет скорость по модулю и направлению?','Если равнодействующая сил равна нулю, в инерциальной системе отсчёта.'],
+          ['Почему действие и противодействие не уравновешивают друг друга?','Они приложены к разным телам.'],
+          ['На тело массой 3 кг действует результирующая сила 12 Н. Найди ускорение.','4 м/с².','practice']
+        ]},
+        {title:'Импульс',items:[
+          ['Что называют импульсом тела?','Произведение массы на скорость: p = mv.'],
+          ['Как формулируется закон сохранения импульса?','В замкнутой системе векторная сумма импульсов остаётся постоянной.']
+        ]}
+      ]
+    },
+    math7:{
+      title:'Математика · 7 класс · Уравнения и функции',
+      description:'Арифметика, линейные уравнения, функции и графики.',
+      sections:[
+        {title:'Выражения',items:[
+          ['Раскрой скобки: 3(x + 2) − x.','2x + 6.','practice'],
+          ['Что значит привести подобные слагаемые?','Сложить коэффициенты у слагаемых с одинаковой буквенной частью.']
+        ]},
+        {title:'Уравнения',items:[
+          ['Реши уравнение 4x − 7 = 9.','x = 4.','practice'],
+          ['Почему обе части уравнения можно умножить на одно и то же ненулевое число?','Преобразование сохраняет множество решений.'],
+          ['Реши 2(x − 3) = 3x + 1.','x = −7.','practice']
+        ]},
+        {title:'Функции',items:[
+          ['Что такое функция?','Соответствие, при котором каждому допустимому значению аргумента сопоставляется одно значение функции.'],
+          ['Принадлежит ли точка (2; 5) графику y = 2x + 1?','Да: 2 · 2 + 1 = 5.','practice'],
+          ['Как по графику найти значение функции при x = 3?','Найти точку графика с абсциссой 3 и прочитать её ординату.']
+        ]}
+      ]
+    },
+    informatics7:{
+      title:'Информатика · 7 класс · Информация и алгоритмы',
+      description:'Входная диагностика: единицы информации, файлы, алгоритмы и таблицы.',
+      sections:[
+        {title:'Информация и файлы',items:[
+          ['Чем отличаются данные от информации?','Данные — представление сведений, информация — осмысленные сведения для получателя.'],
+          ['Что показывает расширение файла?','Обычно указывает на формат или тип содержимого файла.'],
+          ['Сколько бит содержит один байт?','8 бит.']
+        ]},
+        {title:'Алгоритмы',items:[
+          ['Какие свойства должен иметь корректный алгоритм?','Понятность исполнителю, определённость шагов, конечность и результативность для решаемой задачи.'],
+          ['Чем цикл отличается от ветвления?','Цикл повторяет действия, ветвление выбирает одну из альтернатив по условию.'],
+          ['Назови пример алгоритма из повседневной жизни.','Например, последовательность действий для приготовления чая с определёнными шагами.']
+        ]},
+        {title:'Практика',items:[
+          ['Сколько байт в 2 Кбайт при двоичной системе счёта (1 Кбайт = 1024 байт)?','2048 байт.','practice'],
+          ['Чему будет равно x после команд: x = 2; x = x + 3; x = x · 2?','10.','practice']
+        ]}
+      ]
+    },
+    informatics9:{
+      title:'Информатика · 9 класс · Логика и программирование',
+      description:'Повторение логики, циклов, условий и основ программирования.',
+      sections:[
+        {title:'Логические выражения',items:[
+          ['Когда логическое выражение A И B истинно?','Только когда одновременно истинны A и B.'],
+          ['Чему равно НЕ(истина И ложь)?','Истина.','practice'],
+          ['Что означает условие x >= 5 И x < 10?','Число x принадлежит промежутку от 5 включительно до 10 не включительно.']
+        ]},
+        {title:'Циклы и переменные',items:[
+          ['Чем цикл с условием отличается от цикла с известным числом повторений?','В первом число повторений определяется значениями условия, во втором заранее задано.'],
+          ['Чему равно s после трёх выполнений s = s + 2, если сначала s = 0?','6.','practice'],
+          ['Зачем нужны переменные?','Для хранения и изменения значений данных при выполнении алгоритма.']
+        ]},
+        {title:'Алгоритмические задачи',items:[
+          ['Составь алгоритм нахождения максимума из трёх чисел.','Присвоить максимум первому числу, затем сравнить со вторым и третьим, при необходимости обновляя максимум.','practice'],
+          ['Что происходит при делении целого числа на ноль?','Операция не определена; программа должна предотвратить такое действие.']
+        ]}
+      ]
+    },
     physics7:{
       title:'Физика · 7 класс · Основные понятия',
       description:'Величины, измерения, движение и простые расчётные задания.',
@@ -894,7 +1153,7 @@ function qdApplyTemplate(d,key){
   const template=qdTemplate(key);if(!template)return false;
   d.title=template.title;d.description=template.description;d.sections=template.sections;
   d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
-  d.display={mode:'focus',activeId:''};qdStudentFilter='';qdRevealed.clear();
+  d.display={mode:'list',activeId:''};qdStudentFilter='';qdRevealed.clear();
   qdStore();return true;
 }
 function qdReviewItems(d,marks=d.session.marks){
@@ -924,18 +1183,47 @@ function qdSample(){
   ];
   d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
 }
+
+function qdRibbonAction(action){
+  const d=qdDoc();
+  if(action==='writer-diag-library')qdMode='library';
+  else if(action==='writer-diag-builder')qdMode='builder';
+  else if(action==='writer-diag-list'){qdMode='run';qdDisplay(d).mode='list';}
+  else if(action==='writer-diag-focus'){qdMode='run';qdDisplay(d).mode='focus';}
+  else if(action==='writer-diag-export'){qdExport();return;}
+  else if(action==='writer-diag-import'){document.getElementById('qo-diag-file')?.click();return;}
+  else if(action==='writer-diag-templates-export'){qdLibraryExport();return;}
+  else return;
+  if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
+  qdRevealed.clear();qdRefresh();
+}
+function qdRibbonSync(){
+  const modes={
+    'writer-diag-library':qdMode==='library',
+    'writer-diag-builder':qdMode==='builder',
+    'writer-diag-list':qdMode==='run'&&qdDisplay().mode==='list',
+    'writer-diag-focus':qdMode==='run'&&qdDisplay().mode==='focus'
+  };
+  for(const [key,pressed] of Object.entries(modes)){
+    const button=document.querySelector('.qo-document-workspace [data-action="'+key+'"]');
+    if(button){button.classList.toggle('qo-diag-ribbon-active',pressed);button.setAttribute('aria-pressed',String(pressed));}
+  }
+}
+
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
-  root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
+  root.classList.toggle('qd-library-root',qdMode==='library');
+  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
   if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
+  qdRibbonSync();
 }
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
@@ -982,8 +1270,38 @@ function qdRefreshAudit(){
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
-  if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
+  if(action==='mode'){
+    qdMode=['run','builder','library'].includes(button.dataset.mode)?button.dataset.mode:'builder';
+    if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
+    qdRevealed.clear();qdRefresh();return;
+  }
 
+  if(action==='preview-chat'){
+    qdDisplay(d).mode='list';qdMode='run';qoWriter.diagnosticMode='run';
+    qdRevealed.clear();qdStore();qdRefresh();return;
+  }
+  if(action==='library-open'){
+    const id=button.dataset.template,source=button.dataset.source;
+    if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
+    if(!qdLibraryLoad(d,id,source)){status('Шаблон не найден',true);return;}
+    qdMode='run';qoWriter.diagnosticMode='run';qdStore();qdRefresh();status('Шаблон открыт');return;
+  }
+  if(action==='library-save'){
+    const subject=document.getElementById('qd-library-save-subject')?.value||'other';
+    const grade=document.getElementById('qd-library-save-grade')?.value||'';
+    const purpose=document.getElementById('qd-library-save-purpose')?.value||'diagnostic';
+    const result=qdLibrarySaveCurrent(d,subject,grade,purpose);
+    if(!result.ok){status(result.message,true);return;}
+    qdRefresh();status('Шаблон сохранён в библиотеку на этом устройстве');return;
+  }
+  if(action==='library-export'){qdLibraryExport();return;}
+  if(action==='library-import'){document.getElementById('qd-library-file')?.click();return;}
+  if(action==='library-delete'){
+    if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
+    if(qdLibraryDelete(button.dataset.template)){qdRefresh();status('Шаблон удалён');}
+    else status('Не удалось удалить шаблон',true);
+    return;
+  }
   if(action==='review-jump'){
     const index=qdQuestionList(d).findIndex(q=>q.id===button.dataset.qid);
     if(index<0)return;
@@ -1244,6 +1562,9 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-library-search'){
+    qdLibraryQuery=event.target.value.slice(0,120);qdLibraryRefreshCards();return;
+  }
   if(event.target.id==='qd-search'){
     qdSearch=event.target.value.slice(0,160);qdApplyFilterUI();return;
   }
@@ -1290,6 +1611,12 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(['qd-library-subject','qd-library-grade','qd-library-purpose'].includes(event.target.id)){
+    if(event.target.id==='qd-library-subject')qdLibrarySubject=event.target.value;
+    if(event.target.id==='qd-library-grade')qdLibraryGrade=event.target.value;
+    if(event.target.id==='qd-library-purpose')qdLibraryPurpose=event.target.value;
+    qdLibraryRefreshCards();return;
+  }
   if(event.target.matches?.('[data-qd-select]')){
     const id=event.target.dataset.qid;
     if(event.target.checked)qdSelected.add(id);
@@ -1377,6 +1704,17 @@ function qdOnChange(event){
     if(qdAuto(q.type))q.choices=qdChoices(q.choices);
     delete d.session.marks[q.id];delete d.session.responses[q.id];
     qdStore();qdRefresh();return;
+  }
+  if(event.target.id==='qd-library-file'){
+    const file=event.target.files?.[0];event.target.value='';
+    if(!file)return;
+    if(file.size>2_000_000){status('Слишком большой файл шаблонов',true);return;}
+    file.text().then(content=>{
+      const result=qdLibraryImport(content);
+      if(!result.ok){status(result.message,true);return;}
+      qdRefresh();status('Импортировано шаблонов: '+result.count);
+    }).catch(()=>status('Не удалось прочитать библиотеку',true));
+    return;
   }
   if(event.target.id!=='qo-diag-file')return;
   const file=event.target.files?.[0];event.target.value='';

@@ -37,6 +37,7 @@ const {pathToFileURL}=require('node:url');
   assert.match(await page.locator('#qo-diag-root h1').textContent(),/Математика/);
   assert.equal(await page.locator('.qd-edit-card').count(),8);
   await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+  await page.locator('[data-qd-action="view"][data-view="focus"]').click();
   assert.equal(await page.locator('.qd-guided .qd-run-card').count(),1);
   await page.locator('.qd-guided [data-qd-action="mark"][data-mark="no"]').click();
   const count=await page.evaluate(()=>qdReviewItems(qdDoc()).length);

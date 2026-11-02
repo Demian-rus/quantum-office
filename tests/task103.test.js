@@ -36,7 +36,7 @@ test('TASK103 template replacement resets only diagnostics and retains Writer HT
  assert.equal(h.api.qdApplyTemplate(d,'math56'),true);
  assert.equal(d.students.length,0);assert.equal(d.history.length,0);
  assert.equal(Object.keys(d.session.marks).length,0);
- assert.equal(d.display.mode,'focus');
+ assert.equal(d.display.mode,'list'); // TASK106 templates start in the chat-style all-questions view.
  assert.ok(h.saves>0);
  assert.equal(h.doc.html,'<p>Существующий документ</p>');
  const normalized=h.api.qdNormalize(JSON.parse(JSON.stringify(d)));
