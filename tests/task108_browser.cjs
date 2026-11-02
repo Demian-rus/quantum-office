@@ -13,7 +13,7 @@ const {pathToFileURL}=require('node:url');
  const library=async()=>{
    await page.evaluate(()=>route('writer'));
    await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
-   await page.locator('[data-action="writer-diag-library"]').click();
+   await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  };
  await library();
  assert.equal(await page.locator('.qd-library-card').count(),7);
@@ -63,7 +63,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(state.templates.find(x=>x.title.includes('копия')).count,10);
  assert.equal(await page.locator('.qd-library-card').count(),9);
  const wait=page.waitForEvent('download');
- await page.locator('[data-qd-action="library-export"]').click();
+ await page.locator('[data-action="writer-diag-templates-export"]').click();
  const dl=await wait,output=path.join(root,'task108-library.qtpl');
  await dl.saveAs(output);
  const json=JSON.parse(fs.readFileSync(output,'utf8'));
