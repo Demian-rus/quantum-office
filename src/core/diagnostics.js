@@ -1403,9 +1403,7 @@ function qdLibraryView(){
       '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
       '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
       '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
-      '<div class="qd-library-portable"><button type="button" data-qd-action="library-export">Скачать библиотеку .qtpl</button>'+
-      '<button type="button" data-qd-action="library-import">Импорт .qtpl</button>'+
-      '<input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden></div>'+
+      '<p class="qd-library-portable-note">Перенос библиотеки: используйте кнопки QTPL в верхней ленте.</p>'+
       '<p class="qd-hint">Для переносимости между версиями HTML сохраняйте библиотеку в .qtpl. Локальное хранилище зависит от файла и настроек браузера.</p></section>'+
   '</div>';
 }
@@ -1626,23 +1624,32 @@ function qdRibbonAction(action){
   else if(action==='writer-diag-export'){qdExport();return;}
   else if(action==='writer-diag-import'){document.getElementById('qo-diag-file')?.click();return;}
   else if(action==='writer-diag-templates-export'){qdLibraryExport();return;}
+  else if(action==='writer-diag-templates-import'){
+    document.getElementById('qd-library-file')?.click();return;
+  }
+  else if(action==='writer-diag-csv'){qdCSV();return;}
+  else if(action==='writer-diag-new'){
+    if(!confirm('Создать новую пустую диагностику? Вопросы, ученики и история текущей диагностики будут заменены. Сначала сохраните .qdiag.'))return;
+    const blank=qdDefault();
+    d.title=blank.title;d.description=blank.description;d.sections=blank.sections;
+    d.students=blank.students;d.history=blank.history;d.session=blank.session;
+    d.display={mode:'list',activeId:''};
+    qdMode='builder';qoWriter.diagnosticMode='builder';
+    qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
+    qdStore();qdRefresh();return;
+  }
   else return;
   if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
   qdRevealed.clear();qdRefresh();
 }
 function qdRibbonSync(){
-  const modes={
-    'writer-diag-library':qdMode==='library',
-    'writer-diag-builder':qdMode==='builder',
-    'writer-diag-list':qdMode==='run'&&qdDisplay().mode==='list',
-    'writer-diag-focus':qdMode==='run'&&qdDisplay().mode==='focus'
-  };
-  for(const [key,pressed] of Object.entries(modes)){
-    const button=document.querySelector('.qo-document-workspace [data-action="'+key+'"]');
-    if(button){button.classList.toggle('qo-diag-ribbon-active',pressed);button.setAttribute('aria-pressed',String(pressed));}
+  const root=document.getElementById('qo-diag-root');
+  const info=document.querySelector('.qo-document-workspace .qo-diag-ribbon-guide strong');
+  if(info&&root){
+    const d=qdDoc(),count=qdQuestionList(d).length;
+    info.textContent=count+' вопросов · '+d.sections.length+' разделов';
   }
 }
-
 
 function qdSidebarTopics(d,mode){
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
@@ -1714,10 +1721,10 @@ function qdRefresh(){
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.classList.toggle('qd-library-root',qdMode==='library');
   root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdWorkbench(qdDoc(),qdMode,qdMode==='builder'?qdBuilder():qdRun()))+
-    `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
-       <button type="button" data-qd-action="import">Открыть .qdiag</button>
-       <span>Работает без интернета · Для сохранности скачивайте файл</span>
-       <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
+    `<div class="qd-filebar" hidden>
+       <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden>
+       <input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden>
+       </div>`;
   if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
   qdRibbonSync();
