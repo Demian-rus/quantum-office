@@ -591,7 +591,7 @@ function qdBuilderUtilities(d){
     '<pre class="qd-bulk-example">[Теплопередача]\nКак тепло приходит от Солнца? | Излучением\n! Найди количество теплоты. | Q = cmΔt</pre>'+
     '<label>Раздел без заголовка<select id="qd-bulk-target">'+d.sections.map(s=>'<option value="'+qdEsc(s.id)+'" '+(s.id===(qdBulkTarget||d.sections[0]?.id)?'selected':'')+'>'+qdEsc(s.title)+'</option>').join('')+'</select></label>'+
     '<label>Вставьте вопросы<textarea id="qd-bulk-text" rows="6" maxlength="'+QD_BULK_MAX_CHARS+'">'+qdEsc(qdBulkDraft)+'</textarea></label>'+
-    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
+    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details>'+qdVariantsMarkup(d)+'</div>';
 }
 
 
@@ -1604,6 +1604,7 @@ function qoDiagnosticMount(){
 function qdOnBuilderToggle(event){
   if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
   if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
+  if(event.target.dataset?.qdPane==='variants')qdVariantsOpen=event.target.open;
 }
 function qdJumpToEdit(qid,field='prompt'){
   const root=document.getElementById('qo-diag-root');
@@ -1757,6 +1758,22 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
     status('Изменено вопросов: '+result.count);return;
+  }
+  if(action==='variant-download'){
+    const result=qdVariantsBuild(d);
+    const index=Number(button.dataset.variantIndex);
+    const variant=result.ok&&Number.isInteger(index)?result.variants[index]:null;
+    if(!variant){status(result.error||'Неверные настройки вариантов',true);return;}
+    const base=typeof safeFile==='function'?safeFile(d.title):'diagnostic';
+    download(base+'-variant-'+variant.label+'.qdiag',
+      JSON.stringify(variant.document,null,2),'application/json;charset=utf-8');
+    return;
+  }
+  if(action==='collapse-all-sections'){
+    qdCollapsedSections=new Set(d.sections.map(s=>s.id));qdRefresh();return;
+  }
+  if(action==='expand-all-sections'){
+    qdCollapsedSections.clear();qdRefresh();return;
   }
   if(action==='compact-mode'){
     qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
@@ -2003,6 +2020,10 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-var-seed'){
+    qdVariantOptions.seed=event.target.value.slice(0,40);
+    qdVariantPreviewRefresh();return;
+  }
   if(event.target.id==='qd-library-search'){
     qdLibraryQuery=event.target.value.slice(0,120);qdLibraryRefreshCards();return;
   }
@@ -2052,6 +2073,12 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(['qd-var-count','qd-var-per-section','qd-var-choices'].includes(event.target.id)){
+    if(event.target.id==='qd-var-count')qdVariantOptions.count=Number(event.target.value);
+    if(event.target.id==='qd-var-per-section')qdVariantOptions.perSection=Number(event.target.value);
+    if(event.target.id==='qd-var-choices')qdVariantOptions.shuffleChoices=event.target.checked;
+    qdVariantPreviewRefresh();return;
+  }
   if(event.target.matches?.('[data-qd-template-select]')){
     const id=event.target.dataset.qdTemplateSelect;
     if(event.target.checked)qdLibraryPreviewSelected.add(id);
