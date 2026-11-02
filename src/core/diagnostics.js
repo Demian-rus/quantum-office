@@ -1183,6 +1183,33 @@ function qdSample(){
   ];
   d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
 }
+
+function qdRibbonAction(action){
+  const d=qdDoc();
+  if(action==='writer-diag-library')qdMode='library';
+  else if(action==='writer-diag-builder')qdMode='builder';
+  else if(action==='writer-diag-list'){qdMode='run';qdDisplay(d).mode='list';}
+  else if(action==='writer-diag-focus'){qdMode='run';qdDisplay(d).mode='focus';}
+  else if(action==='writer-diag-export'){qdExport();return;}
+  else if(action==='writer-diag-import'){document.getElementById('qo-diag-file')?.click();return;}
+  else if(action==='writer-diag-templates-export'){qdLibraryExport();return;}
+  else return;
+  if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
+  qdRevealed.clear();qdRefresh();
+}
+function qdRibbonSync(){
+  const modes={
+    'writer-diag-library':qdMode==='library',
+    'writer-diag-builder':qdMode==='builder',
+    'writer-diag-list':qdMode==='run'&&qdDisplay().mode==='list',
+    'writer-diag-focus':qdMode==='run'&&qdDisplay().mode==='focus'
+  };
+  for(const [key,pressed] of Object.entries(modes)){
+    const button=document.querySelector('.qo-document-workspace [data-action="'+key+'"]');
+    if(button){button.classList.toggle('qo-diag-ribbon-active',pressed);button.setAttribute('aria-pressed',String(pressed));}
+  }
+}
+
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
@@ -1196,6 +1223,7 @@ function qdRefresh(){
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
   if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
+  qdRibbonSync();
 }
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
