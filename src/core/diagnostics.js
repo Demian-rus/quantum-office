@@ -881,8 +881,9 @@ function qdAdvance(d){
 }
 function qdRunQuestion(q,number,d){
   const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
+  const hasPrompt=!!qdText(q.prompt,1600).trim();
   const markButton=(state,title)=>'<button type="button" data-qd-action="mark" data-qid="'+qdEsc(q.id)+
-    '" data-mark="'+state+'" aria-pressed="'+(mark===state)+'" class="'+(mark===state?'selected':'')+
+    '" data-mark="'+state+'" '+(hasPrompt?'':'disabled title="Заполните вопрос в конструкторе"')+' aria-pressed="'+(mark===state)+'" class="'+(mark===state?'selected':'')+
     '">'+title+'</button>';
   return '<article class="qd-card qd-run-card qd-chat-card '+(mark?'qd-mark-'+mark:'')+'" data-qid="'+qdEsc(q.id)+'">'+
     '<div class="qd-chat-head"><div class="qd-question"><span class="qd-counter">'+(number+1)+'.</span><div>'+
@@ -899,6 +900,7 @@ function qdRunQuestion(q,number,d){
         '">Проверить автоматически</button>':'')+
     '</div>'+
     (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p></div>':'')+
+    (!hasPrompt?'<p class="qd-card-unfilled">Сначала заполните вопрос в конструкторе — пустую карточку нельзя оценить.</p>':'')+
     (mark?'<p class="qd-card-assessed" role="status">'+(mark==='yes'?'Знает':mark==='partial'?'Частично':'Не знает')+'</p>':'')+
   '</article>';
 }
@@ -1666,6 +1668,25 @@ function qdSidebarTopics(d,mode){
     }).join('')+'</div>'+
     '<p class="qd-side-footnote">Нажмите тему, чтобы перейти к её вопросам.</p></nav>';
 }
+
+function qdReviewQueues(d){
+  const all=qdQuestionList(d),pending=[],review=[];
+  for(let i=0;i<all.length;i++){
+    const q=all[i],mark=d.session.marks[q.id];
+    if(!QD_STATES.includes(mark))pending.push({id:q.id,number:i+1,section:q.section,prompt:q.prompt});
+    else if(mark==='no'||mark==='partial')review.push({id:q.id,number:i+1,section:q.section,prompt:q.prompt,mark});
+  }
+  return {pending,review};
+}
+function qdSideQuestionItems(items,empty,kind){
+  if(!items.length)return '<p class="qd-side-empty">'+qdEsc(empty)+'</p>';
+  return '<div class="qd-review-list">'+items.slice(0,5).map(q=>
+    '<button type="button" class="qd-review-link" data-qd-action="sidebar-question" data-qid="'+qdEsc(q.id)+'">'+
+      '<span class="qd-review-title"><b>'+q.number+'.</b>'+qdEsc(q.prompt||'Вопрос не заполнен')+'</span>'+
+      '<span class="qd-review-meta">'+qdEsc(q.section)+
+        (kind==='review'?' · '+(q.mark==='no'?'Не знает':'Частично'):'')+'</span>'+
+    '</button>').join('')+'</div>';
+}
 function qdSidebarInsights(d,mode){
   const all=qdQuestionList(d),s=qdScores(all,d.session.marks);
   if(mode==='builder'){
@@ -1675,30 +1696,38 @@ function qdSidebarInsights(d,mode){
       ['Тест',all.filter(q=>q.type==='single'||q.type==='multiple').length],
       ['Число',all.filter(q=>q.type==='numeric').length]
     ];
-    return '<aside class="qd-side-panel qd-side-insights" aria-label="Структура диагностики">'+
-      '<h2>Состав работы</h2><p class="qd-side-caption">Сводка для преподавателя</p>'+
-      '<div class="qd-side-stat"><span>Разделов</span><strong>'+d.sections.length+'</strong></div>'+
+    return '<aside class="qd-side-panel qd-side-insights" aria-label="Контроль качества диагностики">'+
+      '<h2>Проверка заданий</h2><p class="qd-side-caption">Недочёты можно открыть сразу в конструкторе</p>'+
       '<div class="qd-side-stat"><span>Вопросов</span><strong>'+all.length+'</strong></div>'+
       '<div class="qd-side-stat"><span>Всего баллов</span><strong>'+s.maxPoints+'</strong></div>'+
       '<div class="qd-side-stat"><span>Замечаний</span><strong>'+issues.length+'</strong></div>'+
+      '<h3>Требуют исправления</h3>'+
+      (issues.length?'<div class="qd-review-list">'+issues.slice(0,5).map(issue=>{
+        const question=all.find(q=>q.id===issue.qid),index=all.findIndex(q=>q.id===issue.qid)+1;
+        return '<button type="button" class="qd-review-link" data-qd-action="sidebar-issue" data-qid="'+qdEsc(issue.qid)+'" data-field="'+qdEsc(issue.field)+'">'+
+          '<span class="qd-review-title"><b>'+index+'.</b>'+qdEsc(issue.text)+'</span>'+
+          '<span class="qd-review-meta">'+qdEsc(question?.prompt||'Пустой вопрос')+'</span></button>';
+      }).join('')+'</div>':'<p class="qd-side-empty">Ошибок заполнения не обнаружено.</p>')+
+      (issues.length>5?'<p class="qd-side-footnote">Показано 5 из '+issues.length+' замечаний. Полный список — в аудите конструктора.</p>':'')+
       '<h3>Типы заданий</h3>'+
       types.map(([title,num])=>
         '<div class="qd-side-type"><div><span>'+title+'</span><b>'+num+'</b></div>'+
         '<span class="qd-side-mini-bar"><i style="width:'+(all.length?Math.round(num/all.length*100):0)+'%"></i></span></div>').join('')+
-      '<p class="qd-side-footnote">Настройки и массовые операции находятся в центре конструктора.</p></aside>';
+      '</aside>';
   }
-  const pending=s.total-s.rated;
-  return '<aside class="qd-side-panel qd-side-insights" aria-label="Прогресс диагностики">'+
-    '<h2>Ход проверки</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
-    '<div class="qd-side-big-number">'+(s.rated?s.percent+'%':'—')+'</div>'+
-    '<div class="qd-side-mini-bar qd-side-main-bar"><i style="width:'+(s.total?Math.round(s.rated/s.total*100):0)+'%"></i></div>'+
-    '<div class="qd-side-stat"><span>Оценено</span><strong>'+s.rated+' / '+s.total+'</strong></div>'+
-    '<div class="qd-side-stat"><span>Осталось</span><strong>'+pending+'</strong></div>'+
-    '<div class="qd-side-stat"><span>Знает</span><strong>'+s.yes+'</strong></div>'+
-    '<div class="qd-side-stat"><span>Частично</span><strong>'+s.partial+'</strong></div>'+
-    '<div class="qd-side-stat"><span>Не знает</span><strong>'+s.no+'</strong></div>'+
-    '<p class="qd-side-footnote">Результат считается по оценённым вопросам.</p></aside>';
+  const queues=qdReviewQueues(d);
+  return '<aside class="qd-side-panel qd-side-insights qd-review-sidebar" aria-label="Очередь вопросов">'+
+    '<h2>Очередь занятия</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
+    '<div class="qd-side-stat"><span>Не проверено</span><strong>'+queues.pending.length+'</strong></div>'+
+    '<div class="qd-side-stat"><span>К повторению</span><strong>'+queues.review.length+'</strong></div>'+
+    '<h3>Следующие вопросы</h3>'+
+    qdSideQuestionItems(queues.pending,'Все вопросы оценены.','pending')+
+    '<h3>Вернуться к ответам</h3>'+
+    qdSideQuestionItems(queues.review,'Нет заданий с частичной или отрицательной оценкой.','review')+
+    '<p class="qd-side-footnote">Нажмите на вопрос, чтобы перейти к нему. Очередь обновляется после оценки.</p>'+
+    '</aside>';
 }
+
 function qdWorkbench(d,mode,content){
   return '<div class="qd-workbench">'+
     qdSidebarTopics(d,mode)+
@@ -1767,6 +1796,15 @@ function qdJumpToEdit(qid,field='prompt'){
   if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-20;
   const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
   (input||card.querySelector('textarea'))?.focus({preventScroll:true});
+}
+function qdRefreshSideInsights(){
+  if(qdMode!=='builder')return;
+  const sidebar=document.querySelector('#qo-diag-root .qd-side-insights');
+  if(!sidebar)return;
+  const wrapper=document.createElement('div');
+  wrapper.innerHTML=qdSidebarInsights(qdDoc(),'builder');
+  const next=wrapper.firstElementChild;
+  if(next){sidebar.replaceWith(next);}
 }
 function qdRefreshAudit(){
   if(qdMode!=='builder')return;
@@ -1911,6 +1949,27 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
     status('Изменено вопросов: '+result.count);return;
+  }
+  if(action==='sidebar-question'){
+    const id=button.dataset.qid,all=qdQuestionList(d);
+    const index=all.findIndex(q=>q.id===id);
+    if(index<0||qdMode!=='run')return;
+    if(qdDisplay(d).mode==='focus'){
+      qdSelectQuestion(d,index);qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();return;
+    }
+    const root=document.getElementById('qo-diag-root');
+    const card=[...root?.querySelectorAll('.qd-run-card')||[]].find(el=>el.dataset.qid===id);
+    const scroll=document.getElementById('qo-diag-workspace');
+    if(card&&scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-16;
+    return;
+  }
+  if(action==='sidebar-issue'){
+    const id=button.dataset.qid,section=d.sections.find(s=>s.questions.some(q=>q.id===id));
+    if(!section||qdMode!=='builder')return;
+    qdCollapsedSections.delete(section.id);
+    qdSearch='';qdFilterKind='all';
+    if(qdCompact)qdCardExpanded.add(id);
+    qdRefresh();qdJumpToEdit(id,button.dataset.field);return;
   }
   if(action==='sidebar-topic'){
     const sid=button.dataset.sid,section=d.sections.find(x=>x.id===sid);
@@ -2096,7 +2155,11 @@ function qdOnClick(event){
   }
   if(action==='mark'){
     const qid=button.dataset.qid,mark=button.dataset.mark;
-    if(!QD_STATES.includes(mark)||!qdQuestionList(d).some(q=>q.id===qid))return;
+    const question=qdQuestionList(d).find(q=>q.id===qid);
+    if(!QD_STATES.includes(mark)||!question)return;
+    if(!qdText(question.prompt,1600).trim()){
+      status('Сначала заполните формулировку вопроса в конструкторе',true);return;
+    }
     const isNewGrade=d.session.marks[qid]!==mark;
     if(!isNewGrade)delete d.session.marks[qid];else d.session.marks[qid]=mark;
     if(isNewGrade&&qdDisplay(d).mode==='focus'&&qdQuestionList(d)[qdCurrentIndex(d)]?.id===qid){
@@ -2242,7 +2305,9 @@ function qdOnInput(event){
     const preview=card?.querySelector('.qd-card-preview');
     if(preview)preview.textContent=value.trim()||'Новый вопрос';
   }
-  if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
+  if(['prompt','answer','choice-text','numericAnswer'].includes(field)){
+    qdRefreshAudit();qdRefreshSideInsights();
+  }
 }
 function qdOnChange(event){
   if(['qd-var-count','qd-var-per-section','qd-var-choices'].includes(event.target.id)){
