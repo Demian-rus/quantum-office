@@ -874,7 +874,11 @@ function qdBuilder(){
           <label>Допустимая абсолютная погрешность<input data-qd-field="tolerance" data-qid="${qdEsc(q.id)}"
             type="number" min="0" max="1000000000" step="any" value="${qdTolerance(q.tolerance)}"></label>
         </div>`:''}
-        <div class="qd-card-bank-tools"><button type="button" data-qd-action="bank-save-question"
+        <div class="qd-card-bank-tools"><label>Сложность для банка<select data-qd-bank-save-difficulty
+          aria-label="Сложность сохраняемого вопроса"><option value="unknown">Не указана</option>
+          <option value="easy">Лёгкая</option><option value="medium">Средняя</option>
+          <option value="hard">Сложная</option></select></label>
+          <button type="button" data-qd-action="bank-save-question"
           data-qid="${qdEsc(q.id)}">Сохранить вопрос в банк</button></div>
         <div class="qd-settings">
           <label>Баллы за ответ<input data-qd-field="points" data-qid="${qdEsc(q.id)}" type="number" min="1" max="10" step="1" value="${qdPoints(q.points)}"></label>
@@ -2229,7 +2233,8 @@ function qdOnClick(event){
     const meta=qdBuilderTemplateDefaults(d);
     const result=qdBankSaveQuestion(d,button.dataset.qid,
       document.getElementById('qd-builder-template-subject')?.value||meta.subject,
-      document.getElementById('qd-builder-template-grade')?.value||meta.grade);
+      document.getElementById('qd-builder-template-grade')?.value||meta.grade,
+      button.closest('.qd-edit-card')?.querySelector('[data-qd-bank-save-difficulty]')?.value||'unknown');
     if(!result.ok){status(result.message,true);return;}
     qdBankRefresh();status('Вопрос добавлен в личный банк');return;
   }
@@ -2833,10 +2838,11 @@ function qdOnChange(event){
     if(event.target.id==='qd-var-choices')qdVariantOptions.shuffleChoices=event.target.checked;
     qdVariantPreviewRefresh();return;
   }
-  if(['qd-bank-subject','qd-bank-grade','qd-bank-type'].includes(event.target.id)){
+  if(['qd-bank-subject','qd-bank-grade','qd-bank-type','qd-bank-difficulty'].includes(event.target.id)){
     if(event.target.id==='qd-bank-subject')qdBankSubject=event.target.value;
     if(event.target.id==='qd-bank-grade')qdBankGrade=event.target.value;
     if(event.target.id==='qd-bank-type')qdBankType=event.target.value;
+    if(event.target.id==='qd-bank-difficulty')qdBankDifficulty=event.target.value;
     qdBankPage=0;qdBankRefresh();return;
   }
   if(event.target.matches?.('[data-qd-template-select]')){
