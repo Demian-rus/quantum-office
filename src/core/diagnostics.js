@@ -2025,6 +2025,7 @@ function qdRibbonAction(action){
     d.students=blank.students;d.history=blank.history;d.session=blank.session;
     d.display={mode:'list',activeId:''};
     qdMode='builder';qoWriter.diagnosticMode='builder';
+    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
     qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
     qdStore();qdRefresh();return;
   }
@@ -2530,7 +2531,8 @@ function qdOnClick(event){
   }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
-    qdSample();qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
+    qdSample();qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
+    qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
 
   if(action==='section-collapse'){
@@ -3015,6 +3017,7 @@ function qdOnChange(event){
       throw Error('Неверный формат');
     if(!confirm('Заменить текущую диагностику содержимым файла?'))return;
     qoWriter.diagnostic=qdNormalize(parsed);qdVerified.add(qoWriter);
+    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
     qdMode='run';qoWriter.diagnosticMode='run';qdStudentFilter='';qdRevealed.clear();qdStore();qdRefresh();
   }).catch(()=>status('Не удалось открыть .qdiag: повреждённый или неподдерживаемый файл',true));
 }
