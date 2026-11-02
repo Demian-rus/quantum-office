@@ -68,7 +68,9 @@ function qdNormalize(raw){
       }
       const x=h.summary;
       const summary=x&&typeof x==='object'&&['yes','partial','no','rated','total','percent'].every(k=>Number.isInteger(x[k])&&x[k]>=0&&x[k]<=10000)?{
-        yes:x.yes,partial:x.partial,no:x.no,rated:x.rated,total:x.total,percent:Math.min(100,x.percent)
+        yes:x.yes,partial:x.partial,no:x.no,rated:x.rated,total:x.total,percent:Math.min(100,x.percent),
+        ...(Number.isFinite(x.earned)&&Number.isFinite(x.possible)&&x.earned>=0&&x.possible>=0&&x.earned<=2400&&x.possible<=2400?
+          {earned:qdScoreNumber(x.earned),possible:qdScoreNumber(x.possible)}:{})
       }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
         student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
@@ -313,14 +315,14 @@ function qdCsvCell(value){
 }
 function qdCSV(){
   const d=qdDoc(),questions=qdQuestionList(d);
-  const rows=[['Дата','Ученик','Документ','Проверено','Всего','Знает','Частично','Не знает','Результат, %'],
+  const rows=[['Дата','Ученик','Документ','Проверено','Всего','Знает','Частично','Не знает','Результат, %','Получено баллов','Возможные баллы'],
     ...d.history.map(h=>{const s=h.summary||qdScores(questions,h.marks);
-      return [h.date,h.student,h.title||d.title,s.rated,s.total,s.yes,s.partial,s.no,s.percent];})];
+      return [h.date,h.student,h.title||d.title,s.rated,s.total,s.yes,s.partial,s.no,s.percent,s.earned??'',s.possible??''];})];
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'-results.csv',
     '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
 function qdSample(){
-  const section=(title,pairs,type='question')=>({id:qdNewId(),title,questions:pairs.map(([prompt,answer])=>({id:qdNewId(),type,prompt,answer}))});
+  const section=(title,pairs,type='question')=>({id:qdNewId(),title,questions:pairs.map(([prompt,answer])=>({id:qdNewId(),type,prompt,answer,points:2,partialCredit:50}))});
   const d=qdDoc();d.title='Физика · 8 класс · Осенняя диагностика';d.description='Проверка понимания тепловых явлений и расчётных навыков.';
   d.sections=[
     section('Температура и внутреняя энергия',[
@@ -338,7 +340,7 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.session={student:'',marks:{}};d.history=[];qdRevealed.clear();qdStore();
+  d.students=[];d.session={student:'',studentId:'',marks:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
 }
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
@@ -361,6 +363,10 @@ function qoDiagnosticMount(){
   root.addEventListener('click',qdOnClick);
   root.addEventListener('input',qdOnInput);
   root.addEventListener('change',qdOnChange);
+  root.addEventListener('dragstart',qdDragStart);
+  root.addEventListener('dragover',qdDragOver);
+  root.addEventListener('drop',qdDrop);
+  root.addEventListener('dragend',qdDragEnd);
   qoDiagnosticVisibility();
 }
 function qdOnClick(event){
@@ -374,6 +380,38 @@ function qdOnClick(event){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
     qdSample();qdRefresh();return;
   }
+
+  if(action==='section-up'||action==='section-down'){
+    const index=d.sections.findIndex(s=>s.id===button.dataset.sid),other=index+(action==='section-up'?-1:1);
+    if(index<0||other<0||other>=d.sections.length)return;
+    [d.sections[index],d.sections[other]]=[d.sections[other],d.sections[index]];
+    qdStore();qdRefresh();return;
+  }
+  if(action==='question-up'||action==='question-down'){
+    if(qdShiftQuestion(d,button.dataset.qid,action==='question-up'?-1:1)){qdStore();qdRefresh();}
+    return;
+  }
+  if(action==='duplicate-question'){
+    if(!qdDuplicateQuestion(d,button.dataset.qid))status('Не удалось скопировать: достигнут лимит или вопрос не найден',true);
+    else {qdStore();qdRefresh();}return;
+  }
+  if(action==='add-student'||action==='remember-student'){
+    const input=action==='add-student'?document.getElementById('qd-student-new'):document.querySelector('[data-qd-field="student"]');
+    const student=qdAddStudent(d,input?.value||'');
+    if(!student){status('Введите имя ученика или проверьте лимит списка',true);return;}
+    if(action==='remember-student'){
+      d.session.student=student.name;d.session.studentId=student.id;
+    }
+    qdStore();qdRefresh();status('Ученик добавлен в список');return;
+  }
+  if(action==='remove-student'){
+    const student=d.students.find(s=>s.id===button.dataset.studentId);if(!student)return;
+    if(!confirm('Удалить ученика из списка? Уже записанные результаты сохранятся в журнале.'))return;
+    d.students=d.students.filter(s=>s.id!==student.id);
+    if(d.session.studentId===student.id)d.session.studentId='';
+    if(qdStudentFilter===student.id)qdStudentFilter='';
+    qdStore();qdRefresh();return;
+  }
   if(action==='add-section'){
     if(d.sections.length>=QD_LIMITS.sections){status('Максимум 24 раздела',true);return;}
     d.sections.push({id:qdNewId(),title:`Раздел ${d.sections.length+1}`,questions:[]});qdStore();qdRefresh();return;
@@ -385,7 +423,7 @@ function qdOnClick(event){
   if(action==='add-question'){
     if(qdQuestionList(d).length>=QD_LIMITS.questions){status('Максимум 240 вопросов',true);return;}
     const section=d.sections.find(x=>x.id===button.dataset.sid);if(!section)return;
-    section.questions.push({id:qdNewId(),type:'question',prompt:'',answer:''});qdStore();qdRefresh();return;
+    section.questions.push({id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50});qdStore();qdRefresh();return;
   }
   if(action==='delete-question'){
     const section=d.sections.find(x=>x.id===button.dataset.sid);if(!section)return;
@@ -405,33 +443,106 @@ function qdOnClick(event){
   }
   if(action==='reset'){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
-    d.session={student:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();return;
   }
   if(action==='save-result'){
     const stats=qdScores(qdQuestionList(d),d.session.marks);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
-      title:d.title,marks:{...d.session.marks},summary:stats});
+      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},summary:stats});
     d.history=d.history.slice(-QD_LIMITS.history);
-    d.session={student:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();
+    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
   }
+}
+
+function qdDragStart(event){
+  const handle=event.target.closest?.('[data-qd-drag]');
+  if(!handle||qdMode!=='builder')return;
+  qdDraggedQuestion=handle.dataset.qdDrag;
+  event.dataTransfer.effectAllowed='move';
+  event.dataTransfer.setData('text/plain',qdDraggedQuestion);
+}
+function qdDragOver(event){
+  if(!qdDraggedQuestion||qdMode!=='builder')return;
+  const zone=event.target.closest?.('[data-qd-drop-section]');
+  if(!zone)return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect='move';
+  document.querySelectorAll('#qo-diag-root .qd-drop-target').forEach(el=>el.classList.remove('qd-drop-target'));
+  (event.target.closest('.qd-edit-card')||zone).classList.add('qd-drop-target');
+}
+function qdDrop(event){
+  const id=qdDraggedQuestion,zone=event.target.closest?.('[data-qd-drop-section]');
+  qdDragEnd();
+  if(!id||!zone||qdMode!=='builder')return;
+  event.preventDefault();
+  const card=event.target.closest('.qd-edit-card');
+  const rect=card?.getBoundingClientRect();
+  const after=!!card&&event.clientY>rect.top+rect.height/2;
+  if(qdMoveQuestion(qdDoc(),id,zone.dataset.qdDropSection,card?.dataset.qid||'',after)){
+    qdStore();qdRefresh();
+  }
+}
+function qdDragEnd(){
+  qdDraggedQuestion='';
+  document.querySelectorAll('#qo-diag-root .qd-drop-target').forEach(el=>el.classList.remove('qd-drop-target'));
 }
 function qdOnInput(event){
   const field=event.target.dataset.qdField;if(!field)return;
   const d=qdDoc(),value=event.target.value;
   if(field==='title')d.title=qdText(value,120);
   else if(field==='description')d.description=qdText(value,600);
-  else if(field==='student')d.session.student=qdText(value,100);
+  else if(field==='student'){
+    d.session.student=qdText(value,100);
+    if(d.students.find(x=>x.id===d.session.studentId)?.name!==d.session.student)d.session.studentId='';
+  }
   else if(field==='section'){
     const s=d.sections.find(x=>x.id===event.target.dataset.sid);if(s)s.title=qdText(value,120);
   }else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
     if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig)orig[field]=qdText(value,field==='answer'?3500:1600);}
+  }else if(field==='student-name'){
+    const student=d.students.find(x=>x.id===event.target.dataset.studentId);
+    if(student)student.name=qdText(value,100);
   }else return;
   qdStore();
 }
 function qdOnChange(event){
+  if(event.target.dataset.qdField==='history-filter'){
+    qdStudentFilter=event.target.value;qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='student-select'){
+    const student=qdDoc().students.find(s=>s.id===event.target.value);
+    qdDoc().session.studentId=student?.id||'';
+    qdDoc().session.student=student?.name||'';
+    qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='move-section'){
+    const d=qdDoc();
+    if(qdMoveQuestion(d,event.target.dataset.qid,event.target.value)){qdStore();qdRefresh();}
+    return;
+  }
+  if(['points','partialCredit'].includes(event.target.dataset.qdField)){
+    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    const n=Number(event.target.value);
+    if(event.target.dataset.qdField==='points')q.points=qdPoints(n);
+    else q.partialCredit=qdPartialCredit(n);
+    qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='student-name'){
+    const d=qdDoc(),student=d.students.find(s=>s.id===event.target.dataset.studentId);
+    if(!student)return;
+    const value=qdText(event.target.value,100).trim();
+    if(!value||d.students.some(s=>s.id!==student.id&&s.name.toLocaleLowerCase('ru-RU')===value.toLocaleLowerCase('ru-RU'))){
+      status('Имя не может быть пустым или совпадать с другим учеником',true);
+      event.target.value=student.name;return;
+    }
+    student.name=value;
+    if(d.session.studentId===student.id)d.session.student=student.name;
+    qdStore();qdRefresh();return;
+  }
   if(event.target.dataset.qdField==='type'){
     const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
     if(q)q.type=event.target.value==='practice'?'practice':'question';
