@@ -840,6 +840,129 @@ function qdCSV(){
     '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
 
+
+const QD_LIBRARY_KEY='quantum-office.diagnostic-templates.v1';
+let qdLibraryQuery='',qdLibrarySubject='all',qdLibraryGrade='all',qdLibraryPurpose='all';
+const QD_PRESETS=[
+  {id:'physics8',subject:'physics',grade:'8',purpose:'diagnostic',label:'Молекулы и температура',description:'Устные вопросы, скрытые ответы, тепловые явления и задачи'},
+  {id:'physics7',subject:'physics',grade:'7',purpose:'diagnostic',label:'Введение в физику',description:'Величины, движение, измерения и плотность'},
+  {id:'physics9',subject:'physics',grade:'9',purpose:'review',label:'Законы движения',description:'Ускорение, законы Ньютона и импульс'},
+  {id:'math56',subject:'math',grade:'5–6',purpose:'diagnostic',label:'Дроби, проценты и задачи',description:'Проверка базовых навыков за 5–6 класс'},
+  {id:'math7',subject:'math',grade:'7',purpose:'review',label:'Алгебра: уравнения и функции',description:'Уравнения, графики, вычисления'},
+  {id:'informatics7',subject:'informatics',grade:'7',purpose:'diagnostic',label:'Информация и алгоритмы',description:'Кодирование, файлы, алгоритмы и логика'},
+  {id:'informatics9',subject:'informatics',grade:'9',purpose:'review',label:'Логика и программирование',description:'Булевы выражения, циклы и исполнители'}
+];
+const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',other:'Другое'};
+const QD_PURPOSES={diagnostic:'Входная диагностика',review:'Повторение',practice:'Тренировка',exam:'Контрольная'};
+function qdLibrarySafe(value){
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;
+  const subject=Object.hasOwn(QD_SUBJECTS,value.subject)?value.subject:'other';
+  const purpose=Object.hasOwn(QD_PURPOSES,value.purpose)?value.purpose:'diagnostic';
+  const title=qdText(value.title,120).trim();
+  if(!title||!Array.isArray(value.sections))return null;
+  const model=qdNormalize({title,description:qdText(value.description,600),sections:value.sections,
+    students:[],history:[],session:{},display:{mode:'list',activeId:''}});
+  if(!model.sections.length||!qdQuestionList(model).length)return null;
+  return {id:qdText(value.id,60),title:model.title,description:model.description,
+    subject,grade:qdText(value.grade,18)||'—',purpose,sections:model.sections};
+}
+function qdLibraryRead(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(QD_LIBRARY_KEY)||'[]');
+    return Array.isArray(raw)?raw.slice(0,QD_LIMITS.templates).map(qdLibrarySafe).filter(Boolean):[];
+  }catch(_){return [];}
+}
+function qdLibraryWrite(items){
+  try{localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
+  catch(_){return false;}
+}
+function qdLibrarySaveCurrent(d,subject,grade,purpose){
+  const current=qdLibraryRead();
+  if(current.length>=QD_LIMITS.templates)return {ok:false,message:'Достигнут лимит сохранённых шаблонов'};
+  if(!qdQuestionList(d).some(q=>q.prompt.trim()))return {ok:false,message:'Заполните хотя бы один вопрос'};
+  const data=qdLibrarySafe({
+    id:qdNewId(),title:d.title,description:d.description,sections:d.sections,subject,grade,purpose
+  });
+  if(!data)return {ok:false,message:'Не удалось подготовить шаблон'};
+  const next=[data,...current];
+  if(!qdLibraryWrite(next))return {ok:false,message:'Недостаточно места в локальном хранилище. Сохраните .qdiag на диск'};
+  return {ok:true,id:data.id};
+}
+function qdLibraryDelete(id){
+  const current=qdLibraryRead();
+  if(!current.some(x=>x.id===id))return false;
+  return qdLibraryWrite(current.filter(x=>x.id!==id));
+}
+function qdLibraryItems(){
+  const builtins=QD_PRESETS.map(x=>({...x,source:'built-in',title:qdTemplate(x.id)?.title||x.label,
+    count:qdTemplate(x.id)?.sections.reduce((sum,s)=>sum+s.questions.length,0)||0}));
+  const custom=qdLibraryRead().map(x=>({id:x.id,source:'custom',subject:x.subject,grade:x.grade,purpose:x.purpose,
+    label:x.title,description:x.description,count:x.sections.reduce((sum,s)=>sum+s.questions.length,0)}));
+  const needle=qdLibraryQuery.trim().toLocaleLowerCase('ru-RU');
+  return [...custom,...builtins].filter(x=>
+    (qdLibrarySubject==='all'||x.subject===qdLibrarySubject)&&
+    (qdLibraryGrade==='all'||x.grade===qdLibraryGrade)&&
+    (qdLibraryPurpose==='all'||x.purpose===qdLibraryPurpose)&&
+    (!needle||(x.label+' '+x.description+' '+QD_SUBJECTS[x.subject]).toLocaleLowerCase('ru-RU').includes(needle))
+  );
+}
+function qdLibraryLoad(d,id,source){
+  let payload=null;
+  if(source==='custom'){
+    const x=qdLibraryRead().find(x=>x.id===id);
+    if(x)payload={title:x.title,description:x.description,sections:x.sections};
+  }else if(source==='built-in')payload=qdTemplate(id);
+  if(!payload)return false;
+  // Re-normalizing generates safe, fresh IDs so an old session cannot inherit marks.
+  const model=qdNormalize({title:payload.title,description:payload.description,sections:payload.sections,
+    students:[],history:[],session:{},display:{mode:'list'}});
+  for(const s of model.sections){
+    s.id=qdNewId();
+    for(const q of s.questions)q.id=qdNewId();
+  }
+  d.title=model.title;d.description=model.description;d.sections=model.sections;
+  d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
+  d.display={mode:'list',activeId:''};
+  qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
+  qdStore();return true;
+}
+function qdLibraryView(){
+  const items=qdLibraryItems(),total=QD_PRESETS.length+qdLibraryRead().length;
+  const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
+  return '<div class="qd-template-library">'+
+    '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
+      '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
+      '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
+    '<section class="qd-panel qd-library-filter"><label>Название или тема<input id="qd-library-search" type="search" maxlength="120" value="'+qdEsc(qdLibraryQuery)+'" placeholder="Найти диагностику"></label>'+
+      '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
+      '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
+      '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
+      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+
+      '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
+      '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
+      '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
+      '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
+      '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
+      '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
+      '<p class="qd-hint">Для переноса на другое устройство сохраните отдельный файл .qdiag.</p></section>'+
+  '</div>';
+}
+function qdLibraryCards(items){
+  return items.length?items.map(x=>'<article class="qd-library-card" data-template-id="'+qdEsc(x.id)+'">'+
+    '<div class="qd-library-tags"><span>'+qdEsc(QD_SUBJECTS[x.subject]||'Другое')+'</span><span>'+qdEsc(x.grade)+' класс</span>'+
+    '<span>'+qdEsc(QD_PURPOSES[x.purpose]||'Диагностика')+'</span></div>'+
+    '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
+    '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
+    (x.source==='custom'?'<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
+      '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
+    '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
+}
+function qdLibraryRefreshCards(){
+  const grid=document.getElementById('qd-library-items');
+  if(grid)grid.innerHTML=qdLibraryCards(qdLibraryItems());
+}
+
 function qdTemplate(key){
   const collections={
     physics7:{
