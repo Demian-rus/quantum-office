@@ -67,7 +67,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('.qd-library-card').count(),2);
  await page.locator('[data-action="writer-diag-templates-import"]').click();
  await page.locator('#qd-library-file').setInputFiles(file);
- await page.locator('.qd-library-card').nth(1).waitFor({state:'visible',timeout:5000});
+ await page.locator('.qd-library-card').nth(2).waitFor({state:'visible',timeout:5000});
  assert.equal(await page.locator('.qd-library-card').count(),3,'portable template must restore after import');
  fs.rmSync(file,{force:true});
  assert.deepEqual(errors,[]);
