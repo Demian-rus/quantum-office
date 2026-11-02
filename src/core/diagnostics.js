@@ -231,6 +231,106 @@ function qdToolbar(){
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
     </div></div>`;
 }
+
+const QD_BULK_MAX_CHARS=24000;
+let qdBulkDraft='',qdBulkTarget='',qdBulkOpen=false,qdAuditOpen=false,qdCompact=false;
+let qdCardExpanded=new Set();
+function qdPromptKey(value){
+  return qdText(value,1600).replace(/\s+/g,' ').trim().toLocaleLowerCase('ru-RU');
+}
+function qdAudit(d){
+  const issues=[],seen=new Map();
+  for(const s of d.sections){
+    for(const q of s.questions){
+      const prompt=qdText(q.prompt,1600).trim(),key=qdPromptKey(prompt);
+      if(!prompt)issues.push({qid:q.id,kind:'error',field:'prompt',text:'Вопрос не заполнен'});
+      else if(seen.has(key))issues.push({qid:q.id,kind:'warning',field:'prompt',text:'Повторяет другое задание'});
+      else seen.set(key,q.id);
+      if(['question','practice'].includes(q.type)&&!qdText(q.answer,3500).trim())
+        issues.push({qid:q.id,kind:'warning',field:'answer',text:'Не заполнен ответ преподавателя'});
+      if(['single','multiple'].includes(q.type)){
+        const choices=qdChoices(q.choices),selected=choices.filter(x=>x.correct).length;
+        if(choices.some(x=>!x.text.trim()))issues.push({qid:q.id,kind:'error',field:'choice-text',text:'Заполните все варианты ответа'});
+        if(selected===0||(q.type==='single'&&selected!==1))
+          issues.push({qid:q.id,kind:'error',field:'choice-correct',text:'Неверно отмечены правильные ответы'});
+      }
+      if(q.type==='numeric'&&qdParseNumber(q.numericAnswer)===null)
+        issues.push({qid:q.id,kind:'error',field:'numericAnswer',text:'Введите корректный числовой ответ'});
+    }
+  }
+  return issues;
+}
+function qdBulkPlan(d,text,targetId){
+  const normalized=qdText(text,QD_BULK_MAX_CHARS+1).replace(/\r\n?/g,'\n');
+  const lines=normalized.split('\n');
+  const base=d.sections.find(s=>s.id===targetId)||d.sections[0];
+  const existing=new Set(d.sections.flatMap(s=>s.questions.map(q=>qdPromptKey(q.prompt))).filter(Boolean));
+  const sections=new Map(d.sections.map(s=>[qdPromptKey(s.title),s.id]));
+  const proposed=new Map(),issues=[],items=[];
+  let target=base?.id||'',skipped=0;
+  if(normalized.length>QD_BULK_MAX_CHARS)return {ok:false,issues:['Слишком много текста — не более 24 000 символов'],items:[],skipped:0,newSections:0};
+  if(lines.length>400)return {ok:false,issues:['Слишком много строк — максимум 400'],items:[],skipped:0,newSections:0};
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line)continue;
+    const header=/^\[([^\]\r\n]{1,120})\]$/.exec(line);
+    if(header){
+      const name=header[1].trim(),key=qdPromptKey(name);
+      if(!name){skipped++;issues.push('Строка '+(i+1)+': пустая тема');continue;}
+      if(!sections.has(key)){
+        if(proposed.size+d.sections.length>=QD_LIMITS.sections){
+          issues.push('Строка '+(i+1)+': достигнут предел 24 разделов');return {ok:false,items:[],issues,skipped,newSections:0};
+        }
+        const id='bulk-section-'+proposed.size;
+        proposed.set(id,name);sections.set(key,id);
+      }
+      target=sections.get(key);
+      continue;
+    }
+    const practical=/^!\s+/.test(line),clean=practical?line.replace(/^!\s+/,''):line;
+    const delimiter=clean.indexOf('|')>=0?'|':clean.indexOf('\t')>=0?'\t':null;
+    const cut=delimiter?clean.indexOf(delimiter):-1;
+    const prompt=(cut>=0?clean.slice(0,cut):clean).trim();
+    const answer=cut>=0?clean.slice(cut+1).trim():'';
+    const key=qdPromptKey(prompt);
+    if(!prompt){skipped++;issues.push('Строка '+(i+1)+': отсутствует вопрос');continue;}
+    if(prompt.length>1600||answer.length>3500){skipped++;issues.push('Строка '+(i+1)+': превышена длина вопроса или ответа');continue;}
+    if(existing.has(key)){skipped++;issues.push('Строка '+(i+1)+': повторяющийся вопрос');continue;}
+    if(!target){
+      if(proposed.size+d.sections.length>=QD_LIMITS.sections)return {ok:false,items:[],issues:['Невозможно создать раздел: достигнут лимит'],skipped,newSections:0};
+      if(!proposed.has('bulk-section-empty'))proposed.set('bulk-section-empty','Новые вопросы');
+      target='bulk-section-empty';
+    }
+    existing.add(key);
+    items.push({target,prompt,answer,type:practical?'practice':'question'});
+    if(qdQuestionList(d).length+items.length>QD_LIMITS.questions){
+      issues.push('Достигнут лимит 240 вопросов');return {ok:false,items:[],issues,skipped,newSections:0};
+    }
+  }
+  if(!items.length)return {ok:false,items:[],issues:issues.length?issues:['Нет вопросов для добавления'],skipped,newSections:0};
+  const usedNew=new Set(items.map(item=>item.target).filter(id=>proposed.has(id)));
+  return {ok:true,items,issues,skipped,newSections:usedNew.size,
+    sections:[...proposed.entries()].filter(([id])=>usedNew.has(id)).map(([id,title])=>({id,title}))};
+}
+function qdBulkCommit(d,plan){
+  if(!plan.ok||!plan.items?.length)return false;
+  const count=qdQuestionList(d).length;
+  if(count+plan.items.length>QD_LIMITS.questions||d.sections.length+plan.newSections>QD_LIMITS.sections)return false;
+  const created=new Map();
+  for(const s of plan.sections||[]){
+    const newSection={id:qdNewId(),title:s.title,questions:[]};
+    d.sections.push(newSection);created.set(s.id,newSection.id);
+  }
+  const byId=new Map(d.sections.map(s=>[s.id,s]));
+  for(const item of plan.items){
+    const section=byId.get(created.get(item.target)||item.target);
+    if(!section)return false;
+    section.questions.push({id:qdNewId(),type:item.type,prompt:item.prompt,answer:item.answer,
+      points:2,partialCredit:50,choices:qdChoices(),numericAnswer:'',tolerance:0});
+  }
+  return true;
+}
+
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
