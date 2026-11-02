@@ -1461,6 +1461,51 @@ function qdLibraryWrite(items){
   catch(_){return false;}
 }
 
+/* TASK120: bounded undo history for personal templates, outside the portable QTPL schema. */
+const QD_TEMPLATE_VERSIONS_KEY='quantum-office.diagnostic-template-versions.v1';
+function qdTemplateVersionsRead(){
+  try{
+    const data=JSON.parse(localStorage.getItem(QD_TEMPLATE_VERSIONS_KEY)||'{}');
+    if(!data||typeof data!=='object'||Array.isArray(data))return {};
+    const valid={};
+    for(const [id,versions] of Object.entries(data).slice(0,QD_LIMITS.templates)){
+      if(!Array.isArray(versions))continue;
+      valid[id]=versions.slice(0,5).filter(v=>v&&typeof v.id==='string'&&v.template&&qdLibrarySafe(v.template))
+        .map(v=>({id:v.id,date:qdText(v.date,60),template:qdLibrarySafe(v.template)}));
+    }
+    return valid;
+  }catch(_){return {};}
+}
+function qdTemplateRevisionRemember(item){
+  const data=qdTemplateVersionsRead(),previous=data[item.id]||[];
+  data[item.id]=[{id:qdNewId(),date:new Date().toISOString(),
+    template:qdLibrarySafe(item)},...previous].slice(0,5);
+  try{
+    localStorage.setItem(QD_TEMPLATE_VERSIONS_KEY,JSON.stringify(data));return {ok:true};
+  }catch(_){return {ok:false,message:'Недостаточно места для резервной версии шаблона; скачайте .qtpl'};}
+}
+function qdTemplateVersionOptions(templateId){
+  const versions=qdTemplateVersionsRead()[templateId]||[];
+  return '<option value="">'+(versions.length?'Выберите версию':'Нет предыдущих версий')+'</option>'+
+    versions.map((v,i)=>'<option value="'+qdEsc(v.id)+'">'+(i+1)+'. '+
+      qdEsc(qdDateLabel(v.date))+' — '+v.template.sections.reduce((n,s)=>n+s.questions.length,0)+
+      ' заданий</option>').join('');
+}
+function qdTemplateRevisionRestore(templateId,revisionId){
+  const items=qdLibraryRead(),index=items.findIndex(x=>x.id===templateId);
+  if(index<0)return {ok:false,message:'Свой шаблон не найден'};
+  const item=qdTemplateVersionsRead()[templateId]?.find(x=>x.id===revisionId);
+  if(!item)return {ok:false,message:'Версия не найдена'};
+  const previous=qdLibrarySafe({...item.template,id:templateId});
+  if(!previous)return {ok:false,message:'Повреждённая сохранённая версия'};
+  if(qdLibraryNameUsed(items,previous.title,templateId))
+    return {ok:false,message:'Название версии совпадает с другим шаблоном'};
+  const remembered=qdTemplateRevisionRemember(items[index]);
+  if(!remembered.ok)return remembered;
+  items[index]=previous;
+  if(!qdLibraryWrite(items))return {ok:false,message:'Не удалось восстановить шаблон из-за ограничения памяти'};
+  return {ok:true,questions:qdQuestionList(previous).length};
+}
 let qdLibraryEditingId='';
 function qdLibraryNameUsed(items,title,ignoreId=''){
   const normalized=qdPromptKey(title);
@@ -1482,6 +1527,8 @@ function qdLibraryUpdate(id,fields,d=qdDoc(),replaceQuestions=false){
     sections
   });
   if(!draft)return {ok:false,message:'Не удалось сохранить шаблон'};
+  const remembered=qdTemplateRevisionRemember(original);
+  if(!remembered.ok)return remembered;
   const next=items.slice();next[index]=draft;
   if(!qdLibraryWrite(next))return {ok:false,message:'Недостаточно места в локальном хранилище — скачайте .qtpl'};
   return {ok:true,questions:draft.sections.reduce((s,t)=>s+t.questions.length,0)};
