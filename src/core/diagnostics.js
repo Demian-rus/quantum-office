@@ -836,6 +836,7 @@ function qoDiagnosticMount(){
   root.addEventListener('click',qdOnClick);
   root.addEventListener('input',qdOnInput);
   root.addEventListener('change',qdOnChange);
+  root.addEventListener('toggle',qdOnBuilderToggle,true);
   root.addEventListener('pointerdown',qdPointerDown);
   if(!qdPointerBound){
     window.addEventListener('pointermove',qdPointerMove,true);
@@ -845,6 +846,26 @@ function qoDiagnosticMount(){
   }
   if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);qdKeyboardBound=true;}
   qoDiagnosticVisibility();
+}
+function qdOnBuilderToggle(event){
+  if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
+  if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
+}
+function qdJumpToEdit(qid,field='prompt'){
+  const root=document.getElementById('qo-diag-root');
+  const card=[...root?.querySelectorAll('.qd-edit-card')||[]].find(el=>el.dataset.qid===qid);
+  if(!card)return;
+  const scroll=document.getElementById('qo-diag-workspace');
+  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-20;
+  const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
+  (input||card.querySelector('textarea'))?.focus({preventScroll:true});
+}
+function qdRefreshAudit(){
+  if(qdMode!=='builder')return;
+  const audit=document.getElementById('qd-audit-body');
+  if(audit)audit.innerHTML=qdAuditMarkup(qdDoc());
+  const summary=document.querySelector('[data-qd-pane="audit"] summary span');
+  if(summary)summary.textContent=qdAudit(qdDoc()).length+' замечаний';
 }
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
@@ -874,6 +895,27 @@ function qdOnClick(event){
     }
     if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
     return;
+  }
+  if(action==='compact-mode'){
+    qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
+  }
+  if(action==='card-expand'){
+    const id=button.dataset.qid;
+    if(qdCardExpanded.has(id))qdCardExpanded.delete(id);
+    else qdCardExpanded.add(id);
+    qdRefresh();if(qdCardExpanded.has(id))qdJumpToEdit(id);return;
+  }
+  if(action==='audit-jump'){
+    const id=button.dataset.qid;
+    if(qdCompact)qdCardExpanded.add(id);
+    qdAuditOpen=true;qdRefresh();qdJumpToEdit(id,button.dataset.field);return;
+  }
+  if(action==='bulk-commit'){
+    const plan=qdBulkPlan(d,qdBulkDraft,qdBulkTarget);
+    if(!plan.ok){status('Исправьте ошибки массовой вставки',true);return;}
+    if(!qdBulkCommit(d,plan)){status('Не удалось добавить вопросы из-за ограничения размера',true);return;}
+    qdBulkDraft='';qdBulkOpen=false;qdAuditOpen=true;
+    qdStore();qdRefresh();status('Добавлено '+plan.items.length+' новых заданий');return;
   }
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
@@ -1072,6 +1114,12 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-bulk-text'){
+    qdBulkDraft=event.target.value.slice(0,QD_BULK_MAX_CHARS);
+    const preview=document.getElementById('qd-bulk-preview');
+    if(preview)preview.innerHTML=qdBulkPreview(qdDoc());
+    return;
+  }
   const field=event.target.dataset.qdField;if(!field)return;
   const d=qdDoc(),value=event.target.value;
   if(field==='title')d.title=qdText(value,120);
@@ -1101,8 +1149,20 @@ function qdOnInput(event){
   }else if(field==='student-name')return;
   else return;
   qdStore();
+  if(field==='prompt'){
+    const card=event.target.closest('.qd-edit-card');
+    const preview=card?.querySelector('.qd-card-preview');
+    if(preview)preview.textContent=value.trim()||'Новый вопрос';
+  }
+  if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.id==='qd-bulk-target'){
+    qdBulkTarget=event.target.value;
+    const preview=document.getElementById('qd-bulk-preview');
+    if(preview)preview.innerHTML=qdBulkPreview(qdDoc());
+    return;
+  }
   if(event.target.dataset.qdField==='choice-correct'){
     const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid),i=Number(event.target.dataset.index);
     if(!q||!['single','multiple'].includes(q.type)||!q.choices?.[i])return;
