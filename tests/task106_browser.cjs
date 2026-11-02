@@ -60,6 +60,8 @@ const {pathToFileURL}=require('node:url');
  await page.evaluate(()=>route('writer'));
  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
  await page.locator('[data-action="writer-diag-library"]').click();
+ await page.locator('#qd-library-subject').selectOption('physics');
+ await page.locator('#qd-library-grade').selectOption('8');
  assert.equal(await page.locator('.qd-library-card').count(),2,'custom template should persist across reload of same HTML');
  await page.locator('[data-qd-action="library-delete"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),1);
