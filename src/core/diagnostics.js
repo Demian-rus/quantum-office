@@ -584,7 +584,7 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
+  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
 }
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
@@ -614,12 +614,31 @@ function qoDiagnosticMount(){
     window.addEventListener('pointercancel',qdPointerCancel,true);
     qdPointerBound=true;
   }
+  if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);qdKeyboardBound=true;}
   qoDiagnosticVisibility();
 }
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
   if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
+  if(action==='view'){
+    d.display=qdDisplay(d);
+    d.display.mode=button.dataset.view==='list'?'list':'focus';
+    qdStore();qdRefresh();return;
+  }
+  if(action==='nav-prev'||action==='nav-next'||action==='nav-index'||action==='nav-unrated'){
+    const all=qdQuestionList(d),pos=qdCurrentIndex(d,all);
+    let index=pos;
+    if(action==='nav-prev')index=pos-1;
+    if(action==='nav-next')index=pos+1;
+    if(action==='nav-index')index=Number(button.dataset.index);
+    if(action==='nav-unrated'){
+      const pending=all.findIndex((q,i)=>i>pos&&!QD_STATES.includes(d.session.marks[q.id]));
+      index=pending>=0?pending:all.findIndex(q=>!QD_STATES.includes(d.session.marks[q.id]));
+    }
+    if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
+    return;
+  }
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
@@ -716,8 +735,14 @@ function qdOnClick(event){
   if(action==='mark'){
     const qid=button.dataset.qid,mark=button.dataset.mark;
     if(!QD_STATES.includes(mark)||!qdQuestionList(d).some(q=>q.id===qid))return;
-    if(d.session.marks[qid]===mark)delete d.session.marks[qid];else d.session.marks[qid]=mark;
-    qdStore();qdRefresh();return;
+    const isNewGrade=d.session.marks[qid]!==mark;
+    if(!isNewGrade)delete d.session.marks[qid];else d.session.marks[qid]=mark;
+    if(isNewGrade&&qdDisplay(d).mode==='focus'&&qdQuestionList(d)[qdCurrentIndex(d)]?.id===qid){
+      qdAdvance(d);qdRevealed.clear();
+    }
+    qdStore();qdRefresh();
+    if(isNewGrade&&qdDisplay(d).mode==='focus')qdScrollToQuestion();
+    return;
   }
   if(action==='reveal'){
     if(qdRevealed.has(button.dataset.qid))qdRevealed.delete(button.dataset.qid);
@@ -725,7 +750,7 @@ function qdOnClick(event){
   }
   if(action==='reset'){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
-    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdDisplay(d).activeId='';qdRevealed.clear();qdStore();qdRefresh();return;
   }
   if(action==='report-current'){qdExportReport();return;}
   if(action==='report-saved'){
@@ -740,12 +765,30 @@ function qdOnClick(event){
       title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats,
       topics:qdTopicSnapshot(d,d.session.marks)});
     d.history=d.history.slice(-QD_LIMITS.history);
-    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdDisplay(d).activeId='';qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
   }
 }
 
 
+function qdScrollToQuestion(){
+  const scroll=document.getElementById('qo-diag-workspace'),guided=document.querySelector('#qo-diag-root .qd-guided');
+  if(scroll&&guided)scroll.scrollTop=Math.max(0,guided.offsetTop-14);
+}
+function qdGuidedKeydown(event){
+  if(qdMode!=='run'||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
+  const workspace=document.getElementById('qo-diag-workspace');
+  if(!workspace||workspace.hidden||qdDisplay().mode!=='focus')return;
+  if(event.target.closest?.('input,textarea,select,button,[contenteditable="true"],[role="textbox"]'))return;
+  const actions={ArrowLeft:'nav-prev',ArrowRight:'nav-next',r:'reveal',R:'reveal'};
+  const marks={'1':'yes','2':'partial','3':'no'};
+  let button=null;
+  if(marks[event.key])button=workspace.querySelector('.qd-guided [data-qd-action="mark"][data-mark="'+marks[event.key]+'"]');
+  else if(actions[event.key]){
+    const a=actions[event.key];button=workspace.querySelector('.qd-guided [data-qd-action="'+a+'"]');
+  }
+  if(button&&!button.disabled){event.preventDefault();button.click();}
+}
 function qdPointerDown(event){
   const handle=event.target.closest?.('[data-qd-drag]');
   if(!handle||qdMode!=='builder'||event.button!==0)return;
