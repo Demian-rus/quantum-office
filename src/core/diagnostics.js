@@ -2,6 +2,19 @@
 'use strict';
 // TASK099: interactive diagnostic documents for Quantum Writer.
 const QD_STATES = Object.freeze(['yes','partial','no']);
+const QD_AUTO_TYPES = Object.freeze(['single','multiple','numeric']);
+function qdHistoryResponses(raw){
+  const result={};
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return result;
+  for(const [key,v] of Object.entries(raw).slice(0,QD_LIMITS.questions)){
+    if(!/^[\w-]{1,60}$/.test(key)||!v||typeof v!=='object')continue;
+    if(typeof v.value==='string')result[key]={value:qdText(v.value,80)};
+    else if(Array.isArray(v.selected)){
+      result[key]={selected:[...new Set(v.selected.filter(i=>Number.isInteger(i)&&i>=0&&i<6))].slice(0,6)};
+    }
+  }
+  return result;
+}
 const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
 let qdMode = 'builder';
 let qdRevealed = new Set();
@@ -15,7 +28,7 @@ const qdEsc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const qdDefault = () => ({
   format:'quantum-diagnostic',version:1,title:'Диагностика знаний',description:'',
   sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50}]}],
-  students:[],session:{student:'',studentId:'',marks:{}},history:[]
+  students:[],session:{student:'',studentId:'',marks:{},responses:{}},history:[]
 });
 function qdNormalize(raw){
   const data=qdDefault();
@@ -37,9 +50,11 @@ function qdNormalize(raw){
         for(const q of s.questions){
           if(count>=QD_LIMITS.questions)break;
           if(!q||typeof q!=='object')continue;
-          section.questions.push({id:id(q.id),type:q.type==='practice'?'practice':'question',
+          section.questions.push({id:id(q.id),type:qdType(q.type),
             prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),
-            points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit)});
+            points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit),
+            choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),
+            tolerance:qdTolerance(q.tolerance)});
           count++;
         }
       }
@@ -53,15 +68,20 @@ function qdNormalize(raw){
   const studentIds=new Set(data.students.map(s=>s.id));
   const session=raw.session&&typeof raw.session==='object'?raw.session:{};
   data.session={student:qdText(session.student,100),
-    studentId:studentIds.has(session.studentId)?session.studentId:'',marks:{}};
+    studentId:studentIds.has(session.studentId)?session.studentId:'',marks:{},responses:{}};
   if(session.marks&&typeof session.marks==='object'&&!Array.isArray(session.marks)){
     for(const [key,state] of Object.entries(session.marks)){
       if(questionIds.has(key)&&QD_STATES.includes(state))data.session.marks[key]=state;
     }
   }
+  if(session.responses&&typeof session.responses==='object'&&!Array.isArray(session.responses)){
+    for(const q of data.sections.flatMap(s=>s.questions)){
+      if(Object.hasOwn(session.responses,q.id))data.session.responses[q.id]=qdNormalizeResponse(q,session.responses[q.id]);
+    }
+  }
   if(Array.isArray(raw.history)){
     data.history=raw.history.slice(-QD_LIMITS.history).filter(h=>h&&typeof h==='object').map(h=>{
-      const marks={};
+      const marks={},responses=qdHistoryResponses(h.responses);
       if(h.marks&&typeof h.marks==='object'&&!Array.isArray(h.marks)){
         for(const [key,state] of Object.entries(h.marks)){
           if(/^[\w-]{1,60}$/.test(key)&&QD_STATES.includes(state))marks[key]=state;
@@ -75,7 +95,11 @@ function qdNormalize(raw){
       }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
         student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
-        title:qdText(h.title,120),marks,summary};
+        title:qdText(h.title,120),marks,responses,summary,
+        topics:Array.isArray(h.topics)?h.topics.slice(0,QD_LIMITS.sections).filter(t=>t&&typeof t==='object')
+          .map(t=>({name:qdText(t.name,120),rated:Number.isInteger(t.rated)&&t.rated>=0&&t.rated<=240?t.rated:0,
+            total:Number.isInteger(t.total)&&t.total>=0&&t.total<=240?t.total:0,
+            percent:Number.isInteger(t.percent)&&t.percent>=0&&t.percent<=100?t.percent:0})):null};
     });
   }
   return data;
@@ -91,6 +115,47 @@ function qdDoc(){
 }
 function qdQuestionList(d=qdDoc()){
   return d.sections.flatMap(s=>s.questions.map(q=>({...q,section:s.title})));
+}
+function qdType(value){
+  return ['question','practice',...QD_AUTO_TYPES].includes(value)?value:'question';
+}
+function qdAuto(type){return QD_AUTO_TYPES.includes(type);}
+function qdChoices(raw){
+  const values=Array.isArray(raw)?raw.slice(0,6):Array.from({length:4},()=>({text:'',correct:false}));
+  const result=values.map(item=>({text:qdText(item?.text,240),correct:item?.correct===true}));
+  while(result.length<2)result.push({text:'',correct:false});
+  return result;
+}
+function qdTolerance(v){
+  return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1e9?v:0;
+}
+function qdParseNumber(value){
+  const s=String(value??'').trim().replaceAll(' ','').replace(',', '.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d{1,3})?$/.test(s))return null;
+  const n=Number(s);return Number.isFinite(n)&&Math.abs(n)<=1e12?n:null;
+}
+function qdNormalizeResponse(q,response){
+  if(q.type==='numeric')return {value:qdText(response?.value,80)};
+  const selected=Array.isArray(response?.selected)?response.selected:[];
+  const indices=[...new Set(selected.filter(n=>Number.isInteger(n)&&n>=0&&n<q.choices.length))];
+  return {selected:q.type==='single'?indices.slice(0,1):indices.slice(0,6)};
+}
+function qdCheckAnswer(q,response){
+  if(!qdAuto(q.type))return null;
+  const value=qdNormalizeResponse(q,response);
+  if(q.type==='numeric'){
+    const expected=qdParseNumber(q.numericAnswer),received=qdParseNumber(value.value);
+    if(expected===null||received===null)return null;
+    return Math.abs(expected-received)<=qdTolerance(q.tolerance)+Number.EPSILON*Math.max(1,Math.abs(expected))*4?'yes':'no';
+  }
+  const options=qdChoices(q.choices),valid=options.every(o=>o.text.trim().length>0);
+  const correct=options.flatMap((o,i)=>o.correct?[i]:[]);
+  const selected=value.selected;
+  if(!valid||!correct.length||!selected.length||q.type==='single'&&correct.length!==1)return null;
+  const chosen=new Set(selected);
+  if(correct.length===selected.length&&correct.every(i=>chosen.has(i)))return 'yes';
+  if(q.type==='multiple'&&selected.every(i=>correct.includes(i)))return 'partial';
+  return 'no';
 }
 function qdPoints(value){return Number.isInteger(value)&&value>=1&&value<=10?value:2;}
 function qdPartialCredit(value){return Number.isInteger(value)&&value>=0&&value<=100?value:50;}
@@ -171,6 +236,7 @@ function qdBuilder(){
       <div class="qd-row qd-wrap qd-builder-tools">
         <span class="qd-count-pill">${count} / ${QD_LIMITS.questions} заданий · ${d.sections.length} разделов</span>
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
+        <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
         <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
@@ -193,6 +259,9 @@ function qdBuilder(){
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
             <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
             <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option>
+            <option value="single" ${q.type==='single'?'selected':''}>Выбор одного</option>
+            <option value="multiple" ${q.type==='multiple'?'selected':''}>Несколько ответов</option>
+            <option value="numeric" ${q.type==='numeric'?'selected':''}>Число</option>
           </select>
           <button type="button" data-qd-action="question-up" data-qid="${qdEsc(q.id)}" ${qi===0?'disabled':''} aria-label="Поднять вопрос" title="Поднять вопрос">↑</button>
           <button type="button" data-qd-action="question-down" data-qid="${qdEsc(q.id)}" ${qi===s.questions.length-1?'disabled':''} aria-label="Опустить вопрос" title="Опустить вопрос">↓</button>
@@ -201,6 +270,27 @@ function qdBuilder(){
         </div>
         <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
         <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        ${['single','multiple'].includes(q.type)?`<div class="qd-choices-editor">
+          <strong>Варианты ответов · отметьте правильные</strong>
+          ${qdChoices(q.choices).map((choice,i)=>`<div class="qd-choice-edit">
+            <input type="${q.type==='single'?'radio':'checkbox'}" name="qd-correct-${qdEsc(q.id)}" data-qd-field="choice-correct"
+              data-qid="${qdEsc(q.id)}" data-index="${i}" ${choice.correct?'checked':''}
+              title="Правильный вариант ${i+1}" aria-label="Правильный вариант ${i+1}">
+            <input data-qd-field="choice-text" data-qid="${qdEsc(q.id)}" data-index="${i}" maxlength="240"
+              value="${qdEsc(choice.text)}" placeholder="Вариант ${i+1}" aria-label="Текст варианта ${i+1}">
+            <button type="button" data-qd-action="remove-choice" data-qid="${qdEsc(q.id)}" data-index="${i}"
+              ${q.choices.length<=2?'disabled':''} aria-label="Удалить вариант ${i+1}">×</button>
+          </div>`).join('')}
+          <button type="button" data-qd-action="add-choice" data-qid="${qdEsc(q.id)}"
+            ${q.choices.length>=6?'disabled':''}>+ Вариант</button>
+          <p class="qd-hint">Автопроверка работает, когда все варианты заполнены и указан правильный ответ.</p>
+        </div>`:''}
+        ${q.type==='numeric'?`<div class="qd-numeric-editor">
+          <label>Правильное числовое значение<input data-qd-field="numericAnswer" data-qid="${qdEsc(q.id)}"
+            type="text" maxlength="60" inputmode="decimal" value="${qdEsc(q.numericAnswer||'')}" placeholder="Например, 84 или 84,5"></label>
+          <label>Допустимая абсолютная погрешность<input data-qd-field="tolerance" data-qid="${qdEsc(q.id)}"
+            type="number" min="0" max="1000000000" step="any" value="${qdTolerance(q.tolerance)}"></label>
+        </div>`:''}
         <div class="qd-settings">
           <label>Баллы за ответ<input data-qd-field="points" data-qid="${qdEsc(q.id)}" type="number" min="1" max="10" step="1" value="${qdPoints(q.points)}"></label>
           <label>За частичный ответ, %<input data-qd-field="partialCredit" data-qid="${qdEsc(q.id)}" type="number" min="0" max="100" step="5" value="${qdPartialCredit(q.partialCredit)}"></label>
@@ -228,6 +318,34 @@ function qdBuilder(){
 function qdDateLabel(value){
   const date=new Date(value||'');return Number.isFinite(date.getTime())?date.toLocaleString('ru-RU'):'Дата неизвестна';
 }
+function qdTypeTitle(type){
+  return ({question:'Вопрос',practice:'Практика',single:'Один правильный ответ',
+    multiple:'Несколько ответов',numeric:'Числовой ответ'})[type]||'Вопрос';
+}
+function qdAutoInput(q,response){
+  if(!qdAuto(q.type))return '';
+  const v=qdNormalizeResponse(q,response);
+  if(q.type==='numeric')return `<div class="qd-auto-input">
+    <label>Ваш числовой ответ<input data-qd-field="numeric-response" data-qid="${qdEsc(q.id)}"
+      maxlength="80" type="text" inputmode="decimal" value="${qdEsc(v.value)}" placeholder="Введите число"></label>
+  </div>`;
+  return `<div class="qd-auto-input" role="group" aria-label="Варианты ответа">
+    ${qdChoices(q.choices).map((c,i)=>`<label class="qd-student-option">
+      <input type="${q.type==='single'?'radio':'checkbox'}" data-qd-field="auto-selection"
+        name="qd-answer-${qdEsc(q.id)}" data-qid="${qdEsc(q.id)}" data-index="${i}"
+        ${v.selected.includes(i)?'checked':''}><span>${qdEsc(c.text||'Вариант не заполнен')}</span>
+    </label>`).join('')}
+  </div>`;
+}
+function qdReference(q){
+  let details='';
+  if(['single','multiple'].includes(q.type)){
+    const correct=qdChoices(q.choices).filter(c=>c.correct&&c.text.trim()).map(c=>c.text);
+    if(correct.length)details='Правильные варианты: '+correct.join('; ');
+  }
+  if(q.type==='numeric')details='Числовой ответ: '+(q.numericAnswer||'не задан')+' (± '+qdTolerance(q.tolerance)+')';
+  return [details,q.answer].filter(Boolean).join('\n\n')||'Ответ не заполнен';
+}
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
   const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
@@ -253,16 +371,19 @@ function qdRun(){
         const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id);
         return `<article class="qd-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
          <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div>
-         <span class="qd-type">${q.type==='practice'?'Практика':'Вопрос'} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
+         <span class="qd-type">${qdTypeTitle(q.type)} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
          <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p></div></div>
+         ${qdAutoInput(q,d.session.responses[q.id])}
          <div class="qd-card-actions">
+           ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check"
+              data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
            <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}" aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
            <div class="qd-rating" role="group" aria-label="Оценка ответа">
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes" aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial" aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no" aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
            </div></div>
-         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(q.answer||'Ответ не заполнен').replace(/\n/g,'<br>')}</p></div>`:''}
+         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
         </article>`;
       }).join('')}</section>`).join('')}
     <section class="qd-panel qd-results" aria-label="Итоги диагностики">
@@ -283,6 +404,7 @@ function qdRun(){
         const st=qdScores(section.questions,d.session.marks);
         return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'} · ${st.earned}/${st.possible} б.</span></div>`;
       }).join('')}</div>
+      <div class="qd-report-action"><button type="button" data-qd-action="report-current" ${!s.rated?'disabled':''}>Скачать отчёт HTML / PDF через печать</button></div>
     </section>
     <section class="qd-panel qd-history">
       <div class="qd-row qd-wrap"><h2>Журнал результатов</h2>
@@ -300,10 +422,44 @@ function qdRun(){
       ${history.length?`<div class="qd-history-list">${[...history].reverse().map(h=>{
         const hs=h.summary||qdScores(all,h.marks);
         return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
-        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span></div>`;
+        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span><button type="button" data-qd-action="report-saved" data-hid="${qdEsc(h.id)}">Отчёт</button></div>`;
       }).join('')}</div>`:'<p>Результатов пока нет.</p>'}
     </section></div>`;
 }
+function qdTopicSnapshot(doc,marks){
+  return doc.sections.map(section=>{
+    const s=qdScores(section.questions,marks);
+    return {name:section.title,rated:s.rated,total:s.total,percent:s.percent};
+  });
+}
+function qdReportHTML(entry){
+  const doc=qdDoc(),all=qdQuestionList(doc),current=entry===undefined;
+  const marks=current?doc.session.marks:entry.marks;
+  const s=current?qdScores(all,marks):entry.summary||qdScores(all,marks);
+  const topics=current?qdTopicSnapshot(doc,marks):entry.topics||qdTopicSnapshot(doc,marks);
+  const pupil=qdEsc(current?doc.session.student:(entry.student||''))||'Не указан';
+  const stamp=qdEsc(current?new Date().toLocaleString('ru-RU'):qdDateLabel(entry.date));
+  const title=qdEsc(current?doc.title:(entry.title||doc.title));
+  const rows=topics.map(t=>'<tr><td>'+qdEsc(t.name)+'</td><td>'+t.rated+' / '+t.total+'</td><td>'+t.percent+'%</td></tr>').join('');
+  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Отчёт · '+title+'</title>'+
+   '<style>@page{size:A4;margin:20mm}body{font:15px/1.5 Arial,sans-serif;color:#192d27;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
+   '.muted{color:#60746a}.score{display:flex;align-items:baseline;gap:14px;padding:20px;background:#f0f7f3;border-radius:12px}.score strong{font-size:36px;color:#1c684a}'+
+   'table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #cbd9d1}th{background:#eaf2ed}'+
+   '@media print{body{margin:0;padding:0}.score{print-color-adjust:exact}}'+'</style></head><body>'+
+   '<p class="muted">QUANTUM WRITER · ОТЧЁТ ДИАГНОСТИКИ</p><h1>'+title+'</h1>'+
+   '<p><b>Ученик:</b> '+pupil+'<br><b>Дата:</b> '+stamp+'</p>'+
+   '<div class="score"><strong>'+s.percent+'%</strong><span>Проверено '+s.rated+' из '+s.total+' заданий</span></div>'+
+   '<p>Знает: '+s.yes+' · Частично: '+s.partial+' · Не знает: '+s.no+'</p>'+
+   (Number.isFinite(s.earned)&&Number.isFinite(s.possible)?'<p><b>Баллы:</b> '+s.earned+' из '+s.possible+'</p>':'')+
+   '<h2>Результаты по разделам</h2><table><thead><tr><th>Раздел</th><th>Проверено</th><th>Результат</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+   '<p class="muted">Процент рассчитан только по проверенным заданиям. Для сохранения PDF откройте этот файл и выберите «Печать → Сохранить как PDF».</p>'+
+   '</body></html>';
+}
+function qdExportReport(entry){
+  const doc=qdDoc(),stamp=new Date().toISOString().slice(0,10);
+  download(safeFile(doc.title)+'-отчёт-'+stamp+'.html',qdReportHTML(entry),'text/html;charset=utf-8');
+}
+
 function qdExport(){
   const d=qdDoc();
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'.qdiag',
@@ -341,7 +497,7 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.students=[];d.session={student:'',studentId:'',marks:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
+  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
 }
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
@@ -380,6 +536,22 @@ function qdOnClick(event){
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
+  if(action==='sample-auto'){
+    if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
+      status('Превышен лимит разделов или заданий',true);return;
+    }
+    d.sections.push({id:qdNewId(),title:'Автопроверка · пример',questions:[
+      {id:qdNewId(),type:'single',prompt:'Каким способом тепло Солнца достигает Земли через вакуум?',
+        answer:'В вакууме передача энергии происходит электромагнитным излучением.',
+        choices:[{text:'Теплопроводность',correct:false},{text:'Конвекция',correct:false},
+          {text:'Излучение',correct:true},{text:'Диффузия',correct:false}],
+        numericAnswer:'',tolerance:0,points:2,partialCredit:50},
+      {id:qdNewId(),type:'numeric',prompt:'Сколько килоджоулей нужно для нагрева 2 кг воды на 10 °C? c = 4200 Дж/(кг·°C).',
+        answer:'Q = cmΔt = 4200 × 2 × 10 = 84 000 Дж = 84 кДж.',
+        choices:qdChoices(),numericAnswer:'84',tolerance:0.5,points:4,partialCredit:50}
+    ]});
+    qdStore();qdRefresh();return;
+  }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
     qdSample();qdRefresh();return;
@@ -416,6 +588,23 @@ function qdOnClick(event){
     if(qdStudentFilter===student.id)qdStudentFilter='';
     qdStore();qdRefresh();return;
   }
+  if(action==='add-choice'||action==='remove-choice'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===button.dataset.qid);
+    if(!q||!['single','multiple'].includes(q.type))return;
+    const choices=qdChoices(q.choices),i=Number(button.dataset.index);
+    if(action==='add-choice'&&choices.length<6)choices.push({text:'',correct:false});
+    else if(action==='remove-choice'&&choices.length>2&&Number.isInteger(i)&&i>=0&&i<choices.length)choices.splice(i,1);
+    else return;
+    q.choices=choices;delete d.session.marks[q.id];delete d.session.responses[q.id];
+    qdStore();qdRefresh();return;
+  }
+  if(action==='auto-check'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===button.dataset.qid);
+    if(!q||!qdAuto(q.type))return;
+    const grade=qdCheckAnswer(q,d.session.responses[q.id]);
+    if(grade===null){status('Выберите ответ или проверьте настройку правильного ответа',true);return;}
+    d.session.marks[q.id]=grade;qdStore();qdRefresh();return;
+  }
   if(action==='add-section'){
     if(d.sections.length>=QD_LIMITS.sections){status('Максимум 24 раздела',true);return;}
     d.sections.push({id:qdNewId(),title:`Раздел ${d.sections.length+1}`,questions:[]});qdStore();qdRefresh();return;
@@ -423,7 +612,7 @@ function qdOnClick(event){
   if(action==='delete-section'){
     if(!confirm('Удалить раздел и все его вопросы?'))return;
     const old=d.sections.find(x=>x.id===button.dataset.sid);
-    if(old)old.questions.forEach(q=>{delete d.session.marks[q.id];qdRevealed.delete(q.id);});
+    if(old)old.questions.forEach(q=>{delete d.session.marks[q.id];delete d.session.responses[q.id];qdRevealed.delete(q.id);});
     d.sections=d.sections.filter(x=>x.id!==button.dataset.sid);qdStore();qdRefresh();return;
   }
   if(action==='add-question'){
@@ -434,7 +623,7 @@ function qdOnClick(event){
   if(action==='delete-question'){
     const section=d.sections.find(x=>x.id===button.dataset.sid);if(!section)return;
     section.questions=section.questions.filter(q=>q.id!==button.dataset.qid);
-    delete d.session.marks[button.dataset.qid];qdRevealed.delete(button.dataset.qid);
+    delete d.session.marks[button.dataset.qid];delete d.session.responses[button.dataset.qid];qdRevealed.delete(button.dataset.qid);
     qdStore();qdRefresh();return;
   }
   if(action==='mark'){
@@ -449,15 +638,22 @@ function qdOnClick(event){
   }
   if(action==='reset'){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
-    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+  }
+  if(action==='report-current'){qdExportReport();return;}
+  if(action==='report-saved'){
+    const item=d.history.find(h=>h.id===button.dataset.hid);
+    if(item)qdExportReport(item);
+    return;
   }
   if(action==='save-result'){
     const stats=qdScores(qdQuestionList(d),d.session.marks);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
-      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},summary:stats});
+      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats,
+      topics:qdTopicSnapshot(d,d.session.marks)});
     d.history=d.history.slice(-QD_LIMITS.history);
-    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
   }
 }
@@ -517,11 +713,49 @@ function qdOnInput(event){
   }else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
     if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig)orig[field]=qdText(value,field==='answer'?3500:1600);}
+  }else if(field==='choice-text'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    const i=Number(event.target.dataset.index);
+    if(!q||!q.choices?.[i])return;
+    q.choices[i].text=qdText(value,240);delete d.session.marks[q.id];
+  }else if(field==='numericAnswer'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.numericAnswer=qdText(value,60);delete d.session.marks[q.id];
+  }else if(field==='numeric-response'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q||q.type!=='numeric')return;
+    d.session.responses[q.id]={value:qdText(value,80)};delete d.session.marks[q.id];
   }else if(field==='student-name')return;
   else return;
   qdStore();
 }
 function qdOnChange(event){
+  if(event.target.dataset.qdField==='choice-correct'){
+    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid),i=Number(event.target.dataset.index);
+    if(!q||!['single','multiple'].includes(q.type)||!q.choices?.[i])return;
+    if(q.type==='single')q.choices.forEach((c,j)=>c.correct=i===j);
+    else q.choices[i].correct=event.target.checked;
+    delete qdDoc().session.marks[q.id];qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='tolerance'){
+    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.tolerance=qdTolerance(Number(event.target.value));delete qdDoc().session.marks[q.id];
+    qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='auto-selection'){
+    const d=qdDoc(),q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q||!['single','multiple'].includes(q.type))return;
+    const i=Number(event.target.dataset.index);
+    let selected=qdNormalizeResponse(q,d.session.responses[q.id]).selected;
+    if(i<0||i>=q.choices.length)return;
+    if(q.type==='single')selected=[i];
+    else if(event.target.checked)selected=[...new Set([...selected,i])];
+    else selected=selected.filter(x=>x!==i);
+    d.session.responses[q.id]={selected};delete d.session.marks[q.id];
+    qdStore();return;
+  }
   if(event.target.dataset.qdField==='history-filter'){
     qdStudentFilter=event.target.value;qdRefresh();return;
   }
@@ -557,9 +791,12 @@ function qdOnChange(event){
     qdStore();qdRefresh();return;
   }
   if(event.target.dataset.qdField==='type'){
-    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
-    if(q)q.type=event.target.value==='practice'?'practice':'question';
-    qdStore();return;
+    const d=qdDoc(),q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.type=qdType(event.target.value);
+    if(qdAuto(q.type))q.choices=qdChoices(q.choices);
+    delete d.session.marks[q.id];delete d.session.responses[q.id];
+    qdStore();qdRefresh();return;
   }
   if(event.target.id!=='qo-diag-file')return;
   const file=event.target.files?.[0];event.target.value='';
