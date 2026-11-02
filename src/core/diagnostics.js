@@ -331,6 +331,39 @@ function qdBulkCommit(d,plan){
   return true;
 }
 
+
+function qdAuditMarkup(d){
+  const issues=qdAudit(d),questions=qdQuestionList(d),bad=new Set(issues.map(x=>x.qid));
+  return '<div class="qd-audit-summary"><strong>'+(questions.length-bad.size)+' / '+questions.length+' без замечаний</strong><span>'+issues.length+' замечаний</span></div>'+
+    (issues.length?'<div class="qd-audit-list">'+issues.slice(0,60).map(issue=>{
+      const item=questions.find(q=>q.id===issue.qid);
+      return '<button type="button" class="qd-audit-item" data-qd-action="audit-jump" data-qid="'+qdEsc(issue.qid)+'" data-field="'+qdEsc(issue.field)+'">'+
+        '<span class="qd-audit-marker '+issue.kind+'">'+(issue.kind==='error'?'Исправить':'Проверить')+'</span>'+
+        '<span><strong>'+qdEsc(item?.prompt||'Новый вопрос')+'</strong><small>'+qdEsc(issue.text)+'</small></span></button>';
+    }).join('')+'</div>':'<p class="qd-hint">Вопросы заполнены, ошибок не найдено.</p>');
+}
+function qdBulkPreview(d){
+  const plan=qdBulkPlan(d,qdBulkDraft,qdBulkTarget);
+  return '<div class="qd-bulk-summary"><strong>'+(plan.ok?'Добавится '+plan.items.length+' заданий':'Нет готовых вопросов')+'</strong>'+
+    '<span>Новых разделов: '+(plan.newSections||0)+' · Пропущено: '+plan.skipped+'</span></div>'+
+    (plan.issues.length?'<ul class="qd-bulk-warnings">'+plan.issues.slice(0,8).map(x=>'<li>'+qdEsc(x)+'</li>').join('')+'</ul>':'')+
+    (plan.ok?'<div class="qd-bulk-items">'+plan.items.slice(0,4).map(x=>'<p><strong>'+qdEsc(x.prompt)+'</strong><small>'+qdEsc(x.answer||'Ответ не задан')+'</small></p>').join('')+'</div>':'')+
+    '<button type="button" data-qd-action="bulk-commit" class="qd-primary" '+(plan.ok?'':'disabled')+'>Добавить '+(plan.ok?plan.items.length:0)+' заданий</button>';
+}
+function qdBuilderUtilities(d){
+  const issues=qdAudit(d);
+  return '<div class="qd-panel qd-builder-utilities">'+
+    '<div class="qd-utility-actions"><strong>Инструменты конструктора</strong><button data-qd-action="compact-mode" type="button">'+(qdCompact?'Развернуть все':'Компактный список')+'</button></div>'+
+    '<details data-qd-pane="audit" class="qd-utility-details" '+(qdAuditOpen?'open':'')+'><summary>Проверка заданий <span>'+issues.length+' замечаний</span></summary>'+
+    '<div id="qd-audit-body" class="qd-utility-content">'+qdAuditMarkup(d)+'</div></details>'+
+    '<details data-qd-pane="bulk" class="qd-utility-details" '+(qdBulkOpen?'open':'')+'><summary>Массовое добавление вопросов <span>Из текста</span></summary>'+
+    '<div class="qd-utility-content qd-bulk-panel"><p class="qd-hint">Одна строка — вопрос | ответ. Для новой темы напишите [Название]. Знак ! и пробел в начале строки означают практику.</p>'+
+    '<pre class="qd-bulk-example">[Теплопередача]\nКак тепло приходит от Солнца? | Излучением\n! Найди количество теплоты. | Q = cmΔt</pre>'+
+    '<label>Раздел без заголовка<select id="qd-bulk-target">'+d.sections.map(s=>'<option value="'+qdEsc(s.id)+'" '+(s.id===(qdBulkTarget||d.sections[0]?.id)?'selected':'')+'>'+qdEsc(s.title)+'</option>').join('')+'</select></label>'+
+    '<label>Вставьте вопросы<textarea id="qd-bulk-text" rows="6" maxlength="'+QD_BULK_MAX_CHARS+'">'+qdEsc(qdBulkDraft)+'</textarea></label>'+
+    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
+}
+
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
