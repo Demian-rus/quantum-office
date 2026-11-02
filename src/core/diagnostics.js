@@ -350,6 +350,70 @@ function qdBulkPreview(d){
     (plan.ok?'<div class="qd-bulk-items">'+plan.items.slice(0,4).map(x=>'<p><strong>'+qdEsc(x.prompt)+'</strong><small>'+qdEsc(x.answer||'Ответ не задан')+'</small></p>').join('')+'</div>':'')+
     '<button type="button" data-qd-action="bulk-commit" class="qd-primary" '+(plan.ok?'':'disabled')+'>Добавить '+(plan.ok?plan.items.length:0)+' заданий</button>';
 }
+
+let qdSearch='',qdFilterKind='all',qdSelected=new Set();
+function qdMatchingQuestions(d,search=qdSearch,kind=qdFilterKind){
+  const needle=qdPromptKey(search),problem=kind==='issues'?new Set(qdAudit(d).map(x=>x.qid)):null;
+  const result=[];
+  for(const section of d.sections)for(const q of section.questions){
+    if(problem&&!problem.has(q.id))continue;
+    if(kind!=='all'&&kind!=='issues'&&q.type!==kind)continue;
+    if(needle&&!qdText(section.title+' '+q.prompt+' '+q.answer,6100).replace(/\s+/g,' ').trim().toLocaleLowerCase('ru-RU').includes(needle))continue;
+    result.push(q);
+  }
+  return result;
+}
+function qdBatchApply(d,ids,action,value){
+  const wanted=new Set(ids);
+  if(!wanted.size)return {ok:false,message:'Не выбраны вопросы'};
+  const targets=d.sections.flatMap(s=>s.questions.filter(q=>wanted.has(q.id)));
+  if(targets.length!==wanted.size)return {ok:false,message:'Выбор устарел — обновите список'};
+  if(action==='points'){
+    const points=Number(value);
+    if(!Number.isInteger(points)||points<1||points>10)return {ok:false,message:'Баллы должны быть от 1 до 10'};
+    targets.forEach(q=>q.points=points);
+  }else if(action==='type'){
+    if(!['question','practice','single','multiple','numeric'].includes(value))return {ok:false,message:'Неверный тип'};
+    for(const q of targets)if(q.type!==value){
+      q.type=value;
+      if(['single','multiple'].includes(value))q.choices=qdChoices(q.choices);
+      delete d.session.marks[q.id];delete d.session.responses[q.id];
+    }
+  }else if(action==='move'){
+    const target=d.sections.find(s=>s.id===value);
+    if(!target)return {ok:false,message:'Укажите существующий раздел'};
+    const incoming=d.sections.filter(s=>s.id!==target.id)
+      .flatMap(s=>s.questions.filter(q=>wanted.has(q.id)));
+    for(const section of d.sections)if(section.id!==target.id)
+      section.questions=section.questions.filter(q=>!wanted.has(q.id));
+    target.questions.push(...incoming);
+  }else if(action==='delete'){
+    for(const section of d.sections)section.questions=section.questions.filter(q=>!wanted.has(q.id));
+    for(const q of targets){
+      delete d.session.marks[q.id];delete d.session.responses[q.id];qdRevealed.delete(q.id);
+      qdCardExpanded.delete(q.id);
+    }
+    if(wanted.has(qdDisplay(d).activeId))qdDisplay(d).activeId='';
+  }else return {ok:false,message:'Неизвестная операция'};
+  return {ok:true,count:targets.length};
+}
+function qdBatchInputs(d,action='points'){
+  if(action==='points')return '<label>Баллов за вопрос <input id="qd-batch-value" type="number" min="1" max="10" step="1" value="2"></label>';
+  if(action==='type')return '<label>Тип заданий <select id="qd-batch-value">'+
+    [['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько ответов'],['numeric','Число']]
+      .map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')+'</select></label>';
+  if(action==='move')return '<label>Перенести в раздел <select id="qd-batch-value">'+
+    d.sections.map(s=>'<option value="'+qdEsc(s.id)+'">'+qdEsc(s.title)+'</option>').join('')+'</select></label>';
+  return '<p class="qd-hint">Выбранные задания будут удалены из текущей диагностики; старые записи журнала сохранятся.</p>';
+}
+function qdSelectionSummary(d){
+  const visible=qdMatchingQuestions(d);
+  const visibleIds=new Set(visible.map(q=>q.id));
+  const selected=qdSelected.size,shown=visible.filter(q=>qdSelected.has(q.id)).length;
+  return 'Найдено '+visible.length+' из '+qdQuestionList(d).length+' · Выбрано '+selected+
+    (selected&&shown!==selected?' (в фильтре '+shown+')':'');
+}
+
 function qdBuilderUtilities(d){
   const issues=qdAudit(d);
   return '<div class="qd-panel qd-builder-utilities">'+
@@ -362,6 +426,48 @@ function qdBuilderUtilities(d){
     '<label>Раздел без заголовка<select id="qd-bulk-target">'+d.sections.map(s=>'<option value="'+qdEsc(s.id)+'" '+(s.id===(qdBulkTarget||d.sections[0]?.id)?'selected':'')+'>'+qdEsc(s.title)+'</option>').join('')+'</select></label>'+
     '<label>Вставьте вопросы<textarea id="qd-bulk-text" rows="6" maxlength="'+QD_BULK_MAX_CHARS+'">'+qdEsc(qdBulkDraft)+'</textarea></label>'+
     '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
+}
+
+
+function qdBatchToolbar(d){
+  const kinds=[['all','Все задания'],['question','Вопросы'],['practice','Практика'],['single','Один ответ'],
+    ['multiple','Несколько ответов'],['numeric','Числа'],['issues','С замечаниями']];
+  return '<section class="qd-panel qd-manage-bar" aria-label="Поиск и массовое редактирование">'+
+    '<div class="qd-manage-filter"><label>Поиск<input type="search" id="qd-search" maxlength="160" value="'+qdEsc(qdSearch)+'" placeholder="Вопрос, ответ или тема"></label>'+
+    '<label>Фильтр<select id="qd-filter-kind">'+kinds.map(([k,label])=>'<option value="'+k+'" '+(k===qdFilterKind?'selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
+    '<span id="qd-filter-count" aria-live="polite"></span></div>'+
+    '<div class="qd-manage-select"><button type="button" data-qd-action="select-visible">Выбрать найденные</button>'+
+    '<button type="button" data-qd-action="selection-clear">Снять выделение</button>'+
+    '<strong id="qd-selection-count">'+qdSelected.size+' выбрано</strong></div>'+
+    '<div class="qd-batch-editor"><label>Массовое действие<select id="qd-batch-action">'+
+    '<option value="points">Изменить баллы</option><option value="type">Изменить тип</option>'+
+    '<option value="move">Перенести в раздел</option><option value="delete">Удалить вопросы</option></select></label>'+
+    '<div id="qd-batch-inputs">'+qdBatchInputs(d)+'</div>'+
+    '<button type="button" data-qd-action="batch-apply" class="qd-primary">Применить к выбранным</button></div>'+
+    '<p class="qd-hint">Массовое действие затрагивает все выбранные карточки, в том числе скрытые фильтром.</p></section>';
+}
+function qdApplyFilterUI(){
+  if(qdMode!=='builder')return;
+  const root=document.getElementById('qo-diag-root'),d=qdDoc();
+  if(!root)return;
+  const visible=new Set(qdMatchingQuestions(d).map(q=>q.id)),active=!!qdSearch.trim()||qdFilterKind!=='all';
+  for(const section of root.querySelectorAll('.qd-editor-section')){
+    let shown=0;
+    for(const card of section.querySelectorAll('.qd-edit-card')){
+      const show=visible.has(card.dataset.qid);
+      card.hidden=!show;card.classList.toggle('qd-selected',qdSelected.has(card.dataset.qid));
+      if(show)shown++;
+    }
+    section.hidden=!shown&&(active||!!section.querySelector('.qd-edit-card'));
+  }
+  const count=root.querySelector('#qd-filter-count');
+  if(count)count.textContent='Найдено '+visible.size+' из '+qdQuestionList(d).length;
+  const countSelected=root.querySelector('#qd-selection-count');
+  if(countSelected)countSelected.textContent=qdSelected.size+' выбрано';
+  const empty=root.querySelector('#qd-no-matches');
+  if(empty)empty.hidden=visible.size>0||!active;
+  for(const button of root.querySelectorAll('[data-qd-action="batch-apply"],[data-qd-action="selection-clear"]'))
+    button.disabled=!qdSelected.size;
 }
 
 function qdBuilder(){
@@ -385,6 +491,8 @@ function qdBuilder(){
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
     ${qdBuilderUtilities(d)}
+    ${qdBatchToolbar(d)}
+    <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
         <span class="qd-index">${si+1}</span>
@@ -399,6 +507,8 @@ function qdBuilder(){
       ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card ${qdCompact&&!qdCardExpanded.has(q.id)?'is-compact':''}" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
           <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
+          <input type="checkbox" class="qd-select-card" data-qd-select data-qid="${qdEsc(q.id)}"
+              aria-label="Выбрать вопрос ${qi+1}" ${qdSelected.has(q.id)?'checked':''}>
           <span class="qd-counter">Вопрос ${qi+1}</span>
            <span class="qd-card-preview" title="${qdEsc(q.prompt)}">${qdEsc(q.prompt||'Новый вопрос')}</span>
            ${qdCompact?`<button type="button" data-qd-action="card-expand" data-qid="${qdEsc(q.id)}">${qdCardExpanded.has(q.id)?'Свернуть':'Редактировать'}</button>`:''}
@@ -817,6 +927,7 @@ function qdSample(){
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
@@ -824,6 +935,7 @@ function qdRefresh(){
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
   if(scroll)scroll.scrollTop=top;
+  qdApplyFilterUI();
 }
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
@@ -896,6 +1008,23 @@ function qdOnClick(event){
     if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
     return;
   }
+
+  if(action==='select-visible'){
+    for(const q of qdMatchingQuestions(d))qdSelected.add(q.id);
+    qdRefresh();return;
+  }
+  if(action==='selection-clear'){qdSelected.clear();qdRefresh();return;}
+  if(action==='batch-apply'){
+    const operation=document.getElementById('qd-batch-action')?.value;
+    const value=document.getElementById('qd-batch-value')?.value;
+    const ids=[...qdSelected];
+    if(!ids.length){status('Сначала выберите вопросы',true);return;}
+    if(operation==='delete'&&!confirm('Удалить '+ids.length+' выбранных вопросов? Старые результаты в журнале сохранятся.'))return;
+    const result=qdBatchApply(d,ids,operation,value);
+    if(!result.ok){status(result.message,true);return;}
+    qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
+    status('Изменено вопросов: '+result.count);return;
+  }
   if(action==='compact-mode'){
     qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
   }
@@ -906,6 +1035,7 @@ function qdOnClick(event){
     qdRefresh();if(qdCardExpanded.has(id))qdJumpToEdit(id);return;
   }
   if(action==='audit-jump'){
+    qdSearch='';qdFilterKind='all';
     const id=button.dataset.qid;
     if(qdCompact)qdCardExpanded.add(id);
     qdAuditOpen=true;qdRefresh();qdJumpToEdit(id,button.dataset.field);return;
@@ -924,7 +1054,7 @@ function qdOnClick(event){
     const key=document.getElementById('qd-template-pick')?.value;
     if(!qdTemplate(key))return;
     if(!confirm('Заменить текущую диагностику шаблоном? Вопросы, ученики и история этого документа будут заменены. При необходимости сначала скачайте .qdiag.'))return;
-    qdApplyTemplate(d,key);qdRefresh();return;
+    qdApplyTemplate(d,key);qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
   if(action==='sample-auto'){
     if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
@@ -944,7 +1074,7 @@ function qdOnClick(event){
   }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
-    qdSample();qdRefresh();return;
+    qdSample();qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
 
   if(action==='section-up'||action==='section-down'){
@@ -1114,6 +1244,9 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-search'){
+    qdSearch=event.target.value.slice(0,160);qdApplyFilterUI();return;
+  }
   if(event.target.id==='qd-bulk-text'){
     qdBulkDraft=event.target.value.slice(0,QD_BULK_MAX_CHARS);
     const preview=document.getElementById('qd-bulk-preview');
@@ -1157,6 +1290,21 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.matches?.('[data-qd-select]')){
+    const id=event.target.dataset.qid;
+    if(event.target.checked)qdSelected.add(id);
+    else qdSelected.delete(id);
+    qdApplyFilterUI();return;
+  }
+  if(event.target.id==='qd-filter-kind'){
+    qdFilterKind=event.target.value;
+    qdApplyFilterUI();return;
+  }
+  if(event.target.id==='qd-batch-action'){
+    const body=document.getElementById('qd-batch-inputs');
+    if(body)body.innerHTML=qdBatchInputs(qdDoc(),event.target.value);
+    return;
+  }
   if(event.target.id==='qd-bulk-target'){
     qdBulkTarget=event.target.value;
     const preview=document.getElementById('qd-bulk-preview');
