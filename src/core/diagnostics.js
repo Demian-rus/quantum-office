@@ -1033,6 +1033,7 @@ function qdRun(){
          <span>Занятий: ${history.length}</span>
          <span>Средний результат: ${average===null?'—':average+'%'}</span>
          <span>Последний результат: ${scores.length?scores.at(-1).percent+'%':'—'}</span></div>`:''}
+      ${profile?'<div id="qd-history-progress">'+qdHistoryProgressMarkup(d,qdStudentFilter)+'</div>':''}
       ${history.length?`<div class="qd-history-list">${[...history].reverse().map(h=>{
         const hs=h.summary||qdScores(all,h.marks);
         return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
@@ -1041,6 +1042,97 @@ function qdRun(){
     </section>
     ${qdDisplay(d).mode==='focus'?'</div></details>':''}</div>`;
 }
+
+/* TASK114 — historical results are compared only from stored snapshots, never inferred
+   from the current (potentially edited) question catalog. */
+let qdHistoryComparisonFrom='',qdHistoryComparisonTo='';
+function qdHistoryComparableRows(d,studentId){
+  if(!studentId)return [];
+  return qdStudentResults(d,studentId).filter(h=>
+    h.summary&&h.summary.rated>0&&Array.isArray(h.topics)&&
+    Number.isFinite(h.summary.percent)&&Number.isFinite(Date.parse(h.date)));
+}
+function qdHistoryCompare(d,studentId,fromId='',toId=''){
+  const history=qdHistoryComparableRows(d,studentId);
+  if(history.length<2)return {ok:false,reason:'Для сравнения нужны как минимум два сохранённых занятия с результатами по темам.',history};
+  const current=history.find(h=>h.id===toId)||history.at(-1);
+  const previous=history.find(h=>h.id===fromId&&h.id!==current.id)||
+    history.filter(h=>h.id!==current.id).at(-1);
+  if(!previous)return {ok:false,reason:'Выберите два разных занятия.',history};
+  const older=new Map((previous.topics||[]).filter(x=>x.rated>0)
+    .map(t=>[qdPromptKey(t.name),t]));
+  const topics=(current.topics||[]).filter(x=>x.rated>0).flatMap(now=>{
+    const past=older.get(qdPromptKey(now.name));
+    if(!past)return [];
+    const countsMatch=now.rated===past.rated&&now.total===past.total;
+    return [{name:now.name,from:past.percent,to:now.percent,
+      delta:now.percent-past.percent,countsMatch,
+      fromRated:past.rated,toRated:now.rated}];
+  });
+  const fromScore=previous.summary,toScore=current.summary;
+  return {ok:true,history,from:previous,to:current,topics,
+    delta:toScore.percent-fromScore.percent,
+    equalScope:fromScore.rated===toScore.rated&&fromScore.total===toScore.total,
+    fromScore,toScore};
+}
+function qdHistoryProgressMarkup(d,studentId){
+  const student=d.students.find(x=>x.id===studentId);
+  if(!student)return '';
+  const rows=qdHistoryComparableRows(d,studentId);
+  if(rows.length<2)return '<section class="qd-progress-history" aria-label="Динамика по ученику">'+
+    '<h3>Динамика занятий</h3><p class="qd-progress-hint">Для сравнения ученику нужны два сохранённых занятия с результатами по темам.</p></section>';
+  const result=qdHistoryCompare(d,studentId,qdHistoryComparisonFrom,qdHistoryComparisonTo);
+  if(!result.ok)return '<p class="qd-progress-hint">'+qdEsc(result.reason)+'</p>';
+  const option=(selected)=>[...rows].reverse().map((h,i)=>
+    '<option value="'+qdEsc(h.id)+'" '+(h.id===selected?'selected':'')+'>'+
+    qdEsc(qdDateLabel(h.date))+' · '+h.summary.percent+'% · '+qdEsc(h.title||'Диагностика')+
+    '</option>').join('');
+  const trend=rows.slice(-8);
+  const diff=result.delta;
+  const direction=(n)=>n>0?'+'+n+' п.п.':n<0?n+' п.п.':'0 п.п.';
+  const themeRows=result.topics.map(t=>
+    '<div class="qd-progress-topic"><div><strong>'+qdEsc(t.name)+'</strong>'+
+      '<span>'+t.from+'% → '+t.to+'%</span></div>'+
+    '<div><span class="qd-progress-delta '+(t.delta>0?'up':t.delta<0?'down':'flat')+'">'+direction(t.delta)+'</span>'+
+      (!t.countsMatch?'<small>Разное число заданий</small>':'')+'</div></div>').join('');
+  return '<section class="qd-progress-history" aria-label="Динамика по ученику">'+
+    '<div class="qd-progress-head"><div><h3>Динамика занятий</h3>'+
+      '<p>Сохранённые результаты ученика: '+qdEsc(student.name)+'</p></div>'+
+      '<button type="button" data-qd-action="progress-export">Сравнение CSV</button></div>'+
+    '<div class="qd-progress-trend" aria-label="Последние результаты ученика">'+
+      trend.map(h=>'<div class="qd-progress-trend-item">'+
+        '<div class="qd-progress-trend-value">'+h.summary.percent+'%</div>'+
+        '<div class="qd-progress-trend-bar"><span style="height:'+h.summary.percent+'%"></span></div>'+
+        '<small>'+qdEsc(qdDateLabel(h.date).split(',')[0])+'</small></div>').join('')+
+    '</div>'+
+    '<div class="qd-progress-selectors"><label>Сравнить занятие<select data-qd-field="history-compare-from">'+
+      option(result.from.id)+'</select></label>'+
+      '<label>С занятием<select data-qd-field="history-compare-to">'+
+      option(result.to.id)+'</select></label></div>'+
+    '<div class="qd-progress-summary"><strong>'+result.fromScore.percent+'% → '+result.toScore.percent+'%</strong>'+
+      '<span class="qd-progress-delta '+(diff>0?'up':diff<0?'down':'flat')+'">'+direction(diff)+'</span></div>'+
+    (!result.equalScope?'<p class="qd-progress-caution">Количество проверенных заданий или их общий объём различается. Проценты показаны справочно, а не как строго сопоставимые оценки.</p>':'')+
+    '<h4>Одинаковые темы в двух занятиях</h4>'+
+    (themeRows||'<p class="qd-progress-hint">Совпадающих оценённых тем нет.</p>')+
+    '<p class="qd-progress-hint">Сравнение строится по сохранённым результатам. Состав и сложность заданий могли различаться; изменение процента само по себе не доказывает рост или снижение знаний.</p>'+
+    '</section>';
+}
+function qdHistoryProgressRefresh(){
+  const el=document.getElementById('qd-history-progress');
+  if(el)el.innerHTML=qdHistoryProgressMarkup(qdDoc(),qdStudentFilter);
+}
+function qdHistoryComparisonCSV(d,studentId,fromId,toId){
+  const result=qdHistoryCompare(d,studentId,fromId,toId);
+  if(!result.ok)return {ok:false,reason:result.reason};
+  const fromDate=qdDateLabel(result.from.date),toDate=qdDateLabel(result.to.date);
+  const header=['Тема','Дата 1','Результат 1, %','Дата 2','Результат 2, %',
+    'Изменение, п.п.','Сопоставимое число заданий'];
+  const rows=[header,['Вся работа',fromDate,result.fromScore.percent,toDate,result.toScore.percent,
+    result.delta,result.equalScope?'Да':'Нет'],
+    ...result.topics.map(t=>[t.name,fromDate,t.from,toDate,t.to,t.delta,t.countsMatch?'Да':'Нет'])];
+  return {ok:true,rows,content:'\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n')};
+}
+
 function qdTopicSnapshot(doc,marks){
   return doc.sections.map(section=>{
     const s=qdScores(section.questions,marks);
@@ -2178,6 +2270,13 @@ function qdOnClick(event){
     d.session={student:'',studentId:'',marks:{},responses:{}};qdDisplay(d).activeId='';qdRevealed.clear();qdStore();qdRefresh();return;
   }
   if(action==='report-current'){qdExportReport();return;}
+  if(action==='progress-export'){
+    const result=qdHistoryComparisonCSV(d,qdStudentFilter,qdHistoryComparisonFrom,qdHistoryComparisonTo);
+    if(!result.ok){status(result.reason||'Выберите занятия',true);return;}
+    const student=d.students.find(x=>x.id===qdStudentFilter);
+    download((typeof safeFile==='function'?safeFile(student?.name||'student'):'student')+'-динамика.csv',
+      result.content,'text/csv;charset=utf-8');return;
+  }
   if(action==='report-saved'){
     const item=d.history.find(h=>h.id===button.dataset.hid);
     if(item)qdExportReport(item);
@@ -2388,7 +2487,16 @@ function qdOnChange(event){
     qdStore();return;
   }
   if(event.target.dataset.qdField==='history-filter'){
-    qdStudentFilter=event.target.value;qdRefresh();return;
+    qdStudentFilter=event.target.value;qdHistoryComparisonFrom='';qdHistoryComparisonTo='';
+    qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='history-compare-from'){
+    qdHistoryComparisonFrom=event.target.value;
+    qdHistoryProgressRefresh();return;
+  }
+  if(event.target.dataset.qdField==='history-compare-to'){
+    qdHistoryComparisonTo=event.target.value;
+    qdHistoryProgressRefresh();return;
   }
   if(event.target.dataset.qdField==='student-select'){
     const student=qdDoc().students.find(s=>s.id===event.target.value);
