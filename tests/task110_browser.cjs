@@ -60,7 +60,7 @@ const {pathToFileURL}=require('node:url');
    history:qdDoc().history.length
  })),source);
  await page.locator('[data-qd-action="preview-chat"]').click();
- assert.equal(await page.locator('.qd-side-insights').getByText('Ход проверки').count(),1);
+ assert.equal(await page.locator('.qd-side-insights').getByText('Очередь занятия').count(),1);
  assert.equal(await page.locator('.qd-chat-card').count(),8);
  await page.locator('.qd-side-topic').nth(2).click();
  await page.setViewportSize({width:390,height:840});
