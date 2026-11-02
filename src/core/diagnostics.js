@@ -658,7 +658,6 @@ function qdBuilder(){
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
     <div class="qd-builder-shortcuts">
-      <button type="button" data-qd-action="mode" data-mode="library">Открыть библиотеку шаблонов</button>
       <button type="button" data-qd-action="preview-chat">Предпросмотр карточек</button>
     </div>
     ${qdBuilderUtilities(d)}
@@ -824,7 +823,7 @@ function qdRunQuestion(q,number,d){
 }
 function qdListQuestions(d){
   let index=0;
-  return d.sections.map((section,si)=>`<section class="qd-section">
+  return d.sections.map((section,si)=>`<section class="qd-section" data-section="${qdEsc(section.id)}">
     <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2>
       <span>${section.questions.length} вопросов</span></div>
     ${section.questions.map(q=>qdRunQuestion(q,index++,d)).join('')}
@@ -1563,13 +1562,77 @@ function qdRibbonSync(){
   }
 }
 
+
+function qdSidebarTopics(d,mode){
+  return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
+    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+
+    '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
+      const graded=qdScores(section.questions,d.session.marks);
+      const share=graded.total?Math.round(graded.rated/graded.total*100):0;
+      return '<button type="button" class="qd-side-topic" data-qd-action="sidebar-topic" data-sid="'+qdEsc(section.id)+'">'+
+        '<span class="qd-side-topic-title"><b>'+(i+1)+'.</b>'+qdEsc(section.title||'Без названия')+'</span>'+
+        '<span class="qd-side-topic-meta">'+section.questions.length+' заданий'+
+         (mode==='run'?' · '+graded.rated+' оценено':'')+'</span>'+
+        (mode==='run'?'<span class="qd-side-mini-bar"><i style="width:'+share+'%"></i></span>':'')+
+      '</button>';
+    }).join('')+'</div>'+
+    '<p class="qd-side-footnote">Нажмите тему, чтобы перейти к её вопросам.</p></nav>';
+}
+function qdSidebarInsights(d,mode){
+  const all=qdQuestionList(d),s=qdScores(all,d.session.marks);
+  if(mode==='builder'){
+    const issues=qdAudit(d),types=[
+      ['Вопрос',all.filter(q=>q.type==='question').length],
+      ['Практика',all.filter(q=>q.type==='practice').length],
+      ['Тест',all.filter(q=>q.type==='single'||q.type==='multiple').length],
+      ['Число',all.filter(q=>q.type==='numeric').length]
+    ];
+    return '<aside class="qd-side-panel qd-side-insights" aria-label="Структура диагностики">'+
+      '<h2>Состав работы</h2><p class="qd-side-caption">Сводка для преподавателя</p>'+
+      '<div class="qd-side-stat"><span>Разделов</span><strong>'+d.sections.length+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Вопросов</span><strong>'+all.length+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Всего баллов</span><strong>'+s.maxPoints+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Замечаний</span><strong>'+issues.length+'</strong></div>'+
+      '<h3>Типы заданий</h3>'+
+      types.map(([title,num])=>
+        '<div class="qd-side-type"><div><span>'+title+'</span><b>'+num+'</b></div>'+
+        '<span class="qd-side-mini-bar"><i style="width:'+(all.length?Math.round(num/all.length*100):0)+'%"></i></span></div>').join('')+
+      '<p class="qd-side-footnote">Настройки и массовые операции находятся в центре конструктора.</p></aside>';
+  }
+  const pending=s.total-s.rated;
+  return '<aside class="qd-side-panel qd-side-insights" aria-label="Прогресс диагностики">'+
+    '<h2>Ход проверки</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
+    '<div class="qd-side-big-number">'+(s.rated?s.percent+'%':'—')+'</div>'+
+    '<div class="qd-side-mini-bar qd-side-main-bar"><i style="width:'+(s.total?Math.round(s.rated/s.total*100):0)+'%"></i></div>'+
+    '<div class="qd-side-stat"><span>Оценено</span><strong>'+s.rated+' / '+s.total+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Осталось</span><strong>'+pending+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Знает</span><strong>'+s.yes+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Частично</span><strong>'+s.partial+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Не знает</span><strong>'+s.no+'</strong></div>'+
+    '<p class="qd-side-footnote">Результат считается по оценённым вопросам.</p></aside>';
+}
+function qdWorkbench(d,mode,content){
+  return '<div class="qd-workbench">'+
+    qdSidebarTopics(d,mode)+
+    '<main class="qd-workbench-main">'+content+'</main>'+
+    qdSidebarInsights(d,mode)+'</div>';
+}
+function qdScrollToTopic(sid){
+  const root=document.getElementById('qo-diag-root');
+  const target=[...root?.querySelectorAll('[data-section]')||[]].find(el=>el.dataset.section===sid);
+  const scroll=document.getElementById('qo-diag-workspace');
+  if(!target||!scroll)return false;
+  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+  return true;
+}
+
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.classList.toggle('qd-library-root',qdMode==='library');
-  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
+  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdWorkbench(qdDoc(),qdMode,qdMode==='builder'?qdBuilder():qdRun()))+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
@@ -1758,6 +1821,22 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
     status('Изменено вопросов: '+result.count);return;
+  }
+  if(action==='sidebar-topic'){
+    const sid=button.dataset.sid,section=d.sections.find(x=>x.id===sid);
+    if(!section)return;
+    if(qdMode==='builder'){
+      qdCollapsedSections.delete(sid);
+      if(qdSearch||qdFilterKind!=='all'){qdSearch='';qdFilterKind='all';}
+      qdRefresh();qdScrollToTopic(sid);
+      return;
+    }
+    if(qdMode==='run'&&qdDisplay(d).mode==='focus'){
+      const target=qdQuestionList(d).findIndex(q=>q.id===section.questions[0]?.id);
+      if(target>=0){qdSelectQuestion(d,target);qdRevealed.clear();qdStore();qdRefresh();}
+      return;
+    }
+    qdScrollToTopic(sid);return;
   }
   if(action==='variant-download'){
     const result=qdVariantsBuild(d);
