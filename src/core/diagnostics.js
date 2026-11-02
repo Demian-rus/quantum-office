@@ -1138,6 +1138,64 @@ function qdHistoryComparisonCSV(d,studentId,fromId,toId){
 /* TASK115 — a group snapshot from the latest SAVED result for each roster pupil.
    Averages across different exercises are not treated as directly comparable. */
 let qdGroupJournalFilter='all';
+let qdGroupTopicFilter='';
+let qdGroupTopicExpand=false;
+/* TASK116: one contribution per pupil and topic, from that pupil's latest
+   saved assessed entry. Missing or unassessed topics are not marked weak. */
+function qdGroupTopicPlan(snapshot){
+  const byTopic=new Map();
+  for(const row of snapshot.rows){
+    if(!row.last)continue;
+    const pupilTopics=new Map();
+    for(const item of (Array.isArray(row.last.topics)?row.last.topics:[])){
+      if(!item||!Number.isFinite(item.rated)||item.rated<1||
+        !Number.isFinite(item.percent)||item.percent<0||item.percent>100)continue;
+      const name=qdText(item.name,120).trim(),key=qdPromptKey(name);
+      if(!key)continue;
+      const previous=pupilTopics.get(key);
+      if(!previous||item.percent<previous.percent)pupilTopics.set(key,{name,key,percent:item.percent});
+    }
+    for(const item of pupilTopics.values()){
+      if(!byTopic.has(item.key))byTopic.set(item.key,{
+        key:item.key,name:item.name,assessed:0,need:0,studentIds:[],studentNames:[]
+      });
+      const topic=byTopic.get(item.key);
+      topic.assessed++;
+      if(item.percent<60){
+        topic.need++;topic.studentIds.push(row.student.id);
+        topic.studentNames.push(row.student.name);
+      }
+    }
+  }
+  return [...byTopic.values()].filter(x=>x.need>0).sort((a,b)=>
+    b.need-a.need||b.need/b.assessed-a.need/a.assessed||a.name.localeCompare(b.name,'ru'));
+}
+function qdGroupTopicPlanMarkup(plan){
+  if(!plan.length)return '<p class="qd-group-note">По последним оценённым проверкам нет тем ниже 60%.</p>';
+  const shown=qdGroupTopicExpand?plan:plan.slice(0,6);
+  return '<section class="qd-topic-plan" aria-label="Темы для повторения по группе">'+
+    '<div class="qd-topic-plan-head"><div><h4>Темы для повторения</h4>'+
+      '<p>Сколько учеников получили результат ниже 60% по теме в последней сохранённой проверке.</p></div>'+
+      '<button type="button" data-qd-action="group-topics-export">План CSV</button></div>'+
+    '<div class="qd-topic-plan-grid">'+shown.map(t=>
+      '<button type="button" class="qd-topic-plan-card" data-qd-action="group-topic" data-topic="'+
+        qdEsc(t.key)+'" aria-pressed="'+(qdGroupTopicFilter===t.key)+'">'+
+        '<strong>'+qdEsc(t.name)+'</strong><span>'+t.need+' из '+t.assessed+
+          ' учеников с оценкой по теме</span>'+
+        '<span class="qd-topic-plan-meter" aria-hidden="true"><i style="width:'+
+          Math.round(t.need/t.assessed*100)+'%"></i></span></button>').join('')+'</div>'+
+    (plan.length>6?'<button type="button" class="qd-topic-plan-more" data-qd-action="group-topics-expand">'+
+      (qdGroupTopicExpand?'Свернуть список':'Показать ещё '+(plan.length-6)+' тем')+'</button>':'')+
+    '<p class="qd-group-note">Нажмите тему для фильтрации списка учеников; повторное нажатие снимает фильтр. '+
+      'Неоценённые и отсутствующие темы не учитываются. Состав заданий мог различаться.</p></section>';
+}
+function qdGroupTopicPlanCSV(d){
+  const plan=qdGroupTopicPlan(qdGroupSnapshot(d));
+  const rows=[['Тема','Учеников с результатом ниже 60%','Учеников с оценкой по теме',
+    'Ученики для повторения'],...plan.map(t=>[t.name,t.need,t.assessed,t.studentNames.join(', ')])];
+  return '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n');
+}
+
 function qdGroupSnapshot(d){
   const rows=d.students.map(student=>{
     const entries=qdStudentResults(d,student.id)
@@ -1159,11 +1217,14 @@ function qdGroupSnapshot(d){
   return {rows,withResults:rows.filter(r=>!!r.last).length,
     flagged:rows.filter(r=>r.low).length,unassigned};
 }
-function qdGroupVisibleRows(snapshot,filter=qdGroupJournalFilter){
-  return filter==='attention'?snapshot.rows.filter(r=>r.low):snapshot.rows;
+function qdGroupVisibleRows(snapshot,filter=qdGroupJournalFilter,topic=qdGroupTopicFilter){
+  const rows=filter==='attention'?snapshot.rows.filter(r=>r.low):snapshot.rows;
+  return topic?rows.filter(r=>r.topics.some(t=>qdPromptKey(t.name)===topic)):rows;
 }
 function qdGroupJournalMarkup(d){
-  const snapshot=qdGroupSnapshot(d),rows=qdGroupVisibleRows(snapshot);
+  const snapshot=qdGroupSnapshot(d),plan=qdGroupTopicPlan(snapshot);
+  if(qdGroupTopicFilter&&!plan.some(t=>t.key===qdGroupTopicFilter))qdGroupTopicFilter='';
+  const rows=qdGroupVisibleRows(snapshot);
   const delta=r=>r.delta===null?'—':(r.delta>0?'+':'')+r.delta+' п.п.'+
     (r.sameSize?'':' *');
   return '<section class="qd-group-journal" id="qd-group-journal" aria-label="Сводный журнал учеников">'+
@@ -1176,6 +1237,7 @@ function qdGroupJournalMarkup(d){
       '<div><strong>'+snapshot.withResults+'</strong><span>Есть результаты</span></div>'+
       '<div><strong>'+snapshot.flagged+'</strong><span>Обратить внимание</span></div>'+
     '</div>'+
+    qdGroupTopicPlanMarkup(plan)+
     '<div class="qd-group-filters" role="group" aria-label="Фильтр сводного журнала">'+
       '<button type="button" data-qd-action="group-filter" data-filter="all" aria-pressed="'+
         (qdGroupJournalFilter==='all')+'">Все ученики</button>'+
@@ -1201,7 +1263,8 @@ function qdGroupJournalMarkup(d){
         '<td><button type="button" data-qd-action="group-open-student" data-student="'+qdEsc(r.student.id)+
           '">История</button></td></tr>').join(''):
          '<tr><td colspan="5" class="qd-group-empty">'+
-          (qdGroupJournalFilter==='attention'?'По выбранному порогу учеников нет.':
+          (qdGroupTopicFilter?'По выбранной теме нет учеников для повторения.':
+            qdGroupJournalFilter==='attention'?'По выбранному порогу учеников нет.':
             'Добавьте учеников в настройках занятия.')+'</td></tr>')+
       '</tbody></table></div>'+
     (snapshot.unassigned?'<p class="qd-group-note">Проверок без привязанного профиля: '+
@@ -2374,6 +2437,24 @@ function qdOnClick(event){
   if(action==='group-filter'){
     qdGroupJournalFilter=button.dataset.filter==='attention'?'attention':'all';
     qdGroupJournalRefresh();return;
+  }
+  if(action==='group-topic'){
+    const topic=qdText(button.dataset.topic,120);
+    if(!qdGroupTopicPlan(qdGroupSnapshot(d)).some(x=>x.key===topic))return;
+    qdGroupTopicFilter=qdGroupTopicFilter===topic?'':topic;
+    qdGroupJournalRefresh();return;
+  }
+  if(action==='group-topics-expand'){
+    qdGroupTopicExpand=!qdGroupTopicExpand;
+    if(!qdGroupTopicExpand){
+      const shown=qdGroupTopicPlan(qdGroupSnapshot(d)).slice(0,6);
+      if(qdGroupTopicFilter&&!shown.some(t=>t.key===qdGroupTopicFilter))qdGroupTopicFilter='';
+    }
+    qdGroupJournalRefresh();return;
+  }
+  if(action==='group-topics-export'){
+    download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'-темы-группы.csv',
+      qdGroupTopicPlanCSV(d),'text/csv;charset=utf-8');return;
   }
   if(action==='group-open-student'){
     if(!d.students.some(x=>x.id===button.dataset.student))return;
