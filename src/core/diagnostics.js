@@ -425,6 +425,48 @@ function qdBuilderUtilities(d){
     '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
 }
 
+
+function qdBatchToolbar(d){
+  const kinds=[['all','Все задания'],['question','Вопросы'],['practice','Практика'],['single','Один ответ'],
+    ['multiple','Несколько ответов'],['numeric','Числа'],['issues','С замечаниями']];
+  return '<section class="qd-panel qd-manage-bar" aria-label="Поиск и массовое редактирование">'+
+    '<div class="qd-manage-filter"><label>Поиск<input type="search" id="qd-search" maxlength="160" value="'+qdEsc(qdSearch)+'" placeholder="Вопрос, ответ или тема"></label>'+
+    '<label>Фильтр<select id="qd-filter-kind">'+kinds.map(([k,label])=>'<option value="'+k+'" '+(k===qdFilterKind?'selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
+    '<span id="qd-filter-count" aria-live="polite"></span></div>'+
+    '<div class="qd-manage-select"><button type="button" data-qd-action="select-visible">Выбрать найденные</button>'+
+    '<button type="button" data-qd-action="selection-clear">Снять выделение</button>'+
+    '<strong id="qd-selection-count">'+qdSelected.size+' выбрано</strong></div>'+
+    '<div class="qd-batch-editor"><label>Массовое действие<select id="qd-batch-action">'+
+    '<option value="points">Изменить баллы</option><option value="type">Изменить тип</option>'+
+    '<option value="move">Перенести в раздел</option><option value="delete">Удалить вопросы</option></select></label>'+
+    '<div id="qd-batch-inputs">'+qdBatchInputs(d)+'</div>'+
+    '<button type="button" data-qd-action="batch-apply" class="qd-primary">Применить к выбранным</button></div>'+
+    '<p class="qd-hint">Массовое действие затрагивает все выбранные карточки, в том числе скрытые фильтром.</p></section>';
+}
+function qdApplyFilterUI(){
+  if(qdMode!=='builder')return;
+  const root=document.getElementById('qo-diag-root'),d=qdDoc();
+  if(!root)return;
+  const visible=new Set(qdMatchingQuestions(d).map(q=>q.id)),active=!!qdSearch.trim()||qdFilterKind!=='all';
+  for(const section of root.querySelectorAll('.qd-editor-section')){
+    let shown=0;
+    for(const card of section.querySelectorAll('.qd-edit-card')){
+      const show=visible.has(card.dataset.qid);
+      card.hidden=!show;card.classList.toggle('qd-selected',qdSelected.has(card.dataset.qid));
+      if(show)shown++;
+    }
+    section.hidden=!shown&&(active||!!section.querySelector('.qd-edit-card'));
+  }
+  const count=root.querySelector('#qd-filter-count');
+  if(count)count.textContent='Найдено '+visible.size+' из '+qdQuestionList(d).length;
+  const countSelected=root.querySelector('#qd-selection-count');
+  if(countSelected)countSelected.textContent=qdSelected.size+' выбрано';
+  const empty=root.querySelector('#qd-no-matches');
+  if(empty)empty.hidden=visible.size>0||!active;
+  for(const button of root.querySelectorAll('[data-qd-action="batch-apply"],[data-qd-action="selection-clear"]'))
+    button.disabled=!qdSelected.size;
+}
+
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
@@ -446,6 +488,8 @@ function qdBuilder(){
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
     ${qdBuilderUtilities(d)}
+    ${qdBatchToolbar(d)}
+    <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
         <span class="qd-index">${si+1}</span>
@@ -460,6 +504,8 @@ function qdBuilder(){
       ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card ${qdCompact&&!qdCardExpanded.has(q.id)?'is-compact':''}" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
           <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
+          <input type="checkbox" class="qd-select-card" data-qd-select data-qid="${qdEsc(q.id)}"
+              aria-label="Выбрать вопрос ${qi+1}" ${qdSelected.has(q.id)?'checked':''}>
           <span class="qd-counter">Вопрос ${qi+1}</span>
            <span class="qd-card-preview" title="${qdEsc(q.prompt)}">${qdEsc(q.prompt||'Новый вопрос')}</span>
            ${qdCompact?`<button type="button" data-qd-action="card-expand" data-qid="${qdEsc(q.id)}">${qdCardExpanded.has(q.id)?'Свернуть':'Редактировать'}</button>`:''}
@@ -885,6 +931,8 @@ function qdRefresh(){
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
   if(scroll)scroll.scrollTop=top;
+  qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
+  qdApplyFilterUI();
 }
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
