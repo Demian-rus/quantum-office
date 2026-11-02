@@ -657,9 +657,6 @@ function qdBuilder(){
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
-    <div class="qd-builder-shortcuts">
-      <button type="button" data-qd-action="preview-chat">Предпросмотр карточек</button>
-    </div>
     ${qdBuilderUtilities(d)}
     ${qdBatchToolbar(d)}
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
