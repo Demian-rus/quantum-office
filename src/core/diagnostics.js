@@ -222,21 +222,35 @@ function qdBuilder(){
     </div>
   </div>`;
 }
+function qdDateLabel(value){
+  const date=new Date(value||'');return Number.isFinite(date.getTime())?date.toLocaleString('ru-RU'):'Дата неизвестна';
+}
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
+  const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
+  const profile=d.students.find(x=>x.id===qdStudentFilter);
+  const scores=history.map(h=>h.summary||qdScores(all,h.marks)).filter(x=>x.rated);
+  const average=scores.length?Math.round(scores.reduce((n,x)=>n+x.percent,0)/scores.length):null;
   return `<div class="qd-session">
-    <div class="qd-panel qd-session-panel"><label>Ученик (необязательно)
-    <input type="text" data-qd-field="student" maxlength="100" value="${qdEsc(d.session.student)}" placeholder="Имя или код ученика"></label>
-    <div class="qd-row qd-wrap">
-      <button type="button" data-qd-action="reset">Начать заново</button>
-      <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
-    </div></div>
+    <div class="qd-panel qd-session-panel">
+      <div class="qd-student-chooser">
+        <label>Из списка учеников<select data-qd-field="student-select" aria-label="Выбрать ученика">
+        <option value="">Без привязки к профилю</option>${d.students.map(student=>`<option value="${qdEsc(student.id)}" ${student.id===d.session.studentId?'selected':''}>${qdEsc(student.name)}</option>`).join('')}</select></label>
+        <label>Ученик<input type="text" data-qd-field="student" maxlength="100" value="${qdEsc(d.session.student)}" placeholder="Имя или код ученика"></label>
+        <button data-qd-action="remember-student" type="button" title="Создать профиль из введённого имени">+ В список</button>
+      </div>
+      <div class="qd-row qd-wrap">
+        <button type="button" data-qd-action="reset">Начать заново</button>
+        <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
+      </div>
+    </div>
     ${d.sections.map((section,si)=>`<section class="qd-section">
       <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2><span>${section.questions.length} вопросов</span></div>
       ${section.questions.map((q,qi)=>{
         const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id);
         return `<article class="qd-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
-         <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div><span class="qd-type">${q.type==='practice'?'Практика':'Вопрос'}</span>
+         <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div>
+         <span class="qd-type">${q.type==='practice'?'Практика':'Вопрос'} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
          <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p></div></div>
          <div class="qd-card-actions">
            <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}" aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
@@ -261,16 +275,30 @@ function qdRun(){
         <span class="qd-progress-partial" style="width:${s.total?s.partial/s.total*100:0}%"></span>
         <span class="qd-progress-bad" style="width:${s.total?s.no/s.total*100:0}%"></span>
       </div>
-      <p class="qd-percent">${s.rated?`Результат: <strong>${s.percent}%</strong> из проверенных вопросов (2 балла — знает, 1 — частично, 0 — не знает).`:'Начните отмечать ответы, чтобы увидеть результат.'}</p>
+      <p class="qd-percent">${s.rated?`Результат: <strong>${s.percent}%</strong> · ${s.earned} из ${s.possible} доступных баллов за проверенные вопросы.`:'Начните отмечать ответы, чтобы увидеть результат.'}</p>
       <div class="qd-topic-results">${d.sections.map(section=>{
         const st=qdScores(section.questions,d.session.marks);
-        return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'}</span></div>`;
+        return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'} · ${st.earned}/${st.possible} б.</span></div>`;
       }).join('')}</div>
     </section>
-    <section class="qd-panel qd-history"><div class="qd-row qd-wrap"><h2>История результатов</h2>
-      <button type="button" data-qd-action="csv" ${!d.history.length?'disabled':''}>Экспорт CSV</button></div>
-      ${d.history.length?`<div class="qd-history-list">${[...d.history].reverse().map(h=>{const hs=h.summary||qdScores(all,h.marks);return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(h.date?new Date(h.date).toLocaleString('ru-RU'):'Дата неизвестна')}</small></span>
-        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено</span></div>`;}).join('')}</div>`:'<p>Сохранённые занятия появятся здесь после завершения диагностики.</p>'}
+    <section class="qd-panel qd-history">
+      <div class="qd-row qd-wrap"><h2>Журнал результатов</h2>
+        <button type="button" data-qd-action="csv" ${!d.history.length?'disabled':''}>Экспорт CSV</button>
+      </div>
+      <label class="qd-filter-label">Показать результаты
+        <select data-qd-field="history-filter"><option value="">Все ученики</option>
+        ${d.students.map(student=>`<option value="${qdEsc(student.id)}" ${qdStudentFilter===student.id?'selected':''}>${qdEsc(student.name)}</option>`).join('')}
+        </select>
+      </label>
+      ${profile?`<div class="qd-profile-insight"><strong>${qdEsc(profile.name)}</strong>
+         <span>Занятий: ${history.length}</span>
+         <span>Средний результат: ${average===null?'—':average+'%'}</span>
+         <span>Последний результат: ${scores.length?scores.at(-1).percent+'%':'—'}</span></div>`:''}
+      ${history.length?`<div class="qd-history-list">${[...history].reverse().map(h=>{
+        const hs=h.summary||qdScores(all,h.marks);
+        return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
+        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span></div>`;
+      }).join('')}</div>`:'<p>Результатов пока нет.</p>'}
     </section></div>`;
 }
 function qdExport(){
