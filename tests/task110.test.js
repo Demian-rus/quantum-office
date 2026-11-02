@@ -61,7 +61,7 @@ test('TASK110 useful topic navigation and stats appear without copying the toolb
  const h=setup(),d=h.qdDoc();h.qdSample();
  const left=h.qdSidebarTopics(d,'builder'),right=h.qdSidebarInsights(d,'builder');
  assert.match(left,/qd-side-topic/);assert.match(left,/toggle-all-sections/);
- assert.match(right,/Состав работы/);assert.match(right,/Типы заданий/);
+ assert.match(right,/Проверка заданий/);assert.match(right,/Типы заданий/);
  assert.ok(!left.includes('writer-diag-library'));
  assert.ok(!right.includes('data-qd-action="mode"'));
  const html=h.qdWorkbench(d,'builder','<div>Центральная область</div>');
