@@ -492,6 +492,10 @@ function qdBuilder(){
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
+    <div class="qd-builder-shortcuts">
+      <button type="button" data-qd-action="mode" data-mode="library">Открыть библиотеку шаблонов</button>
+      <button type="button" data-qd-action="preview-chat">Предпросмотр карточек</button>
+    </div>
     ${qdBuilderUtilities(d)}
     ${qdBatchToolbar(d)}
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
@@ -569,6 +573,7 @@ function qdBuilder(){
     </section>
     <div class="qd-panel qd-bottom-actions">
       <button data-qd-action="add-section" type="button">+ Новый раздел</button>
+      <button type="button" data-qd-action="preview-chat">Просмотреть карточки как в чате</button>
       <button data-qd-action="mode" data-mode="run" class="qd-primary" type="button">Перейти к проведению</button>
     </div>
   </div>`;
@@ -627,28 +632,26 @@ function qdAdvance(d){
 }
 function qdRunQuestion(q,number,d){
   const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
-  return `<article class="qd-card qd-run-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
-    <div class="qd-question"><span class="qd-counter">${number+1}.</span><div>
-      <span class="qd-type">${qdTypeTitle(q.type)} · ${points} ${points===1?'балл':points<=4?'балла':'баллов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
-      <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p>
-    </div></div>
-    ${qdAutoInput(q,d.session.responses[q.id])}
-    <div class="qd-card-actions">
-      ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
-      <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}"
-       aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
-      <div class="qd-rating" role="group" aria-label="Оценка ответа">
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes"
-          aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial"
-          aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
-        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no"
-          aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
-      </div>
-    </div>
-    ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
-    ${mark?`<p class="qd-card-assessed" role="status">${mark==='yes'?'Ответ зачтён':mark==='partial'?'Частично зачтён':'Ответ не зачтён'}</p>`:''}
-  </article>`;
+  const markButton=(state,title)=>'<button type="button" data-qd-action="mark" data-qid="'+qdEsc(q.id)+
+    '" data-mark="'+state+'" aria-pressed="'+(mark===state)+'" class="'+(mark===state?'selected':'')+
+    '">'+title+'</button>';
+  return '<article class="qd-card qd-run-card qd-chat-card '+(mark?'qd-mark-'+mark:'')+'" data-qid="'+qdEsc(q.id)+'">'+
+    '<div class="qd-chat-head"><div class="qd-question"><span class="qd-counter">'+(number+1)+'.</span><div>'+
+      '<span class="qd-type">'+qdEsc(qdTypeTitle(q.type))+' · '+points+' '+(points===1?'балл':points<5?'балла':'баллов')+'</span>'+
+      '<p>'+qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')+'</p></div></div>'+
+      '<div class="qd-rating qd-chat-rating" role="group" aria-label="Оценка ответа">'+
+        markButton('yes','✓ Знает')+markButton('no','× Не знает')+
+        markButton('partial','◐ Частично')+'</div></div>'+
+    qdAutoInput(q,d.session.responses[q.id])+
+    '<div class="qd-card-actions qd-chat-actions">'+
+      '<button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="'+qdEsc(q.id)+
+        '" aria-expanded="'+visible+'">'+(visible?'◉ Скрыть ответ':'◎ Показать ответ')+'</button>'+
+      (qdAuto(q.type)?'<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="'+qdEsc(q.id)+
+        '">Проверить автоматически</button>':'')+
+    '</div>'+
+    (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p></div>':'')+
+    (mark?'<p class="qd-card-assessed" role="status">'+(mark==='yes'?'Знает':mark==='partial'?'Частично':'Не знает')+'</p>':'')+
+  '</article>';
 }
 function qdListQuestions(d){
   let index=0;
@@ -1216,6 +1219,30 @@ function qdOnClick(event){
     qdRevealed.clear();qdRefresh();return;
   }
 
+  if(action==='preview-chat'){
+    qdDisplay(d).mode='list';qdMode='run';qoWriter.diagnosticMode='run';
+    qdRevealed.clear();qdStore();qdRefresh();return;
+  }
+  if(action==='library-open'){
+    const id=button.dataset.template,source=button.dataset.source;
+    if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
+    if(!qdLibraryLoad(d,id,source)){status('Шаблон не найден',true);return;}
+    qdMode='run';qoWriter.diagnosticMode='run';qdStore();qdRefresh();status('Шаблон открыт');return;
+  }
+  if(action==='library-save'){
+    const subject=document.getElementById('qd-library-save-subject')?.value||'other';
+    const grade=document.getElementById('qd-library-save-grade')?.value||'';
+    const purpose=document.getElementById('qd-library-save-purpose')?.value||'diagnostic';
+    const result=qdLibrarySaveCurrent(d,subject,grade,purpose);
+    if(!result.ok){status(result.message,true);return;}
+    qdRefresh();status('Шаблон сохранён в библиотеку на этом устройстве');return;
+  }
+  if(action==='library-delete'){
+    if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
+    if(qdLibraryDelete(button.dataset.template)){qdRefresh();status('Шаблон удалён');}
+    else status('Не удалось удалить шаблон',true);
+    return;
+  }
   if(action==='review-jump'){
     const index=qdQuestionList(d).findIndex(q=>q.id===button.dataset.qid);
     if(index<0)return;
@@ -1476,6 +1503,9 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-library-search'){
+    qdLibraryQuery=event.target.value.slice(0,120);qdLibraryRefreshCards();return;
+  }
   if(event.target.id==='qd-search'){
     qdSearch=event.target.value.slice(0,160);qdApplyFilterUI();return;
   }
@@ -1522,6 +1552,12 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(['qd-library-subject','qd-library-grade','qd-library-purpose'].includes(event.target.id)){
+    if(event.target.id==='qd-library-subject')qdLibrarySubject=event.target.value;
+    if(event.target.id==='qd-library-grade')qdLibraryGrade=event.target.value;
+    if(event.target.id==='qd-library-purpose')qdLibraryPurpose=event.target.value;
+    qdLibraryRefreshCards();return;
+  }
   if(event.target.matches?.('[data-qd-select]')){
     const id=event.target.dataset.qid;
     if(event.target.checked)qdSelected.add(id);
