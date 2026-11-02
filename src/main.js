@@ -882,6 +882,7 @@ function qoWorkSwitchTab(kind,tab){
  qoWorkspaceTab[kind]=tab;
  document.querySelectorAll(`[data-editor-panel="${kind}"]`).forEach(el=>{const on=el.dataset.panelTab===tab;el.hidden=!on;el.classList.toggle('active',on);});
  document.querySelectorAll(`.qo-work-tabs [data-editor="${kind}"]`).forEach(el=>{const on=el.dataset.tab===tab;el.classList.toggle('active',on);el.setAttribute('aria-selected',String(on));});
+ if(kind==='writer')qoDiagnosticVisibility();
 }
 function qoWriterStats(){const doc=document.getElementById('qo-writer-page'),out=document.getElementById('qo-writer-stats');if(!doc||!out)return;const value=doc.innerText.trim();out.textContent=`Слов: ${(value.match(/\S+/g)||[]).length} · Знаков: ${value.length}`;}
 function qoWriterPage(){
@@ -910,14 +911,16 @@ function qoWriterPage(){
  const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
  return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
  <div class="qo-office-toolbar">
- ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['file','Файл']])}
+ ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['file','Файл'],['diagnostic','Диагностика']])}
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
  ${qoWorkPanel('writer','home',main+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','file',files+exporttools)}
+ ${qoWorkPanel('writer','diagnostic',qoWorkGroup('Интерактивная диагностика','<span class="qo-work-text">Создавайте вопросы, проводите занятие и сохраняйте результаты.</span>'))}
  </div></div>
- <section class="qo-editor-scroll"><div class="qo-writer-pagewrap"><article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
+ <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap"><article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
+ <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section>
  <input type="file" id="qo-writer-file" accept=".qdoc,.txt,.html,text/plain,text/html,application/json" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
  <footer class="qo-editor-foot qo-office-footer"><span>A4 · ${f.margin} мм · ${esc(f.font)}</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / HTML / TXT</span></footer></main>`;
 }
@@ -989,7 +992,7 @@ function qoWriterExport(format){
   clone.querySelectorAll('[data-qo-break]').forEach(el=>el.replaceWith(document.createTextNode('\\n\\n--- Разрыв страницы ---\\n\\n')));
   download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
  }else if(format==='qdoc'){
-  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),updated:Date.now()},null,2),'application/json;charset=utf-8');
+  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdDoc(),updated:Date.now()},null,2),'application/json;charset=utf-8');
  }else download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
 }
 function qoWriterPrint(){
@@ -2069,7 +2072,7 @@ function render(){
  }
  app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():page==='writer'?qoWriterPage():page==='slides'?qoSlidesPage():page==='photo'?qoPhotoPage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  // Keep the filter dialog inside the scrollable worksheet frame, below the ribbon.
- if(page==='writer')qoWriterStats();
+ if(page==='writer'){qoWriterStats();qoDiagnosticMount();}
  if(page==='photo'){qoPhotoRender();const stage=document.getElementById('qs-stage');if(stage&&stageScroll){stage.scrollLeft=stageScroll[0];stage.scrollTop=stageScroll[1];}}
  document.title='Quantum Office — '+({writer:'Тексты',slides:'Презентации',photo:'Фото',sheet:'Таблицы',home:'Обзор',templates:'Шаблоны'}[page]||'Офис');
  const filterDialog=app.querySelector('.qo-filter-popup'),frame=app.querySelector('#grid-frame');
@@ -2627,7 +2630,7 @@ app.addEventListener('change',async e=>{const t=e.target;
    const raw=await file.text(),kind=file.name.toLowerCase();
    if(kind.endsWith('.qdoc')){
     const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
-    qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,updated:Date.now()};
+    qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,updated:Date.now()};
    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
   }catch(error){status('Не удалось открыть документ: неверный формат или повреждённые данные',true);}return;
