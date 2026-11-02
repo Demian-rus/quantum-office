@@ -50,7 +50,7 @@ const {pathToFileURL}=require('node:url');
  const dl=await pending,dest=path.join(root,'task105-test.qdiag');await dl.saveAs(dest);
  const data=JSON.parse(fs.readFileSync(dest,'utf8'));
  assert.equal(data.sections.flatMap(s=>s.questions).length,7);
- assert.equal(data.sections[0].questions.filter(q=>q.points===5).length,2);
+ assert.equal(data.sections[0].questions.filter(q=>q.points===5).length,1); // The other 5-point question was deliberately deleted.
  fs.rmSync(dest,{force:true});
  assert.deepEqual(errors,[]);
  console.log('PASS TASK105: live filtering, select visible, batch points/move/type/delete, reload and QDIAG');
