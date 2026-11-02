@@ -358,7 +358,7 @@ function qdMatchingQuestions(d,search=qdSearch,kind=qdFilterKind){
   for(const section of d.sections)for(const q of section.questions){
     if(problem&&!problem.has(q.id))continue;
     if(kind!=='all'&&kind!=='issues'&&q.type!==kind)continue;
-    if(needle&&!qdPromptKey(section.title+' '+q.prompt+' '+q.answer).includes(needle))continue;
+    if(needle&&!qdText(section.title+' '+q.prompt+' '+q.answer,6100).replace(/\s+/g,' ').trim().toLocaleLowerCase('ru-RU').includes(needle))continue;
     result.push(q);
   }
   return result;
@@ -927,6 +927,7 @@ function qdSample(){
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
@@ -934,7 +935,6 @@ function qdRefresh(){
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden></div>`;
   if(scroll)scroll.scrollTop=top;
-  qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   qdApplyFilterUI();
 }
 function qoDiagnosticVisibility(){
