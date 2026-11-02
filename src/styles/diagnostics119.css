@@ -1,0 +1,107 @@
+/* TASK119. Compact cards may never dictate the width of the central work area. */
+#qo-diag-root .qd-workbench{
+  grid-template-columns:clamp(205px,12.5vw,250px) minmax(0,1fr) clamp(290px,20vw,355px);
+  gap:clamp(16px,1.65vw,30px);
+  justify-content:stretch;
+}
+#qo-diag-root .qd-workbench>.qd-workbench-main{max-width:none;min-width:0;width:100%}
+#qo-diag-root .qd-workbench>.qd-side-insights{min-width:0;max-width:none}
+#qo-diag-root .qd-editor,#qo-diag-root .qd-editor-section,
+#qo-diag-root .qd-question-list,#qo-diag-root .qd-edit-card{min-width:0;max-width:100%}
+#qo-diag-root .qd-edit-card.is-compact{
+  width:100%;min-width:0;max-width:100%;
+  overflow:hidden; /* protect against long text inside intrinsic widgets */
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head{
+  display:grid;
+  grid-template-columns:22px 19px max-content minmax(0,1fr) max-content 108px 28px 28px max-content 28px;
+  gap:6px;
+  align-items:center;
+  width:100%;min-width:0;max-width:100%;
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head>*{
+  min-width:0;max-width:100%;
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head .qd-card-preview{
+  min-width:0;width:100%;max-width:100%;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;grid-column:4;
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head select{
+  box-sizing:border-box;width:108px;min-width:0;max-width:108px;margin-left:0;
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head button{
+  min-width:0;max-width:100%;padding:6px 7px;white-space:nowrap;
+}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head .qd-counter{white-space:nowrap}
+/* If the center becomes narrower, keep a compact two-row card instead of
+   pushing the editor buttons outside the panel. */
+@media(max-width:1510px){
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head{
+    grid-template-columns:22px 20px minmax(67px,auto) minmax(0,1fr) auto auto auto auto;
+    grid-template-rows:28px 30px;
+    row-gap:6px;
+  }
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(1){grid-row:1;grid-column:1}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(2){grid-row:1;grid-column:2}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(3){grid-row:1;grid-column:3}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(4){grid-row:1;grid-column:4 / 8}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(5){grid-row:1;grid-column:8}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(6){grid-row:2;grid-column:3 / 5;justify-self:start}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(7){grid-row:2;grid-column:5}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(8){grid-row:2;grid-column:6}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(9){grid-row:2;grid-column:7}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(10){grid-row:2;grid-column:8}
+}
+@media(max-width:1330px) and (min-width:901px){
+  #qo-diag-root .qd-workbench{
+    grid-template-columns:minmax(182px,225px) minmax(0,1fr);
+    gap:16px 22px;
+  }
+  #qo-diag-root .qd-workbench>.qd-side-insights{grid-column:1;grid-row:2}
+  #qo-diag-root .qd-workbench>.qd-workbench-main{grid-column:2;grid-row:1 / span 2}
+}
+@media(max-width:900px){
+  #qo-diag-root .qd-workbench{display:flex;flex-direction:column;gap:12px}
+  #qo-diag-root .qd-workbench>.qd-workbench-main,
+  #qo-diag-root .qd-workbench>.qd-side-insights{width:100%;max-width:none}
+}
+@media(max-width:650px){
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head{
+    grid-template-columns:22px 20px 60px minmax(0,1fr) auto auto auto auto;
+    gap:4px;
+  }
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(4){grid-column:4 / 9}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(5){grid-row:2;grid-column:3 / 5;justify-self:start}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(6){grid-row:3;grid-column:3 / 5}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(7){grid-row:3;grid-column:5}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(8){grid-row:3;grid-column:6}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(9){grid-row:3;grid-column:7}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(10){grid-row:3;grid-column:8}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head{grid-template-rows:28px 30px 30px}
+}
+#qo-diag-root .qd-builder-save{display:grid;gap:13px}
+#qo-diag-root .qd-builder-save-head{
+  display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px
+}
+#qo-diag-root .qd-builder-save-head h2{font-size:16px}
+#qo-diag-root .qd-builder-save-head p{font-size:12px;color:var(--qo-muted);line-height:1.45;margin-top:4px}
+#qo-diag-root .qd-builder-save-head>span{
+  font-size:11px;font-weight:700;color:var(--qo-muted);white-space:nowrap
+}
+#qo-diag-root .qd-builder-save-fields{
+  display:grid;grid-template-columns:minmax(110px,1fr) 95px minmax(140px,1fr) minmax(190px,1.5fr);
+  gap:9px;align-items:end;
+}
+#qo-diag-root .qd-builder-save-fields>label{min-width:0}
+#qo-diag-root .qd-builder-save-fields select,
+#qo-diag-root .qd-builder-save-fields input{height:36px;min-height:36px;min-width:0;max-width:100%}
+#qo-diag-root .qd-builder-save-actions{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#qo-diag-root .qd-builder-save-actions button{min-height:36px}
+#qo-diag-root .qd-builder-save>.qd-hint{margin:0;font-size:11px;line-height:1.5}
+@media(max-width:1050px){
+ #qo-diag-root .qd-builder-save-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:570px){
+ #qo-diag-root .qd-builder-save-fields{grid-template-columns:1fr}
+ #qo-diag-root .qd-builder-save-actions button{flex:1 1 100%;text-align:center}
+}
