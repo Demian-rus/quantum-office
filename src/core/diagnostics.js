@@ -414,7 +414,7 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.students=[];d.session={student:'',studentId:'',marks:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
+  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
 }
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
@@ -489,6 +489,23 @@ function qdOnClick(event){
     if(qdStudentFilter===student.id)qdStudentFilter='';
     qdStore();qdRefresh();return;
   }
+  if(action==='add-choice'||action==='remove-choice'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===button.dataset.qid);
+    if(!q||!['single','multiple'].includes(q.type))return;
+    const choices=qdChoices(q.choices),i=Number(button.dataset.index);
+    if(action==='add-choice'&&choices.length<6)choices.push({text:'',correct:false});
+    else if(action==='remove-choice'&&choices.length>2&&Number.isInteger(i)&&i>=0&&i<choices.length)choices.splice(i,1);
+    else return;
+    q.choices=choices;delete d.session.marks[q.id];delete d.session.responses[q.id];
+    qdStore();qdRefresh();return;
+  }
+  if(action==='auto-check'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===button.dataset.qid);
+    if(!q||!qdAuto(q.type))return;
+    const grade=qdCheckAnswer(q,d.session.responses[q.id]);
+    if(grade===null){status('Выберите ответ или проверьте настройку правильного ответа',true);return;}
+    d.session.marks[q.id]=grade;qdStore();qdRefresh();return;
+  }
   if(action==='add-section'){
     if(d.sections.length>=QD_LIMITS.sections){status('Максимум 24 раздела',true);return;}
     d.sections.push({id:qdNewId(),title:`Раздел ${d.sections.length+1}`,questions:[]});qdStore();qdRefresh();return;
@@ -496,7 +513,7 @@ function qdOnClick(event){
   if(action==='delete-section'){
     if(!confirm('Удалить раздел и все его вопросы?'))return;
     const old=d.sections.find(x=>x.id===button.dataset.sid);
-    if(old)old.questions.forEach(q=>{delete d.session.marks[q.id];qdRevealed.delete(q.id);});
+    if(old)old.questions.forEach(q=>{delete d.session.marks[q.id];delete d.session.responses[q.id];qdRevealed.delete(q.id);});
     d.sections=d.sections.filter(x=>x.id!==button.dataset.sid);qdStore();qdRefresh();return;
   }
   if(action==='add-question'){
@@ -507,7 +524,7 @@ function qdOnClick(event){
   if(action==='delete-question'){
     const section=d.sections.find(x=>x.id===button.dataset.sid);if(!section)return;
     section.questions=section.questions.filter(q=>q.id!==button.dataset.qid);
-    delete d.session.marks[button.dataset.qid];qdRevealed.delete(button.dataset.qid);
+    delete d.session.marks[button.dataset.qid];delete d.session.responses[button.dataset.qid];qdRevealed.delete(button.dataset.qid);
     qdStore();qdRefresh();return;
   }
   if(action==='mark'){
@@ -522,15 +539,15 @@ function qdOnClick(event){
   }
   if(action==='reset'){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
-    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();return;
   }
   if(action==='save-result'){
     const stats=qdScores(qdQuestionList(d),d.session.marks);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
-      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},summary:stats});
+      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats});
     d.history=d.history.slice(-QD_LIMITS.history);
-    d.session={student:'',studentId:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
   }
 }
@@ -590,11 +607,49 @@ function qdOnInput(event){
   }else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
     if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig)orig[field]=qdText(value,field==='answer'?3500:1600);}
+  }else if(field==='choice-text'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    const i=Number(event.target.dataset.index);
+    if(!q||!q.choices?.[i])return;
+    q.choices[i].text=qdText(value,240);delete d.session.marks[q.id];
+  }else if(field==='numericAnswer'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.numericAnswer=qdText(value,60);delete d.session.marks[q.id];
+  }else if(field==='numeric-response'){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q||q.type!=='numeric')return;
+    d.session.responses[q.id]={value:qdText(value,80)};delete d.session.marks[q.id];
   }else if(field==='student-name')return;
   else return;
   qdStore();
 }
 function qdOnChange(event){
+  if(event.target.dataset.qdField==='choice-correct'){
+    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid),i=Number(event.target.dataset.index);
+    if(!q||!['single','multiple'].includes(q.type)||!q.choices?.[i])return;
+    if(q.type==='single')q.choices.forEach((c,j)=>c.correct=i===j);
+    else q.choices[i].correct=event.target.checked;
+    delete qdDoc().session.marks[q.id];qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='tolerance'){
+    const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q)return;
+    q.tolerance=qdTolerance(Number(event.target.value));delete qdDoc().session.marks[q.id];
+    qdStore();qdRefresh();return;
+  }
+  if(event.target.dataset.qdField==='auto-selection'){
+    const d=qdDoc(),q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
+    if(!q||!['single','multiple'].includes(q.type))return;
+    const i=Number(event.target.dataset.index);
+    let selected=qdNormalizeResponse(q,d.session.responses[q.id]).selected;
+    if(i<0||i>=q.choices.length)return;
+    if(q.type==='single')selected=[i];
+    else if(event.target.checked)selected=[...new Set([...selected,i])];
+    else selected=selected.filter(x=>x!==i);
+    d.session.responses[q.id]={selected};delete d.session.marks[q.id];
+    qdStore();return;
+  }
   if(event.target.dataset.qdField==='history-filter'){
     qdStudentFilter=event.target.value;qdRefresh();return;
   }
