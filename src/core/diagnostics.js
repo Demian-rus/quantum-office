@@ -83,7 +83,11 @@ function qdNormalize(raw){
       }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
         student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
-        title:qdText(h.title,120),marks,summary};
+        title:qdText(h.title,120),marks,summary,
+        topics:Array.isArray(h.topics)?h.topics.slice(0,QD_LIMITS.sections).filter(t=>t&&typeof t==='object')
+          .map(t=>({name:qdText(t.name,120),rated:Number.isInteger(t.rated)&&t.rated>=0&&t.rated<=240?t.rated:0,
+            total:Number.isInteger(t.total)&&t.total>=0&&t.total<=240?t.total:0,
+            percent:Number.isInteger(t.percent)&&t.percent>=0&&t.percent<=100?t.percent:0})):null};
     });
   }
   return data;
@@ -220,6 +224,7 @@ function qdBuilder(){
       <div class="qd-row qd-wrap qd-builder-tools">
         <span class="qd-count-pill">${count} / ${QD_LIMITS.questions} заданий · ${d.sections.length} разделов</span>
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
+        <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
         <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
@@ -387,6 +392,7 @@ function qdRun(){
         const st=qdScores(section.questions,d.session.marks);
         return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'} · ${st.earned}/${st.possible} б.</span></div>`;
       }).join('')}</div>
+      <div class="qd-report-action"><button type="button" data-qd-action="report-current" ${!s.rated?'disabled':''}>Скачать отчёт HTML / PDF через печать</button></div>
     </section>
     <section class="qd-panel qd-history">
       <div class="qd-row qd-wrap"><h2>Журнал результатов</h2>
@@ -404,10 +410,44 @@ function qdRun(){
       ${history.length?`<div class="qd-history-list">${[...history].reverse().map(h=>{
         const hs=h.summary||qdScores(all,h.marks);
         return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
-        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span></div>`;
+        <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span><button type="button" data-qd-action="report-saved" data-hid="${qdEsc(h.id)}">Отчёт</button></div>`;
       }).join('')}</div>`:'<p>Результатов пока нет.</p>'}
     </section></div>`;
 }
+function qdTopicSnapshot(doc,marks){
+  return doc.sections.map(section=>{
+    const s=qdScores(section.questions,marks);
+    return {name:section.title,rated:s.rated,total:s.total,percent:s.percent};
+  });
+}
+function qdReportHTML(entry){
+  const doc=qdDoc(),all=qdQuestionList(doc),current=entry===undefined;
+  const marks=current?doc.session.marks:entry.marks;
+  const s=current?qdScores(all,marks):entry.summary||qdScores(all,marks);
+  const topics=current?qdTopicSnapshot(doc,marks):entry.topics||qdTopicSnapshot(doc,marks);
+  const pupil=qdEsc(current?doc.session.student:(entry.student||''))||'Не указан';
+  const stamp=qdEsc(current?new Date().toLocaleString('ru-RU'):qdDateLabel(entry.date));
+  const title=qdEsc(current?doc.title:(entry.title||doc.title));
+  const rows=topics.map(t=>'<tr><td>'+qdEsc(t.name)+'</td><td>'+t.rated+' / '+t.total+'</td><td>'+t.percent+'%</td></tr>').join('');
+  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Отчёт · '+title+'</title>'+
+   '<style>@page{size:A4;margin:20mm}body{font:15px/1.5 Arial,sans-serif;color:#192d27;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
+   '.muted{color:#60746a}.score{display:flex;align-items:baseline;gap:14px;padding:20px;background:#f0f7f3;border-radius:12px}.score strong{font-size:36px;color:#1c684a}'+
+   'table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #cbd9d1}th{background:#eaf2ed}'+
+   '@media print{body{margin:0;padding:0}.score{print-color-adjust:exact}}'+'</style></head><body>'+
+   '<p class="muted">QUANTUM WRITER · ОТЧЁТ ДИАГНОСТИКИ</p><h1>'+title+'</h1>'+
+   '<p><b>Ученик:</b> '+pupil+'<br><b>Дата:</b> '+stamp+'</p>'+
+   '<div class="score"><strong>'+s.percent+'%</strong><span>Проверено '+s.rated+' из '+s.total+' заданий</span></div>'+
+   '<p>Знает: '+s.yes+' · Частично: '+s.partial+' · Не знает: '+s.no+'</p>'+
+   (Number.isFinite(s.earned)&&Number.isFinite(s.possible)?'<p><b>Баллы:</b> '+s.earned+' из '+s.possible+'</p>':'')+
+   '<h2>Результаты по разделам</h2><table><thead><tr><th>Раздел</th><th>Проверено</th><th>Результат</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+   '<p class="muted">Процент рассчитан только по проверенным заданиям. Для сохранения PDF откройте этот файл и выберите «Печать → Сохранить как PDF».</p>'+
+   '</body></html>';
+}
+function qdExportReport(entry){
+  const doc=qdDoc(),stamp=new Date().toISOString().slice(0,10);
+  download(safeFile(doc.title)+'-отчёт-'+stamp+'.html',qdReportHTML(entry),'text/html;charset=utf-8');
+}
+
 function qdExport(){
   const d=qdDoc();
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'.qdiag',
@@ -484,6 +524,22 @@ function qdOnClick(event){
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
+  if(action==='sample-auto'){
+    if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
+      status('Превышен лимит разделов или заданий',true);return;
+    }
+    d.sections.push({id:qdNewId(),title:'Автопроверка · пример',questions:[
+      {id:qdNewId(),type:'single',prompt:'Каким способом тепло Солнца достигает Земли через вакуум?',
+        answer:'В вакууме передача энергии происходит электромагнитным излучением.',
+        choices:[{text:'Теплопроводность',correct:false},{text:'Конвекция',correct:false},
+          {text:'Излучение',correct:true},{text:'Диффузия',correct:false}],
+        numericAnswer:'',tolerance:0,points:2,partialCredit:50},
+      {id:qdNewId(),type:'numeric',prompt:'Сколько килоджоулей нужно для нагрева 2 кг воды на 10 °C? c = 4200 Дж/(кг·°C).',
+        answer:'Q = cmΔt = 4200 × 2 × 10 = 84 000 Дж = 84 кДж.',
+        choices:qdChoices(),numericAnswer:'84',tolerance:0.5,points:4,partialCredit:50}
+    ]});
+    qdStore();qdRefresh();return;
+  }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
     qdSample();qdRefresh();return;
@@ -572,11 +628,18 @@ function qdOnClick(event){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
     d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();return;
   }
+  if(action==='report-current'){qdExportReport();return;}
+  if(action==='report-saved'){
+    const item=d.history.find(h=>h.id===button.dataset.hid);
+    if(item)qdExportReport(item);
+    return;
+  }
   if(action==='save-result'){
     const stats=qdScores(qdQuestionList(d),d.session.marks);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
-      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats});
+      title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats,
+      topics:qdTopicSnapshot(d,d.session.marks)});
     d.history=d.history.slice(-QD_LIMITS.history);
     d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
