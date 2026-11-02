@@ -15,6 +15,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-qd-action="sample"]').click();
   assert.equal(await page.locator('.qd-edit-card').count(),8);
   await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+  await page.locator('[data-qd-action="view"][data-view="list"]').click();
   assert.equal(await page.locator('.qd-card[data-qid]').count(),8);
   await page.locator('[data-qd-action="reveal"]').first().click();
   assert.equal(await page.locator('.qd-answer').count(),1);

@@ -19,6 +19,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: node tests/task100_browser.cjs
       - run: node tests/task101_browser.cjs
+      - run: node tests/task102_browser.cjs
       - run: python tests/ui_smoke.py
       - run: python tests/xlsx_browser.py
       - run: python tests/filter_freeze_browser.py

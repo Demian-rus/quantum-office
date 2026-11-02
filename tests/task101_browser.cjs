@@ -26,6 +26,7 @@ const {pathToFileURL}=require('node:url');
  const firstId=await page.evaluate(()=>qdDoc().sections[0].questions[0].id);
  assert.equal(await page.evaluate(id=>qdCheckAnswer(qdDoc().sections[0].questions[0],{selected:[0]}),firstId),'partial');
  await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+  await page.locator('[data-qd-action="view"][data-view="list"]').click();
 
  const card=page.locator('.qd-card[data-qid="'+firstId+'"]');
  await card.locator('[data-qd-field="auto-selection"]').nth(0).check();

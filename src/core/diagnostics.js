@@ -21,6 +21,7 @@ let qdRevealed = new Set();
 let qdStudentFilter = '';
 let qdPointerDrag = null;
 let qdPointerBound = false;
+let qdKeyboardBound = false;
 const qdVerified = new WeakSet();
 const qdNewId = () => 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,9);
 const qdText = (value,max=1200) => typeof value==='string'?value.slice(0,max):'';
@@ -28,7 +29,8 @@ const qdEsc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const qdDefault = () => ({
   format:'quantum-diagnostic',version:1,title:'Диагностика знаний',description:'',
   sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50}]}],
-  students:[],session:{student:'',studentId:'',marks:{},responses:{}},history:[]
+  students:[],session:{student:'',studentId:'',marks:{},responses:{}},
+  display:{mode:'focus',activeId:''},history:[]
 });
 function qdNormalize(raw){
   const data=qdDefault();
@@ -62,6 +64,8 @@ function qdNormalize(raw){
     }
   }
   const questionIds=new Set(data.sections.flatMap(s=>s.questions.map(q=>q.id)));
+  const display=raw.display&&typeof raw.display==='object'?raw.display:{};
+  data.display={mode:display.mode==='list'?'list':'focus',activeId:questionIds.has(display.activeId)?display.activeId:''};
   if(Array.isArray(raw.students)) data.students=raw.students.slice(0,QD_LIMITS.students)
     .filter(s=>s&&typeof s==='object'&&qdText(s.name,100).trim())
     .map(s=>({id:id(s.id),name:qdText(s.name,100).trim()}));
@@ -346,6 +350,105 @@ function qdReference(q){
   if(q.type==='numeric')details='Числовой ответ: '+(q.numericAnswer||'не задан')+' (± '+qdTolerance(q.tolerance)+')';
   return [details,q.answer].filter(Boolean).join('\n\n')||'Ответ не заполнен';
 }
+function qdDisplay(d=qdDoc()){
+  if(!d.display||typeof d.display!=='object')d.display={mode:'focus',activeId:''};
+  return d.display;
+}
+function qdCurrentIndex(d=qdDoc(),all=qdQuestionList(d)){
+  if(!all.length)return -1;
+  const requested=all.findIndex(q=>q.id===qdDisplay(d).activeId);
+  if(requested>=0)return requested;
+  const pending=all.findIndex(q=>!QD_STATES.includes(d.session.marks[q.id]));
+  return pending>=0?pending:0;
+}
+function qdSelectQuestion(d,index){
+  const all=qdQuestionList(d);
+  if(!Number.isInteger(index)||index<0||index>=all.length)return false;
+  qdDisplay(d).activeId=all[index].id;
+  return true;
+}
+function qdAdvance(d){
+  const all=qdQuestionList(d),index=qdCurrentIndex(d,all);
+  if(index>=0&&index<all.length-1)qdSelectQuestion(d,index+1);
+}
+function qdRunQuestion(q,number,d){
+  const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
+  return `<article class="qd-card qd-run-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
+    <div class="qd-question"><span class="qd-counter">${number+1}.</span><div>
+      <span class="qd-type">${qdTypeTitle(q.type)} · ${points} ${points===1?'балл':points<=4?'балла':'баллов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
+      <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p>
+    </div></div>
+    ${qdAutoInput(q,d.session.responses[q.id])}
+    <div class="qd-card-actions">
+      ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
+      <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}"
+       aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
+      <div class="qd-rating" role="group" aria-label="Оценка ответа">
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes"
+          aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial"
+          aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no"
+          aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
+      </div>
+    </div>
+    ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
+    ${mark?`<p class="qd-card-assessed" role="status">${mark==='yes'?'Ответ зачтён':mark==='partial'?'Частично зачтён':'Ответ не зачтён'}</p>`:''}
+  </article>`;
+}
+function qdListQuestions(d){
+  let index=0;
+  return d.sections.map((section,si)=>`<section class="qd-section">
+    <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2>
+      <span>${section.questions.length} вопросов</span></div>
+    ${section.questions.map(q=>qdRunQuestion(q,index++,d)).join('')}
+  </section>`).join('');
+}
+function qdGuidedQuestions(d,all,s){
+  if(!all.length)return `<section class="qd-panel qd-guided-empty"><h2>Пока нет вопросов</h2>
+    <p>Добавьте задания в конструкторе и вернитесь к проведению.</p>
+    <button type="button" data-qd-action="mode" data-mode="builder" class="qd-primary">Открыть конструктор</button></section>`;
+  const index=qdCurrentIndex(d,all),q=all[index],progress=s.total?Math.round(s.rated/s.total*100):0;
+  return `<section class="qd-guided" aria-label="Пошаговая диагностика">
+    <div class="qd-guided-status">
+      <div class="qd-guided-topline"><span class="qd-guided-section">${qdEsc(q.section)}</span>
+        <strong>Вопрос ${index+1} из ${all.length}</strong></div>
+      <div class="qd-guided-progress" role="progressbar" aria-label="Проверено вопросов"
+        aria-valuenow="${s.rated}" aria-valuemin="0" aria-valuemax="${s.total}">
+        <span style="width:${progress}%"></span></div>
+      <div class="qd-guided-measures">
+        <span>Проверено <strong>${s.rated} / ${s.total}</strong></span>
+        <span>Результат <strong>${s.rated?s.percent+'%':'—'}</strong></span>
+        <span>Баллы <strong>${s.earned} / ${s.possible}</strong></span>
+      </div>
+    </div>
+    ${qdRunQuestion(q,index,d)}
+    <div class="qd-guided-nav" role="group" aria-label="Перемещение по вопросам">
+      <button type="button" data-qd-action="nav-prev" ${index===0?'disabled':''}>← Назад</button>
+      <button type="button" data-qd-action="nav-next" class="qd-primary"
+       ${index===all.length-1?'disabled':''}>Следующий →</button>
+      <button type="button" data-qd-action="nav-unrated"
+       ${s.rated===s.total?'disabled':''}>К непроверенному</button>
+    </div>
+    <details class="qd-question-map">
+      <summary>Карта вопросов <span>${s.rated} из ${s.total} проверено</span></summary>
+      <div class="qd-map-grid" role="group" aria-label="Выбор вопроса">
+        ${all.map((item,i)=>{
+          const grade=d.session.marks[item.id];
+          const cls=i===index?' current':grade?' rated-'+grade:'';
+          return `<button type="button" data-qd-action="nav-index" data-index="${i}"
+            class="qd-map-number${cls}" aria-label="Вопрос ${i+1}: ${qdEsc(item.section)}"
+            aria-current="${i===index?'step':'false'}" title="${qdEsc(item.section)}">${i+1}</button>`;
+        }).join('')}
+      </div>
+    </details>
+    <div class="qd-guided-finish">
+      <span>Оценено ${s.rated} из ${s.total}</span>
+      <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
+    </div>
+    <p class="qd-shortcuts">Клавиши: 1 — знает, 2 — частично, 3 — не знает, ← → — переключение, R — ответ.</p>
+  </section>`;
+}
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
   const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
@@ -353,6 +456,8 @@ function qdRun(){
   const scores=history.map(h=>h.summary||qdScores(all,h.marks)).filter(x=>x.rated);
   const average=scores.length?Math.round(scores.reduce((n,x)=>n+x.percent,0)/scores.length):null;
   return `<div class="qd-session">
+    ${qdDisplay(d).mode==='focus'?`<details class="qd-session-drawer">
+      <summary>Ученик: ${qdEsc(d.session.student||'не выбран')} <span>Настройки занятия</span></summary>`:''}
     <div class="qd-panel qd-session-panel">
       <div class="qd-student-chooser">
         <label>Из списка учеников<select data-qd-field="student-select" aria-label="Выбрать ученика">
@@ -362,30 +467,18 @@ function qdRun(){
       </div>
       <div class="qd-row qd-wrap">
         <button type="button" data-qd-action="reset">Начать заново</button>
-        <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
+        ${qdDisplay(d).mode==='list'?`<button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>`:''}
       </div>
     </div>
-    ${d.sections.map((section,si)=>`<section class="qd-section">
-      <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2><span>${section.questions.length} вопросов</span></div>
-      ${section.questions.map((q,qi)=>{
-        const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id);
-        return `<article class="qd-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
-         <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div>
-         <span class="qd-type">${qdTypeTitle(q.type)} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
-         <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p></div></div>
-         ${qdAutoInput(q,d.session.responses[q.id])}
-         <div class="qd-card-actions">
-           ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check"
-              data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
-           <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}" aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
-           <div class="qd-rating" role="group" aria-label="Оценка ответа">
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes" aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial" aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no" aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
-           </div></div>
-         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
-        </article>`;
-      }).join('')}</section>`).join('')}
+    ${qdDisplay(d).mode==='focus'?'</details>':''}
+    <div class="qd-view-switch" role="group" aria-label="Вид проведения">
+      <button type="button" data-qd-action="view" data-view="focus" aria-pressed="${qdDisplay(d).mode==='focus'}"
+        class="${qdDisplay(d).mode==='focus'?'active':''}">По одному</button>
+      <button type="button" data-qd-action="view" data-view="list" aria-pressed="${qdDisplay(d).mode==='list'}"
+        class="${qdDisplay(d).mode==='list'?'active':''}">Все вопросы</button>
+    </div>
+    ${qdDisplay(d).mode==='focus'?qdGuidedQuestions(d,all,s):qdListQuestions(d)}
+    ${qdDisplay(d).mode==='focus'?'<details class="qd-guided-insights"><summary>Подробные результаты и журнал</summary><div class="qd-guided-insights-body">':''}
     <section class="qd-panel qd-results" aria-label="Итоги диагностики">
       <h2>Итоги диагностики</h2>
       <div class="qd-metrics">
@@ -424,7 +517,8 @@ function qdRun(){
         return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
         <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span><button type="button" data-qd-action="report-saved" data-hid="${qdEsc(h.id)}">Отчёт</button></div>`;
       }).join('')}</div>`:'<p>Результатов пока нет.</p>'}
-    </section></div>`;
+    </section>
+    ${qdDisplay(d).mode==='focus'?'</div></details>':''}</div>`;
 }
 function qdTopicSnapshot(doc,marks){
   return doc.sections.map(section=>{
@@ -497,11 +591,12 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';qdRevealed.clear();qdStore();
+  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
 }
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
@@ -527,12 +622,31 @@ function qoDiagnosticMount(){
     window.addEventListener('pointercancel',qdPointerCancel,true);
     qdPointerBound=true;
   }
+  if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);qdKeyboardBound=true;}
   qoDiagnosticVisibility();
 }
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
   if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
+  if(action==='view'){
+    d.display=qdDisplay(d);
+    d.display.mode=button.dataset.view==='list'?'list':'focus';
+    qdStore();qdRefresh();return;
+  }
+  if(action==='nav-prev'||action==='nav-next'||action==='nav-index'||action==='nav-unrated'){
+    const all=qdQuestionList(d),pos=qdCurrentIndex(d,all);
+    let index=pos;
+    if(action==='nav-prev')index=pos-1;
+    if(action==='nav-next')index=pos+1;
+    if(action==='nav-index')index=Number(button.dataset.index);
+    if(action==='nav-unrated'){
+      const pending=all.findIndex((q,i)=>i>pos&&!QD_STATES.includes(d.session.marks[q.id]));
+      index=pending>=0?pending:all.findIndex(q=>!QD_STATES.includes(d.session.marks[q.id]));
+    }
+    if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
+    return;
+  }
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
@@ -629,8 +743,14 @@ function qdOnClick(event){
   if(action==='mark'){
     const qid=button.dataset.qid,mark=button.dataset.mark;
     if(!QD_STATES.includes(mark)||!qdQuestionList(d).some(q=>q.id===qid))return;
-    if(d.session.marks[qid]===mark)delete d.session.marks[qid];else d.session.marks[qid]=mark;
-    qdStore();qdRefresh();return;
+    const isNewGrade=d.session.marks[qid]!==mark;
+    if(!isNewGrade)delete d.session.marks[qid];else d.session.marks[qid]=mark;
+    if(isNewGrade&&qdDisplay(d).mode==='focus'&&qdQuestionList(d)[qdCurrentIndex(d)]?.id===qid){
+      qdAdvance(d);qdRevealed.clear();
+    }
+    qdStore();qdRefresh();
+    if(isNewGrade&&qdDisplay(d).mode==='focus')qdScrollToQuestion();
+    return;
   }
   if(action==='reveal'){
     if(qdRevealed.has(button.dataset.qid))qdRevealed.delete(button.dataset.qid);
@@ -638,7 +758,7 @@ function qdOnClick(event){
   }
   if(action==='reset'){
     if(Object.keys(d.session.marks).length&&!confirm('Очистить оценки текущего занятия без сохранения?'))return;
-    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();return;
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdDisplay(d).activeId='';qdRevealed.clear();qdStore();qdRefresh();return;
   }
   if(action==='report-current'){qdExportReport();return;}
   if(action==='report-saved'){
@@ -653,12 +773,30 @@ function qdOnClick(event){
       title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats,
       topics:qdTopicSnapshot(d,d.session.marks)});
     d.history=d.history.slice(-QD_LIMITS.history);
-    d.session={student:'',studentId:'',marks:{},responses:{}};qdRevealed.clear();qdStore();qdRefresh();
+    d.session={student:'',studentId:'',marks:{},responses:{}};qdDisplay(d).activeId='';qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
   }
 }
 
 
+function qdScrollToQuestion(){
+  const scroll=document.getElementById('qo-diag-workspace'),guided=document.querySelector('#qo-diag-root .qd-guided');
+  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+}
+function qdGuidedKeydown(event){
+  if(qdMode!=='run'||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
+  const workspace=document.getElementById('qo-diag-workspace');
+  if(!workspace||workspace.hidden||qdDisplay().mode!=='focus')return;
+  if(event.target.closest?.('input,textarea,select,button,[contenteditable="true"],[role="textbox"]'))return;
+  const actions={ArrowLeft:'nav-prev',ArrowRight:'nav-next',r:'reveal',R:'reveal'};
+  const marks={'1':'yes','2':'partial','3':'no'};
+  let button=null;
+  if(marks[event.key])button=workspace.querySelector('.qd-guided [data-qd-action="mark"][data-mark="'+marks[event.key]+'"]');
+  else if(actions[event.key]){
+    const a=actions[event.key];button=workspace.querySelector('.qd-guided [data-qd-action="'+a+'"]');
+  }
+  if(button&&!button.disabled){event.preventDefault();button.click();}
+}
 function qdPointerDown(event){
   const handle=event.target.closest?.('[data-qd-drag]');
   if(!handle||qdMode!=='builder'||event.button!==0)return;

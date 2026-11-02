@@ -46,6 +46,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-qd-action="add-student"]').click();
   assert.equal(await page.locator('.qd-student-row').count(),1);
   await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+  await page.locator('[data-qd-action="view"][data-view="list"]').click();
   await page.locator('[data-qd-field="student-select"]').selectOption(await page.evaluate(()=>qdDoc().students[0].id));
   assert.equal(await page.locator('[data-qd-field="student"]').inputValue(),'Ученица А');
 
