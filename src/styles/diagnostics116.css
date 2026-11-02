@@ -1,0 +1,63 @@
+/* TASK116: a compact topic-level action plan inside the existing group journal. */
+#qo-diag-root .qd-topic-plan{
+  display:grid;gap:10px;min-width:0;
+  padding:13px 14px;
+  border:1px solid var(--qo-border);
+  border-radius:10px;background:var(--qo-surface);
+}
+#qo-diag-root .qd-topic-plan-head{
+  display:flex;align-items:flex-start;justify-content:space-between;
+  gap:12px;
+}
+#qo-diag-root .qd-topic-plan-head h4{
+  margin:0 0 4px;font-size:14px;line-height:1.3;
+}
+#qo-diag-root .qd-topic-plan-head p{
+  margin:0;color:var(--qo-muted);font-size:11px;line-height:1.45;
+}
+#qo-diag-root .qd-topic-plan-head>button{
+  flex:none;min-height:32px;padding:6px 10px;font-size:11px;border-radius:7px;
+}
+#qo-diag-root .qd-topic-plan-grid{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+}
+#qo-diag-root .qd-topic-plan-card{
+  display:flex;flex-direction:column;align-items:stretch;gap:7px;
+  min-width:0;min-height:91px;
+  padding:11px 12px;
+  border:1px solid var(--qo-border);border-radius:9px;
+  background:var(--qo-surface-alt);color:var(--qo-text);
+  text-align:left;cursor:pointer;
+}
+#qo-diag-root .qd-topic-plan-card strong{
+  font-size:12px;line-height:1.3;overflow-wrap:anywhere;
+}
+#qo-diag-root .qd-topic-plan-card>span:not(.qd-topic-plan-meter){
+  color:var(--qo-muted);font-size:11px;line-height:1.35;
+}
+#qo-diag-root .qd-topic-plan-card:hover,
+#qo-diag-root .qd-topic-plan-card:focus-visible{
+  border-color:var(--qo-accent);outline-offset:2px;
+}
+#qo-diag-root .qd-topic-plan-card[aria-pressed="true"]{
+  border-color:var(--qo-accent);
+  box-shadow:inset 0 0 0 1px var(--qo-accent);
+  background:var(--qo-surface);
+}
+#qo-diag-root .qd-topic-plan-meter{
+  display:block;overflow:hidden;height:4px;width:100%;
+  border-radius:5px;background:var(--qo-border);
+}
+#qo-diag-root .qd-topic-plan-meter i{
+  display:block;height:100%;border-radius:5px;
+  background:var(--qo-accent);
+}
+#qo-diag-root .qd-topic-plan-more{
+  justify-self:start;min-height:30px;
+  padding:5px 10px;font-size:11px;border-radius:7px;
+}
+@media(max-width:700px){
+  #qo-diag-root .qd-topic-plan{padding:11px}
+  #qo-diag-root .qd-topic-plan-grid{grid-template-columns:1fr}
+  #qo-diag-root .qd-topic-plan-head{flex-wrap:wrap}
+}
