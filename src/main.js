@@ -907,6 +907,14 @@ function qoWriterPage(){
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
  const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack"><label class="qo-work-field"><span>Размер бумаги</span><div class="qo-work-value">A4 · 210 × 297 мм</div></label><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`);
+ const diagnosticQuick=qoWorkGroup('Режимы',qoWorkButton('writer-diag-library','Библиотека шаблонов','layout-template')+
+   qoWorkButton('writer-diag-builder','Конструктор','type')+
+   qoWorkButton('writer-diag-list','Все вопросы','list')+
+   qoWorkButton('writer-diag-focus','По одному','check'));
+ const diagnosticFiles=qoWorkGroup('Файлы диагностики',qoWorkButton('writer-diag-export','Скачать QDIAG','save')+
+   qoWorkButton('writer-diag-import','Открыть QDIAG','folder')+
+   qoWorkButton('writer-diag-templates-export','Скачать шаблоны','copy'));
+ const diagnosticInfo=qoWorkGroup('Коллекция','<span class="qo-work-text">Физика · Математика · Информатика; классы 5–9</span>');
  const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
  const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
  return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
@@ -917,7 +925,7 @@ function qoWriterPage(){
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','file',files+exporttools)}
- ${qoWorkPanel('writer','diagnostic',qoWorkGroup('Интерактивная диагностика','<span class="qo-work-text">Создавайте вопросы, проводите занятие и сохраняйте результаты.</span>'))}
+ ${qoWorkPanel('writer','diagnostic',diagnosticQuick+diagnosticFiles+diagnosticInfo)}
  </div></div>
  <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap"><article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
  <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section>
@@ -2336,6 +2344,9 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   const url=prompt('Адрес ссылки (https://...)');if(url===null)return;
   const safe=qoSafeURL(url.trim());if(!safe){status('Допустимы HTTPS, HTTP и mailto',true);return;}
   qoWriterFocusSelection();document.execCommand('createLink',false,safe);qoPersistWriter();return;
+ }
+ if(action.startsWith('writer-diag-')){
+   qdRibbonAction(action);return;
  }
  if(action==='writer-new'){
   if(!confirm('Создать новый текстовый документ? Текущий документ можно скачать в HTML.'))return;
