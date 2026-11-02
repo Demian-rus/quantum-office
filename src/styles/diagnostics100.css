@@ -8,7 +8,7 @@
 #qo-diag-root .qd-card-head{flex-wrap:wrap}
 #qo-diag-root .qd-card-head select{max-width:125px}
 #qo-diag-root .qd-card-head button{padding:4px 9px;min-height:30px;font-size:12px}
-#qo-diag-root .qd-drag-handle{display:flex;align-items:center;justify-content:center;width:29px;height:30px;flex:none;color:var(--qo-muted);background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:6px;cursor:grab;font-size:18px;touch-action:pan-y;user-select:none}
+#qo-diag-root .qd-drag-handle{display:flex;align-items:center;justify-content:center;width:29px;height:30px;flex:none;color:var(--qo-muted);background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:6px;cursor:grab;font-size:18px;touch-action:none;user-select:none}
 #qo-diag-root .qd-drag-handle:active{cursor:grabbing}
 #qo-diag-root .qd-drag-handle:focus-visible{outline:2px solid var(--qo-focus);outline-offset:2px}
 #qo-diag-root .qd-edit-card.qd-drop-target{outline:2px dashed var(--qo-accent);outline-offset:2px}
