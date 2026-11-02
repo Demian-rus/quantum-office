@@ -46,7 +46,7 @@ const {pathToFileURL}=require('node:url');
  await page.reload();await open();
  assert.equal(await page.evaluate(()=>qdQuestionList().length),7);
  assert.equal(await page.locator('.qd-edit-card:visible').count(),7);
- const pending=page.waitForEvent('download');await page.locator('[data-qd-action="export"]').click();
+ const pending=page.waitForEvent('download');await page.locator('[data-action="writer-diag-export"]').click();
  const dl=await pending,dest=path.join(root,'task105-test.qdiag');await dl.saveAs(dest);
  const data=JSON.parse(fs.readFileSync(dest,'utf8'));
  assert.equal(data.sections.flatMap(s=>s.questions).length,7);

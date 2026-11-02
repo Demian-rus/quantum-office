@@ -37,7 +37,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.evaluate(()=>qdDoc().sections[0].questions[0].prompt),'Проверочный вопрос для ученика');
  assert.equal(await page.evaluate(()=>qdDoc().sections[1].questions[1].answer),'4');
  const pending=page.waitForEvent('download');
- await page.locator('[data-qd-action="export"]').click();
+ await page.locator('[data-action="writer-diag-export"]').click();
  const dl=await pending,out=path.join(root,'task104-smoke.qdiag');await dl.saveAs(out);
  const d=JSON.parse(fs.readFileSync(out,'utf8'));
  assert.equal(d.sections.length,2);assert.equal(d.sections[1].questions.length,2);

@@ -53,7 +53,7 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.evaluate(()=>Object.values(qdDoc().session.marks).filter(x=>x==='partial').length),1);
 
   const pending=page.waitForEvent('download');
-  await page.locator('[data-qd-action="export"]').click();
+  await page.locator('[data-action="writer-diag-export"]').click();
   const dl=await pending,local=path.join(root,'task102-guide.qdiag');await dl.saveAs(local);
   const data=JSON.parse(fs.readFileSync(local,'utf8'));
   assert.equal(data.display.mode,'focus');

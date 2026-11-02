@@ -32,7 +32,7 @@ const {pathToFileURL}=require('node:url');
   assert.match(await page.locator('.qd-history').textContent(),/Ученик 1/);
   assert.match(await page.locator('.qd-metrics').textContent(),/0 \/ 8/);
   const pending=page.waitForEvent('download');
-  await page.locator('[data-qd-action="export"]').click();
+  await page.locator('[data-action="writer-diag-export"]').click();
   const downloaded=await pending;assert.match(downloaded.suggestedFilename(),/\.qdiag$/);
   const output=path.join(root,'task099-diagnostic-test.qdiag');await downloaded.saveAs(output);
   const saved=JSON.parse(fs.readFileSync(output,'utf8'));assert.equal(saved.sections.length,3);
