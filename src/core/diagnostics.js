@@ -930,6 +930,120 @@ function qdLibraryLoad(d,id,source){
   qdStore();return true;
 }
 
+
+let qdLibraryPreviewData=null,qdLibraryPreviewSelected=new Set();
+function qdLibraryResolve(source,id){
+  let raw=null;
+  if(source==='built-in')raw=qdTemplate(id);
+  if(source==='custom'){
+    const custom=qdLibraryRead().find(x=>x.id===id);
+    if(custom)raw={title:custom.title,description:custom.description,sections:custom.sections};
+  }
+  if(!raw)return null;
+  const model=qdNormalize({title:raw.title,description:raw.description,sections:raw.sections});
+  return qdQuestionList(model).length?model:null;
+}
+function qdLibraryPreviewPick(source,id){
+  const model=qdLibraryResolve(source,id);
+  if(!model)return false;
+  qdLibraryPreviewData={source,id,model};
+  qdLibraryPreviewSelected=new Set(qdQuestionList(model).map(q=>q.id));
+  return true;
+}
+function qdLibraryMergePlan(d,model,selection){
+  if(!model||!Array.isArray(model.sections))return {ok:false,error:'Шаблон не найден'};
+  const chosen=new Set(selection);
+  const knownIds=new Set(qdQuestionList(model).map(q=>q.id));
+  if(!chosen.size||[...chosen].some(id=>!knownIds.has(id)))return {ok:false,error:'Выберите вопросы из текущего предпросмотра'};
+  const prompts=new Set(qdQuestionList(d).map(q=>qdPromptKey(q.prompt)).filter(Boolean));
+  const names=new Map(d.sections.map(s=>[qdPromptKey(s.title),{id:s.id,title:s.title}]));
+  const additions=[],newSections=[];let duplicates=0;
+  for(const section of model.sections){
+    const selected=section.questions.filter(q=>chosen.has(q.id));
+    if(!selected.length)continue;
+    const clean=selected.filter(q=>{
+      const key=qdPromptKey(q.prompt);
+      if(!key||prompts.has(key)){duplicates++;return false;}
+      prompts.add(key);return true;
+    });
+    if(!clean.length)continue;
+    const key=qdPromptKey(section.title);
+    if(!names.has(key)){
+      names.set(key,{id:null,title:section.title});
+      newSections.push({key,title:section.title});
+    }
+    for(const q of clean)additions.push({sectionKey:key,question:q});
+  }
+  if(!additions.length)return {ok:false,error:'Все выбранные задания уже есть в диагностике или не заполнены',duplicates,items:[]};
+  if(d.sections.length+newSections.length>QD_LIMITS.sections)
+    return {ok:false,error:'Лимит: максимум 24 раздела',duplicates,items:[]};
+  if(qdQuestionList(d).length+additions.length>QD_LIMITS.questions)
+    return {ok:false,error:'Лимит: максимум 240 вопросов',duplicates,items:[]};
+  return {ok:true,items:additions,newSections,duplicates};
+}
+function qdLibraryMergeApply(d,plan){
+  if(!plan?.ok||!plan.items?.length)return false;
+  if(d.sections.length+plan.newSections.length>QD_LIMITS.sections||
+    qdQuestionList(d).length+plan.items.length>QD_LIMITS.questions)return false;
+  const byName=new Map(d.sections.map(s=>[qdPromptKey(s.title),s]));
+  for(const s of plan.newSections){
+    const section={id:qdNewId(),title:s.title,questions:[]};
+    d.sections.push(section);byName.set(s.key,section);
+  }
+  for(const item of plan.items){
+    const section=byName.get(item.sectionKey);
+    if(!section)return false;
+    const source=item.question;
+    section.questions.push({
+      id:qdNewId(),type:qdType(source.type),prompt:source.prompt,answer:source.answer,
+      points:qdPoints(source.points),partialCredit:qdPartialCredit(source.partialCredit),
+      choices:qdChoices(source.choices),numericAnswer:qdText(source.numericAnswer,60),
+      tolerance:qdTolerance(source.tolerance)
+    });
+  }
+  return true;
+}
+function qdLibraryPreviewMarkup(d=qdDoc()){
+  const picked=qdLibraryPreviewData;
+  if(!picked)return '';
+  const {model,source,id}=picked,questions=qdQuestionList(model);
+  const selected=qdLibraryPreviewSelected;
+  const plan=qdLibraryMergePlan(d,model,selected);
+  const numSelected=questions.filter(q=>selected.has(q.id)).length;
+  return '<section class="qd-panel qd-library-preview" aria-label="Предпросмотр шаблона">'+
+    '<div class="qd-library-preview-head"><div><p class="qd-eyebrow">ПРЕДПРОСМОТР ШАБЛОНА</p>'+
+    '<h2>'+qdEsc(model.title)+'</h2><p>'+qdEsc(model.description)+'</p></div>'+
+    '<button type="button" data-qd-action="library-preview-close" aria-label="Закрыть предпросмотр">× Закрыть</button></div>'+
+    '<div class="qd-library-preview-options"><strong>'+numSelected+' из '+questions.length+' выбрано</strong>'+
+    '<button type="button" data-qd-action="library-preview-all">Выбрать все</button>'+
+    '<button type="button" data-qd-action="library-preview-none">Снять выделение</button></div>'+
+    '<div class="qd-library-preview-sections">'+model.sections.map((section,si)=>
+      '<section><div class="qd-library-preview-section-head"><h3>'+(si+1)+'. '+qdEsc(section.title)+'</h3>'+
+      '<span>'+section.questions.length+' вопросов</span></div>'+
+      section.questions.map((q,qi)=>
+        '<article class="qd-library-preview-question"><label>'+
+        '<input type="checkbox" data-qd-template-select="'+qdEsc(q.id)+'" '+(selected.has(q.id)?'checked':'')+'>'+
+        '<span class="qd-library-preview-question-text"><strong>'+qdEsc(q.prompt||'Пустой вопрос')+'</strong>'+
+        '<small>'+qdEsc(qdTypeTitle(q.type))+' · '+qdPoints(q.points)+' балл(ов)</small></span></label>'+
+        '<details><summary>Показать ответ</summary><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p></details></article>'
+      ).join('')+'</section>'
+    ).join('')+'</div>'+
+    '<div class="qd-library-preview-footer"><div class="qd-library-preview-count">'+
+    (plan.ok?'<strong>Будет добавлено: '+plan.items.length+'</strong> · новых разделов: '+plan.newSections.length+
+      (plan.duplicates?' · повторов пропущено: '+plan.duplicates:''):
+      '<strong>'+qdEsc(plan.error||'Нет вопросов для добавления')+'</strong>')+
+    '</div><div class="qd-library-preview-actions">'+
+    '<button type="button" data-qd-action="library-open" data-source="'+qdEsc(source)+'" data-template="'+qdEsc(id)+'">Открыть вместо текущей</button>'+
+    '<button type="button" class="qd-primary" data-qd-action="library-preview-add" '+(plan.ok?'':'disabled')+
+      '>Добавить выбранные в текущую</button></div></div>'+
+    '<p class="qd-hint">Добавление сохраняет текущих учеников и оценки. Совпадающие вопросы по формулировке пропускаются; новые разделы создаются только при необходимости.</p>'+
+    '</section>';
+}
+function qdLibraryPreviewRefresh(){
+  const target=document.getElementById('qd-library-preview-slot');
+  if(target)target.innerHTML=qdLibraryPreviewMarkup();
+}
+
 function qdLibraryExport(){
   download('QuantumOffice-templates.qtpl',JSON.stringify({format:'quantum-templates',version:1,
     templates:qdLibraryRead()},null,2),'application/json;charset=utf-8');
@@ -966,7 +1080,7 @@ function qdLibraryView(){
       '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
-      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+
+      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
       '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
       '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
@@ -986,7 +1100,7 @@ function qdLibraryCards(items){
     '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
     '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
     (x.source==='custom'?'<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
-    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
+    '<button type="button" data-qd-action="library-preview" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">Просмотреть</button>'+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
       '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
     '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
 }
@@ -1280,6 +1394,33 @@ function qdOnClick(event){
     qdDisplay(d).mode='list';qdMode='run';qoWriter.diagnosticMode='run';
     qdRevealed.clear();qdStore();qdRefresh();return;
   }
+  if(action==='library-preview'){
+    if(!qdLibraryPreviewPick(button.dataset.source,button.dataset.template)){
+      status('Шаблон не найден',true);return;
+    }
+    qdLibraryPreviewRefresh();
+    const preview=document.querySelector('#qd-library-preview-slot .qd-library-preview');
+    if(preview)preview.scrollIntoView({block:'start',behavior:'instant'});
+    return;
+  }
+  if(action==='library-preview-close'){
+    qdLibraryPreviewData=null;qdLibraryPreviewSelected.clear();qdLibraryPreviewRefresh();return;
+  }
+  if(action==='library-preview-all'||action==='library-preview-none'){
+    const model=qdLibraryPreviewData?.model;if(!model)return;
+    qdLibraryPreviewSelected=action==='library-preview-all'?
+      new Set(qdQuestionList(model).map(q=>q.id)):new Set();
+    qdLibraryPreviewRefresh();return;
+  }
+  if(action==='library-preview-add'){
+    const model=qdLibraryPreviewData?.model;
+    const plan=qdLibraryMergePlan(d,model,qdLibraryPreviewSelected);
+    if(!plan.ok){status(plan.error||'Выберите вопросы',true);qdLibraryPreviewRefresh();return;}
+    if(!qdLibraryMergeApply(d,plan)){status('Невозможно добавить вопросы',true);return;}
+    qdStore();qdLibraryPreviewRefresh();
+    status('Добавлено '+plan.items.length+' вопросов'+(plan.duplicates?'; пропущено повторов: '+plan.duplicates:''));
+    return;
+  }
   if(action==='library-open'){
     const id=button.dataset.template,source=button.dataset.source;
     if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
@@ -1298,7 +1439,9 @@ function qdOnClick(event){
   if(action==='library-import'){document.getElementById('qd-library-file')?.click();return;}
   if(action==='library-delete'){
     if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
-    if(qdLibraryDelete(button.dataset.template)){qdRefresh();status('Шаблон удалён');}
+    if(qdLibraryDelete(button.dataset.template)){
+      if(qdLibraryPreviewData?.id===button.dataset.template){qdLibraryPreviewData=null;qdLibraryPreviewSelected.clear();}
+      qdRefresh();status('Шаблон удалён');}
     else status('Не удалось удалить шаблон',true);
     return;
   }
@@ -1611,6 +1754,25 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.matches?.('[data-qd-template-select]')){
+    const id=event.target.dataset.qdTemplateSelect;
+    if(event.target.checked)qdLibraryPreviewSelected.add(id);
+    else qdLibraryPreviewSelected.delete(id);
+    const slot=document.getElementById('qd-library-preview-slot');
+    const footer=slot?.querySelector('.qd-library-preview-footer');
+    const summary=slot?.querySelector('.qd-library-preview-options strong');
+    const preview=qdLibraryPreviewData?.model;
+    if(preview&&summary)summary.textContent=qdLibraryPreviewSelected.size+' из '+qdQuestionList(preview).length+' выбрано';
+    if(footer&&preview){
+      const plan=qdLibraryMergePlan(qdDoc(),preview,qdLibraryPreviewSelected);
+      footer.querySelector('.qd-library-preview-count').innerHTML=plan.ok?
+        '<strong>Будет добавлено: '+plan.items.length+'</strong> · новых разделов: '+plan.newSections.length+
+        (plan.duplicates?' · повторов пропущено: '+plan.duplicates:''):
+        '<strong>'+qdEsc(plan.error||'Выберите вопросы')+'</strong>';
+      footer.querySelector('[data-qd-action="library-preview-add"]').disabled=!plan.ok;
+    }
+    return;
+  }
   if(['qd-library-subject','qd-library-grade','qd-library-purpose'].includes(event.target.id)){
     if(event.target.id==='qd-library-subject')qdLibrarySubject=event.target.value;
     if(event.target.id==='qd-library-grade')qdLibraryGrade=event.target.value;
