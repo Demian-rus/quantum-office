@@ -51,7 +51,7 @@ const {pathToFileURL}=require('node:url');
  assert.ok(duplicates.original.every((v,i)=>v!==duplicates.copy[i]));
 
  const pending=page.waitForEvent('download');
- await page.locator('[data-qd-action="export"]').click();
+ await page.locator('[data-action="writer-diag-export"]').click();
  const download=await pending;const local=path.join(root,'task109-smoke.qdiag');
  await download.saveAs(local);
  const data=JSON.parse(fs.readFileSync(local,'utf8'));
