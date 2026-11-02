@@ -23,6 +23,8 @@
 #qo-diag-root .qd-builder-revisions label select{height:36px;max-width:100%}
 #qo-diag-root .qd-builder-revisions button{min-height:36px}
 #qo-diag-root .qd-card-bank-tools{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+#qo-diag-root .qd-card-bank-tools label{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:11px}
+#qo-diag-root .qd-card-bank-tools select{height:30px;width:130px;max-width:100%;padding:4px}
 #qo-diag-root .qd-card-bank-tools button{
   min-height:29px;font-size:11px;padding:5px 9px;
 }
@@ -35,7 +37,7 @@
 #qo-diag-root .qd-bank-head p{font-size:11px;line-height:1.5;color:var(--qo-muted);max-width:660px}
 #qo-diag-root .qd-bank-head>button{min-height:34px}
 #qo-diag-root .qd-bank-filters{
-  display:grid;grid-template-columns:minmax(170px,2fr) repeat(3,minmax(92px,1fr));
+  display:grid;grid-template-columns:minmax(170px,2fr) repeat(4,minmax(92px,1fr));
   gap:9px;
 }
 #qo-diag-root .qd-bank-filters label{min-width:0}
