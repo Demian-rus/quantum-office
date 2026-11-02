@@ -6,7 +6,6 @@ const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:8
 let qdMode = 'builder';
 let qdRevealed = new Set();
 let qdStudentFilter = '';
-let qdDraggedQuestion = '';
 let qdPointerDrag = null;
 let qdPointerBound = false;
 const qdVerified = new WeakSet();
@@ -365,10 +364,6 @@ function qoDiagnosticMount(){
   root.addEventListener('click',qdOnClick);
   root.addEventListener('input',qdOnInput);
   root.addEventListener('change',qdOnChange);
-  root.addEventListener('dragstart',qdDragStart);
-  root.addEventListener('dragover',qdDragOver);
-  root.addEventListener('drop',qdDrop);
-  root.addEventListener('dragend',qdDragEnd);
   root.addEventListener('pointerdown',qdPointerDown);
   if(!qdPointerBound){
     window.addEventListener('pointermove',qdPointerMove,true);
@@ -495,7 +490,7 @@ function qdPointerUp(event){
   const drag=qdPointerDrag;
   if(!drag||event.pointerId!==drag.pointerId)return;
   const location=drag.active?qdPointerLocation(event):null;
-  qdPointerDrag=null;qdDragEnd();
+  qdPointerDrag=null;qdClearDropTarget();
   if(!location||qdMode!=='builder')return;
   const rect=location.card?.getBoundingClientRect();
   const after=!!rect&&event.clientY>rect.top+rect.height/2;
@@ -503,39 +498,11 @@ function qdPointerUp(event){
     qdStore();qdRefresh();
   }
 }
-function qdPointerCancel(){qdPointerDrag=null;qdDragEnd();}
-function qdDragStart(event){
-  const handle=event.target.closest?.('[data-qd-drag]');
-  if(!handle||qdMode!=='builder')return;
-  qdDraggedQuestion=handle.dataset.qdDrag;
-  event.dataTransfer.effectAllowed='move';
-  event.dataTransfer.setData('text/plain',qdDraggedQuestion);
-}
-function qdDragOver(event){
-  if(!qdDraggedQuestion||qdMode!=='builder')return;
-  const zone=event.target.closest?.('[data-qd-drop-section]');
-  if(!zone)return;
-  event.preventDefault();
-  event.dataTransfer.dropEffect='move';
-  document.querySelectorAll('#qo-diag-root .qd-drop-target').forEach(el=>el.classList.remove('qd-drop-target'));
-  (event.target.closest('.qd-edit-card')||zone).classList.add('qd-drop-target');
-}
-function qdDrop(event){
-  const id=qdDraggedQuestion,zone=event.target.closest?.('[data-qd-drop-section]');
-  qdDragEnd();
-  if(!id||!zone||qdMode!=='builder')return;
-  event.preventDefault();
-  const card=event.target.closest('.qd-edit-card');
-  const rect=card?.getBoundingClientRect();
-  const after=!!card&&event.clientY>rect.top+rect.height/2;
-  if(qdMoveQuestion(qdDoc(),id,zone.dataset.qdDropSection,card?.dataset.qid||'',after)){
-    qdStore();qdRefresh();
-  }
-}
-function qdDragEnd(){
-  qdDraggedQuestion='';
+function qdPointerCancel(){qdPointerDrag=null;qdClearDropTarget();}
+function qdClearDropTarget(){
   document.querySelectorAll('#qo-diag-root .qd-drop-target').forEach(el=>el.classList.remove('qd-drop-target'));
 }
+
 function qdOnInput(event){
   const field=event.target.dataset.qdField;if(!field)return;
   const d=qdDoc(),value=event.target.value;
