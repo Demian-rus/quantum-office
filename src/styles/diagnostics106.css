@@ -1,0 +1,101 @@
+/* TASK106 — teacher-oriented template library and chat-like answer cards */
+#qo-diag-root .qd-actions{display:flex;gap:4px;flex-wrap:wrap}
+#qo-diag-root .qd-library-heading{display:flex;align-items:start;justify-content:space-between;gap:14px}
+#qo-diag-root .qd-library-heading h2{font-size:21px;margin:0 0 7px;line-height:1.2}
+#qo-diag-root .qd-library-heading p{font-size:13px;line-height:1.55;color:var(--qo-muted);margin:0;max-width:660px}
+#qo-diag-root .qd-library-total{font-size:12px;font-weight:700;color:var(--qo-muted);white-space:nowrap}
+#qo-diag-root .qd-template-library{display:grid;gap:15px}
+#qo-diag-root .qd-library-filter{display:grid;grid-template-columns:minmax(160px,1.5fr) repeat(3,minmax(118px,.9fr));gap:11px;align-items:end}
+#qo-diag-root .qd-library-filter label,#qo-diag-root .qd-library-save-form label{display:grid;gap:5px;min-width:0;font-size:11px;font-weight:650;color:var(--qo-muted)}
+#qo-diag-root .qd-library-filter input,#qo-diag-root .qd-library-filter select,
+#qo-diag-root .qd-library-save-form select,#qo-diag-root .qd-library-save-form input{
+  box-sizing:border-box;width:100%;height:38px;padding:6px 10px;border-radius:8px;
+  color:var(--qo-text);background:var(--qo-surface);border:1px solid var(--qo-border);
+  font-size:12px
+}
+#qo-diag-root .qd-library-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+#qo-diag-root .qd-library-card{
+  display:flex;flex-direction:column;min-height:181px;gap:9px;padding:19px;
+  background:var(--qo-surface);border:1px solid var(--qo-border);border-radius:13px;
+  transition:box-shadow .15s ease,border-color .15s ease
+}
+#qo-diag-root .qd-library-card:hover{border-color:var(--qo-accent);box-shadow:0 5px 15px rgba(0,0,0,.055)}
+#qo-diag-root .qd-library-tags{display:flex;gap:5px;flex-wrap:wrap}
+#qo-diag-root .qd-library-tags span{border:1px solid var(--qo-border);border-radius:999px;padding:4px 8px;font-size:10px;color:var(--qo-muted);font-weight:650}
+#qo-diag-root .qd-library-card h3{font-size:16px;line-height:1.35;color:var(--qo-text);margin:0}
+#qo-diag-root .qd-library-card p{font-size:12px;line-height:1.55;color:var(--qo-muted);margin:0;flex:1}
+#qo-diag-root .qd-library-card-footer{margin-top:8px;display:flex;align-items:center;justify-content:space-between;gap:9px}
+#qo-diag-root .qd-library-card-footer>span{font-size:12px;font-weight:700;color:var(--qo-muted);white-space:nowrap}
+#qo-diag-root .qd-library-card-footer>div{display:flex;gap:6px}
+#qo-diag-root .qd-library-card-footer button{min-height:36px;padding:6px 12px;font-size:12px}
+#qo-diag-root .qd-library-empty{grid-column:1/-1;text-align:center;color:var(--qo-muted);padding:28px;border:1px dashed var(--qo-border);border-radius:11px}
+#qo-diag-root .qd-library-save{display:grid;gap:12px}
+#qo-diag-root .qd-library-save h3{font-size:15px;margin:0 0 6px}
+#qo-diag-root .qd-library-save p{font-size:12px;color:var(--qo-muted);margin:0;line-height:1.6}
+#qo-diag-root .qd-library-save-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:9px;align-items:end}
+#qo-diag-root .qd-library-save-form>button{min-height:38px;font-size:12px;white-space:nowrap}
+#qo-diag-root .qd-library-portable{display:flex;gap:8px;flex-wrap:wrap}
+#qo-diag-root .qd-library-portable button{font-size:12px;min-height:36px}
+#qo-diag-root .qd-builder-shortcuts{display:flex;flex-wrap:wrap;gap:8px}
+#qo-diag-root .qd-builder-shortcuts button{font-size:12px;min-height:37px}
+/* Cards match the requested horizontal composition. */
+#qo-diag-root .qd-run-card.qd-chat-card{padding:15px 16px;border-radius:12px;display:block}
+#qo-diag-root .qd-chat-card .qd-chat-head{display:flex;align-items:center;gap:16px;justify-content:space-between}
+#qo-diag-root .qd-chat-card .qd-question{display:flex;align-items:baseline;gap:9px;flex:1;min-width:0}
+#qo-diag-root .qd-chat-card .qd-counter{
+  flex:none;min-width:20px;width:auto;height:auto;border:0;padding:0;display:block;
+  font-weight:450;font-size:13px;background:transparent;color:var(--qo-muted)
+}
+#qo-diag-root .qd-chat-card .qd-type{display:none}
+#qo-diag-root .qd-chat-card .qd-question p{
+  margin:0;font-size:15px;line-height:1.55;font-weight:650;color:var(--qo-text);overflow-wrap:anywhere
+}
+#qo-diag-root .qd-chat-card .qd-chat-rating{
+  width:auto;flex:none;display:flex;flex-wrap:nowrap;align-items:center;gap:6px;justify-content:end
+}
+#qo-diag-root .qd-chat-card .qd-chat-rating button{
+  width:auto;min-width:80px;min-height:32px;padding:6px 11px;
+  background:var(--qo-surface);color:var(--qo-text);
+  border:1px solid var(--qo-border);border-radius:999px;font-size:12px;font-weight:650;white-space:nowrap
+}
+#qo-diag-root .qd-chat-card .qd-chat-rating [data-mark="partial"]{
+  min-width:0;font-size:11px;color:var(--qo-muted);padding:6px 9px
+}
+#qo-diag-root .qd-chat-card .qd-chat-rating button[aria-pressed="true"][data-mark="yes"]{background:var(--qo-success-soft);color:var(--qo-success);border-color:var(--qo-success)}
+#qo-diag-root .qd-chat-card .qd-chat-rating button[aria-pressed="true"][data-mark="no"]{background:var(--qo-danger-soft);color:var(--qo-danger);border-color:var(--qo-danger)}
+#qo-diag-root .qd-chat-card .qd-chat-rating button[aria-pressed="true"][data-mark="partial"]{background:var(--qo-warning-soft);color:var(--qo-warning);border-color:var(--qo-warning)}
+#qo-diag-root .qd-chat-card .qd-card-actions.qd-chat-actions{
+  display:flex;align-items:center;justify-content:flex-start;gap:10px;margin-top:9px
+}
+#qo-diag-root .qd-chat-card .qd-chat-actions button{border-radius:999px;min-height:29px;padding:5px 11px;font-size:12px}
+#qo-diag-root .qd-chat-card .qd-chat-answer{
+  margin:10px 0 0 25px;padding:8px 0 0;border:0;background:transparent;
+  border-top:1px solid var(--qo-border);border-radius:0;color:var(--qo-text)
+}
+#qo-diag-root .qd-chat-card .qd-chat-answer p{
+  font-size:13px;font-weight:400;line-height:1.65;margin:0;white-space:normal
+}
+#qo-diag-root .qd-chat-card .qd-card-assessed{font-size:11px;margin:7px 0 0 25px;color:var(--qo-muted)}
+/* Focused mode preserves single-question navigation without changing its scoring semantics. */
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-head{flex-direction:column;align-items:stretch}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-question p{font-size:clamp(18px,2.1vw,23px);font-weight:650}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-rating{width:100%;justify-content:start;flex-wrap:wrap}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-rating button{flex:1 1 125px;min-height:43px}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-actions{margin-top:14px}
+@media(max-width:900px){
+ #qo-diag-root .qd-library-filter{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #qo-diag-root .qd-library-save-form{grid-template-columns:repeat(2,minmax(0,1fr))}
+ #qo-diag-root .qd-library-save-form button{grid-column:1/-1;justify-self:start}
+ #qo-diag-root .qd-chat-card .qd-chat-head{flex-direction:column;align-items:stretch;gap:9px}
+ #qo-diag-root .qd-chat-card .qd-chat-rating{justify-content:start}
+}
+@media(max-width:520px){
+ #qo-diag-root .qd-library-filter,#qo-diag-root .qd-library-save-form{grid-template-columns:1fr}
+ #qo-diag-root .qd-library-save-form button{grid-column:1}
+ #qo-diag-root .qd-library-heading{flex-wrap:wrap}
+ #qo-diag-root .qd-run-card.qd-chat-card{padding:12px}
+ #qo-diag-root .qd-chat-card .qd-chat-rating{gap:6px;flex-wrap:wrap}
+ #qo-diag-root .qd-chat-card .qd-chat-rating button{flex:1 1 105px;min-width:0}
+ #qo-diag-root .qd-chat-card .qd-chat-rating button[data-mark="partial"]{flex:1 1 100%}
+ #qo-diag-root .qd-chat-card .qd-chat-answer{margin-left:0}
+}
