@@ -2,17 +2,19 @@
 'use strict';
 // TASK099: interactive diagnostic documents for Quantum Writer.
 const QD_STATES = Object.freeze(['yes','partial','no']);
-const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50});
+const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
 let qdMode = 'builder';
 let qdRevealed = new Set();
+let qdStudentFilter = '';
+let qdDraggedQuestion = '';
 const qdVerified = new WeakSet();
 const qdNewId = () => 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,9);
 const qdText = (value,max=1200) => typeof value==='string'?value.slice(0,max):'';
 const qdEsc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const qdDefault = () => ({
   format:'quantum-diagnostic',version:1,title:'Диагностика знаний',description:'',
-  sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:''}]}],
-  session:{student:'',marks:{}},history:[]
+  sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50}]}],
+  students:[],session:{student:'',studentId:'',marks:{}},history:[]
 });
 function qdNormalize(raw){
   const data=qdDefault();
@@ -35,7 +37,8 @@ function qdNormalize(raw){
           if(count>=QD_LIMITS.questions)break;
           if(!q||typeof q!=='object')continue;
           section.questions.push({id:id(q.id),type:q.type==='practice'?'practice':'question',
-            prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500)});
+            prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),
+            points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit)});
           count++;
         }
       }
@@ -43,8 +46,13 @@ function qdNormalize(raw){
     }
   }
   const questionIds=new Set(data.sections.flatMap(s=>s.questions.map(q=>q.id)));
+  if(Array.isArray(raw.students)) data.students=raw.students.slice(0,QD_LIMITS.students)
+    .filter(s=>s&&typeof s==='object'&&qdText(s.name,100).trim())
+    .map(s=>({id:id(s.id),name:qdText(s.name,100).trim()}));
+  const studentIds=new Set(data.students.map(s=>s.id));
   const session=raw.session&&typeof raw.session==='object'?raw.session:{};
-  data.session={student:qdText(session.student,100),marks:{}};
+  data.session={student:qdText(session.student,100),
+    studentId:studentIds.has(session.studentId)?session.studentId:'',marks:{}};
   if(session.marks&&typeof session.marks==='object'&&!Array.isArray(session.marks)){
     for(const [key,state] of Object.entries(session.marks)){
       if(questionIds.has(key)&&QD_STATES.includes(state))data.session.marks[key]=state;
@@ -63,7 +71,8 @@ function qdNormalize(raw){
         yes:x.yes,partial:x.partial,no:x.no,rated:x.rated,total:x.total,percent:Math.min(100,x.percent)
       }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
-        student:qdText(h.student,100),title:qdText(h.title,120),marks,summary};
+        student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
+        title:qdText(h.title,120),marks,summary};
     });
   }
   return data;
@@ -80,16 +89,64 @@ function qdDoc(){
 function qdQuestionList(d=qdDoc()){
   return d.sections.flatMap(s=>s.questions.map(q=>({...q,section:s.title})));
 }
+function qdPoints(value){return Number.isInteger(value)&&value>=1&&value<=10?value:2;}
+function qdPartialCredit(value){return Number.isInteger(value)&&value>=0&&value<=100?value:50;}
+function qdScoreNumber(n){return Math.round(n*10)/10;}
 function qdScores(questions,marks){
-  let yes=0,partial=0,no=0;
+  let yes=0,partial=0,no=0,earned=0,possible=0,maxPoints=0;
   for(const q of questions){
-    const mark=marks[q.id];
-    if(mark==='yes')yes++;
-    if(mark==='partial')partial++;
-    if(mark==='no')no++;
+    const points=qdPoints(q.points),state=marks?.[q.id];
+    maxPoints+=points;
+    if(state==='yes'){yes++;earned+=points;possible+=points;}
+    if(state==='partial'){partial++;earned+=points*qdPartialCredit(q.partialCredit)/100;possible+=points;}
+    if(state==='no'){no++;possible+=points;}
   }
   const rated=yes+partial+no;
-  return {yes,partial,no,rated,total:questions.length,percent:rated?Math.round((2*yes+partial)/(2*rated)*100):0};
+  return {yes,partial,no,rated,total:questions.length,
+    earned:qdScoreNumber(earned),possible:qdScoreNumber(possible),maxPoints:qdScoreNumber(maxPoints),
+    percent:possible?Math.round(earned/possible*100):0};
+}
+function qdMoveQuestion(d,qid,destSid,targetQid='',after=false){
+  const source=d.sections.find(s=>s.questions.some(q=>q.id===qid));
+  const dest=d.sections.find(s=>s.id===destSid);
+  if(!source||!dest||qid===targetQid)return false;
+  const index=source.questions.findIndex(q=>q.id===qid);
+  const [question]=source.questions.splice(index,1);
+  let destinationIndex=targetQid?dest.questions.findIndex(q=>q.id===targetQid):-1;
+  if(destinationIndex<0)destinationIndex=dest.questions.length;
+  else if(after)destinationIndex++;
+  dest.questions.splice(destinationIndex,0,question);
+  return true;
+}
+function qdDuplicateQuestion(d,qid){
+  if(qdQuestionList(d).length>=QD_LIMITS.questions)return false;
+  const section=d.sections.find(s=>s.questions.some(q=>q.id===qid));
+  if(!section)return false;
+  const index=section.questions.findIndex(q=>q.id===qid),orig=section.questions[index];
+  section.questions.splice(index+1,0,{...orig,id:qdNewId()});
+  return true;
+}
+function qdShiftQuestion(d,qid,step){
+  const section=d.sections.find(s=>s.questions.some(q=>q.id===qid));
+  if(!section)return false;
+  const index=section.questions.findIndex(q=>q.id===qid),other=index+step;
+  if(other<0||other>=section.questions.length)return false;
+  [section.questions[index],section.questions[other]]=[section.questions[other],section.questions[index]];
+  return true;
+}
+function qdAddStudent(d,name){
+  name=qdText(name,100).trim();
+  if(!name)return null;
+  const found=d.students.find(s=>s.name.toLocaleLowerCase('ru-RU')===name.toLocaleLowerCase('ru-RU'));
+  if(found)return found;
+  if(d.students.length>=QD_LIMITS.students)return null;
+  const entry={id:qdNewId(),name};d.students.push(entry);return entry;
+}
+function qdStudentResults(d,studentId){
+  const student=d.students.find(s=>s.id===studentId);
+  if(!student)return [];
+  return d.history.filter(h=>h.studentId===studentId||
+    (!h.studentId&&h.student.trim().toLocaleLowerCase('ru-RU')===student.name.toLocaleLowerCase('ru-RU')));
 }
 function qdStore(){qoPersistWriter();}
 function qdToolbar(){
