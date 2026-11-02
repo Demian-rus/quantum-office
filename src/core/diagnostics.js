@@ -7,6 +7,8 @@ let qdMode = 'builder';
 let qdRevealed = new Set();
 let qdStudentFilter = '';
 let qdDraggedQuestion = '';
+let qdPointerDrag = null;
+let qdPointerBound = false;
 const qdVerified = new WeakSet();
 const qdNewId = () => 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,9);
 const qdText = (value,max=1200) => typeof value==='string'?value.slice(0,max):'';
@@ -187,7 +189,7 @@ function qdBuilder(){
       <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
       ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
-          <span class="qd-drag-handle" draggable="true" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
+          <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
           <span class="qd-counter">Вопрос ${qi+1}</span>
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
             <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
@@ -367,6 +369,13 @@ function qoDiagnosticMount(){
   root.addEventListener('dragover',qdDragOver);
   root.addEventListener('drop',qdDrop);
   root.addEventListener('dragend',qdDragEnd);
+  root.addEventListener('pointerdown',qdPointerDown);
+  if(!qdPointerBound){
+    window.addEventListener('pointermove',qdPointerMove,true);
+    window.addEventListener('pointerup',qdPointerUp,true);
+    window.addEventListener('pointercancel',qdPointerCancel,true);
+    qdPointerBound=true;
+  }
   qoDiagnosticVisibility();
 }
 function qdOnClick(event){
@@ -458,6 +467,43 @@ function qdOnClick(event){
   }
 }
 
+
+function qdPointerDown(event){
+  const handle=event.target.closest?.('[data-qd-drag]');
+  if(!handle||qdMode!=='builder'||event.button!==0)return;
+  qdPointerDrag={id:handle.dataset.qdDrag,x:event.clientX,y:event.clientY,pointerId:event.pointerId,active:false};
+  event.preventDefault();
+}
+function qdPointerLocation(event){
+  const element=document.elementFromPoint(event.clientX,event.clientY);
+  if(!element?.closest('#qo-diag-root'))return null;
+  const zone=element.closest('[data-qd-drop-section]');
+  if(!zone)return null;
+  const card=element.closest('.qd-edit-card');
+  return {zone,card};
+}
+function qdPointerMove(event){
+  const drag=qdPointerDrag;
+  if(!drag||event.pointerId!==drag.pointerId||qdMode!=='builder')return;
+  if(!drag.active&&Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<7)return;
+  drag.active=true;
+  const location=qdPointerLocation(event);
+  document.querySelectorAll('#qo-diag-root .qd-drop-target').forEach(el=>el.classList.remove('qd-drop-target'));
+  (location?.card||location?.zone)?.classList.add('qd-drop-target');
+}
+function qdPointerUp(event){
+  const drag=qdPointerDrag;
+  if(!drag||event.pointerId!==drag.pointerId)return;
+  const location=drag.active?qdPointerLocation(event):null;
+  qdPointerDrag=null;qdDragEnd();
+  if(!location||qdMode!=='builder')return;
+  const rect=location.card?.getBoundingClientRect();
+  const after=!!rect&&event.clientY>rect.top+rect.height/2;
+  if(qdMoveQuestion(qdDoc(),drag.id,location.zone.dataset.qdDropSection,location.card?.dataset.qid||'',after)){
+    qdStore();qdRefresh();
+  }
+}
+function qdPointerCancel(){qdPointerDrag=null;qdDragEnd();}
 function qdDragStart(event){
   const handle=event.target.closest?.('[data-qd-drag]');
   if(!handle||qdMode!=='builder')return;
