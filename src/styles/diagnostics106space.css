@@ -1,0 +1,51 @@
+/* TASK106 — use the available desktop width rather than an arbitrary 900px island.
+   The A4 document canvas is intentionally unchanged; these rules target only diagnostics. */
+.qo-document-workspace .qo-diag-scroll{
+  box-sizing:border-box;
+  padding:18px clamp(12px,2.15vw,38px) 36px;
+  background:var(--qo-bg)
+}
+#qo-diag-root{width:100%;max-width:1540px;margin-inline:auto}
+#qo-diag-root .qd-guided{max-width:1230px}
+#qo-diag-root.qd-focused-root .qd-session-drawer{max-width:1230px}
+#qo-diag-root .qd-builder{max-width:none}
+#qo-diag-root .qd-section,#qo-diag-root .qd-editor-section{width:100%;min-width:0}
+#qo-diag-root .qd-library-filter,#qo-diag-root .qd-manage-filter{width:100%}
+#qo-diag-root .qd-run-card.qd-chat-card{width:100%;min-width:0}
+#qo-diag-root .qd-library-grid{grid-template-columns:repeat(auto-fit,minmax(275px,1fr))}
+#qo-diag-root .qd-chat-card .qd-chat-head{gap:20px}
+#qo-diag-root .qd-chat-card .qd-chat-head>.qd-question{flex:1 1 57%}
+#qo-diag-root .qd-chat-card .qd-chat-head>.qd-rating{flex:0 0 auto}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"]{
+  min-width:100%;
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group:last-child{
+  flex:1 1 280px;
+  min-width:260px;
+  justify-content:stretch
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group-body{
+  min-width:0;display:flex;gap:6px
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-text{
+  max-width:none;
+  font-size:12px;line-height:1.5;
+  color:var(--qo-muted);
+  display:flex;align-items:center
+}
+.qo-document-workspace .qo-diag-ribbon-active{
+  color:var(--qo-accent)!important;
+  border-color:var(--qo-accent-border)!important;
+  background:var(--qo-accent-soft)!important;
+}
+@media(max-width:900px){
+  .qo-document-workspace .qo-diag-scroll{padding-inline:14px}
+  #qo-diag-root .qd-chat-card .qd-chat-head>.qd-question{flex:auto}
+  #qo-diag-root .qd-chat-card .qd-chat-head>.qd-rating{flex:auto}
+}
+@media(max-width:560px){
+ .qo-document-workspace .qo-diag-scroll{padding:11px 9px 30px}
+ #qo-diag-root .qd-library-grid{grid-template-columns:minmax(0,1fr)}
+ #qo-diag-root .qd-library-card{min-height:0}
+ #qo-diag-root .qd-chat-card .qd-chat-head{gap:7px}
+}
