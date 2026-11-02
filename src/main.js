@@ -732,8 +732,8 @@ const qoWriterDefaults=()=>({margin:20,font:'Georgia',size:16,line:1.55,pageNumb
 function qoWriterLayout(){
  const x=qoWriter.layout&&typeof qoWriter.layout==='object'?qoWriter.layout:{};
  return {margin:[12,15,20,25,30].includes(+x.margin)?+x.margin:20,
-  font:['Georgia','Arial','Times New Roman','Segoe UI','Verdana'].includes(x.font)?x.font:'Georgia',
-  size:[12,14,16,18,20].includes(+x.size)?+x.size:16,
+  font:['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New'].includes(x.font)?x.font:'Georgia',
+  size:Number.isInteger(+x.size)&&+x.size>=8&&+x.size<=96?+x.size:16,
   line:[1.2,1.4,1.55,1.8,2].includes(+x.line)?+x.line:1.55,
   pageNumber:x.pageNumber!==false};
 }
