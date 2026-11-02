@@ -929,6 +929,32 @@ function qdLibraryLoad(d,id,source){
   qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
   qdStore();return true;
 }
+
+function qdLibraryExport(){
+  download('QuantumOffice-templates.qtpl',JSON.stringify({format:'quantum-templates',version:1,
+    templates:qdLibraryRead()},null,2),'application/json;charset=utf-8');
+}
+function qdLibraryImport(text){
+  let payload;
+  try{payload=JSON.parse(text);}catch(_){return {ok:false,message:'Повреждённый файл'};}
+  if(payload?.format!=='quantum-templates'||payload.version!==1||!Array.isArray(payload.templates))
+    return {ok:false,message:'Файл должен содержать библиотеку .qtpl'};
+  if(payload.templates.length>QD_LIMITS.templates)return {ok:false,message:'В файле слишком много шаблонов'};
+  const current=qdLibraryRead(),room=QD_LIMITS.templates-current.length;
+  if(payload.templates.length>room)return {ok:false,message:'Недостаточно места в библиотеке — удалите лишние шаблоны'};
+  const names=new Set(current.map(x=>x.title.toLocaleLowerCase('ru-RU')));
+  const incoming=[];
+  for(const value of payload.templates){
+    const item=qdLibrarySafe(value);
+    if(!item)return {ok:false,message:'Найден повреждённый шаблон'};
+    if(names.has(item.title.toLocaleLowerCase('ru-RU')))continue;
+    item.id=qdNewId();names.add(item.title.toLocaleLowerCase('ru-RU'));incoming.push(item);
+  }
+  if(!qdLibraryWrite([...incoming,...current]))
+    return {ok:false,message:'Недостаточно памяти для импортированной библиотеки'};
+  return {ok:true,count:incoming.length};
+}
+
 function qdLibraryView(){
   const items=qdLibraryItems(),total=QD_PRESETS.length+qdLibraryRead().length;
   const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
@@ -947,7 +973,10 @@ function qdLibraryView(){
       '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
       '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
       '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
-      '<p class="qd-hint">Для переноса на другое устройство сохраните отдельный файл .qdiag.</p></section>'+
+      '<div class="qd-library-portable"><button type="button" data-qd-action="library-export">Скачать библиотеку .qtpl</button>'+
+      '<button type="button" data-qd-action="library-import">Импорт .qtpl</button>'+
+      '<input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden></div>'+
+      '<p class="qd-hint">Для переносимости между версиями HTML сохраняйте библиотеку в .qtpl. Локальное хранилище зависит от файла и настроек браузера.</p></section>'+
   '</div>';
 }
 function qdLibraryCards(items){
@@ -1237,6 +1266,8 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdRefresh();status('Шаблон сохранён в библиотеку на этом устройстве');return;
   }
+  if(action==='library-export'){qdLibraryExport();return;}
+  if(action==='library-import'){document.getElementById('qd-library-file')?.click();return;}
   if(action==='library-delete'){
     if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
     if(qdLibraryDelete(button.dataset.template)){qdRefresh();status('Шаблон удалён');}
@@ -1645,6 +1676,17 @@ function qdOnChange(event){
     if(qdAuto(q.type))q.choices=qdChoices(q.choices);
     delete d.session.marks[q.id];delete d.session.responses[q.id];
     qdStore();qdRefresh();return;
+  }
+  if(event.target.id==='qd-library-file'){
+    const file=event.target.files?.[0];event.target.value='';
+    if(!file)return;
+    if(file.size>2_000_000){status('Слишком большой файл шаблонов',true);return;}
+    file.text().then(content=>{
+      const result=qdLibraryImport(content);
+      if(!result.ok){status(result.message,true);return;}
+      qdRefresh();status('Импортировано шаблонов: '+result.count);
+    }).catch(()=>status('Не удалось прочитать библиотеку',true));
+    return;
   }
   if(event.target.id!=='qo-diag-file')return;
   const file=event.target.files?.[0];event.target.value='';
