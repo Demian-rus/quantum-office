@@ -2,6 +2,7 @@
 'use strict';
 // TASK099: interactive diagnostic documents for Quantum Writer.
 const QD_STATES = Object.freeze(['yes','partial','no']);
+const QD_AUTO_TYPES = Object.freeze(['single','multiple','numeric']);
 const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
 let qdMode = 'builder';
 let qdRevealed = new Set();
@@ -15,7 +16,7 @@ const qdEsc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const qdDefault = () => ({
   format:'quantum-diagnostic',version:1,title:'Диагностика знаний',description:'',
   sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50}]}],
-  students:[],session:{student:'',studentId:'',marks:{}},history:[]
+  students:[],session:{student:'',studentId:'',marks:{},responses:{}},history:[]
 });
 function qdNormalize(raw){
   const data=qdDefault();
@@ -37,9 +38,11 @@ function qdNormalize(raw){
         for(const q of s.questions){
           if(count>=QD_LIMITS.questions)break;
           if(!q||typeof q!=='object')continue;
-          section.questions.push({id:id(q.id),type:q.type==='practice'?'practice':'question',
+          section.questions.push({id:id(q.id),type:qdType(q.type),
             prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),
-            points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit)});
+            points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit),
+            choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),
+            tolerance:qdTolerance(q.tolerance)});
           count++;
         }
       }
@@ -53,10 +56,15 @@ function qdNormalize(raw){
   const studentIds=new Set(data.students.map(s=>s.id));
   const session=raw.session&&typeof raw.session==='object'?raw.session:{};
   data.session={student:qdText(session.student,100),
-    studentId:studentIds.has(session.studentId)?session.studentId:'',marks:{}};
+    studentId:studentIds.has(session.studentId)?session.studentId:'',marks:{},responses:{}};
   if(session.marks&&typeof session.marks==='object'&&!Array.isArray(session.marks)){
     for(const [key,state] of Object.entries(session.marks)){
       if(questionIds.has(key)&&QD_STATES.includes(state))data.session.marks[key]=state;
+    }
+  }
+  if(session.responses&&typeof session.responses==='object'&&!Array.isArray(session.responses)){
+    for(const q of data.sections.flatMap(s=>s.questions)){
+      if(Object.hasOwn(session.responses,q.id))data.session.responses[q.id]=qdNormalizeResponse(q,session.responses[q.id]);
     }
   }
   if(Array.isArray(raw.history)){
@@ -91,6 +99,47 @@ function qdDoc(){
 }
 function qdQuestionList(d=qdDoc()){
   return d.sections.flatMap(s=>s.questions.map(q=>({...q,section:s.title})));
+}
+function qdType(value){
+  return ['question','practice',...QD_AUTO_TYPES].includes(value)?value:'question';
+}
+function qdAuto(type){return QD_AUTO_TYPES.includes(type);}
+function qdChoices(raw){
+  const values=Array.isArray(raw)?raw.slice(0,6):[];
+  const result=values.map(item=>({text:qdText(item?.text,240),correct:item?.correct===true}));
+  while(result.length<2)result.push({text:'',correct:false});
+  return result;
+}
+function qdTolerance(v){
+  return typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=1e9?v:0;
+}
+function qdParseNumber(value){
+  const s=String(value??'').trim().replaceAll(' ','').replace(',', '.');
+  if(!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d{1,3})?$/.test(s))return null;
+  const n=Number(s);return Number.isFinite(n)&&Math.abs(n)<=1e12?n:null;
+}
+function qdNormalizeResponse(q,response){
+  if(q.type==='numeric')return {value:qdText(response?.value,80)};
+  const selected=Array.isArray(response?.selected)?response.selected:[];
+  const indices=[...new Set(selected.filter(n=>Number.isInteger(n)&&n>=0&&n<q.choices.length))];
+  return {selected:q.type==='single'?indices.slice(0,1):indices.slice(0,6)};
+}
+function qdCheckAnswer(q,response){
+  if(!qdAuto(q.type))return null;
+  const value=qdNormalizeResponse(q,response);
+  if(q.type==='numeric'){
+    const expected=qdParseNumber(q.numericAnswer),received=qdParseNumber(value.value);
+    if(expected===null||received===null)return null;
+    return Math.abs(expected-received)<=qdTolerance(q.tolerance)+Number.EPSILON*Math.max(1,Math.abs(expected))*4?'yes':'no';
+  }
+  const options=qdChoices(q.choices),valid=options.every(o=>o.text.trim().length>0);
+  const correct=options.flatMap((o,i)=>o.correct?[i]:[]);
+  const selected=value.selected;
+  if(!valid||!correct.length||!selected.length||q.type==='single'&&correct.length!==1)return null;
+  const chosen=new Set(selected);
+  if(correct.length===selected.length&&correct.every(i=>chosen.has(i)))return 'yes';
+  if(q.type==='multiple'&&selected.every(i=>correct.includes(i)))return 'partial';
+  return 'no';
 }
 function qdPoints(value){return Number.isInteger(value)&&value>=1&&value<=10?value:2;}
 function qdPartialCredit(value){return Number.isInteger(value)&&value>=0&&value<=100?value:50;}
