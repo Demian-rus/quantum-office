@@ -71,7 +71,7 @@ const {pathToFileURL}=require('node:url');
  const savedDl=await savedPending;assert.match(savedDl.suggestedFilename(),/\.html$/);
 
  const qdiagPending=page.waitForEvent('download');
- await page.locator('[data-qd-action="export"]').click();
+ await page.locator('[data-action="writer-diag-export"]').click();
  const qdiag=await qdiagPending;
  const qdiagPath=path.join(root,'task101-smoke.qdiag');await qdiag.saveAs(qdiagPath);
  const data=JSON.parse(fs.readFileSync(qdiagPath,'utf8'));
