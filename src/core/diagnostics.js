@@ -190,12 +190,77 @@ function qdMoveQuestion(d,qid,destSid,targetQid='',after=false){
   dest.questions.splice(destinationIndex,0,question);
   return true;
 }
+
+/* TASK109 — rapid in-section authoring and safe independent section cloning. */
+let qdCollapsedSections=new Set();
+let qdQuickLastType='question';
+function qdCopyCard(q,independentId=true){
+  return {...q,id:independentId?qdNewId():q.id,
+    choices:qdChoices(q.choices).map(c=>({text:c.text,correct:!!c.correct}))};
+}
+function qdDuplicateSection(d,sid){
+  const source=d.sections.find(s=>s.id===sid);
+  if(!source)return {ok:false,message:'Раздел не найден'};
+  if(d.sections.length>=QD_LIMITS.sections)return {ok:false,message:'Максимум 24 раздела'};
+  if(qdQuestionList(d).length+source.questions.length>QD_LIMITS.questions)
+    return {ok:false,message:'Максимум 240 вопросов'};
+  const titles=new Set(d.sections.map(s=>qdPromptKey(s.title)));
+  const base=qdText(source.title,100).trim()+' — копия';
+  let title=base,suffix=2;
+  while(titles.has(qdPromptKey(title)))title=base+' '+suffix++;
+  title=qdText(title,120);
+  const copy={id:qdNewId(),title,questions:source.questions.map(q=>qdCopyCard(q))};
+  const index=d.sections.findIndex(s=>s.id===sid);
+  d.sections.splice(index+1,0,copy);
+  return {ok:true,id:copy.id,count:copy.questions.length};
+}
+function qdQuickAdd(d,sid,input){
+  const section=d.sections.find(s=>s.id===sid);
+  if(!section)return {ok:false,message:'Раздел не найден'};
+  if(qdQuestionList(d).length>=QD_LIMITS.questions)return {ok:false,message:'Максимум 240 вопросов'};
+  const prompt=qdText(input?.prompt,1600).trim(),answer=qdText(input?.answer,3500).trim();
+  const type=qdType(input?.type);
+  if(!prompt)return {ok:false,message:'Введите текст вопроса'};
+  if(!['question','practice','single','multiple','numeric'].includes(type))
+    return {ok:false,message:'Неизвестный тип'};
+  const q={id:qdNewId(),type,prompt,answer,points:2,partialCredit:50,
+    choices:qdChoices(),numericAnswer:'',tolerance:0};
+  if(type==='numeric'&&qdParseNumber(answer)!==null)q.numericAnswer=answer;
+  section.questions.push(q);
+  return {ok:true,id:q.id};
+}
+function qdQuickMarkup(s){
+  return '<div class="qd-quick-entry" data-qd-quick-sid="'+qdEsc(s.id)+'">'+
+    '<div class="qd-quick-header"><strong>Быстро добавить вопрос</strong>'+
+      '<span>Enter в вопросе · Ctrl+Enter в ответе</span></div>'+
+    '<div class="qd-quick-fields">'+
+      '<label>Вопрос<input data-qd-quick="prompt" maxlength="1600" placeholder="Что спросить у ученика?" aria-label="Новый вопрос"></label>'+
+      '<label>Ответ преподавателя<textarea data-qd-quick="answer" maxlength="3500" rows="2" placeholder="Ответ или решение" aria-label="Ответ для нового вопроса"></textarea></label>'+
+      '<label>Тип<select data-qd-quick="type" aria-label="Тип нового вопроса">'+
+      [['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько ответов'],['numeric','Число']]
+        .map(([value,title])=>'<option value="'+value+'" '+(qdQuickLastType===value?'selected':'')+'>'+title+'</option>').join('')+
+      '</select></label>'+
+      '<button type="button" class="qd-primary" data-qd-action="quick-add" data-sid="'+qdEsc(s.id)+'">+ Добавить</button>'+
+    '</div><p class="qd-hint">Для тестовых вопросов варианты ответа можно настроить в добавленной карточке.</p></div>';
+}
+function qdQuickKeydown(event){
+  if(qdMode!=='builder'||event.isComposing||event.altKey||event.metaKey)return;
+  const field=event.target?.dataset?.qdQuick;
+  if(!field||event.key!=='Enter')return;
+  const trigger=field==='prompt'&&!event.shiftKey&&!event.ctrlKey||
+    field==='answer'&&event.ctrlKey;
+  if(!trigger)return;
+  const pane=event.target.closest('[data-qd-quick-sid]');
+  const button=pane?.querySelector('[data-qd-action="quick-add"]');
+  if(button&&!button.disabled){event.preventDefault();button.click();}
+}
+
 function qdDuplicateQuestion(d,qid){
   if(qdQuestionList(d).length>=QD_LIMITS.questions)return false;
   const section=d.sections.find(s=>s.questions.some(q=>q.id===qid));
   if(!section)return false;
   const index=section.questions.findIndex(q=>q.id===qid),orig=section.questions[index];
-  section.questions.splice(index+1,0,{...orig,id:qdNewId()});
+  section.questions.splice(index+1,0,qdCopyCard(orig));
   return true;
 }
 function qdShiftQuestion(d,qid,step){
@@ -461,6 +526,7 @@ function qdApplyFilterUI(){
       if(show)shown++;
     }
     section.hidden=!shown&&(active||!!section.querySelector('.qd-edit-card'));
+    section.classList.toggle('qd-section-collapsed',!active&&qdCollapsedSections.has(section.dataset.section));
   }
   const count=root.querySelector('#qd-filter-count');
   if(count)count.textContent='Найдено '+visible.size+' из '+qdQuestionList(d).length;
@@ -499,14 +565,17 @@ function qdBuilder(){
     ${qdBuilderUtilities(d)}
     ${qdBatchToolbar(d)}
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
-    ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
+    ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section ${qdCollapsedSections.has(s.id)?'qd-section-collapsed':''}" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
         <span class="qd-index">${si+1}</span>
         <label>Название раздела<input data-qd-field="section" data-sid="${qdEsc(s.id)}" maxlength="120" value="${qdEsc(s.title)}"></label>
         <div class="qd-section-actions">
           <button data-qd-action="section-up" data-sid="${qdEsc(s.id)}" type="button" ${si===0?'disabled':''} title="Раздел выше" aria-label="Раздел выше">↑</button>
           <button data-qd-action="section-down" data-sid="${qdEsc(s.id)}" type="button" ${si===d.sections.length-1?'disabled':''} title="Раздел ниже" aria-label="Раздел ниже">↓</button>
-          <button data-qd-action="delete-section" data-sid="${qdEsc(s.id)}" type="button">Удалить</button>
+          <button data-qd-action="section-collapse" data-sid="${qdEsc(s.id)}" type="button"
+     aria-expanded="${!qdCollapsedSections.has(s.id)}">${qdCollapsedSections.has(s.id)?'Развернуть':'Свернуть'}</button>
+   <button data-qd-action="duplicate-section" data-sid="${qdEsc(s.id)}" type="button" title="Копировать раздел вместе с заданиями">Копия раздела</button>
+   <button data-qd-action="delete-section" data-sid="${qdEsc(s.id)}" type="button">Удалить</button>
         </div>
       </div>
       <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
@@ -560,7 +629,8 @@ function qdBuilder(){
           ${d.sections.filter(other=>other.id!==s.id).map(other=>`<option value="${qdEsc(other.id)}">${qdEsc(other.title)}</option>`).join('')}</select></label>
         </div>
       </article>`).join('')}</div>
-      <button type="button" data-qd-action="add-question" data-sid="${qdEsc(s.id)}">+ Добавить вопрос</button></section>`).join('')}
+      ${qdQuickMarkup(s)}
+       <button type="button" data-qd-action="add-question" data-sid="${qdEsc(s.id)}">+ Пустая карточка</button></section>`).join('')}
     <section class="qd-panel qd-roster">
       <div class="qd-row qd-wrap"><h2>Ученики</h2><span class="qd-muted">${d.students.length} / ${QD_LIMITS.students}</span></div>
       <p class="qd-hint">Список хранится внутри этой диагностики. Сохранённые результаты привязаны к ученику и не удаляются при смене имени.</p>
@@ -1418,6 +1488,7 @@ function qoDiagnosticVisibility(){
 function qoDiagnosticMount(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   root.addEventListener('click',qdOnClick);
+  root.addEventListener('keydown',qdQuickKeydown);
   root.addEventListener('input',qdOnInput);
   root.addEventListener('change',qdOnChange);
   root.addEventListener('toggle',qdOnBuilderToggle,true);
@@ -1640,6 +1711,32 @@ function qdOnClick(event){
     qdSample();qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
 
+  if(action==='section-collapse'){
+    const sid=button.dataset.sid;
+    if(!d.sections.some(s=>s.id===sid))return;
+    if(qdCollapsedSections.has(sid))qdCollapsedSections.delete(sid);
+    else qdCollapsedSections.add(sid);
+    qdRefresh();return;
+  }
+  if(action==='duplicate-section'){
+    const result=qdDuplicateSection(d,button.dataset.sid);
+    if(!result.ok){status(result.message,true);return;}
+    qdCollapsedSections.delete(result.id);
+    qdStore();qdRefresh();status('Раздел скопирован: '+result.count+' вопросов');return;
+  }
+  if(action==='quick-add'){
+    const section=button.closest('[data-qd-quick-sid]');
+    if(!section)return;
+    const get=field=>section.querySelector('[data-qd-quick="'+field+'"]')?.value||'';
+    const input={prompt:get('prompt'),answer:get('answer'),type:get('type')};
+    const result=qdQuickAdd(d,section.dataset.qdQuickSid,input);
+    if(!result.ok){status(result.message,true);return;}
+    qdQuickLastType=input.type;qdStore();qdRefresh();
+    const refreshed=[...document.querySelectorAll('[data-qd-quick-sid]')]
+      .find(el=>el.dataset.qdQuickSid===section.dataset.qdQuickSid);
+    refreshed?.querySelector('[data-qd-quick="prompt"]')?.focus({preventScroll:true});
+    status('Вопрос добавлен');return;
+  }
   if(action==='section-up'||action==='section-down'){
     const index=d.sections.findIndex(s=>s.id===button.dataset.sid),other=index+(action==='section-up'?-1:1);
     if(index<0||other<0||other>=d.sections.length)return;
