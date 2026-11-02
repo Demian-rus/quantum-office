@@ -61,6 +61,9 @@ test('TASK101 imported QDIAG limits inputs and preserves older question types an
   assert.equal(d.session.responses.m.selected.length,1);
   assert.equal(d.session.responses.n.value,'42');
   assert.equal(d.sections[0].questions[2].tolerance,0.5);
+  const reopened=h.qdNormalize({sections:[{id:'sec',questions:[{id:'s',type:'single',choices:[{text:'A',correct:true},{text:'B',correct:false}]}]}],
+    history:[{student:'X',marks:{s:'yes'},responses:{s:{selected:[0,0,3,99]}}}]});
+  assert.deepEqual([...reopened.history[0].responses.s.selected],[0,3]);
   assert.equal(h.qdNormalize({sections:[{questions:[{type:'random',choices:Array(10).fill({text:'x',correct:true}),tolerance:-1}]}]}).sections[0].questions[0].type,'question');
   assert.equal(h.qdType('numeric'),'numeric');
   assert.equal(h.qdChoices().length,4);
