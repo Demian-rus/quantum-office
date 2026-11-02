@@ -32,9 +32,11 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.evaluate(()=>qdQuestionList()[0].partialCredit),25);
 
   const before=await page.evaluate(()=>qdDoc().sections[0].questions.map(q=>q.id));
+  await page.evaluate(()=>{window._qdDragTrace=[];for(const type of ['dragstart','dragenter','dragover','drop','dragend'])document.getElementById('qo-diag-root').addEventListener(type,e=>window._qdDragTrace.push({type,tag:e.target.tagName,cls:e.target.className,inside:!!e.target.closest?.('[data-qd-drop-section]'),active:qdDraggedQuestion}),true);});
   const targetBox=await page.locator('.qd-edit-card').nth(1).boundingBox();
   await page.locator('.qd-drag-handle').first().dragTo(page.locator('.qd-edit-card').nth(1),{targetPosition:{x:15,y:targetBox.height-12}});
   const after=await page.evaluate(()=>qdDoc().sections[0].questions.map(q=>q.id));
+  console.log('TASK100 drag trace',JSON.stringify(await page.evaluate(()=>({events:window._qdDragTrace,before:qdDoc().sections[0].questions.map(q=>q.id)}))));
   assert.notDeepEqual(before,after,'drag and drop must reorder actual model');
 
   const moved=after[0];
