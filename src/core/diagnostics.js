@@ -3,6 +3,18 @@
 // TASK099: interactive diagnostic documents for Quantum Writer.
 const QD_STATES = Object.freeze(['yes','partial','no']);
 const QD_AUTO_TYPES = Object.freeze(['single','multiple','numeric']);
+function qdHistoryResponses(raw){
+  const result={};
+  if(!raw||typeof raw!=='object'||Array.isArray(raw))return result;
+  for(const [key,v] of Object.entries(raw).slice(0,QD_LIMITS.questions)){
+    if(!/^[\w-]{1,60}$/.test(key)||!v||typeof v!=='object')continue;
+    if(typeof v.value==='string')result[key]={value:qdText(v.value,80)};
+    else if(Array.isArray(v.selected)){
+      result[key]={selected:[...new Set(v.selected.filter(i=>Number.isInteger(i)&&i>=0&&i<6))].slice(0,6)};
+    }
+  }
+  return result;
+}
 const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
 let qdMode = 'builder';
 let qdRevealed = new Set();
@@ -69,7 +81,7 @@ function qdNormalize(raw){
   }
   if(Array.isArray(raw.history)){
     data.history=raw.history.slice(-QD_LIMITS.history).filter(h=>h&&typeof h==='object').map(h=>{
-      const marks={};
+      const marks={},responses=qdHistoryResponses(h.responses);
       if(h.marks&&typeof h.marks==='object'&&!Array.isArray(h.marks)){
         for(const [key,state] of Object.entries(h.marks)){
           if(/^[\w-]{1,60}$/.test(key)&&QD_STATES.includes(state))marks[key]=state;
@@ -83,7 +95,7 @@ function qdNormalize(raw){
       }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
         student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
-        title:qdText(h.title,120),marks,summary,
+        title:qdText(h.title,120),marks,responses,summary,
         topics:Array.isArray(h.topics)?h.topics.slice(0,QD_LIMITS.sections).filter(t=>t&&typeof t==='object')
           .map(t=>({name:qdText(t.name,120),rated:Number.isInteger(t.rated)&&t.rated>=0&&t.rated<=240?t.rated:0,
             total:Number.isInteger(t.total)&&t.total>=0&&t.total<=240?t.total:0,
