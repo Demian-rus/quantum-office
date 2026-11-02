@@ -15,7 +15,7 @@ function qdHistoryResponses(raw){
   }
   return result;
 }
-const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80});
+const QD_LIMITS = Object.freeze({sections:24,questions:240,history:50,students:80,templates:30});
 let qdMode = 'builder';
 let qdRevealed = new Set();
 let qdStudentFilter = '';
@@ -227,6 +227,8 @@ function qdToolbar(){
     <div><span class="qd-eyebrow">QUANTUM WRITER · ИНТЕРАКТИВНЫЙ ДОКУМЕНТ</span>
     <h1>${qdEsc(d.title)}</h1><p>${qdEsc(d.description||'Создавайте вопросы, открывайте ответы и отмечайте знания ученика.')}</p></div>
     <div class="qd-actions" role="group" aria-label="Режим работы">
+      <button type="button" data-qd-action="mode" data-mode="library" class="${qdMode==='library'?'active':''}"
+        aria-pressed="${qdMode==='library'}">Шаблоны</button>
       <button type="button" data-qd-action="mode" data-mode="builder" class="${qdMode==='builder'?'active':''}" aria-pressed="${qdMode==='builder'}">Конструктор</button>
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
     </div></div>`;
@@ -894,7 +896,7 @@ function qdApplyTemplate(d,key){
   const template=qdTemplate(key);if(!template)return false;
   d.title=template.title;d.description=template.description;d.sections=template.sections;
   d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
-  d.display={mode:'focus',activeId:''};qdStudentFilter='';qdRevealed.clear();
+  d.display={mode:'list',activeId:''};qdStudentFilter='';qdRevealed.clear();
   qdStore();return true;
 }
 function qdReviewItems(d,marks=d.session.marks){
@@ -929,7 +931,8 @@ function qdRefresh(){
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
-  root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
+  root.classList.toggle('qd-library-root',qdMode==='library');
+  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
@@ -982,7 +985,11 @@ function qdRefreshAudit(){
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
-  if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
+  if(action==='mode'){
+    qdMode=['run','builder','library'].includes(button.dataset.mode)?button.dataset.mode:'builder';
+    if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
+    qdRevealed.clear();qdRefresh();return;
+  }
 
   if(action==='review-jump'){
     const index=qdQuestionList(d).findIndex(q=>q.id===button.dataset.qid);
