@@ -442,6 +442,10 @@ function qdGuidedQuestions(d,all,s){
         }).join('')}
       </div>
     </details>
+    <div class="qd-guided-finish">
+      <span>Оценено ${s.rated} из ${s.total}</span>
+      <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
+    </div>
     <p class="qd-shortcuts">Клавиши: 1 — знает, 2 — частично, 3 — не знает, ← → — переключение, R — ответ.</p>
   </section>`;
 }
@@ -452,6 +456,8 @@ function qdRun(){
   const scores=history.map(h=>h.summary||qdScores(all,h.marks)).filter(x=>x.rated);
   const average=scores.length?Math.round(scores.reduce((n,x)=>n+x.percent,0)/scores.length):null;
   return `<div class="qd-session">
+    ${qdDisplay(d).mode==='focus'?`<details class="qd-session-drawer">
+      <summary>Ученик: ${qdEsc(d.session.student||'не выбран')} <span>Настройки занятия</span></summary>`:''}
     <div class="qd-panel qd-session-panel">
       <div class="qd-student-chooser">
         <label>Из списка учеников<select data-qd-field="student-select" aria-label="Выбрать ученика">
@@ -461,9 +467,10 @@ function qdRun(){
       </div>
       <div class="qd-row qd-wrap">
         <button type="button" data-qd-action="reset">Начать заново</button>
-        <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
+        ${qdDisplay(d).mode==='list'?`<button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>`:''}
       </div>
     </div>
+    ${qdDisplay(d).mode==='focus'?'</details>':''}
     <div class="qd-view-switch" role="group" aria-label="Вид проведения">
       <button type="button" data-qd-action="view" data-view="focus" aria-pressed="${qdDisplay(d).mode==='focus'}"
         class="${qdDisplay(d).mode==='focus'?'active':''}">По одному</button>
@@ -589,6 +596,7 @@ function qdSample(){
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.innerHTML=qdToolbar()+(qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
