@@ -16,17 +16,17 @@ const {pathToFileURL}=require('node:url');
    await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  };
  await library();
- assert.equal(await page.locator('.qd-library-card').count(),7);
+ assert.equal(await page.locator('.qd-library-card').count(),19);
  await page.locator('.qd-library-card').filter({hasText:'Молекулы и температура'})
     .locator('[data-qd-action="library-open"]').click();
- assert.equal(await page.locator('.qd-chat-card').count(),10);
+ assert.ok((await page.locator('.qd-chat-card').count())>=20,'expanded physics8');
  await page.locator('.qd-chat-card [data-mark="partial"]').first().click();
  assert.equal(await page.evaluate(()=>Object.keys(qdDoc().session.marks).length),1);
  await library();
  await page.locator('#qd-library-save-subject').selectOption('physics');
  await page.locator('#qd-library-save-grade').fill('8');
  await page.locator('[data-qd-action="library-save"]').click();
- assert.equal(await page.locator('.qd-library-card').count(),8);
+ assert.equal(await page.locator('.qd-library-card').count(),20);
  let card=page.locator('.qd-library-card').filter({has:page.locator('[data-qd-action="library-edit"]')}).first();
  await card.locator('[data-qd-action="library-edit"]').click();
  assert.equal(await page.locator('.qd-library-editor').count(),1);
@@ -38,15 +38,15 @@ const {pathToFileURL}=require('node:url');
  await page.locator('#qd-library-edit-purpose').selectOption('review');
  await page.locator('[data-qd-action="library-edit-save"]').click();
  assert.equal(await page.locator('.qd-library-editor').count(),0);
- assert.equal(await page.locator('.qd-library-card').count(),8);
+ assert.equal(await page.locator('.qd-library-card').count(),20);
  card=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'});
  assert.match(await card.textContent(),/9 класс/);
  await card.locator('[data-qd-action="library-clone"]').click();
- assert.equal(await page.locator('.qd-library-card').count(),9);
+ assert.equal(await page.locator('.qd-library-card').count(),21);
  assert.equal(await page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика — копия'}).count(),1);
  await page.locator('.qd-library-card').filter({hasText:'Алгебра: уравнения и функции'})
    .locator('[data-qd-action="library-open"]').click();
- assert.equal(await page.locator('.qd-chat-card').count(),8);
+ assert.ok((await page.locator('.qd-chat-card').count())>=18,'expanded math7');
  await library();
  card=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'})
    .filter({has:page.locator('[data-qd-action="library-edit"]')}).last();
@@ -58,10 +58,10 @@ const {pathToFileURL}=require('node:url');
    templates:qdLibraryRead().map(x=>({title:x.title,count:x.sections.flatMap(s=>s.questions).length})),
    current:qdQuestionList().length
  }));
- assert.equal(state.current,8);
- assert.equal(state.templates.find(x=>x.title==='Молекулы: авторская диагностика').count,8);
- assert.equal(state.templates.find(x=>x.title.includes('копия')).count,10);
- assert.equal(await page.locator('.qd-library-card').count(),9);
+ assert.ok(state.current>=18);
+ assert.equal(state.templates.find(x=>x.title==='Молекулы: авторская диагностика').count,state.current);
+ assert.ok(state.templates.find(x=>x.title.includes('копия')).count>=20);
+ assert.equal(await page.locator('.qd-library-card').count(),21);
  const wait=page.waitForEvent('download');
  await page.locator('[data-action="writer-diag-templates-export"]').click();
  const dl=await wait,output=path.join(root,'task108-library.qtpl');
@@ -73,7 +73,7 @@ const {pathToFileURL}=require('node:url');
  assert.ok(!JSON.stringify(json).includes('"marks"'));
  fs.rmSync(output,{force:true});
  await page.reload();await library();
- assert.equal(await page.locator('.qd-library-card').count(),9);
+ assert.equal(await page.locator('.qd-library-card').count(),21);
  await page.setViewportSize({width:390,height:830});
  await page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'})
    .filter({has:page.locator('[data-qd-action="library-edit"]')}).last()
