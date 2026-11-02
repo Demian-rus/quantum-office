@@ -84,7 +84,7 @@ function qdDoc(){
     qoWriter.diagnostic=qdNormalize(qoWriter.diagnostic);
     qdMode=qoWriter.diagnosticMode==='run'?'run':'builder';
     qdVerified.add(qoWriter);
-    qdRevealed.clear();
+    qdRevealed.clear();qdStudentFilter='';
   }
   return qoWriter.diagnostic;
 }
@@ -93,7 +93,7 @@ function qdQuestionList(d=qdDoc()){
 }
 function qdPoints(value){return Number.isInteger(value)&&value>=1&&value<=10?value:2;}
 function qdPartialCredit(value){return Number.isInteger(value)&&value>=0&&value<=100?value:50;}
-function qdScoreNumber(n){return Math.round(n*10)/10;}
+function qdScoreNumber(n){return Math.round(n*100)/100;}
 function qdScores(questions,marks){
   let yes=0,partial=0,no=0,earned=0,possible=0,maxPoints=0;
   for(const q of questions){
@@ -325,7 +325,7 @@ function qdSample(){
   const section=(title,pairs,type='question')=>({id:qdNewId(),title,questions:pairs.map(([prompt,answer])=>({id:qdNewId(),type,prompt,answer,points:2,partialCredit:50}))});
   const d=qdDoc();d.title='Физика · 8 класс · Осенняя диагностика';d.description='Проверка понимания тепловых явлений и расчётных навыков.';
   d.sections=[
-    section('Температура и внутреняя энергия',[
+    section('Температура и внутренняя энергия',[
       ['Почему сахар быстрее растворяется в горячем чае?','Частицы при нагревании движутся быстрее. Диффузия и растворение обычно ускоряются.'],
       ['Какими способами можно изменить внутреннюю энергию тела?','Теплопередачей или совершением работы.'],
       ['Почему металл на ощупь холоднее дерева при одинаковой температуре?','Металл быстрее отводит тепло от руки благодаря высокой теплопроводности.']
@@ -418,6 +418,8 @@ function qdOnClick(event){
   }
   if(action==='delete-section'){
     if(!confirm('Удалить раздел и все его вопросы?'))return;
+    const old=d.sections.find(x=>x.id===button.dataset.sid);
+    if(old)old.questions.forEach(q=>{delete d.session.marks[q.id];qdRevealed.delete(q.id);});
     d.sections=d.sections.filter(x=>x.id!==button.dataset.sid);qdStore();qdRefresh();return;
   }
   if(action==='add-question'){
@@ -502,10 +504,8 @@ function qdOnInput(event){
   }else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
     if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig)orig[field]=qdText(value,field==='answer'?3500:1600);}
-  }else if(field==='student-name'){
-    const student=d.students.find(x=>x.id===event.target.dataset.studentId);
-    if(student)student.name=qdText(value,100);
-  }else return;
+  }else if(field==='student-name')return;
+  else return;
   qdStore();
 }
 function qdOnChange(event){
@@ -558,6 +558,6 @@ function qdOnChange(event){
       throw Error('Неверный формат');
     if(!confirm('Заменить текущую диагностику содержимым файла?'))return;
     qoWriter.diagnostic=qdNormalize(parsed);qdVerified.add(qoWriter);
-    qdMode='run';qoWriter.diagnosticMode='run';qdRevealed.clear();qdStore();qdRefresh();
+    qdMode='run';qoWriter.diagnosticMode='run';qdStudentFilter='';qdRevealed.clear();qdStore();qdRefresh();
   }).catch(()=>status('Не удалось открыть .qdiag: повреждённый или неподдерживаемый файл',true));
 }
