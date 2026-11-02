@@ -4,5 +4,6 @@
 @import "./styles/shell.css";
 @import "./styles/sheets.css";
 @import "./styles/writer-slides.css";
+@import "./styles/diagnostics.css";
 @import "./styles/studio.css";
 @import "./styles/controls.css";
