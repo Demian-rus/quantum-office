@@ -773,7 +773,7 @@ function qdOnClick(event){
 
 function qdScrollToQuestion(){
   const scroll=document.getElementById('qo-diag-workspace'),guided=document.querySelector('#qo-diag-root .qd-guided');
-  if(scroll&&guided)scroll.scrollTop=Math.max(0,guided.offsetTop-14);
+  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
 }
 function qdGuidedKeydown(event){
   if(qdMode!=='run'||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
