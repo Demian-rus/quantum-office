@@ -58,7 +58,6 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.evaluate(()=>qdLibraryRead().length),1);
  assert.equal(await save.locator('[data-qd-action="builder-template-update"]').isDisabled(),false);
  assert.equal(await page.evaluate(()=>qdDoc().history.length),0);
- await prompt.locator('[data-qd-action="card-expand"]').click();
  await prompt.locator('[data-qd-field="answer"]').fill('Исправленный развёрнутый ответ по диффузии.');
  const storedBefore=await page.evaluate(()=>qdLibraryRead()[0].sections[0].questions[0].answer);
  assert.notEqual(storedBefore,'Исправленный развёрнутый ответ по диффузии.');
