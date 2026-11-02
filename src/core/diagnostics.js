@@ -384,6 +384,7 @@ function qdBuilder(){
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
+    ${qdBuilderUtilities(d)}
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
         <span class="qd-index">${si+1}</span>
@@ -395,10 +396,12 @@ function qdBuilder(){
         </div>
       </div>
       <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
-      ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
+      ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card ${qdCompact&&!qdCardExpanded.has(q.id)?'is-compact':''}" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
           <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
           <span class="qd-counter">Вопрос ${qi+1}</span>
+           <span class="qd-card-preview" title="${qdEsc(q.prompt)}">${qdEsc(q.prompt||'Новый вопрос')}</span>
+           ${qdCompact?`<button type="button" data-qd-action="card-expand" data-qid="${qdEsc(q.id)}">${qdCardExpanded.has(q.id)?'Свернуть':'Редактировать'}</button>`:''}
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
             <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
             <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option>
