@@ -89,6 +89,7 @@ jobs:
       - run: node tests/task096_browser.cjs
       - run: node tests/task097_browser.cjs
       - run: node tests/task098_browser.cjs
+      - run: node tests/task099_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
