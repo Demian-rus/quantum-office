@@ -139,7 +139,9 @@ function qdBankMarkup(){
       '<label>Предмет<select id="qd-bank-subject">'+choices([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdBankSubject)+'</select></label>'+
       '<label>Класс<select id="qd-bank-grade">'+choices([['all','Все'],...['5–6','7','8','9'].map(x=>[x,x])],qdBankGrade)+'</select></label>'+
       '<label>Тип<select id="qd-bank-type">'+choices([['all','Все типы'],['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько'],['numeric','Число']],qdBankType)+'</select></label>'+
-    '</div><div id="qd-bank-results">'+qdBankResultsMarkup()+'</div>'+
+    '</div><div class="qd-bank-portable"><button type="button" data-qd-action="bank-export">Экспорт своих вопросов .qbank</button>'+ 
+    '<button type="button" data-qd-action="bank-import">Импорт .qbank</button></div>'+ 
+    '<div id="qd-bank-results">'+qdBankResultsMarkup()+'</div>'+
     '<p class="qd-hint">Встроенные задания не изменяются. Свой вопрос можно добавить в банк из его карточки. Повторы пропускаются. Банк на этом устройстве; данные учеников не сохраняются.</p>':'')+'</section>';
 }
 function qdBankRefresh(){
