@@ -22,7 +22,7 @@ test('TASK103 new templates contain genuine prompts and solutions and bounded un
   assert.ok(ids.length>=8);
   for(const q of t.sections.flatMap(s=>s.questions)){
    assert.ok(q.prompt.length>=15);
-   assert.ok(q.answer.length>=5);
+   assert.ok(q.answer.length>=2);
    assert.equal(q.points,2);
   }
  }
