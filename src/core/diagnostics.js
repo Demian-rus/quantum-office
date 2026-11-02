@@ -1080,7 +1080,7 @@ function qdLibraryView(){
       '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
-      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+
+      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
       '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
       '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
@@ -1100,7 +1100,7 @@ function qdLibraryCards(items){
     '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
     '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
     (x.source==='custom'?'<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
-    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
+    '<button type="button" data-qd-action="library-preview" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">Просмотреть</button>'+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
       '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
     '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
 }
@@ -1394,6 +1394,33 @@ function qdOnClick(event){
     qdDisplay(d).mode='list';qdMode='run';qoWriter.diagnosticMode='run';
     qdRevealed.clear();qdStore();qdRefresh();return;
   }
+  if(action==='library-preview'){
+    if(!qdLibraryPreviewPick(button.dataset.source,button.dataset.template)){
+      status('Шаблон не найден',true);return;
+    }
+    qdLibraryPreviewRefresh();
+    const preview=document.querySelector('#qd-library-preview-slot .qd-library-preview');
+    if(preview)preview.scrollIntoView({block:'start',behavior:'instant'});
+    return;
+  }
+  if(action==='library-preview-close'){
+    qdLibraryPreviewData=null;qdLibraryPreviewSelected.clear();qdLibraryPreviewRefresh();return;
+  }
+  if(action==='library-preview-all'||action==='library-preview-none'){
+    const model=qdLibraryPreviewData?.model;if(!model)return;
+    qdLibraryPreviewSelected=action==='library-preview-all'?
+      new Set(qdQuestionList(model).map(q=>q.id)):new Set();
+    qdLibraryPreviewRefresh();return;
+  }
+  if(action==='library-preview-add'){
+    const model=qdLibraryPreviewData?.model;
+    const plan=qdLibraryMergePlan(d,model,qdLibraryPreviewSelected);
+    if(!plan.ok){status(plan.error||'Выберите вопросы',true);qdLibraryPreviewRefresh();return;}
+    if(!qdLibraryMergeApply(d,plan)){status('Невозможно добавить вопросы',true);return;}
+    qdStore();qdLibraryPreviewRefresh();
+    status('Добавлено '+plan.items.length+' вопросов'+(plan.duplicates?'; пропущено повторов: '+plan.duplicates:''));
+    return;
+  }
   if(action==='library-open'){
     const id=button.dataset.template,source=button.dataset.source;
     if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
@@ -1412,7 +1439,9 @@ function qdOnClick(event){
   if(action==='library-import'){document.getElementById('qd-library-file')?.click();return;}
   if(action==='library-delete'){
     if(!confirm('Удалить свой шаблон из библиотеки? Текущая диагностика сохранится.'))return;
-    if(qdLibraryDelete(button.dataset.template)){qdRefresh();status('Шаблон удалён');}
+    if(qdLibraryDelete(button.dataset.template)){
+      if(qdLibraryPreviewData?.id===button.dataset.template){qdLibraryPreviewData=null;qdLibraryPreviewSelected.clear();}
+      qdRefresh();status('Шаблон удалён');}
     else status('Не удалось удалить шаблон',true);
     return;
   }
@@ -1725,6 +1754,25 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.matches?.('[data-qd-template-select]')){
+    const id=event.target.dataset.qdTemplateSelect;
+    if(event.target.checked)qdLibraryPreviewSelected.add(id);
+    else qdLibraryPreviewSelected.delete(id);
+    const slot=document.getElementById('qd-library-preview-slot');
+    const footer=slot?.querySelector('.qd-library-preview-footer');
+    const summary=slot?.querySelector('.qd-library-preview-options strong');
+    const preview=qdLibraryPreviewData?.model;
+    if(preview&&summary)summary.textContent=qdLibraryPreviewSelected.size+' из '+qdQuestionList(preview).length+' выбрано';
+    if(footer&&preview){
+      const plan=qdLibraryMergePlan(qdDoc(),preview,qdLibraryPreviewSelected);
+      footer.querySelector('.qd-library-preview-count').innerHTML=plan.ok?
+        '<strong>Будет добавлено: '+plan.items.length+'</strong> · новых разделов: '+plan.newSections.length+
+        (plan.duplicates?' · повторов пропущено: '+plan.duplicates:''):
+        '<strong>'+qdEsc(plan.error||'Выберите вопросы')+'</strong>';
+      footer.querySelector('[data-qd-action="library-preview-add"]').disabled=!plan.ok;
+    }
+    return;
+  }
   if(['qd-library-subject','qd-library-grade','qd-library-purpose'].includes(event.target.id)){
     if(event.target.id==='qd-library-subject')qdLibrarySubject=event.target.value;
     if(event.target.id==='qd-library-grade')qdLibraryGrade=event.target.value;
