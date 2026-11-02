@@ -2,7 +2,7 @@
    Does not mutate QDIAG until the teacher explicitly adds a question. */
 const QD_BANK_KEY='quantum-office.diagnostic-question-bank.v1';
 const QD_BANK_LIMIT=500;
-let qdBankOpen=false,qdBankQuery='',qdBankSubject='all',qdBankGrade='all',qdBankType='all',qdBankPage=0;
+let qdBankOpen=false,qdBankQuery='',qdBankSubject='all',qdBankGrade='all',qdBankType='all',qdBankDifficulty='all',qdBankPage=0;
 let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
 
 function qdBankSafe(raw){
@@ -13,8 +13,9 @@ function qdBankSafe(raw){
   const question=normalized.sections[0]?.questions[0];
   if(!question)return null;
   const subject=Object.hasOwn(QD_SUBJECTS,raw.subject)?raw.subject:'other';
+  const difficulty=['easy','medium','hard'].includes(raw.difficulty)?raw.difficulty:'unknown';
   return {id:qdText(raw.id,65),subject,grade:qdText(raw.grade,18).trim(),
-    topic:qdText(raw.topic,120).trim()||'Без темы',question};
+    topic:qdText(raw.topic,120).trim()||'Без темы',difficulty,question};
 }
 function qdBankRead(){
   try {
@@ -38,7 +39,7 @@ function qdBankBuiltins(){
         if(seen.has(signature))continue;
         seen.add(signature);
         result.push({id:'builtin:'+result.length,source:'built-in',subject:item.subject,grade:item.grade,
-          topic:section.title,question});
+          topic:section.title,difficulty:'unknown',question});
       }
     }
   }
@@ -53,7 +54,7 @@ function qdBankItems(){
 function qdBankSignature(q){
   return qdPromptKey(q?.prompt||'');
 }
-function qdBankSaveQuestion(d,qid,subject,grade){
+function qdBankSaveQuestion(d,qid,subject,grade,difficulty='unknown'){
   const section=d.sections.find(s=>s.questions.some(q=>q.id===qid));
   const question=section?.questions.find(q=>q.id===qid);
   if(!question?.prompt.trim())return {ok:false,message:'Заполните вопрос перед сохранением в банк'};
@@ -62,7 +63,7 @@ function qdBankSaveQuestion(d,qid,subject,grade){
   if(items.some(x=>x.subject===subject&&qdBankSignature(x.question)===signature))
     return {ok:false,message:'В вашем банке уже есть такой вопрос'};
   if(items.length>=QD_BANK_LIMIT)return {ok:false,message:'Лимит банка — 500 собственных вопросов'};
-  const safe=qdBankSafe({id:qdNewId(),subject,grade,topic:section.title,question:qdCopyCard(question)});
+  const safe=qdBankSafe({id:qdNewId(),subject,grade,topic:section.title,difficulty,question:qdCopyCard(question)});
   if(!safe)return {ok:false,message:'Не удалось подготовить вопрос'};
   if(!qdBankWrite([safe,...items]))return {ok:false,message:'Браузер не смог сохранить банк; экспортируйте работу'};
   return {ok:true};
@@ -78,6 +79,7 @@ function qdBankFiltered(){
     (qdBankSubject==='all'||x.subject===qdBankSubject)&&
     (qdBankGrade==='all'||x.grade===qdBankGrade)&&
     (qdBankType==='all'||x.question.type===qdBankType)&&
+    (qdBankDifficulty==='all'||x.difficulty===qdBankDifficulty)&&
     (!query||qdPromptKey([x.question.prompt,x.topic,x.question.answer].join(' ')).includes(query))
   );
 }
@@ -113,7 +115,7 @@ function qdBankResultsMarkup(){
       return '<article class="qd-bank-item"><div class="qd-bank-item-main">'+
         '<div class="qd-bank-tags"><span>'+qdEsc(QD_SUBJECTS[entry.subject]||'Другое')+
         '</span><span>'+qdEsc(entry.grade)+' класс</span><span>'+qdEsc(entry.topic)+
-        '</span><span>'+qdEsc(qdTypeTitle(entry.question.type))+'</span></div>'+
+        '</span><span>'+qdEsc(qdTypeTitle(entry.question.type))+'</span><span>'+qdEsc({easy:'Лёгкая',medium:'Средняя',hard:'Сложная',unknown:'Не размечена'}[entry.difficulty])+'</span></div>'+
         '<p>'+qdEsc(entry.question.prompt)+'</p>'+
         '<details><summary>Ответ преподавателя</summary><p>'+qdEsc(entry.question.answer||'Ответ не заполнен')+'</p></details></div>'+
         '<div class="qd-bank-item-actions"><label>Добавить в<select data-qd-bank-section="'+qdEsc(entry.id)+'">'+
@@ -138,7 +140,8 @@ function qdBankMarkup(){
     (qdBankOpen?'<div class="qd-bank-filters"><label>Поиск<input id="qd-bank-search" type="search" maxlength="120" value="'+qdEsc(qdBankQuery)+'" placeholder="Вопрос, тема, ответ"></label>'+
       '<label>Предмет<select id="qd-bank-subject">'+choices([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdBankSubject)+'</select></label>'+
       '<label>Класс<select id="qd-bank-grade">'+choices([['all','Все'],...['5–6','7','8','9'].map(x=>[x,x])],qdBankGrade)+'</select></label>'+
-      '<label>Тип<select id="qd-bank-type">'+choices([['all','Все типы'],['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько'],['numeric','Число']],qdBankType)+'</select></label>'+
+      '<label>Тип<select id="qd-bank-type">'+choices([['all','Все типы'],['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько'],['numeric','Число']],qdBankType)+'</select></label>'+ 
+      '<label>Сложность<select id="qd-bank-difficulty">'+choices([['all','Любая'],['unknown','Не размечена'],['easy','Лёгкая'],['medium','Средняя'],['hard','Сложная']],qdBankDifficulty)+'</select></label>'+
     '</div><div class="qd-bank-portable"><button type="button" data-qd-action="bank-export">Экспорт своих вопросов .qbank</button>'+ 
     '<button type="button" data-qd-action="bank-import">Импорт .qbank</button></div>'+ 
     '<div id="qd-bank-results">'+qdBankResultsMarkup()+'</div>'+
