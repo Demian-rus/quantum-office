@@ -382,8 +382,11 @@ function qdBatchApply(d,ids,action,value){
   }else if(action==='move'){
     const target=d.sections.find(s=>s.id===value);
     if(!target)return {ok:false,message:'Укажите существующий раздел'};
-    for(const section of d.sections)section.questions=section.questions.filter(q=>!wanted.has(q.id));
-    target.questions.push(...targets);
+    const incoming=d.sections.filter(s=>s.id!==target.id)
+      .flatMap(s=>s.questions.filter(q=>wanted.has(q.id)));
+    for(const section of d.sections)if(section.id!==target.id)
+      section.questions=section.questions.filter(q=>!wanted.has(q.id));
+    target.questions.push(...incoming);
   }else if(action==='delete'){
     for(const section of d.sections)section.questions=section.questions.filter(q=>!wanted.has(q.id));
     for(const q of targets){
