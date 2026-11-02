@@ -2268,6 +2268,7 @@ function qdOnClick(event){
     if(!confirm('Восстановить выбранную версию своего шаблона в библиотеке? Текущая диагностика не изменится.'))return;
     const result=qdTemplateRevisionRestore(target,revision);
     if(!result.ok){status(result.message,true);return;}
+    if(qdBuilderLinkedTemplateId===target)qdBuilderSavedSignature='';
     qdRefresh();status('Версия шаблона восстановлена в библиотеке. Текущая диагностика не изменена.');
     return;
   }
