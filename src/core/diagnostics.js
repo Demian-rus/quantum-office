@@ -160,33 +160,67 @@ function qdToolbar(){
     </div></div>`;
 }
 function qdBuilder(){
-  const d=qdDoc();
+  const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
     <div class="qd-panel qd-meta">
       <label>Название диагностики<input data-qd-field="title" maxlength="120" value="${qdEsc(d.title)}"></label>
       <label>Описание<textarea data-qd-field="description" maxlength="600" rows="2">${qdEsc(d.description)}</textarea></label>
-      <div class="qd-row qd-wrap">
+      <div class="qd-row qd-wrap qd-builder-tools">
+        <span class="qd-count-pill">${count} / ${QD_LIMITS.questions} заданий · ${d.sections.length} разделов</span>
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
-        <button data-qd-action="add-section" type="button">+ Добавить раздел</button>
+        <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
+      <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
-      <div class="qd-section-head"><span class="qd-index">${si+1}</span>
-      <label>Название раздела<input data-qd-field="section" data-sid="${qdEsc(s.id)}" maxlength="120" value="${qdEsc(s.title)}"></label>
-      <button data-qd-action="delete-section" data-sid="${qdEsc(s.id)}" type="button" aria-label="Удалить раздел">Удалить раздел</button></div>
-      <div class="qd-question-list">${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card">
-        <div class="qd-card-head"><span class="qd-counter">Вопрос ${qi+1}</span><select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
-          <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
-          <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option></select>
-          <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}">Удалить</button></div>
+      <div class="qd-section-head">
+        <span class="qd-index">${si+1}</span>
+        <label>Название раздела<input data-qd-field="section" data-sid="${qdEsc(s.id)}" maxlength="120" value="${qdEsc(s.title)}"></label>
+        <div class="qd-section-actions">
+          <button data-qd-action="section-up" data-sid="${qdEsc(s.id)}" type="button" ${si===0?'disabled':''} title="Раздел выше" aria-label="Раздел выше">↑</button>
+          <button data-qd-action="section-down" data-sid="${qdEsc(s.id)}" type="button" ${si===d.sections.length-1?'disabled':''} title="Раздел ниже" aria-label="Раздел ниже">↓</button>
+          <button data-qd-action="delete-section" data-sid="${qdEsc(s.id)}" type="button">Удалить</button>
+        </div>
+      </div>
+      <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
+      ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
+        <div class="qd-card-head">
+          <span class="qd-drag-handle" draggable="true" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
+          <span class="qd-counter">Вопрос ${qi+1}</span>
+          <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
+            <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
+            <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option>
+          </select>
+          <button type="button" data-qd-action="question-up" data-qid="${qdEsc(q.id)}" ${qi===0?'disabled':''} aria-label="Поднять вопрос" title="Поднять вопрос">↑</button>
+          <button type="button" data-qd-action="question-down" data-qid="${qdEsc(q.id)}" ${qi===s.questions.length-1?'disabled':''} aria-label="Опустить вопрос" title="Опустить вопрос">↓</button>
+          <button type="button" data-qd-action="duplicate-question" data-qid="${qdEsc(q.id)}" title="Создать копию">Копия</button>
+          <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}" title="Удалить вопрос">×</button>
+        </div>
         <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
         <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        <div class="qd-settings">
+          <label>Баллы за ответ<input data-qd-field="points" data-qid="${qdEsc(q.id)}" type="number" min="1" max="10" step="1" value="${qdPoints(q.points)}"></label>
+          <label>За частичный ответ, %<input data-qd-field="partialCredit" data-qid="${qdEsc(q.id)}" type="number" min="0" max="100" step="5" value="${qdPartialCredit(q.partialCredit)}"></label>
+          <label>Перенести в раздел<select data-qd-field="move-section" data-qid="${qdEsc(q.id)}" aria-label="Перенести вопрос в раздел"><option value="${qdEsc(s.id)}">Текущий раздел</option>
+          ${d.sections.filter(other=>other.id!==s.id).map(other=>`<option value="${qdEsc(other.id)}">${qdEsc(other.title)}</option>`).join('')}</select></label>
+        </div>
       </article>`).join('')}</div>
       <button type="button" data-qd-action="add-question" data-sid="${qdEsc(s.id)}">+ Добавить вопрос</button></section>`).join('')}
+    <section class="qd-panel qd-roster">
+      <div class="qd-row qd-wrap"><h2>Ученики</h2><span class="qd-muted">${d.students.length} / ${QD_LIMITS.students}</span></div>
+      <p class="qd-hint">Список хранится внутри этой диагностики. Сохранённые результаты привязаны к ученику и не удаляются при смене имени.</p>
+      <div class="qd-add-student"><input id="qd-student-new" maxlength="100" placeholder="Имя или код ученика" aria-label="Новый ученик"><button type="button" data-qd-action="add-student">+ Добавить</button></div>
+      <div class="qd-student-list">${d.students.map(student=>`<div class="qd-student-row">
+        <input data-qd-field="student-name" data-student-id="${qdEsc(student.id)}" value="${qdEsc(student.name)}" maxlength="100" aria-label="Изменить имя ученика">
+        <span>${qdStudentResults(d,student.id).length} занятий</span>
+        <button type="button" data-qd-action="remove-student" data-student-id="${qdEsc(student.id)}" aria-label="Удалить ученика">Удалить</button>
+      </div>`).join('')||'<p class="qd-hint">Добавьте ученика, чтобы вести его историю.</p>'}</div>
+    </section>
     <div class="qd-panel qd-bottom-actions">
       <button data-qd-action="add-section" type="button">+ Новый раздел</button>
       <button data-qd-action="mode" data-mode="run" class="qd-primary" type="button">Перейти к проведению</button>
-    </div></div>`;
+    </div>
+  </div>`;
 }
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
