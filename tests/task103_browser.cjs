@@ -54,7 +54,7 @@ const {pathToFileURL}=require('node:url');
   assert.match(await page.locator('#qo-diag-root h1').textContent(),/Математика/);
   assert.equal(await page.evaluate(()=>qdReviewItems(qdDoc()).length),1);
   const pending=page.waitForEvent('download');
-  await page.locator('[data-qd-action="export"]').click();
+  await page.locator('[data-action="writer-diag-export"]').click();
   const dl=await pending,local=path.join(root,'task103-test.qdiag');await dl.saveAs(local);
   const diag=JSON.parse(fs.readFileSync(local,'utf8'));
   assert.equal(diag.sections.length,3);
