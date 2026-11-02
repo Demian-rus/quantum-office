@@ -7,7 +7,7 @@ A reviewable follow-up to TASK099, based on `feat/task099-writer-interactive-dia
 
 ### Builder
 
-- Reorder sections using arrow buttons, questions via arrow buttons and HTML5 drag handle; transfer questions between sections through an accessible select.
+- Reorder sections using arrow buttons, questions via arrow buttons and pointer drag handle; transfer questions between sections through an accessible select.
 - Duplicate questions with fresh stable IDs (marks are not duplicated).
 - Per-question weight from 1 to 10 points and partial-credit percentage from 0 to 100. Existing TASK099 questions normalize to 2 points / 50% partial credit.
 - Safely delete questions/sections without carrying active marks to nonexistent questions.
