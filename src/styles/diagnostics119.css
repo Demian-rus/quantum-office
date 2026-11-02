@@ -38,7 +38,7 @@
 @media(max-width:1510px){
   #qo-diag-root .qd-edit-card.is-compact .qd-card-head{
     grid-template-columns:22px 20px minmax(67px,auto) minmax(0,1fr) auto auto auto auto;
-    grid-template-rows:28px 30px;
+    grid-template-rows:36px 38px;
     row-gap:6px;
   }
   #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(1){grid-row:1;grid-column:1}
@@ -77,7 +77,7 @@
   #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(8){grid-row:3;grid-column:6}
   #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(9){grid-row:3;grid-column:7}
   #qo-diag-root .qd-edit-card.is-compact .qd-card-head>:nth-child(10){grid-row:3;grid-column:8}
-  #qo-diag-root .qd-edit-card.is-compact .qd-card-head{grid-template-rows:28px 30px 30px}
+  #qo-diag-root .qd-edit-card.is-compact .qd-card-head{grid-template-rows:36px 36px 38px}
 }
 #qo-diag-root .qd-builder-save{display:grid;gap:13px}
 #qo-diag-root .qd-builder-save-head{
