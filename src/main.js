@@ -992,7 +992,7 @@ function qoWriterExport(format){
   clone.querySelectorAll('[data-qo-break]').forEach(el=>el.replaceWith(document.createTextNode('\\n\\n--- Разрыв страницы ---\\n\\n')));
   download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
  }else if(format==='qdoc'){
-  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdDoc(),updated:Date.now()},null,2),'application/json;charset=utf-8');
+  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
  }else download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
 }
 function qoWriterPrint(){
@@ -2630,7 +2630,7 @@ app.addEventListener('change',async e=>{const t=e.target;
    const raw=await file.text(),kind=file.name.toLowerCase();
    if(kind.endsWith('.qdoc')){
     const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
-    qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,updated:Date.now()};
+    qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode,updated:Date.now()};
    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
   }catch(error){status('Не удалось открыть документ: неверный формат или повреждённые данные',true);}return;
