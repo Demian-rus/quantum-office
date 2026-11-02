@@ -350,6 +350,101 @@ function qdReference(q){
   if(q.type==='numeric')details='Числовой ответ: '+(q.numericAnswer||'не задан')+' (± '+qdTolerance(q.tolerance)+')';
   return [details,q.answer].filter(Boolean).join('\n\n')||'Ответ не заполнен';
 }
+function qdDisplay(d=qdDoc()){
+  if(!d.display||typeof d.display!=='object')d.display={mode:'focus',activeId:''};
+  return d.display;
+}
+function qdCurrentIndex(d=qdDoc(),all=qdQuestionList(d)){
+  if(!all.length)return -1;
+  const requested=all.findIndex(q=>q.id===qdDisplay(d).activeId);
+  if(requested>=0)return requested;
+  const pending=all.findIndex(q=>!QD_STATES.includes(d.session.marks[q.id]));
+  return pending>=0?pending:0;
+}
+function qdSelectQuestion(d,index){
+  const all=qdQuestionList(d);
+  if(!Number.isInteger(index)||index<0||index>=all.length)return false;
+  qdDisplay(d).activeId=all[index].id;
+  return true;
+}
+function qdAdvance(d){
+  const all=qdQuestionList(d),index=qdCurrentIndex(d,all);
+  if(index>=0&&index<all.length-1)qdSelectQuestion(d,index+1);
+}
+function qdRunQuestion(q,number,d){
+  const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
+  return `<article class="qd-card qd-run-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
+    <div class="qd-question"><span class="qd-counter">${number+1}.</span><div>
+      <span class="qd-type">${qdTypeTitle(q.type)} · ${points} ${points===1?'балл':points<=4?'балла':'баллов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
+      <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p>
+    </div></div>
+    ${qdAutoInput(q,d.session.responses[q.id])}
+    <div class="qd-card-actions">
+      ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
+      <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}"
+       aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
+      <div class="qd-rating" role="group" aria-label="Оценка ответа">
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes"
+          aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial"
+          aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
+        <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no"
+          aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
+      </div>
+    </div>
+    ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
+    ${mark?`<p class="qd-card-assessed" role="status">${mark==='yes'?'Ответ зачтён':mark==='partial'?'Частично зачтён':'Ответ не зачтён'}</p>`:''}
+  </article>`;
+}
+function qdListQuestions(d){
+  let index=0;
+  return d.sections.map((section,si)=>`<section class="qd-section">
+    <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2>
+      <span>${section.questions.length} вопросов</span></div>
+    ${section.questions.map(q=>qdRunQuestion(q,index++,d)).join('')}
+  </section>`).join('');
+}
+function qdGuidedQuestions(d,all,s){
+  if(!all.length)return `<section class="qd-panel qd-guided-empty"><h2>Пока нет вопросов</h2>
+    <p>Добавьте задания в конструкторе и вернитесь к проведению.</p>
+    <button type="button" data-qd-action="mode" data-mode="builder" class="qd-primary">Открыть конструктор</button></section>`;
+  const index=qdCurrentIndex(d,all),q=all[index],progress=s.total?Math.round(s.rated/s.total*100):0;
+  return `<section class="qd-guided" aria-label="Пошаговая диагностика">
+    <div class="qd-guided-status">
+      <div class="qd-guided-topline"><span class="qd-guided-section">${qdEsc(q.section)}</span>
+        <strong>Вопрос ${index+1} из ${all.length}</strong></div>
+      <div class="qd-guided-progress" role="progressbar" aria-label="Проверено вопросов"
+        aria-valuenow="${s.rated}" aria-valuemin="0" aria-valuemax="${s.total}">
+        <span style="width:${progress}%"></span></div>
+      <div class="qd-guided-measures">
+        <span>Проверено <strong>${s.rated} / ${s.total}</strong></span>
+        <span>Результат <strong>${s.rated?s.percent+'%':'—'}</strong></span>
+        <span>Баллы <strong>${s.earned} / ${s.possible}</strong></span>
+      </div>
+    </div>
+    ${qdRunQuestion(q,index,d)}
+    <div class="qd-guided-nav" role="group" aria-label="Перемещение по вопросам">
+      <button type="button" data-qd-action="nav-prev" ${index===0?'disabled':''}>← Назад</button>
+      <button type="button" data-qd-action="nav-next" class="qd-primary"
+       ${index===all.length-1?'disabled':''}>Следующий →</button>
+      <button type="button" data-qd-action="nav-unrated"
+       ${s.rated===s.total?'disabled':''}>К непроверенному</button>
+    </div>
+    <details class="qd-question-map">
+      <summary>Карта вопросов <span>${s.rated} из ${s.total} проверено</span></summary>
+      <div class="qd-map-grid" role="group" aria-label="Выбор вопроса">
+        ${all.map((item,i)=>{
+          const grade=d.session.marks[item.id];
+          const cls=i===index?' current':grade?' rated-'+grade:'';
+          return `<button type="button" data-qd-action="nav-index" data-index="${i}"
+            class="qd-map-number${cls}" aria-label="Вопрос ${i+1}: ${qdEsc(item.section)}"
+            aria-current="${i===index?'step':'false'}" title="${qdEsc(item.section)}">${i+1}</button>`;
+        }).join('')}
+      </div>
+    </details>
+    <p class="qd-shortcuts">Клавиши: 1 — знает, 2 — частично, 3 — не знает, ← → — переключение, R — ответ.</p>
+  </section>`;
+}
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
   const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
@@ -369,27 +464,14 @@ function qdRun(){
         <button type="button" data-qd-action="save-result" class="qd-primary" ${!s.rated?'disabled':''}>Завершить и сохранить результат</button>
       </div>
     </div>
-    ${d.sections.map((section,si)=>`<section class="qd-section">
-      <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2><span>${section.questions.length} вопросов</span></div>
-      ${section.questions.map((q,qi)=>{
-        const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id);
-        return `<article class="qd-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
-         <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div>
-         <span class="qd-type">${qdTypeTitle(q.type)} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
-         <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p></div></div>
-         ${qdAutoInput(q,d.session.responses[q.id])}
-         <div class="qd-card-actions">
-           ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check"
-              data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
-           <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}" aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
-           <div class="qd-rating" role="group" aria-label="Оценка ответа">
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes" aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial" aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
-             <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no" aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
-           </div></div>
-         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
-        </article>`;
-      }).join('')}</section>`).join('')}
+    <div class="qd-view-switch" role="group" aria-label="Вид проведения">
+      <button type="button" data-qd-action="view" data-view="focus" aria-pressed="${qdDisplay(d).mode==='focus'}"
+        class="${qdDisplay(d).mode==='focus'?'active':''}">По одному</button>
+      <button type="button" data-qd-action="view" data-view="list" aria-pressed="${qdDisplay(d).mode==='list'}"
+        class="${qdDisplay(d).mode==='list'?'active':''}">Все вопросы</button>
+    </div>
+    ${qdDisplay(d).mode==='focus'?qdGuidedQuestions(d,all,s):qdListQuestions(d)}
+    ${qdDisplay(d).mode==='focus'?'<details class="qd-guided-insights"><summary>Подробные результаты и журнал</summary><div class="qd-guided-insights-body">':''}
     <section class="qd-panel qd-results" aria-label="Итоги диагностики">
       <h2>Итоги диагностики</h2>
       <div class="qd-metrics">
@@ -428,7 +510,8 @@ function qdRun(){
         return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(qdDateLabel(h.date))}</small></span>
         <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено${Number.isFinite(hs.earned)?` · ${hs.earned}/${hs.possible} б.`:''}</span><button type="button" data-qd-action="report-saved" data-hid="${qdEsc(h.id)}">Отчёт</button></div>`;
       }).join('')}</div>`:'<p>Результатов пока нет.</p>'}
-    </section></div>`;
+    </section>
+    ${qdDisplay(d).mode==='focus'?'</div></details>':''}</div>`;
 }
 function qdTopicSnapshot(doc,marks){
   return doc.sections.map(section=>{
