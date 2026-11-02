@@ -350,6 +350,67 @@ function qdBulkPreview(d){
     (plan.ok?'<div class="qd-bulk-items">'+plan.items.slice(0,4).map(x=>'<p><strong>'+qdEsc(x.prompt)+'</strong><small>'+qdEsc(x.answer||'Ответ не задан')+'</small></p>').join('')+'</div>':'')+
     '<button type="button" data-qd-action="bulk-commit" class="qd-primary" '+(plan.ok?'':'disabled')+'>Добавить '+(plan.ok?plan.items.length:0)+' заданий</button>';
 }
+
+let qdSearch='',qdFilterKind='all',qdSelected=new Set();
+function qdMatchingQuestions(d,search=qdSearch,kind=qdFilterKind){
+  const needle=qdPromptKey(search),problem=kind==='issues'?new Set(qdAudit(d).map(x=>x.qid)):null;
+  const result=[];
+  for(const section of d.sections)for(const q of section.questions){
+    if(problem&&!problem.has(q.id))continue;
+    if(kind!=='all'&&kind!=='issues'&&q.type!==kind)continue;
+    if(needle&&!qdPromptKey(section.title+' '+q.prompt+' '+q.answer).includes(needle))continue;
+    result.push(q);
+  }
+  return result;
+}
+function qdBatchApply(d,ids,action,value){
+  const wanted=new Set(ids);
+  if(!wanted.size)return {ok:false,message:'Не выбраны вопросы'};
+  const targets=d.sections.flatMap(s=>s.questions.filter(q=>wanted.has(q.id)));
+  if(targets.length!==wanted.size)return {ok:false,message:'Выбор устарел — обновите список'};
+  if(action==='points'){
+    const points=Number(value);
+    if(!Number.isInteger(points)||points<1||points>10)return {ok:false,message:'Баллы должны быть от 1 до 10'};
+    targets.forEach(q=>q.points=points);
+  }else if(action==='type'){
+    if(!['question','practice','single','multiple','numeric'].includes(value))return {ok:false,message:'Неверный тип'};
+    for(const q of targets)if(q.type!==value){
+      q.type=value;
+      if(['single','multiple'].includes(value))q.choices=qdChoices(q.choices);
+      delete d.session.marks[q.id];delete d.session.responses[q.id];
+    }
+  }else if(action==='move'){
+    const target=d.sections.find(s=>s.id===value);
+    if(!target)return {ok:false,message:'Укажите существующий раздел'};
+    for(const section of d.sections)section.questions=section.questions.filter(q=>!wanted.has(q.id));
+    target.questions.push(...targets);
+  }else if(action==='delete'){
+    for(const section of d.sections)section.questions=section.questions.filter(q=>!wanted.has(q.id));
+    for(const q of targets){
+      delete d.session.marks[q.id];delete d.session.responses[q.id];qdRevealed.delete(q.id);
+      qdCardExpanded.delete(q.id);
+    }
+    if(wanted.has(qdDisplay(d).activeId))qdDisplay(d).activeId='';
+  }else return {ok:false,message:'Неизвестная операция'};
+  return {ok:true,count:targets.length};
+}
+function qdBatchInputs(d,action='points'){
+  if(action==='points')return '<label>Баллов за вопрос <input id="qd-batch-value" type="number" min="1" max="10" step="1" value="2"></label>';
+  if(action==='type')return '<label>Тип заданий <select id="qd-batch-value">'+
+    [['question','Вопрос'],['practice','Практика'],['single','Один ответ'],['multiple','Несколько ответов'],['numeric','Число']]
+      .map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('')+'</select></label>';
+  if(action==='move')return '<label>Перенести в раздел <select id="qd-batch-value">'+
+    d.sections.map(s=>'<option value="'+qdEsc(s.id)+'">'+qdEsc(s.title)+'</option>').join('')+'</select></label>';
+  return '<p class="qd-hint">Выбранные задания будут удалены из текущей диагностики; старые записи журнала сохранятся.</p>';
+}
+function qdSelectionSummary(d){
+  const visible=qdMatchingQuestions(d);
+  const visibleIds=new Set(visible.map(q=>q.id));
+  const selected=qdSelected.size,shown=visible.filter(q=>qdSelected.has(q.id)).length;
+  return 'Найдено '+visible.length+' из '+qdQuestionList(d).length+' · Выбрано '+selected+
+    (selected&&shown!==selected?' (в фильтре '+shown+')':'');
+}
+
 function qdBuilderUtilities(d){
   const issues=qdAudit(d);
   return '<div class="qd-panel qd-builder-utilities">'+
