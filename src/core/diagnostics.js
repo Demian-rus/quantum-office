@@ -541,6 +541,85 @@ function qdVariantsBuild(d,opts=qdVariantOptions){
   }
   return {ok:true,variants,ignored,sectionCount:groups.length,seed:rawSeed};
 }
+
+/* TASK111 — printable student sheets and separate teacher answer keys. */
+function qdVariantPaperHTML(variant,kind='student'){
+  if(!variant?.document?.sections||!['student','key'].includes(kind))return '';
+  const doc=variant.document,teacher=kind==='key',label=variant.label;
+  const title=qdEsc(doc.title||'Проверочная работа');
+  const count=doc.sections.reduce((n,s)=>n+s.questions.length,0);
+  const points=doc.sections.reduce((n,s)=>n+s.questions.reduce((m,q)=>m+qdPoints(q.points),0),0);
+  const entries=doc.sections.map((section,si)=>'<section class="topic"><h2>'+(si+1)+'. '+qdEsc(section.title)+'</h2>'+
+    section.questions.map((q,qi)=>{
+      const answer=qdReference(q);
+      const options=['single','multiple'].includes(q.type)?qdChoices(q.choices):[];
+      const opts=options.length?
+        '<ol class="answers" type="A">'+options.map(c=>
+          '<li><span class="choice-box">'+(q.type==='multiple'?'□':'○')+'</span> '+qdEsc(c.text||'Не заполнено')+'</li>'
+        ).join('')+'</ol>':'';
+      const numeric=q.type==='numeric'&&!teacher?
+        '<div class="write-line">Ответ: ______________________________</div>':'';
+      const writing=!teacher&&!options.length&&q.type!=='numeric'?
+        '<div class="write-lines"><span></span><span></span>'+
+          (q.type==='practice'?'<span></span><span></span>':'')+'</div>':'';
+      const solution=teacher?
+        '<div class="solution"><strong>Ответ и критерии</strong><div>'+qdEsc(answer).replace(/\n/g,'<br>')+'</div>'+
+          '<small>Полный ответ: '+qdPoints(q.points)+' балл(ов) · частичный: '+qdPartialCredit(q.partialCredit)+'%</small></div>':'';
+      return '<article class="question"><div class="question-head"><span class="question-number">'+(qi+1)+'.</span>'+
+        '<div class="question-text">'+qdEsc(q.prompt||'Вопрос не заполнен').replace(/\n/g,'<br>')+'</div>'+
+        '<span class="points">'+qdPoints(q.points)+' б.</span></div>'+
+        opts+numeric+writing+solution+'</article>';
+    }).join('')+'</section>').join('');
+  const purpose=teacher?'Ключ ответов — только преподавателю':'Бланк для ученика';
+  return '<!doctype html><html lang="ru"><head><meta charset="utf-8">'+
+    '<meta name="viewport" content="width=device-width,initial-scale=1">'+
+    '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
+    '<style>'+
+    '@page{size:A4;margin:17mm 16mm}'+
+    '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#202833;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
+    '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
+    '.eyebrow{color:#55667d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}'+
+    'h1{font-size:23px;line-height:1.25;margin:5px 0 8px}'+
+    '.byline{font-size:11px;color:#526278;display:flex;gap:18px;flex-wrap:wrap}'+
+    '.pupil{margin:16px 0 0;display:flex;gap:20px;flex-wrap:wrap;font-size:12px}'+
+    '.topic{margin:24px 0;break-inside:auto}h2{font-size:15px;border-bottom:1px solid #ced6e0;padding-bottom:6px;margin:0 0 12px;break-after:avoid}'+
+    '.question{margin:0 0 19px;break-inside:avoid-page;page-break-inside:avoid}'+
+    '.question-head{display:flex;gap:9px;align-items:baseline;line-height:1.55}'+
+    '.question-number{font-weight:700;flex:none}.question-text{flex:1;overflow-wrap:anywhere}'+
+    '.points{flex:none;font-size:11px;color:#526278;white-space:nowrap}'+
+    '.answers{margin:8px 0 0 25px;padding-left:15px;display:grid;gap:6px}'+
+    '.choice-box{display:inline-block;width:16px;color:#2d3e55}'+
+    '.write-line{margin:12px 0 0 25px;min-height:32px}'+
+    '.write-lines{display:grid;margin:9px 0 0 25px;gap:7px}'+
+    '.write-lines span{border-bottom:1px solid #cbd3de;min-height:21px}'+
+    '.solution{margin:10px 0 0 25px;padding:11px 13px;border-left:3px solid #35678a;background:#f4f7fa;overflow-wrap:anywhere}'+
+    '.solution strong{display:block;margin-bottom:4px;font-size:11px}'+
+    '.solution small{display:block;margin-top:7px;color:#57687f;font-size:10px}'+
+    '.page-footer{border-top:1px solid #d1d8e0;margin-top:25px;padding-top:8px;color:#536279;font-size:10px}'+
+    '@media print{body{padding:0;max-width:none}.question{break-inside:avoid-page}.solution{print-color-adjust:exact;-webkit-print-color-adjust:exact}}'+
+    '</style></head><body><header class="doc-head"><div class="eyebrow">'+qdEsc(purpose)+'</div>'+
+    '<h1>'+title+'</h1><div class="byline"><span>Вариант '+qdEsc(label)+'</span>'+
+    '<span>Вопросов: '+count+'</span><span>Максимум: '+points+' баллов</span></div>'+
+    (teacher?'':'<div class="pupil"><span>ФИО: __________________________________</span>'+
+      '<span>Класс: __________</span><span>Дата: ______________</span></div>')+
+    '</header>'+entries+'<footer class="page-footer">'+
+      (teacher?'Лист ответов преподавателя. Не выдавайте ученикам.':'Проверочная работа · Вариант '+qdEsc(label))+
+    '</footer></body></html>';
+}
+function qdVariantPrintDownload(d,index,kind){
+  const generated=qdVariantsBuild(d);
+  if(!generated.ok)return {ok:false,message:generated.error};
+  if(!Number.isInteger(index)||index<0||index>=generated.variants.length)
+    return {ok:false,message:'Вариант не найден'};
+  if(!['student','key'].includes(kind))return {ok:false,message:'Неизвестный вид бланка'};
+  const variant=generated.variants[index],html=qdVariantPaperHTML(variant,kind);
+  if(!html)return {ok:false,message:'Не удалось создать бланк'};
+  const file=(typeof safeFile==='function'?safeFile(d.title):'diagnostic')+
+    '-variant-'+variant.label+'-'+(kind==='key'?'answers':'student')+'.html';
+  download(file,html,'text/html;charset=utf-8');
+  return {ok:true,file};
+}
+
 function qdVariantPreview(d){
   const result=qdVariantsBuild(d);
   if(!result.ok)return '<p class="qd-variant-error" role="status">'+qdEsc(result.error)+'</p>';
@@ -551,8 +630,13 @@ function qdVariantPreview(d){
       '<strong>Вариант '+v.label+'</strong><span>'+v.count+' вопросов · '+v.maxPoints+' баллов</span></div>'+
       '<div class="qd-variant-topics">'+v.document.sections.map(s=>
         '<p><b>'+qdEsc(s.title)+'</b><span>'+s.questions.length+' вопросов</span></p>').join('')+'</div>'+
+      '<div class="qd-variant-actions">'+
       '<button type="button" data-qd-action="variant-download" data-variant-index="'+i+
-      '" class="qd-primary">Скачать вариант '+v.label+' .qdiag</button></article>').join('')+
+        '" title="Открывается в конструкторе Quantum Writer">Диагностика .qdiag</button>'+
+      '<button type="button" data-qd-action="variant-print" data-variant-kind="student" data-variant-index="'+i+
+        '" class="qd-primary">Бланк ученика</button>'+
+      '<button type="button" data-qd-action="variant-print" data-variant-kind="key" data-variant-index="'+i+
+        '">Ключ ответов</button></div></article>').join('')+
     '</div><p class="qd-hint">При одинаковом ключе генерации распределение вопросов повторяется; '+
     'при разных баллах у заданий сумма баллов между вариантами может отличаться. '+
     'Каждый файл создаётся без учеников, оценок и истории.</p>';
@@ -1836,6 +1920,11 @@ function qdOnClick(event){
       return;
     }
     qdScrollToTopic(sid);return;
+  }
+  if(action==='variant-print'){
+    const result=qdVariantPrintDownload(d,Number(button.dataset.variantIndex),button.dataset.variantKind);
+    if(!result.ok)status(result.message,true);
+    return;
   }
   if(action==='variant-download'){
     const result=qdVariantsBuild(d);
