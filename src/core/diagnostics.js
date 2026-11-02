@@ -481,6 +481,105 @@ function qdSelectionSummary(d){
     (selected&&shown!==selected?' (в фильтре '+shown+')':'');
 }
 
+
+/* TASK110: non-destructive, reproducible parallel assessment variants. */
+let qdVariantsOpen=false;
+let qdVariantOptions={count:2,perSection:0,seed:'2026',shuffleChoices:true};
+const QD_VARIANT_NAMES=['А','Б','В','Г'];
+function qdVariantHash(value){
+  let x=2166136261;
+  for(const ch of String(value)){x^=ch.charCodeAt(0);x=Math.imul(x,16777619);}
+  return x>>>0;
+}
+function qdVariantShuffle(items,seed){
+  const copy=items.slice();let x=(seed>>>0)||0x6d2b79f5;
+  for(let i=copy.length-1;i>0;i--){
+    x^=x<<13;x^=x>>>17;x^=x<<5;
+    const j=(x>>>0)%(i+1);
+    [copy[i],copy[j]]=[copy[j],copy[i]];
+  }
+  return copy;
+}
+function qdVariantsBuild(d,opts=qdVariantOptions){
+  const count=Number(opts.count),size=Number(opts.perSection);
+  if(!Number.isInteger(count)||count<2||count>4)return {ok:false,error:'Выберите от 2 до 4 вариантов'};
+  if(!Number.isInteger(size)||size<0||size>240)return {ok:false,error:'Неверное количество вопросов на раздел'};
+  const rawSeed=String(opts.seed??'').trim();
+  if(!rawSeed||rawSeed.length>40)return {ok:false,error:'Введите короткий ключ генерации'};
+  const groups=d.sections.map(s=>({
+    title:s.title,questions:s.questions.filter(q=>qdText(q.prompt,1600).trim())
+  })).filter(s=>s.questions.length);
+  if(!groups.length)return {ok:false,error:'Сначала заполните хотя бы один вопрос'};
+  if(size&&groups.some(s=>s.questions.length<size))
+    return {ok:false,error:'Не хватает вопросов: в каждом непустом разделе должно быть не менее '+size};
+  const ignored=d.sections.reduce((sum,s)=>sum+s.questions.length,0)-
+    groups.reduce((sum,s)=>sum+s.questions.length,0);
+  const variants=[];
+  for(let v=0;v<count;v++){
+    const sections=[];
+    for(let si=0;si<groups.length;si++){
+      const section=groups[si],pool=qdVariantShuffle(section.questions,qdVariantHash(rawSeed+'|'+si));
+      const amount=size||pool.length;
+      const picked=size?
+        Array.from({length:amount},(_,i)=>pool[(v*amount+i)%pool.length]):
+        pool.slice();
+      const shuffled=qdVariantShuffle(picked,qdVariantHash(rawSeed+'|order|'+v+'|'+si));
+      sections.push({id:qdNewId(),title:section.title,questions:shuffled.map((q,qi)=>{
+        const copy=qdCopyCard(q);
+        if(opts.shuffleChoices&&['single','multiple'].includes(copy.type))
+          copy.choices=qdVariantShuffle(copy.choices,qdVariantHash(rawSeed+'|options|'+v+'|'+si+'|'+qi));
+        return copy;
+      })});
+    }
+    const title=qdText(d.title,98)+' — Вариант '+QD_VARIANT_NAMES[v];
+    const doc=qdNormalize({title,description:d.description,sections,
+      session:{student:'',studentId:'',marks:{},responses:{}},students:[],history:[],
+      display:{mode:'list',activeId:''}});
+    const questions=qdQuestionList(doc);
+    variants.push({label:QD_VARIANT_NAMES[v],document:doc,
+      count:questions.length,maxPoints:questions.reduce((sum,q)=>sum+qdPoints(q.points),0)});
+  }
+  return {ok:true,variants,ignored,sectionCount:groups.length,seed:rawSeed};
+}
+function qdVariantPreview(d){
+  const result=qdVariantsBuild(d);
+  if(!result.ok)return '<p class="qd-variant-error" role="status">'+qdEsc(result.error)+'</p>';
+  return '<div class="qd-variant-summary">Вопросы распределены по '+result.sectionCount+
+    ' темам · пропущено незаполненных: '+result.ignored+
+    ' · источник остаётся без изменений</div><div class="qd-variant-grid">'+
+    result.variants.map((v,i)=>'<article class="qd-variant-card"><div>'+
+      '<strong>Вариант '+v.label+'</strong><span>'+v.count+' вопросов · '+v.maxPoints+' баллов</span></div>'+
+      '<div class="qd-variant-topics">'+v.document.sections.map(s=>
+        '<p><b>'+qdEsc(s.title)+'</b><span>'+s.questions.length+' вопросов</span></p>').join('')+'</div>'+
+      '<button type="button" data-qd-action="variant-download" data-variant-index="'+i+
+      '" class="qd-primary">Скачать вариант '+v.label+' .qdiag</button></article>').join('')+
+    '</div><p class="qd-hint">При одинаковом ключе генерации распределение вопросов повторяется; '+
+    'при разных баллах у заданий сумма баллов между вариантами может отличаться. '+
+    'Каждый файл создаётся без учеников, оценок и истории.</p>';
+}
+function qdVariantsMarkup(d){
+  const opts=qdVariantOptions;
+  return '<details class="qd-utility-details qd-variants-tool" data-qd-pane="variants" '+(qdVariantsOpen?'open':'')+'>'+
+    '<summary>Варианты проверочной работы <span>А / Б / В / Г</span></summary>'+
+    '<div class="qd-utility-content"><p class="qd-hint">Соберите несколько вариантов из текущих тем. '+
+      'Варианты можно открывать как отдельные диагностики. Исходный документ не изменяется.</p>'+
+      '<div class="qd-variant-controls"><label>Количество вариантов<select id="qd-var-count">'+
+        [2,3,4].map(n=>'<option value="'+n+'" '+(opts.count===n?'selected':'')+'>'+n+'</option>').join('')+
+      '</select></label><label>Вопросов из каждого раздела<select id="qd-var-per-section">'+
+        '<option value="0" '+(opts.perSection===0?'selected':'')+'>Все вопросы</option>'+
+        Array.from({length:12},(_,i)=>i+1).map(n=>
+          '<option value="'+n+'" '+(opts.perSection===n?'selected':'')+'>'+n+'</option>').join('')+
+      '</select></label><label>Ключ вариантов<input type="text" maxlength="40" id="qd-var-seed" value="'+qdEsc(opts.seed)+
+      '" placeholder="Например, ноябрь-2026"></label><label class="qd-variant-checkbox">'+
+      '<input type="checkbox" id="qd-var-choices" '+(opts.shuffleChoices?'checked':'')+'>'+
+      'Перемешивать варианты ответов</label></div>'+
+      '<div id="qd-variant-preview" aria-live="polite">'+(qdVariantsOpen?qdVariantPreview(d):'<p class="qd-hint">Откройте панель для настройки вариантов.</p>')+'</div></div></details>';
+}
+function qdVariantPreviewRefresh(){
+  const preview=document.getElementById('qd-variant-preview');
+  if(preview)preview.innerHTML=qdVariantPreview(qdDoc());
+}
+
 function qdBuilderUtilities(d){
   const issues=qdAudit(d);
   return '<div class="qd-panel qd-builder-utilities">'+
@@ -492,7 +591,7 @@ function qdBuilderUtilities(d){
     '<pre class="qd-bulk-example">[Теплопередача]\nКак тепло приходит от Солнца? | Излучением\n! Найди количество теплоты. | Q = cmΔt</pre>'+
     '<label>Раздел без заголовка<select id="qd-bulk-target">'+d.sections.map(s=>'<option value="'+qdEsc(s.id)+'" '+(s.id===(qdBulkTarget||d.sections[0]?.id)?'selected':'')+'>'+qdEsc(s.title)+'</option>').join('')+'</select></label>'+
     '<label>Вставьте вопросы<textarea id="qd-bulk-text" rows="6" maxlength="'+QD_BULK_MAX_CHARS+'">'+qdEsc(qdBulkDraft)+'</textarea></label>'+
-    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
+    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details>'+qdVariantsMarkup(d)+'</div>';
 }
 
 
@@ -557,10 +656,6 @@ function qdBuilder(){
         <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
-    </div>
-    <div class="qd-builder-shortcuts">
-      <button type="button" data-qd-action="mode" data-mode="library">Открыть библиотеку шаблонов</button>
-      <button type="button" data-qd-action="preview-chat">Предпросмотр карточек</button>
     </div>
     ${qdBuilderUtilities(d)}
     ${qdBatchToolbar(d)}
@@ -725,7 +820,7 @@ function qdRunQuestion(q,number,d){
 }
 function qdListQuestions(d){
   let index=0;
-  return d.sections.map((section,si)=>`<section class="qd-section">
+  return d.sections.map((section,si)=>`<section class="qd-section" data-section="${qdEsc(section.id)}">
     <div class="qd-section-title"><h2>${si+1}. ${qdEsc(section.title)}</h2>
       <span>${section.questions.length} вопросов</span></div>
     ${section.questions.map(q=>qdRunQuestion(q,index++,d)).join('')}
@@ -1464,13 +1559,77 @@ function qdRibbonSync(){
   }
 }
 
+
+function qdSidebarTopics(d,mode){
+  return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
+    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
+    '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
+      const graded=qdScores(section.questions,d.session.marks);
+      const share=graded.total?Math.round(graded.rated/graded.total*100):0;
+      return '<button type="button" class="qd-side-topic" data-qd-action="sidebar-topic" data-sid="'+qdEsc(section.id)+'">'+
+        '<span class="qd-side-topic-title"><b>'+(i+1)+'.</b>'+qdEsc(section.title||'Без названия')+'</span>'+
+        '<span class="qd-side-topic-meta">'+section.questions.length+' заданий'+
+         (mode==='run'?' · '+graded.rated+' оценено':'')+'</span>'+
+        (mode==='run'?'<span class="qd-side-mini-bar"><i style="width:'+share+'%"></i></span>':'')+
+      '</button>';
+    }).join('')+'</div>'+
+    '<p class="qd-side-footnote">Нажмите тему, чтобы перейти к её вопросам.</p></nav>';
+}
+function qdSidebarInsights(d,mode){
+  const all=qdQuestionList(d),s=qdScores(all,d.session.marks);
+  if(mode==='builder'){
+    const issues=qdAudit(d),types=[
+      ['Вопрос',all.filter(q=>q.type==='question').length],
+      ['Практика',all.filter(q=>q.type==='practice').length],
+      ['Тест',all.filter(q=>q.type==='single'||q.type==='multiple').length],
+      ['Число',all.filter(q=>q.type==='numeric').length]
+    ];
+    return '<aside class="qd-side-panel qd-side-insights" aria-label="Структура диагностики">'+
+      '<h2>Состав работы</h2><p class="qd-side-caption">Сводка для преподавателя</p>'+
+      '<div class="qd-side-stat"><span>Разделов</span><strong>'+d.sections.length+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Вопросов</span><strong>'+all.length+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Всего баллов</span><strong>'+s.maxPoints+'</strong></div>'+
+      '<div class="qd-side-stat"><span>Замечаний</span><strong>'+issues.length+'</strong></div>'+
+      '<h3>Типы заданий</h3>'+
+      types.map(([title,num])=>
+        '<div class="qd-side-type"><div><span>'+title+'</span><b>'+num+'</b></div>'+
+        '<span class="qd-side-mini-bar"><i style="width:'+(all.length?Math.round(num/all.length*100):0)+'%"></i></span></div>').join('')+
+      '<p class="qd-side-footnote">Настройки и массовые операции находятся в центре конструктора.</p></aside>';
+  }
+  const pending=s.total-s.rated;
+  return '<aside class="qd-side-panel qd-side-insights" aria-label="Прогресс диагностики">'+
+    '<h2>Ход проверки</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
+    '<div class="qd-side-big-number">'+(s.rated?s.percent+'%':'—')+'</div>'+
+    '<div class="qd-side-mini-bar qd-side-main-bar"><i style="width:'+(s.total?Math.round(s.rated/s.total*100):0)+'%"></i></div>'+
+    '<div class="qd-side-stat"><span>Оценено</span><strong>'+s.rated+' / '+s.total+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Осталось</span><strong>'+pending+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Знает</span><strong>'+s.yes+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Частично</span><strong>'+s.partial+'</strong></div>'+
+    '<div class="qd-side-stat"><span>Не знает</span><strong>'+s.no+'</strong></div>'+
+    '<p class="qd-side-footnote">Результат считается по оценённым вопросам.</p></aside>';
+}
+function qdWorkbench(d,mode,content){
+  return '<div class="qd-workbench">'+
+    qdSidebarTopics(d,mode)+
+    '<main class="qd-workbench-main">'+content+'</main>'+
+    qdSidebarInsights(d,mode)+'</div>';
+}
+function qdScrollToTopic(sid){
+  const root=document.getElementById('qo-diag-root');
+  const target=[...root?.querySelectorAll('[data-section]')||[]].find(el=>el.dataset.section===sid);
+  const scroll=document.getElementById('qo-diag-workspace');
+  if(!target||!scroll)return false;
+  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+  return true;
+}
+
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
   const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.classList.toggle('qd-library-root',qdMode==='library');
-  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
+  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdWorkbench(qdDoc(),qdMode,qdMode==='builder'?qdBuilder():qdRun()))+
     `<div class="qd-filebar"><button type="button" data-qd-action="export">Сохранить диагностику .qdiag</button>
        <button type="button" data-qd-action="import">Открыть .qdiag</button>
        <span>Работает без интернета · Для сохранности скачивайте файл</span>
@@ -1505,6 +1664,9 @@ function qoDiagnosticMount(){
 function qdOnBuilderToggle(event){
   if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
   if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
+  if(event.target.dataset?.qdPane==='variants'){
+    qdVariantsOpen=event.target.open;if(qdVariantsOpen)qdVariantPreviewRefresh();
+  }
 }
 function qdJumpToEdit(qid,field='prompt'){
   const root=document.getElementById('qo-diag-root');
@@ -1658,6 +1820,36 @@ function qdOnClick(event){
     if(!result.ok){status(result.message,true);return;}
     qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
     status('Изменено вопросов: '+result.count);return;
+  }
+  if(action==='sidebar-topic'){
+    const sid=button.dataset.sid,section=d.sections.find(x=>x.id===sid);
+    if(!section)return;
+    if(qdMode==='builder'){
+      qdCollapsedSections.delete(sid);
+      if(qdSearch||qdFilterKind!=='all'){qdSearch='';qdFilterKind='all';}
+      qdRefresh();qdScrollToTopic(sid);
+      return;
+    }
+    if(qdMode==='run'&&qdDisplay(d).mode==='focus'){
+      const target=qdQuestionList(d).findIndex(q=>q.id===section.questions[0]?.id);
+      if(target>=0){qdSelectQuestion(d,target);qdRevealed.clear();qdStore();qdRefresh();}
+      return;
+    }
+    qdScrollToTopic(sid);return;
+  }
+  if(action==='variant-download'){
+    const result=qdVariantsBuild(d);
+    const index=Number(button.dataset.variantIndex);
+    const variant=result.ok&&Number.isInteger(index)?result.variants[index]:null;
+    if(!variant){status(result.error||'Неверные настройки вариантов',true);return;}
+    const base=typeof safeFile==='function'?safeFile(d.title):'diagnostic';
+    download(base+'-variant-'+variant.label+'.qdiag',
+      JSON.stringify(variant.document,null,2),'application/json;charset=utf-8');
+    return;
+  }
+  if(action==='toggle-all-sections'){
+    qdCollapsedSections=qdCollapsedSections.size?new Set():new Set(d.sections.map(s=>s.id));
+    qdRefresh();return;
   }
   if(action==='compact-mode'){
     qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
@@ -1904,6 +2096,10 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-var-seed'){
+    qdVariantOptions.seed=event.target.value.slice(0,40);
+    qdVariantPreviewRefresh();return;
+  }
   if(event.target.id==='qd-library-search'){
     qdLibraryQuery=event.target.value.slice(0,120);qdLibraryRefreshCards();return;
   }
@@ -1953,6 +2149,12 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(['qd-var-count','qd-var-per-section','qd-var-choices'].includes(event.target.id)){
+    if(event.target.id==='qd-var-count')qdVariantOptions.count=Number(event.target.value);
+    if(event.target.id==='qd-var-per-section')qdVariantOptions.perSection=Number(event.target.value);
+    if(event.target.id==='qd-var-choices')qdVariantOptions.shuffleChoices=event.target.checked;
+    qdVariantPreviewRefresh();return;
+  }
   if(event.target.matches?.('[data-qd-template-select]')){
     const id=event.target.dataset.qdTemplateSelect;
     if(event.target.checked)qdLibraryPreviewSelected.add(id);
