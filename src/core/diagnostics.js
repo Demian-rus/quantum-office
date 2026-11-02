@@ -240,6 +240,12 @@ function qdBuilder(){
       <div class="qd-row qd-wrap qd-builder-tools">
         <span class="qd-count-pill">${count} / ${QD_LIMITS.questions} заданий · ${d.sections.length} разделов</span>
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
+        <label class="qd-template-selector">Готовые диагностики
+          <select id="qd-template-pick" aria-label="Выбрать готовую диагностику">
+            <option value="physics7">Физика · 7 класс</option>
+            <option value="math56">Математика · 5–6 класс</option>
+          </select></label>
+        <button data-qd-action="use-template" type="button">Создать из шаблона</button>
         <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
         <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
@@ -497,6 +503,19 @@ function qdRun(){
         const st=qdScores(section.questions,d.session.marks);
         return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'} · ${st.earned}/${st.possible} б.</span></div>`;
       }).join('')}</div>
+
+      ${qdReviewItems(d).length?`<section class="qd-review-plan" aria-label="Что повторить с учеником">
+        <div class="qd-review-title"><strong>На повторение</strong>
+          <span>${qdReviewItems(d).filter(x=>x.grade==='no').length} не знает ·
+          ${qdReviewItems(d).filter(x=>x.grade==='partial').length} частично</span></div>
+        <div class="qd-review-items">
+          ${qdReviewItems(d).slice(0,20).map(item=>`<div class="qd-review-item">
+            <span class="qd-review-mark">${item.grade==='no'?'Повторить':'Закрепить'}</span>
+            <div><strong>${qdEsc(item.section)}</strong><span>${qdEsc(item.prompt)}</span></div>
+            <button type="button" data-qd-action="review-jump" data-qid="${qdEsc(item.id)}">К вопросу</button>
+          </div>`).join('')}
+        </div>
+      </section>`:'<p class="qd-hint">Пока нет вопросов, отмеченных как «Частично» или «Не знает».</p>'}
       <div class="qd-report-action"><button type="button" data-qd-action="report-current" ${!s.rated?'disabled':''}>Скачать отчёт HTML / PDF через печать</button></div>
     </section>
     <section class="qd-panel qd-history">
@@ -572,6 +591,72 @@ function qdCSV(){
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'-results.csv',
     '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
 }
+
+function qdTemplate(key){
+  const collections={
+    physics7:{
+      title:'Физика · 7 класс · Основные понятия',
+      description:'Величины, измерения, движение и простые расчётные задания.',
+      sections:[
+        {title:'Физические величины',items:[
+          ['Что называют физической величиной? Приведи два примера.','Величина — измеряемое свойство явления или тела: длина, масса, время, температура.'],
+          ['Как найти цену деления шкалы прибора?','Найти разность значений соседних подписанных штрихов и разделить на число промежутков.'],
+          ['Почему результаты измерений не всегда абсолютно точны?','Из-за ограничений прибора, цены деления и погрешностей наблюдения.']
+        ]},
+        {title:'Движение и скорость',items:[
+          ['Чем путь отличается от перемещения?','Путь — длина траектории, перемещение — вектор от начальной до конечной точки.'],
+          ['Как вычислить скорость при равномерном движении?','v = s / t.'],
+          ['Поезд проехал 120 км за 2 часа. Какова средняя скорость?','60 км/ч.','practice']
+        ]},
+        {title:'Масса и плотность',items:[
+          ['Что показывает плотность вещества?','Массу единицы объёма: ρ = m / V.'],
+          ['Тело объёмом 2 м³ имеет массу 1000 кг. Определи плотность.','500 кг/м³.','practice']
+        ]}
+      ]
+    },
+    math56:{
+      title:'Математика · 5–6 класс · Диагностика',
+      description:'Дроби, проценты, уравнения и геометрические задачи.',
+      sections:[
+        {title:'Числа и дроби',items:[
+          ['Почему при сложении дробей с разными знаменателями их сначала приводят к общему знаменателю?','Чтобы складывать равные доли единицы.'],
+          ['Вычисли 1/2 + 1/4.','3/4.','practice'],
+          ['Что означает сократить дробь?','Разделить числитель и знаменатель на одно и то же ненулевое число.']
+        ]},
+        {title:'Проценты и уравнения',items:[
+          ['Что такое 1% от числа?','Одна сотая этого числа.'],
+          ['Найди 15% от 200.','30.','practice'],
+          ['Реши уравнение 3x + 7 = 22.','x = 5.','practice']
+        ]},
+        {title:'Геометрия',items:[
+          ['Чем периметр прямоугольника отличается от его площади?','Периметр — сумма длин сторон; площадь — мера поверхности.'],
+          ['Прямоугольник имеет стороны 5 см и 8 см. Найди периметр и площадь.','Периметр 26 см, площадь 40 см².','practice']
+        ]}
+      ]
+    }
+  };
+  const model=collections[key];if(!model)return null;
+  return {title:model.title,description:model.description,sections:model.sections.map(s=>({
+    id:qdNewId(),title:s.title,
+    questions:s.items.map(([prompt,answer,type='question'])=>({
+      id:qdNewId(),type,prompt,answer,points:2,partialCredit:50,choices:qdChoices(),
+      numericAnswer:'',tolerance:0
+    }))
+  }))};
+}
+function qdApplyTemplate(d,key){
+  const template=qdTemplate(key);if(!template)return false;
+  d.title=template.title;d.description=template.description;d.sections=template.sections;
+  d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
+  d.display={mode:'focus',activeId:''};qdStudentFilter='';qdRevealed.clear();
+  qdStore();return true;
+}
+function qdReviewItems(d,marks=d.session.marks){
+  return d.sections.flatMap(section=>section.questions
+    .filter(q=>marks[q.id]==='no'||marks[q.id]==='partial')
+    .map(q=>({id:q.id,section:section.title,prompt:q.prompt,
+      grade:marks[q.id]})));
+}
 function qdSample(){
   const section=(title,pairs,type='question')=>({id:qdNewId(),title,questions:pairs.map(([prompt,answer])=>({id:qdNewId(),type,prompt,answer,points:2,partialCredit:50}))});
   const d=qdDoc();d.title='Физика · 8 класс · Осенняя диагностика';d.description='Проверка понимания тепловых явлений и расчётных навыков.';
@@ -629,6 +714,13 @@ function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
   if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
+
+  if(action==='review-jump'){
+    const index=qdQuestionList(d).findIndex(q=>q.id===button.dataset.qid);
+    if(index<0)return;
+    qdDisplay(d).mode='focus';qdSelectQuestion(d,index);
+    qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();return;
+  }
   if(action==='view'){
     d.display=qdDisplay(d);
     d.display.mode=button.dataset.view==='list'?'list':'focus';
@@ -650,6 +742,12 @@ function qdOnClick(event){
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
+  if(action==='use-template'){
+    const key=document.getElementById('qd-template-pick')?.value;
+    if(!qdTemplate(key))return;
+    if(!confirm('Заменить текущую диагностику шаблоном? Вопросы, ученики и история этого документа будут заменены. При необходимости сначала скачайте .qdiag.'))return;
+    qdApplyTemplate(d,key);qdRefresh();return;
+  }
   if(action==='sample-auto'){
     if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
       status('Превышен лимит разделов или заданий',true);return;
