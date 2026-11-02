@@ -1,0 +1,73 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const root=path.resolve(__dirname,'..');
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage({viewport:{width:1536,height:920},acceptDownloads:true});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
+ await page.evaluate(()=>route('writer'));
+ await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('[data-qd-action="sample"]').click();
+ await page.locator('[data-qd-action="preview-chat"]').first().click();
+ await page.locator('.qd-chat-card [data-qd-action="mark"][data-mark="yes"]').first().click();
+ const before=await page.evaluate(()=>({count:qdQuestionList().length,marks:{...qdDoc().session.marks}}));
+ assert.equal(before.count,8);assert.equal(Object.values(before.marks).length,1);
+ await page.locator('[data-action="writer-diag-library"]').click();
+ assert.equal(await page.locator('.qd-library-card').count(),7);
+ const card=page.locator('.qd-library-card').filter({hasText:'Законы движения'});
+ await card.locator('[data-qd-action="library-preview"]').click();
+ assert.equal(await page.locator('.qd-library-preview').count(),1);
+ assert.equal(await page.locator('[data-qd-template-select]').count(),8);
+ assert.equal(await page.locator('[data-qd-template-select]:checked').count(),8);
+ await page.locator('.qd-library-preview-question details summary').first().click();
+ assert.equal(await page.locator('.qd-library-preview-question details[open]').count(),1);
+ await page.locator('[data-qd-template-select]').first().uncheck();
+ assert.equal(await page.locator('[data-qd-template-select]:checked').count(),7);
+ assert.match(await page.locator('.qd-library-preview-count').textContent(),/Будет добавлено: 7/);
+ await page.locator('[data-qd-action="library-preview-add"]').click();
+ assert.equal(await page.evaluate(()=>qdQuestionList().length),15);
+ assert.deepEqual(await page.evaluate(()=>Object.values(qdDoc().session.marks)),['yes']);
+ assert.equal(await page.evaluate(()=>qdDoc().history.length),0);
+ assert.equal(await page.locator('.qd-library-preview').count(),1,'keep preview for repeated composition');
+ assert.match(await page.locator('.qd-library-preview-count').textContent(),/уже есть/);
+ await page.locator('[data-qd-action="library-preview-all"]').click();
+ assert.equal(await page.locator('[data-qd-template-select]:checked').count(),8);
+ assert.match(await page.locator('.qd-library-preview-count').textContent(),/Будет добавлено: 1/);
+ await page.locator('[data-qd-action="library-preview-add"]').click();
+ assert.equal(await page.evaluate(()=>qdQuestionList().length),16);
+ assert.equal(await page.locator('[data-qd-action="library-preview-add"]').isDisabled(),true);
+ await page.locator('[data-qd-action="library-preview-close"]').click();
+ assert.equal(await page.locator('.qd-library-preview').count(),0);
+ await page.locator('[data-action="writer-diag-list"]').click();
+ assert.equal(await page.locator('.qd-chat-card').count(),16);
+ const downloadPromise=page.waitForEvent('download');
+ await page.locator('[data-qd-action="export"]').click();
+ const download=await downloadPromise,output=path.join(root,'task107-smoke.qdiag');
+ await download.saveAs(output);
+ const json=JSON.parse(fs.readFileSync(output,'utf8'));
+ assert.equal(json.sections.flatMap(s=>s.questions).length,16);
+ assert.equal(Object.values(json.session.marks).filter(x=>x==='yes').length,1);
+ fs.rmSync(output,{force:true});
+ await page.reload();
+ await page.evaluate(()=>route('writer'));
+ await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ assert.equal(await page.evaluate(()=>qdQuestionList().length),16);
+ assert.equal(await page.evaluate(()=>Object.keys(qdDoc().session.marks).length),1);
+ await page.locator('[data-action="writer-diag-library"]').click();
+ await page.locator('.qd-library-card').filter({hasText:'Дроби, проценты и задачи'})
+   .locator('[data-qd-action="library-preview"]').click();
+ await page.setViewportSize({width:390,height:820});
+ const widths=await page.locator('.qd-library-preview').evaluate(el=>({
+    screen:document.documentElement.clientWidth,
+    scroll:document.documentElement.scrollWidth,
+    preview:el.getBoundingClientRect().width
+ }));
+ assert.ok(widths.preview<widths.screen,'preview must fit mobile viewport');
+ assert.ok(widths.scroll<=widths.screen+3,'mobile preview must not overflow horizontally');
+ assert.deepEqual(errors,[]);
+ console.log('PASS TASK107: detailed preview, reveal, selective append, dedup, scores, QDIAG and mobile');
+ await browser.close();
+})().catch(e=>{console.error(e.stack);process.exit(1);});
