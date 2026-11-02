@@ -21,6 +21,7 @@ let qdRevealed = new Set();
 let qdStudentFilter = '';
 let qdPointerDrag = null;
 let qdPointerBound = false;
+let qdKeyboardBound = false;
 const qdVerified = new WeakSet();
 const qdNewId = () => 'qd-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2,9);
 const qdText = (value,max=1200) => typeof value==='string'?value.slice(0,max):'';
@@ -28,7 +29,8 @@ const qdEsc = value => String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<'
 const qdDefault = () => ({
   format:'quantum-diagnostic',version:1,title:'Диагностика знаний',description:'',
   sections:[{id:qdNewId(),title:'Раздел 1',questions:[{id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50}]}],
-  students:[],session:{student:'',studentId:'',marks:{},responses:{}},history:[]
+  students:[],session:{student:'',studentId:'',marks:{},responses:{}},
+  display:{mode:'focus',activeId:''},history:[]
 });
 function qdNormalize(raw){
   const data=qdDefault();
@@ -62,6 +64,8 @@ function qdNormalize(raw){
     }
   }
   const questionIds=new Set(data.sections.flatMap(s=>s.questions.map(q=>q.id)));
+  const display=raw.display&&typeof raw.display==='object'?raw.display:{};
+  data.display={mode:display.mode==='list'?'list':'focus',activeId:questionIds.has(display.activeId)?display.activeId:''};
   if(Array.isArray(raw.students)) data.students=raw.students.slice(0,QD_LIMITS.students)
     .filter(s=>s&&typeof s==='object'&&qdText(s.name,100).trim())
     .map(s=>({id:id(s.id),name:qdText(s.name,100).trim()}));
