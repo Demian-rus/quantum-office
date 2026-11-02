@@ -52,7 +52,7 @@ const {pathToFileURL}=require('node:url');
  const download=await promise;assert.match(download.suggestedFilename(),/динамика\.csv$/);
  const filename=path.join(root,'task114-student-history.csv');await download.saveAs(filename);
  const csv=fs.readFileSync(filename,'utf8');
- assert.match(csv,/Молекулы/);
+ assert.match(csv,/Температура и внутренняя энергия/);
  assert.ok(!csv.includes('Другой ученик'));
  fs.rmSync(filename,{force:true});
  await page.reload();await page.evaluate(()=>route('writer'));
