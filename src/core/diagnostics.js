@@ -732,8 +732,8 @@ function qdBuilder(){
         <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
         <label class="qd-template-selector">Готовые диагностики
           <select id="qd-template-pick" aria-label="Выбрать готовую диагностику">
-            <option value="physics7">Физика · 7 класс</option>
-            <option value="math56">Математика · 5–6 класс</option>
+            \u0024{QD_PRESETS.map(p=>'<option value="'+qdEsc(p.id)+'">'+qdEsc(QD_SUBJECTS[p.subject]||'Другое')+
+              ' · '+qdEsc(p.grade)+' класс · '+qdEsc(p.label)+'</option>').join('')}
           </select></label>
         <button data-qd-action="use-template" type="button">Создать из шаблона</button>
         <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
@@ -1353,9 +1353,14 @@ const QD_PRESETS=[
   {id:'math56',subject:'math',grade:'5–6',purpose:'diagnostic',label:'Дроби, проценты и задачи',description:'Проверка базовых навыков за 5–6 класс'},
   {id:'math7',subject:'math',grade:'7',purpose:'review',label:'Алгебра: уравнения и функции',description:'Уравнения, графики, вычисления'},
   {id:'informatics7',subject:'informatics',grade:'7',purpose:'diagnostic',label:'Информация и алгоритмы',description:'Кодирование, файлы, алгоритмы и логика'},
-  {id:'informatics9',subject:'informatics',grade:'9',purpose:'review',label:'Логика и программирование',description:'Булевы выражения, циклы и исполнители'}
+  {id:'informatics9',subject:'informatics',grade:'9',purpose:'review',label:'Логика и программирование',description:'Булевы выражения, циклы и исполнители'},
+  ...(typeof QD_PRESET_CURRICULUM==='object'?Object.entries(QD_PRESET_CURRICULUM.new)
+    .map(([id,m])=>({id,subject:m.subject,grade:m.grade,purpose:m.purpose,
+      label:m.label,description:m.description})) : [])
 ];
-const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',other:'Другое'};
+const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',
+  russian:'Русский язык',biology:'Биология',geography:'География',
+  chemistry:'Химия',other:'Другое'};
 const QD_PURPOSES={diagnostic:'Входная диагностика',review:'Повторение',practice:'Тренировка',exam:'Контрольная'};
 function qdLibrarySafe(value){
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
@@ -1822,13 +1827,20 @@ function qdTemplate(key){
       ]
     }
   };
-  const model=collections[key];if(!model)return null;
-  return {title:model.title,description:model.description,sections:model.sections.map(s=>({
+  const curriculum=typeof QD_PRESET_CURRICULUM==='object'?QD_PRESET_CURRICULUM:null;
+  const model=collections[key]||curriculum?.new?.[key];if(!model)return null;
+  const sections=[...model.sections,...(curriculum?.upgrades?.[key]||[])];
+  return {title:model.title,description:model.description,sections:sections.map(s=>({
     id:qdNewId(),title:s.title,
-    questions:s.items.map(([prompt,answer,type='question'])=>({
-      id:qdNewId(),type,prompt,answer,points:2,partialCredit:50,choices:qdChoices(),
-      numericAnswer:'',tolerance:0
-    }))
+    questions:s.items.map(item=>{
+      const q=Array.isArray(item)?{prompt:item[0],answer:item[1],type:item[2],points:item[3]}:item;
+      const options=Array.isArray(q.options)?q.options.slice(0,6):null;
+      const correct=Array.isArray(q.correct)?q.correct:[q.correct];
+      return {id:qdNewId(),type:qdType(q.type),prompt:qdText(q.prompt,1600),
+        answer:qdText(q.answer,3500),points:qdPoints(q.points),partialCredit:50,
+        choices:options?qdChoices(options.map((text,i)=>({text,correct:correct.includes(i)}))):qdChoices(),
+        numericAnswer:qdText(q.numericAnswer,60),tolerance:qdTolerance(q.tolerance)};
+    })
   }))};
 }
 function qdApplyTemplate(d,key){
