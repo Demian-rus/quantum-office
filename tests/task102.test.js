@@ -9,7 +9,7 @@ function harness(){
   const ctx={qoWriter:doc,qoPersistWriter:()=>{},download:(...x)=>downloads.push(x),
     confirm:()=>true,safeFile:x=>x,status:()=>{},console};
   runInNewContext(source+
-    '\\nthis.api={qdDoc,qdNormalize,qdSample,qdQuestionList,qdDisplay,qdCurrentIndex,qdSelectQuestion,qdAdvance,qdGuidedQuestions,qdRun,qdScores};',ctx);
+    '\nthis.api={qdDoc,qdNormalize,qdSample,qdQuestionList,qdDisplay,qdCurrentIndex,qdSelectQuestion,qdAdvance,qdGuidedQuestions,qdRun,qdScores};',ctx);
   return {api:ctx.api,doc,downloads};
 }
 test('TASK102 guided view is default with one focus card and safe navigation',()=>{
