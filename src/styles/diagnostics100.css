@@ -1,0 +1,62 @@
+
+#qo-diag-root .qd-builder-tools{justify-content:flex-end}
+#qo-diag-root .qd-count-pill{margin-right:auto;font-size:12px;font-weight:700;color:var(--qo-accent);background:var(--qo-accent-soft);padding:7px 10px;border-radius:999px}
+#qo-diag-root .qd-hint{font-size:12px;line-height:1.5;color:var(--qo-muted)}
+#qo-diag-root .qd-meta>.qd-hint{margin-top:-3px}
+#qo-diag-root .qd-section-actions{display:flex;align-items:center;gap:5px}
+#qo-diag-root .qd-section-actions button{white-space:nowrap;padding:6px 9px;font-size:12px}
+#qo-diag-root .qd-card-head{flex-wrap:wrap}
+#qo-diag-root .qd-card-head select{max-width:125px}
+#qo-diag-root .qd-card-head button{padding:4px 9px;min-height:30px;font-size:12px}
+#qo-diag-root .qd-drag-handle{display:flex;align-items:center;justify-content:center;width:29px;height:30px;flex:none;color:var(--qo-muted);background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:6px;cursor:grab;font-size:18px;touch-action:pan-y;user-select:none}
+#qo-diag-root .qd-drag-handle:active{cursor:grabbing}
+#qo-diag-root .qd-drag-handle:focus-visible{outline:2px solid var(--qo-focus);outline-offset:2px}
+#qo-diag-root .qd-edit-card.qd-drop-target{outline:2px dashed var(--qo-accent);outline-offset:2px}
+#qo-diag-root .qd-question-list.qd-drop-target{background:var(--qo-accent-soft);min-height:48px;border-radius:8px}
+#qo-diag-root .qd-settings{display:grid;grid-template-columns:minmax(100px,1fr) minmax(135px,1fr) minmax(170px,1.45fr);align-items:end;gap:10px;border-top:1px solid var(--qo-border);padding-top:10px}
+#qo-diag-root .qd-settings input,#qo-diag-root .qd-settings select{min-height:36px}
+#qo-diag-root .qd-roster{display:grid;gap:12px}
+#qo-diag-root .qd-roster .qd-row{margin:0}
+#qo-diag-root .qd-muted{font-size:12px;color:var(--qo-muted)}
+#qo-diag-root .qd-add-student{display:flex;gap:9px;align-items:center}
+#qo-diag-root .qd-add-student input{max-width:400px}
+#qo-diag-root .qd-add-student button{white-space:nowrap}
+#qo-diag-root .qd-student-list{display:grid;gap:7px}
+#qo-diag-root .qd-student-row{display:grid;grid-template-columns:minmax(0,1fr) 105px auto;align-items:center;gap:10px;background:var(--qo-surface-alt);border:1px solid var(--qo-border);padding:8px;border-radius:8px}
+#qo-diag-root .qd-student-row>span{color:var(--qo-muted);font-size:12px;text-align:center}
+#qo-diag-root .qd-student-row button{font-size:12px}
+#qo-diag-root .qd-session-panel{align-items:center}
+#qo-diag-root .qd-student-chooser{display:grid;grid-template-columns:minmax(140px,1fr) minmax(135px,1fr) auto;align-items:end;gap:8px;flex:1;min-width:0}
+#qo-diag-root .qd-student-chooser label{min-width:0;max-width:none}
+#qo-diag-root .qd-student-chooser button{white-space:nowrap}
+#qo-diag-root .qd-session-panel>.qd-row{justify-content:flex-end;max-width:310px}
+#qo-diag-root .qd-session-panel>.qd-row button{font-size:12px}
+#qo-diag-root .qd-history .qd-filter-label{max-width:320px;margin-bottom:14px}
+#qo-diag-root .qd-profile-insight{display:flex;flex-wrap:wrap;gap:9px 14px;align-items:center;margin-bottom:12px;padding:11px 13px;background:var(--qo-accent-soft);border-radius:9px;font-size:12px}
+#qo-diag-root .qd-profile-insight strong{font-size:14px;margin-right:auto;color:var(--qo-accent)}
+#qo-diag-root .qd-profile-insight span{font-variant-numeric:tabular-nums}
+@media(max-width:980px){
+ #qo-diag-root .qd-session-panel{flex-direction:column;align-items:stretch}
+ #qo-diag-root .qd-session-panel>.qd-row{max-width:none;justify-content:flex-start}
+}
+@media(max-width:720px){
+ #qo-diag-root .qd-builder-tools{justify-content:flex-start}
+ #qo-diag-root .qd-count-pill{width:100%}
+ #qo-diag-root .qd-settings{grid-template-columns:1fr 1fr}
+ #qo-diag-root .qd-settings label:last-child{grid-column:1/-1}
+ #qo-diag-root .qd-card-head select{margin-left:0}
+ #qo-diag-root .qd-card-head .qd-counter{margin-right:auto}
+ #qo-diag-root .qd-student-chooser{grid-template-columns:1fr 1fr}
+ #qo-diag-root .qd-student-chooser button{grid-column:1/-1;justify-self:start}
+ #qo-diag-root .qd-student-row{grid-template-columns:minmax(0,1fr) auto}
+ #qo-diag-root .qd-student-row>span{grid-column:1;grid-row:2;text-align:left}
+ #qo-diag-root .qd-student-row>button{grid-column:2;grid-row:2}
+}
+@media(max-width:440px){
+ #qo-diag-root .qd-student-chooser{grid-template-columns:1fr}
+ #qo-diag-root .qd-student-chooser button{grid-column:1}
+ #qo-diag-root .qd-section-actions{width:100%;justify-content:flex-end}
+ #qo-diag-root .qd-settings{grid-template-columns:1fr}
+ #qo-diag-root .qd-settings label:last-child{grid-column:auto}
+ #qo-diag-root .qd-add-student{flex-wrap:wrap}
+}
