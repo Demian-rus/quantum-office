@@ -67,7 +67,7 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.locator('.qd-card[data-qid]').count(),9);
 
   const pending=page.waitForEvent('download');
-  await page.locator('[data-qd-action="export"]').click();
+  await page.locator('[data-action="writer-diag-export"]').click();
   const dl=await pending;
   const dest=path.join(root,'task100-smoke.qdiag');await dl.saveAs(dest);
   const data=JSON.parse(fs.readFileSync(dest,'utf8'));
