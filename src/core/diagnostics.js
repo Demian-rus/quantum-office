@@ -231,6 +231,139 @@ function qdToolbar(){
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
     </div></div>`;
 }
+
+const QD_BULK_MAX_CHARS=24000;
+let qdBulkDraft='',qdBulkTarget='',qdBulkOpen=false,qdAuditOpen=false,qdCompact=false;
+let qdCardExpanded=new Set();
+function qdPromptKey(value){
+  return qdText(value,1600).replace(/\s+/g,' ').trim().toLocaleLowerCase('ru-RU');
+}
+function qdAudit(d){
+  const issues=[],seen=new Map();
+  for(const s of d.sections){
+    for(const q of s.questions){
+      const prompt=qdText(q.prompt,1600).trim(),key=qdPromptKey(prompt);
+      if(!prompt)issues.push({qid:q.id,kind:'error',field:'prompt',text:'Вопрос не заполнен'});
+      else if(seen.has(key))issues.push({qid:q.id,kind:'warning',field:'prompt',text:'Повторяет другое задание'});
+      else seen.set(key,q.id);
+      if(['question','practice'].includes(q.type)&&!qdText(q.answer,3500).trim())
+        issues.push({qid:q.id,kind:'warning',field:'answer',text:'Не заполнен ответ преподавателя'});
+      if(['single','multiple'].includes(q.type)){
+        const choices=qdChoices(q.choices),selected=choices.filter(x=>x.correct).length;
+        if(choices.some(x=>!x.text.trim()))issues.push({qid:q.id,kind:'error',field:'choice-text',text:'Заполните все варианты ответа'});
+        if(selected===0||(q.type==='single'&&selected!==1))
+          issues.push({qid:q.id,kind:'error',field:'choice-correct',text:'Неверно отмечены правильные ответы'});
+      }
+      if(q.type==='numeric'&&qdParseNumber(q.numericAnswer)===null)
+        issues.push({qid:q.id,kind:'error',field:'numericAnswer',text:'Введите корректный числовой ответ'});
+    }
+  }
+  return issues;
+}
+function qdBulkPlan(d,text,targetId){
+  const normalized=qdText(text,QD_BULK_MAX_CHARS+1).replace(/\r\n?/g,'\n');
+  const lines=normalized.split('\n');
+  const base=d.sections.find(s=>s.id===targetId)||d.sections[0];
+  const existing=new Set(d.sections.flatMap(s=>s.questions.map(q=>qdPromptKey(q.prompt))).filter(Boolean));
+  const sections=new Map(d.sections.map(s=>[qdPromptKey(s.title),s.id]));
+  const proposed=new Map(),issues=[],items=[];
+  let target=base?.id||'',skipped=0;
+  if(normalized.length>QD_BULK_MAX_CHARS)return {ok:false,issues:['Слишком много текста — не более 24 000 символов'],items:[],skipped:0,newSections:0};
+  if(lines.length>400)return {ok:false,issues:['Слишком много строк — максимум 400'],items:[],skipped:0,newSections:0};
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i].trim();
+    if(!line)continue;
+    const header=/^\[([^\]\r\n]{1,120})\]$/.exec(line);
+    if(header){
+      const name=header[1].trim(),key=qdPromptKey(name);
+      if(!name){skipped++;issues.push('Строка '+(i+1)+': пустая тема');continue;}
+      if(!sections.has(key)){
+        if(proposed.size+d.sections.length>=QD_LIMITS.sections){
+          issues.push('Строка '+(i+1)+': достигнут предел 24 разделов');return {ok:false,items:[],issues,skipped,newSections:0};
+        }
+        const id='bulk-section-'+proposed.size;
+        proposed.set(id,name);sections.set(key,id);
+      }
+      target=sections.get(key);
+      continue;
+    }
+    const practical=/^!\s+/.test(line),clean=practical?line.replace(/^!\s+/,''):line;
+    const delimiter=clean.indexOf('|')>=0?'|':clean.indexOf('\t')>=0?'\t':null;
+    const cut=delimiter?clean.indexOf(delimiter):-1;
+    const prompt=(cut>=0?clean.slice(0,cut):clean).trim();
+    const answer=cut>=0?clean.slice(cut+1).trim():'';
+    const key=qdPromptKey(prompt);
+    if(!prompt){skipped++;issues.push('Строка '+(i+1)+': отсутствует вопрос');continue;}
+    if(prompt.length>1600||answer.length>3500){skipped++;issues.push('Строка '+(i+1)+': превышена длина вопроса или ответа');continue;}
+    if(existing.has(key)){skipped++;issues.push('Строка '+(i+1)+': повторяющийся вопрос');continue;}
+    if(!target){
+      if(proposed.size+d.sections.length>=QD_LIMITS.sections)return {ok:false,items:[],issues:['Невозможно создать раздел: достигнут лимит'],skipped,newSections:0};
+      if(!proposed.has('bulk-section-empty'))proposed.set('bulk-section-empty','Новые вопросы');
+      target='bulk-section-empty';
+    }
+    existing.add(key);
+    items.push({target,prompt,answer,type:practical?'practice':'question'});
+    if(qdQuestionList(d).length+items.length>QD_LIMITS.questions){
+      issues.push('Достигнут лимит 240 вопросов');return {ok:false,items:[],issues,skipped,newSections:0};
+    }
+  }
+  if(!items.length)return {ok:false,items:[],issues:issues.length?issues:['Нет вопросов для добавления'],skipped,newSections:0};
+  const usedNew=new Set(items.map(item=>item.target).filter(id=>proposed.has(id)));
+  return {ok:true,items,issues,skipped,newSections:usedNew.size,
+    sections:[...proposed.entries()].filter(([id])=>usedNew.has(id)).map(([id,title])=>({id,title}))};
+}
+function qdBulkCommit(d,plan){
+  if(!plan.ok||!plan.items?.length)return false;
+  const count=qdQuestionList(d).length;
+  if(count+plan.items.length>QD_LIMITS.questions||d.sections.length+plan.newSections>QD_LIMITS.sections)return false;
+  const created=new Map();
+  for(const s of plan.sections||[]){
+    const newSection={id:qdNewId(),title:s.title,questions:[]};
+    d.sections.push(newSection);created.set(s.id,newSection.id);
+  }
+  const byId=new Map(d.sections.map(s=>[s.id,s]));
+  for(const item of plan.items){
+    const section=byId.get(created.get(item.target)||item.target);
+    if(!section)return false;
+    section.questions.push({id:qdNewId(),type:item.type,prompt:item.prompt,answer:item.answer,
+      points:2,partialCredit:50,choices:qdChoices(),numericAnswer:'',tolerance:0});
+  }
+  return true;
+}
+
+
+function qdAuditMarkup(d){
+  const issues=qdAudit(d),questions=qdQuestionList(d),bad=new Set(issues.map(x=>x.qid));
+  return '<div class="qd-audit-summary"><strong>'+(questions.length-bad.size)+' / '+questions.length+' без замечаний</strong><span>'+issues.length+' замечаний</span></div>'+
+    (issues.length?'<div class="qd-audit-list">'+issues.slice(0,60).map(issue=>{
+      const item=questions.find(q=>q.id===issue.qid);
+      return '<button type="button" class="qd-audit-item" data-qd-action="audit-jump" data-qid="'+qdEsc(issue.qid)+'" data-field="'+qdEsc(issue.field)+'">'+
+        '<span class="qd-audit-marker '+issue.kind+'">'+(issue.kind==='error'?'Исправить':'Проверить')+'</span>'+
+        '<span><strong>'+qdEsc(item?.prompt||'Новый вопрос')+'</strong><small>'+qdEsc(issue.text)+'</small></span></button>';
+    }).join('')+'</div>':'<p class="qd-hint">Вопросы заполнены, ошибок не найдено.</p>');
+}
+function qdBulkPreview(d){
+  const plan=qdBulkPlan(d,qdBulkDraft,qdBulkTarget);
+  return '<div class="qd-bulk-summary"><strong>'+(plan.ok?'Добавится '+plan.items.length+' заданий':'Нет готовых вопросов')+'</strong>'+
+    '<span>Новых разделов: '+(plan.newSections||0)+' · Пропущено: '+plan.skipped+'</span></div>'+
+    (plan.issues.length?'<ul class="qd-bulk-warnings">'+plan.issues.slice(0,8).map(x=>'<li>'+qdEsc(x)+'</li>').join('')+'</ul>':'')+
+    (plan.ok?'<div class="qd-bulk-items">'+plan.items.slice(0,4).map(x=>'<p><strong>'+qdEsc(x.prompt)+'</strong><small>'+qdEsc(x.answer||'Ответ не задан')+'</small></p>').join('')+'</div>':'')+
+    '<button type="button" data-qd-action="bulk-commit" class="qd-primary" '+(plan.ok?'':'disabled')+'>Добавить '+(plan.ok?plan.items.length:0)+' заданий</button>';
+}
+function qdBuilderUtilities(d){
+  const issues=qdAudit(d);
+  return '<div class="qd-panel qd-builder-utilities">'+
+    '<div class="qd-utility-actions"><strong>Инструменты конструктора</strong><button data-qd-action="compact-mode" type="button">'+(qdCompact?'Развернуть все':'Компактный список')+'</button></div>'+
+    '<details data-qd-pane="audit" class="qd-utility-details" '+(qdAuditOpen?'open':'')+'><summary>Проверка заданий <span>'+issues.length+' замечаний</span></summary>'+
+    '<div id="qd-audit-body" class="qd-utility-content">'+qdAuditMarkup(d)+'</div></details>'+
+    '<details data-qd-pane="bulk" class="qd-utility-details" '+(qdBulkOpen?'open':'')+'><summary>Массовое добавление вопросов <span>Из текста</span></summary>'+
+    '<div class="qd-utility-content qd-bulk-panel"><p class="qd-hint">Одна строка — вопрос | ответ. Для новой темы напишите [Название]. Знак ! и пробел в начале строки означают практику.</p>'+
+    '<pre class="qd-bulk-example">[Теплопередача]\nКак тепло приходит от Солнца? | Излучением\n! Найди количество теплоты. | Q = cmΔt</pre>'+
+    '<label>Раздел без заголовка<select id="qd-bulk-target">'+d.sections.map(s=>'<option value="'+qdEsc(s.id)+'" '+(s.id===(qdBulkTarget||d.sections[0]?.id)?'selected':'')+'>'+qdEsc(s.title)+'</option>').join('')+'</select></label>'+
+    '<label>Вставьте вопросы<textarea id="qd-bulk-text" rows="6" maxlength="'+QD_BULK_MAX_CHARS+'">'+qdEsc(qdBulkDraft)+'</textarea></label>'+
+    '<div id="qd-bulk-preview" aria-live="polite">'+qdBulkPreview(d)+'</div></div></details></div>';
+}
+
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
@@ -251,6 +384,7 @@ function qdBuilder(){
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
+    ${qdBuilderUtilities(d)}
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
         <span class="qd-index">${si+1}</span>
@@ -262,10 +396,12 @@ function qdBuilder(){
         </div>
       </div>
       <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
-      ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
+      ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card ${qdCompact&&!qdCardExpanded.has(q.id)?'is-compact':''}" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
           <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
           <span class="qd-counter">Вопрос ${qi+1}</span>
+           <span class="qd-card-preview" title="${qdEsc(q.prompt)}">${qdEsc(q.prompt||'Новый вопрос')}</span>
+           ${qdCompact?`<button type="button" data-qd-action="card-expand" data-qid="${qdEsc(q.id)}">${qdCardExpanded.has(q.id)?'Свернуть':'Редактировать'}</button>`:''}
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
             <option value="question" ${q.type==='question'?'selected':''}>Вопрос</option>
             <option value="practice" ${q.type==='practice'?'selected':''}>Практика</option>
@@ -700,6 +836,7 @@ function qoDiagnosticMount(){
   root.addEventListener('click',qdOnClick);
   root.addEventListener('input',qdOnInput);
   root.addEventListener('change',qdOnChange);
+  root.addEventListener('toggle',qdOnBuilderToggle,true);
   root.addEventListener('pointerdown',qdPointerDown);
   if(!qdPointerBound){
     window.addEventListener('pointermove',qdPointerMove,true);
@@ -709,6 +846,26 @@ function qoDiagnosticMount(){
   }
   if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);qdKeyboardBound=true;}
   qoDiagnosticVisibility();
+}
+function qdOnBuilderToggle(event){
+  if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
+  if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
+}
+function qdJumpToEdit(qid,field='prompt'){
+  const root=document.getElementById('qo-diag-root');
+  const card=[...root?.querySelectorAll('.qd-edit-card')||[]].find(el=>el.dataset.qid===qid);
+  if(!card)return;
+  const scroll=document.getElementById('qo-diag-workspace');
+  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-20;
+  const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
+  (input||card.querySelector('textarea'))?.focus({preventScroll:true});
+}
+function qdRefreshAudit(){
+  if(qdMode!=='builder')return;
+  const audit=document.getElementById('qd-audit-body');
+  if(audit)audit.innerHTML=qdAuditMarkup(qdDoc());
+  const summary=document.querySelector('[data-qd-pane="audit"] summary span');
+  if(summary)summary.textContent=qdAudit(qdDoc()).length+' замечаний';
 }
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
@@ -738,6 +895,27 @@ function qdOnClick(event){
     }
     if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
     return;
+  }
+  if(action==='compact-mode'){
+    qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
+  }
+  if(action==='card-expand'){
+    const id=button.dataset.qid;
+    if(qdCardExpanded.has(id))qdCardExpanded.delete(id);
+    else qdCardExpanded.add(id);
+    qdRefresh();if(qdCardExpanded.has(id))qdJumpToEdit(id);return;
+  }
+  if(action==='audit-jump'){
+    const id=button.dataset.qid;
+    if(qdCompact)qdCardExpanded.add(id);
+    qdAuditOpen=true;qdRefresh();qdJumpToEdit(id,button.dataset.field);return;
+  }
+  if(action==='bulk-commit'){
+    const plan=qdBulkPlan(d,qdBulkDraft,qdBulkTarget);
+    if(!plan.ok){status('Исправьте ошибки массовой вставки',true);return;}
+    if(!qdBulkCommit(d,plan)){status('Не удалось добавить вопросы из-за ограничения размера',true);return;}
+    qdBulkDraft='';qdBulkOpen=false;qdAuditOpen=true;
+    qdStore();qdRefresh();status('Добавлено '+plan.items.length+' новых заданий');return;
   }
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
@@ -936,6 +1114,12 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-bulk-text'){
+    qdBulkDraft=event.target.value.slice(0,QD_BULK_MAX_CHARS);
+    const preview=document.getElementById('qd-bulk-preview');
+    if(preview)preview.innerHTML=qdBulkPreview(qdDoc());
+    return;
+  }
   const field=event.target.dataset.qdField;if(!field)return;
   const d=qdDoc(),value=event.target.value;
   if(field==='title')d.title=qdText(value,120);
@@ -965,8 +1149,20 @@ function qdOnInput(event){
   }else if(field==='student-name')return;
   else return;
   qdStore();
+  if(field==='prompt'){
+    const card=event.target.closest('.qd-edit-card');
+    const preview=card?.querySelector('.qd-card-preview');
+    if(preview)preview.textContent=value.trim()||'Новый вопрос';
+  }
+  if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.id==='qd-bulk-target'){
+    qdBulkTarget=event.target.value;
+    const preview=document.getElementById('qd-bulk-preview');
+    if(preview)preview.innerHTML=qdBulkPreview(qdDoc());
+    return;
+  }
   if(event.target.dataset.qdField==='choice-correct'){
     const q=qdDoc().sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid),i=Number(event.target.dataset.index);
     if(!q||!['single','multiple'].includes(q.type)||!q.choices?.[i])return;

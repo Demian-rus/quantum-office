@@ -1,0 +1,44 @@
+/* TASK104: practical, fast authoring for teachers */
+#qo-diag-root .qd-builder-utilities{display:grid;gap:9px;margin-bottom:12px}
+#qo-diag-root .qd-utility-actions{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px}
+#qo-diag-root .qd-utility-actions>strong{font-size:15px}
+#qo-diag-root .qd-utility-actions>button{font-size:12px;min-height:34px;padding:7px 13px}
+#qo-diag-root .qd-utility-details{border:1px solid var(--qo-border);border-radius:10px;background:var(--qo-surface);overflow:hidden}
+#qo-diag-root .qd-utility-details>summary{cursor:pointer;padding:13px 16px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:space-between;gap:8px}
+#qo-diag-root .qd-utility-details>summary:hover{background:var(--qo-hover)}
+#qo-diag-root .qd-utility-details>summary span{font-size:11px;font-weight:500;color:var(--qo-muted)}
+#qo-diag-root .qd-utility-content{padding:13px 16px;border-top:1px solid var(--qo-border);display:grid;gap:11px}
+#qo-diag-root .qd-audit-summary,#qo-diag-root .qd-bulk-summary{display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;align-items:center;font-size:12px;color:var(--qo-muted)}
+#qo-diag-root .qd-audit-summary strong,#qo-diag-root .qd-bulk-summary strong{font-size:13px;color:var(--qo-text)}
+#qo-diag-root .qd-audit-list{display:grid;gap:6px;max-height:280px;overflow:auto}
+#qo-diag-root .qd-audit-item{width:100%;display:grid;grid-template-columns:74px minmax(0,1fr);gap:11px;align-items:center;text-align:left;min-height:50px;padding:7px 11px;border:1px solid var(--qo-border);border-radius:8px;background:var(--qo-surface-alt)}
+#qo-diag-root .qd-audit-item:hover{background:var(--qo-hover)}
+#qo-diag-root .qd-audit-item>span:nth-child(2){display:grid;gap:3px;min-width:0}
+#qo-diag-root .qd-audit-item strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--qo-text)}
+#qo-diag-root .qd-audit-item small{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-audit-marker{font-weight:700;font-size:10px;color:var(--qo-warning)}
+#qo-diag-root .qd-audit-marker.error{color:var(--qo-danger)}
+#qo-diag-root .qd-bulk-panel>label{display:grid;gap:6px;font-size:12px;font-weight:650}
+#qo-diag-root .qd-bulk-panel select{width:100%;max-width:370px}
+#qo-diag-root .qd-bulk-panel textarea{width:100%;min-height:125px;resize:vertical;font:13px/1.55 "Segoe UI",Arial,sans-serif}
+#qo-diag-root .qd-bulk-example{background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:8px;padding:11px 13px;font:12px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere;margin:0}
+#qo-diag-root .qd-bulk-panel #qd-bulk-preview{display:grid;gap:11px;padding:11px;border:1px dashed var(--qo-border);border-radius:10px}
+#qo-diag-root .qd-bulk-warnings{margin:0;padding-left:20px;color:var(--qo-warning);font-size:12px}
+#qo-diag-root .qd-bulk-items{display:grid;gap:6px;max-height:205px;overflow:auto}
+#qo-diag-root .qd-bulk-items p{display:grid;gap:3px;margin:0;padding:8px 10px;border-radius:7px;background:var(--qo-surface-alt);font-size:12px}
+#qo-diag-root .qd-bulk-items small{color:var(--qo-muted)}
+#qo-diag-root #qd-bulk-preview>.qd-primary{justify-self:start}
+#qo-diag-root .qd-card-preview{display:none;font-size:12px;line-height:1.35;font-weight:650;color:var(--qo-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+#qo-diag-root .qd-edit-card.is-compact>:not(.qd-card-head){display:none!important}
+#qo-diag-root .qd-edit-card.is-compact{padding:10px 12px;min-height:46px}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head{display:flex;gap:7px;align-items:center;flex-wrap:nowrap;width:100%;margin:0}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-preview{display:block}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head select{width:115px;max-width:115px}
+#qo-diag-root .qd-edit-card.is-compact .qd-card-head button{min-width:28px;flex:none}
+@media(max-width:760px){
+ #qo-diag-root .qd-edit-card.is-compact .qd-card-head{flex-wrap:wrap}
+ #qo-diag-root .qd-edit-card.is-compact .qd-card-preview{flex-basis:calc(100% - 120px);order:2}
+ #qo-diag-root .qd-edit-card.is-compact .qd-card-head select{width:100px}
+ #qo-diag-root .qd-utility-details>summary{padding:11px}
+ #qo-diag-root .qd-utility-content{padding:10px}
+}
