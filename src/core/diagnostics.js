@@ -301,6 +301,34 @@ function qdBuilder(){
 function qdDateLabel(value){
   const date=new Date(value||'');return Number.isFinite(date.getTime())?date.toLocaleString('ru-RU'):'Дата неизвестна';
 }
+function qdTypeTitle(type){
+  return ({question:'Вопрос',practice:'Практика',single:'Один правильный ответ',
+    multiple:'Несколько ответов',numeric:'Числовой ответ'})[type]||'Вопрос';
+}
+function qdAutoInput(q,response){
+  if(!qdAuto(q.type))return '';
+  const v=qdNormalizeResponse(q,response);
+  if(q.type==='numeric')return `<div class="qd-auto-input">
+    <label>Ваш числовой ответ<input data-qd-field="numeric-response" data-qid="${qdEsc(q.id)}"
+      maxlength="80" type="text" inputmode="decimal" value="${qdEsc(v.value)}" placeholder="Введите число"></label>
+  </div>`;
+  return `<div class="qd-auto-input" role="group" aria-label="Варианты ответа">
+    ${qdChoices(q.choices).map((c,i)=>`<label class="qd-student-option">
+      <input type="${q.type==='single'?'radio':'checkbox'}" data-qd-field="auto-selection"
+        name="qd-answer-${qdEsc(q.id)}" data-qid="${qdEsc(q.id)}" data-index="${i}"
+        ${v.selected.includes(i)?'checked':''}><span>${qdEsc(c.text||'Вариант не заполнен')}</span>
+    </label>`).join('')}
+  </div>`;
+}
+function qdReference(q){
+  let details='';
+  if(['single','multiple'].includes(q.type)){
+    const correct=qdChoices(q.choices).filter(c=>c.correct&&c.text.trim()).map(c=>c.text);
+    if(correct.length)details='Правильные варианты: '+correct.join('; ');
+  }
+  if(q.type==='numeric')details='Числовой ответ: '+(q.numericAnswer||'не задан')+' (± '+qdTolerance(q.tolerance)+')';
+  return [details,q.answer].filter(Boolean).join('\n\n')||'Ответ не заполнен';
+}
 function qdRun(){
   const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
   const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
@@ -326,16 +354,19 @@ function qdRun(){
         const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id);
         return `<article class="qd-card ${mark?'qd-mark-'+mark:''}" data-qid="${qdEsc(q.id)}">
          <div class="qd-question"><span class="qd-counter">${qi+1}.</span><div>
-         <span class="qd-type">${q.type==='practice'?'Практика':'Вопрос'} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
+         <span class="qd-type">${qdTypeTitle(q.type)} · ${qdPoints(q.points)} балл${qdPoints(q.points)===1?'':qdPoints(q.points)<5?'а':'ов'} · частично ${qdPartialCredit(q.partialCredit)}%</span>
          <p>${qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')}</p></div></div>
+         ${qdAutoInput(q,d.session.responses[q.id])}
          <div class="qd-card-actions">
+           ${qdAuto(q.type)?`<button type="button" class="qd-primary" data-qd-action="auto-check"
+              data-qid="${qdEsc(q.id)}">Проверить автоматически</button>`:''}
            <button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="${qdEsc(q.id)}" aria-expanded="${visible}">${visible?'Скрыть ответ':'Показать ответ'}</button>
            <div class="qd-rating" role="group" aria-label="Оценка ответа">
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="yes" aria-pressed="${mark==='yes'}" class="${mark==='yes'?'selected':''}">✓ Знает</button>
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="partial" aria-pressed="${mark==='partial'}" class="${mark==='partial'?'selected':''}">◐ Частично</button>
              <button type="button" data-qd-action="mark" data-qid="${qdEsc(q.id)}" data-mark="no" aria-pressed="${mark==='no'}" class="${mark==='no'?'selected':''}">× Не знает</button>
            </div></div>
-         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(q.answer||'Ответ не заполнен').replace(/\n/g,'<br>')}</p></div>`:''}
+         ${visible?`<div class="qd-answer"><strong>Ответ</strong><p>${qdEsc(qdReference(q)).replace(/\n/g,'<br>')}</p></div>`:''}
         </article>`;
       }).join('')}</section>`).join('')}
     <section class="qd-panel qd-results" aria-label="Итоги диагностики">
