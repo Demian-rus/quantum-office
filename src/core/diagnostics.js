@@ -58,8 +58,12 @@ function qdNormalize(raw){
           if(/^[\w-]{1,60}$/.test(key)&&QD_STATES.includes(state))marks[key]=state;
         }
       }
+      const x=h.summary;
+      const summary=x&&typeof x==='object'&&['yes','partial','no','rated','total','percent'].every(k=>Number.isInteger(x[k])&&x[k]>=0&&x[k]<=10000)?{
+        yes:x.yes,partial:x.partial,no:x.no,rated:x.rated,total:x.total,percent:Math.min(100,x.percent)
+      }:null;
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
-        student:qdText(h.student,100),title:qdText(h.title,120),marks};
+        student:qdText(h.student,100),title:qdText(h.title,120),marks,summary};
     });
   }
   return data;
@@ -173,7 +177,7 @@ function qdRun(){
     </section>
     <section class="qd-panel qd-history"><div class="qd-row qd-wrap"><h2>История результатов</h2>
       <button type="button" data-qd-action="csv" ${!d.history.length?'disabled':''}>Экспорт CSV</button></div>
-      ${d.history.length?`<div class="qd-history-list">${[...d.history].reverse().map(h=>{const hs=qdScores(all,h.marks);return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(h.date?new Date(h.date).toLocaleString('ru-RU'):'Дата неизвестна')}</small></span>
+      ${d.history.length?`<div class="qd-history-list">${[...d.history].reverse().map(h=>{const hs=h.summary||qdScores(all,h.marks);return `<div><span>${qdEsc(h.student||'Ученик без имени')}<small>${qdEsc(h.date?new Date(h.date).toLocaleString('ru-RU'):'Дата неизвестна')}</small></span>
         <strong>${hs.rated?hs.percent+'%':'—'}</strong><span>${hs.rated} проверено</span></div>`;}).join('')}</div>`:'<p>Сохранённые занятия появятся здесь после завершения диагностики.</p>'}
     </section></div>`;
 }
@@ -190,7 +194,7 @@ function qdCsvCell(value){
 function qdCSV(){
   const d=qdDoc(),questions=qdQuestionList(d);
   const rows=[['Дата','Ученик','Документ','Проверено','Всего','Знает','Частично','Не знает','Результат, %'],
-    ...d.history.map(h=>{const s=qdScores(questions,h.marks);
+    ...d.history.map(h=>{const s=h.summary||qdScores(questions,h.marks);
       return [h.date,h.student,h.title||d.title,s.rated,s.total,s.yes,s.partial,s.no,s.percent];})];
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'-results.csv',
     '\ufeff'+rows.map(row=>row.map(qdCsvCell).join(';')).join('\r\n'),'text/csv;charset=utf-8');
@@ -287,7 +291,7 @@ function qdOnClick(event){
     const stats=qdScores(qdQuestionList(d),d.session.marks);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
-      title:d.title,marks:{...d.session.marks}});
+      title:d.title,marks:{...d.session.marks},summary:stats});
     d.history=d.history.slice(-QD_LIMITS.history);
     d.session={student:'',marks:{}};qdRevealed.clear();qdStore();qdRefresh();
     status('Результат сохранён в истории диагностики');return;
