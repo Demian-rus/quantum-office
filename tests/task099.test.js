@@ -42,7 +42,7 @@ test('strictly bound untrusted diagnostic content and escape markup',()=>{
   assert.equal(new Set([safe.sections[0].id,...safe.sections[0].questions.map(q=>q.id)]).size,3);
   assert.equal(safe.sections[0].questions[0].type,'question');
   assert.equal(safe.sections[0].questions[1].type,'practice');
-  assert.equal(Object.keys(safe.session.marks).length,1);
+  assert.equal(Object.keys(safe.session.marks).length,0); // ambiguous duplicate ID must not attach a mark to a different question
   assert.ok(safe.title.startsWith('<img'));
   assert.equal(h.api.qdEsc(safe.title).includes('<img'),false);
   assert.equal(h.api.qdEsc(safe.title).includes('&lt;img'),true);
