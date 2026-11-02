@@ -1005,6 +1005,23 @@ function qdOnClick(event){
     if(qdSelectQuestion(d,index)){qdRevealed.clear();qdStore();qdRefresh();qdScrollToQuestion();}
     return;
   }
+
+  if(action==='select-visible'){
+    for(const q of qdMatchingQuestions(d))qdSelected.add(q.id);
+    qdRefresh();return;
+  }
+  if(action==='selection-clear'){qdSelected.clear();qdRefresh();return;}
+  if(action==='batch-apply'){
+    const operation=document.getElementById('qd-batch-action')?.value;
+    const value=document.getElementById('qd-batch-value')?.value;
+    const ids=[...qdSelected];
+    if(!ids.length){status('Сначала выберите вопросы',true);return;}
+    if(operation==='delete'&&!confirm('Удалить '+ids.length+' выбранных вопросов? Старые результаты в журнале сохранятся.'))return;
+    const result=qdBatchApply(d,ids,operation,value);
+    if(!result.ok){status(result.message,true);return;}
+    qdSelected.clear();qdCardExpanded.clear();qdStore();qdRefresh();
+    status('Изменено вопросов: '+result.count);return;
+  }
   if(action==='compact-mode'){
     qdCompact=!qdCompact;qdCardExpanded.clear();qdRefresh();return;
   }
@@ -1015,6 +1032,7 @@ function qdOnClick(event){
     qdRefresh();if(qdCardExpanded.has(id))qdJumpToEdit(id);return;
   }
   if(action==='audit-jump'){
+    qdSearch='';qdFilterKind='all';
     const id=button.dataset.qid;
     if(qdCompact)qdCardExpanded.add(id);
     qdAuditOpen=true;qdRefresh();qdJumpToEdit(id,button.dataset.field);return;
@@ -1033,7 +1051,7 @@ function qdOnClick(event){
     const key=document.getElementById('qd-template-pick')?.value;
     if(!qdTemplate(key))return;
     if(!confirm('Заменить текущую диагностику шаблоном? Вопросы, ученики и история этого документа будут заменены. При необходимости сначала скачайте .qdiag.'))return;
-    qdApplyTemplate(d,key);qdRefresh();return;
+    qdApplyTemplate(d,key);qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
   if(action==='sample-auto'){
     if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
@@ -1053,7 +1071,7 @@ function qdOnClick(event){
   }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
-    qdSample();qdRefresh();return;
+    qdSample();qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
 
   if(action==='section-up'||action==='section-down'){
@@ -1223,6 +1241,9 @@ function qdClearDropTarget(){
 }
 
 function qdOnInput(event){
+  if(event.target.id==='qd-search'){
+    qdSearch=event.target.value.slice(0,160);qdApplyFilterUI();return;
+  }
   if(event.target.id==='qd-bulk-text'){
     qdBulkDraft=event.target.value.slice(0,QD_BULK_MAX_CHARS);
     const preview=document.getElementById('qd-bulk-preview');
@@ -1266,6 +1287,21 @@ function qdOnInput(event){
   if(['prompt','answer','choice-text','numericAnswer'].includes(field))qdRefreshAudit();
 }
 function qdOnChange(event){
+  if(event.target.matches?.('[data-qd-select]')){
+    const id=event.target.dataset.qid;
+    if(event.target.checked)qdSelected.add(id);
+    else qdSelected.delete(id);
+    qdApplyFilterUI();return;
+  }
+  if(event.target.id==='qd-filter-kind'){
+    qdFilterKind=event.target.value;
+    qdApplyFilterUI();return;
+  }
+  if(event.target.id==='qd-batch-action'){
+    const body=document.getElementById('qd-batch-inputs');
+    if(body)body.innerHTML=qdBatchInputs(qdDoc(),event.target.value);
+    return;
+  }
   if(event.target.id==='qd-bulk-target'){
     qdBulkTarget=event.target.value;
     const preview=document.getElementById('qd-bulk-preview');
