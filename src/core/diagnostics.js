@@ -71,6 +71,7 @@ function qdNormalize(raw){
 function qdDoc(){
   if(!qdVerified.has(qoWriter)){
     qoWriter.diagnostic=qdNormalize(qoWriter.diagnostic);
+    qdMode=qoWriter.diagnosticMode==='run'?'run':'builder';
     qdVerified.add(qoWriter);
     qdRevealed.clear();
   }
@@ -246,7 +247,7 @@ function qoDiagnosticMount(){
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
-  if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qdRevealed.clear();qdRefresh();return;}
+  if(action==='mode'){qdMode=button.dataset.mode==='run'?'run':'builder';qoWriter.diagnosticMode=qdMode;qdRevealed.clear();qdStore();qdRefresh();return;}
   if(action==='export'){qdExport();return;}
   if(action==='csv'){qdCSV();return;}
   if(action==='import'){document.getElementById('qo-diag-file')?.click();return;}
@@ -327,6 +328,6 @@ function qdOnChange(event){
       throw Error('Неверный формат');
     if(!confirm('Заменить текущую диагностику содержимым файла?'))return;
     qoWriter.diagnostic=qdNormalize(parsed);qdVerified.add(qoWriter);
-    qdMode='run';qdRevealed.clear();qdStore();qdRefresh();
+    qdMode='run';qoWriter.diagnosticMode='run';qdRevealed.clear();qdStore();qdRefresh();
   }).catch(()=>status('Не удалось открыть .qdiag: повреждённый или неподдерживаемый файл',true));
 }
