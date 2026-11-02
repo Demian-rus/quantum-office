@@ -1,0 +1,84 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const {pathToFileURL}=require('node:url');
+
+(async()=>{
+ const root=path.resolve(__dirname,'..');
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage({viewport:{width:1280,height:950},acceptDownloads:true});
+ const errors=[];page.on('pageerror',err=>errors.push(err.message));page.on('dialog',d=>d.accept());
+ const open=async()=>{await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();};
+ await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
+ await open();
+ await page.locator('[data-qd-action="sample"]').click();
+ await page.locator('[data-qd-action="sample-auto"]').click();
+ assert.equal(await page.locator('.qd-edit-card').count(),10);
+ const multi=page.locator('.qd-edit-card').first();
+ await multi.locator('[data-qd-field="type"]').selectOption('multiple');
+ assert.equal(await page.locator('.qd-choices-editor').count(),2);
+ const first=page.locator('.qd-edit-card').first();
+ for(const [i,value] of ['Правильный первый','Неверный','Правильный второй','Неверный второй'].entries()){
+   await first.locator('[data-qd-field="choice-text"]').nth(i).fill(value);
+ }
+ await first.locator('[data-qd-field="choice-correct"]').nth(0).check();
+ await first.locator('[data-qd-field="choice-correct"]').nth(2).check();
+ const firstId=await page.evaluate(()=>qdDoc().sections[0].questions[0].id);
+ assert.equal(await page.evaluate(id=>qdCheckAnswer(qdDoc().sections[0].questions[0],{selected:[0]}),firstId),'partial');
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+
+ const card=page.locator('.qd-card[data-qid="'+firstId+'"]');
+ await card.locator('[data-qd-field="auto-selection"]').nth(0).check();
+ await card.locator('[data-qd-action="auto-check"]').click();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],firstId),'partial');
+ assert.match(await page.locator('.qd-percent').textContent(),/50%/);
+ await card.locator('[data-qd-field="auto-selection"]').nth(2).check();
+ await card.locator('[data-qd-action="auto-check"]').click();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],firstId),'yes');
+
+ const numerical=page.locator('.qd-card[data-qid]').last();
+ const numId=await numerical.getAttribute('data-qid');
+ await numerical.locator('[data-qd-field="numeric-response"]').fill('84,3');
+ await numerical.locator('[data-qd-action="auto-check"]').click();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],numId),'yes');
+ await numerical.locator('[data-qd-field="numeric-response"]').fill('85');
+ await numerical.locator('[data-qd-action="auto-check"]').click();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],numId),'no');
+ const single=page.locator('.qd-card[data-qid]').nth(8);
+ const singleId=await single.getAttribute('data-qid');
+ await single.locator('[data-qd-field="auto-selection"]').nth(2).check();
+ await single.locator('[data-qd-action="auto-check"]').click();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],singleId),'yes');
+ const reportPending=page.waitForEvent('download');
+ await page.locator('[data-qd-action="report-current"]').click();
+ const htmlDownload=await reportPending;
+ assert.match(htmlDownload.suggestedFilename(),/\.html$/);
+ const reportPath=path.join(root,'task101-report-smoke.html');
+ await htmlDownload.saveAs(reportPath);
+ const report=fs.readFileSync(reportPath,'utf8');assert.match(report,/Результаты по разделам/);
+ assert.match(report,/Автопроверка/);
+ fs.rmSync(reportPath,{force:true});
+ await page.reload();await open();
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],singleId),'yes');
+ assert.equal(await page.evaluate(id=>qdDoc().session.marks[id],numId),'no');
+ assert.equal(await page.evaluate(id=>qdDoc().session.responses[id].value,numId),'85');
+ await page.locator('[data-qd-action="save-result"]').click();
+ assert.equal(await page.evaluate(()=>qdDoc().history.length),1);
+ assert.equal(await page.locator('[data-qd-action="report-saved"]').count(),1);
+ const savedPending=page.waitForEvent('download');
+ await page.locator('[data-qd-action="report-saved"]').click();
+ const savedDl=await savedPending;assert.match(savedDl.suggestedFilename(),/\.html$/);
+
+ const qdiagPending=page.waitForEvent('download');
+ await page.locator('[data-qd-action="export"]').click();
+ const qdiag=await qdiagPending;
+ const qdiagPath=path.join(root,'task101-smoke.qdiag');await qdiag.saveAs(qdiagPath);
+ const data=JSON.parse(fs.readFileSync(qdiagPath,'utf8'));
+ assert.equal(data.sections.flatMap(s=>s.questions).length,10);
+ assert.equal(data.history[0].summary.rated,3);
+ assert.equal(data.history[0].topics.length,4);
+ fs.rmSync(qdiagPath,{force:true});
+ assert.deepEqual(errors,[]);
+ console.log('PASS TASK101: live multi/single/numeric grading, tolerance, marks, reload and printable report');
+ await browser.close();
+})().catch(e=>{console.error(e.stack);process.exit(1);});
