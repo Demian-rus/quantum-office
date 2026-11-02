@@ -11,6 +11,12 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: node -e "const fs=require('fs');if(!fs.readFileSync('dist/index.html','utf8').includes('grid-scroll'))process.exit(1)"
+      # Direct HTML download; unlike the ZIP artifact this requires no extraction.
+      - uses: actions/upload-artifact@v7
+        with:
+          path: Quantum-Office.html
+          archive: false
+          if-no-files-found: error
       - uses: actions/upload-artifact@v4
         with:
           name: Quantum-Office-offline
