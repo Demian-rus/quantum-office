@@ -879,9 +879,76 @@ function qdLibraryWrite(items){
   try{localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
   catch(_){return false;}
 }
+
+let qdLibraryEditingId='';
+function qdLibraryNameUsed(items,title,ignoreId=''){
+  const normalized=qdPromptKey(title);
+  return items.some(t=>t.id!==ignoreId&&qdPromptKey(t.title)===normalized);
+}
+function qdLibraryUpdate(id,fields,d=qdDoc(),replaceQuestions=false){
+  const items=qdLibraryRead(),index=items.findIndex(t=>t.id===id);
+  if(index<0)return {ok:false,message:'Шаблон не найден'};
+  const original=items[index];
+  const title=qdText(fields?.title,120).trim(),description=qdText(fields?.description,600);
+  if(!title)return {ok:false,message:'Введите название шаблона'};
+  if(qdLibraryNameUsed(items,title,id))return {ok:false,message:'Шаблон с таким названием уже существует'};
+  const sections=replaceQuestions?d.sections:original.sections;
+  if(replaceQuestions&&!qdQuestionList(d).some(q=>q.prompt.trim()))
+    return {ok:false,message:'Нельзя перезаписать шаблон пустыми вопросами'};
+  const draft=qdLibrarySafe({
+    id:original.id,title,description,
+    subject:fields.subject,grade:qdText(fields.grade,18).trim(),purpose:fields.purpose,
+    sections
+  });
+  if(!draft)return {ok:false,message:'Не удалось сохранить шаблон'};
+  const next=items.slice();next[index]=draft;
+  if(!qdLibraryWrite(next))return {ok:false,message:'Недостаточно места в локальном хранилище — скачайте .qtpl'};
+  return {ok:true,questions:draft.sections.reduce((s,t)=>s+t.questions.length,0)};
+}
+function qdLibraryClone(id){
+  const items=qdLibraryRead(),item=items.find(x=>x.id===id);
+  if(!item)return {ok:false,message:'Шаблон не найден'};
+  if(items.length>=QD_LIMITS.templates)return {ok:false,message:'Достигнут лимит 30 шаблонов'};
+  const base=item.title+' — копия';
+  let title=base,num=2;
+  while(qdLibraryNameUsed(items,title))title=base+' '+num++;
+  const copy=qdLibrarySafe({...item,id:qdNewId(),title,sections:item.sections});
+  if(!copy)return {ok:false,message:'Не удалось скопировать шаблон'};
+  if(!qdLibraryWrite([copy,...items]))return {ok:false,message:'Недостаточно места для копии'};
+  return {ok:true,id:copy.id,title:copy.title};
+}
+function qdLibraryEditorMarkup(){
+  const item=qdLibraryRead().find(x=>x.id===qdLibraryEditingId);
+  if(!item)return '';
+  const options=(values,chosen)=>values.map(([v,label])=>
+    '<option value="'+qdEsc(v)+'" '+(v===chosen?'selected':'')+'>'+qdEsc(label)+'</option>').join('');
+  return '<section class="qd-panel qd-library-editor" aria-label="Редактирование своего шаблона">'+
+    '<div class="qd-library-editor-title"><div><h2>Изменить свой шаблон</h2>'+
+    '<p>Название и настройки можно изменить отдельно от вопросов. Содержимое не затронется, пока вы явно не включите его замену.</p></div>'+
+    '<button type="button" data-qd-action="library-edit-cancel">Отмена</button></div>'+
+    '<div class="qd-library-editor-fields">'+
+    '<label>Название<input id="qd-library-edit-title" maxlength="120" value="'+qdEsc(item.title)+'"></label>'+
+    '<label>Предмет<select id="qd-library-edit-subject">'+options(Object.entries(QD_SUBJECTS),item.subject)+'</select></label>'+
+    '<label>Класс<input id="qd-library-edit-grade" maxlength="18" value="'+qdEsc(item.grade)+'"></label>'+
+    '<label>Цель<select id="qd-library-edit-purpose">'+options(Object.entries(QD_PURPOSES),item.purpose)+'</select></label>'+
+    '<label class="qd-library-editor-description">Описание<textarea id="qd-library-edit-description" maxlength="600" rows="3">'+qdEsc(item.description)+'</textarea></label>'+
+    '</div>'+
+    '<div class="qd-library-editor-refresh"><label>'+
+    '<input type="checkbox" id="qd-library-edit-replace"><span>Обновить вопросы шаблона из текущей диагностики</span></label>'+
+    '<p>По умолчанию сохраняются прежние вопросы ('+item.sections.reduce((s,t)=>s+t.questions.length,0)+
+    '). Если включить замену, текущие вопросы скопируются в этот шаблон. Ученики, оценки и журнал не копируются.</p></div>'+
+    '<div class="qd-library-editor-actions"><button type="button" data-qd-action="library-edit-save" class="qd-primary">Сохранить изменения</button>'+
+    '<button type="button" data-qd-action="library-edit-cancel">Отменить</button></div></section>';
+}
+function qdLibraryEditorRefresh(){
+  const root=document.getElementById('qd-library-editor-slot');
+  if(root)root.innerHTML=qdLibraryEditorMarkup();
+}
+
 function qdLibrarySaveCurrent(d,subject,grade,purpose){
   const current=qdLibraryRead();
   if(current.length>=QD_LIMITS.templates)return {ok:false,message:'Достигнут лимит сохранённых шаблонов'};
+  if(qdLibraryNameUsed(current,d.title))return {ok:false,message:'Шаблон с таким названием уже существует — откройте «Изменить» для обновления'};
   if(!qdQuestionList(d).some(q=>q.prompt.trim()))return {ok:false,message:'Заполните хотя бы один вопрос'};
   const data=qdLibrarySafe({
     id:qdNewId(),title:d.title,description:d.description,sections:d.sections,subject,grade,purpose
