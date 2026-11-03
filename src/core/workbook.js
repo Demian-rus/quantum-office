@@ -577,10 +577,40 @@ export function fillAreasDirection(sheet,areas,direction){
  return filled;
 }
 
+/** Recognise IDs and labels with a changing final number, e.g. QX-001, Lesson 3.
+ * For two or more seeds, only extrapolate a consistent arithmetic progression.
+ * Preserve original prefix/suffix and leading zeros without treating plain numbers as IDs. */
+function labeledFillSequence(source){
+ const parts=source.map(({cell})=>{
+  const value=cell.value;
+  if(typeof value!=='string'||value.startsWith('=')||
+     /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(value.trim()))return null;
+  const match=/^(.*?)(\d+)([^\d]*)$/.exec(value);
+  if(!match||(!match[1]&&!match[3]))return null;
+  const n=Number(match[2]);
+  return Number.isSafeInteger(n)?{prefix:match[1],digits:match[2],suffix:match[3],n}:null;
+ });
+ if(parts.some(p=>!p))return null;
+ const first=parts[0];
+ if(parts.some(p=>p.prefix!==first.prefix||p.suffix!==first.suffix))return null;
+ const step=parts.length>1?parts[1].n-first.n:1;
+ if(!Number.isSafeInteger(step)||
+    parts.some((p,i)=>p.n!==first.n+step*i))return null;
+ const pad=parts.some(p=>p.digits.length>1&&p.digits[0]==='0')?
+  Math.max(...parts.map(p=>p.digits.length)):0;
+ return index=>{
+  const number=first.n+step*index;
+  if(!Number.isSafeInteger(number)||Math.abs(number)>1e15)
+   throw Error('Числовая последовательность выходит за пределы допустимых значений');
+  return first.prefix+(number<0?'-':'')+
+   String(Math.abs(number)).padStart(pad,'0')+first.suffix;
+ };
+}
 /** TASK070: extend one rectangle through its Excel-like drag fill handle.
- * Numeric sequences (2+ evenly spaced entries) continue; formulas translate;
- * all other entries cycle, preserving cell styles. One atomic staged write. */
-export function extendFillHandle(sheet,from,to,direction,targetIndex){
+ * Numeric and prefixed-number sequences continue; formulas translate;
+ * plain text cycles. Ctrl+drag copies source values. One atomic staged write. */
+export function extendFillHandle(sheet,from,to,direction,targetIndex,fillMode='auto'){
+ if(!['auto','copy'].includes(fillMode))throw Error('Недопустимый режим автозаполнения');
  if(!['up','down','left','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
  if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон для автозаполнения');
  const a=rectangle(from,to),vertical=direction==='up'||direction==='down',
@@ -624,21 +654,24 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
    step=numericSeries?nums[1]-nums[0]:dateSeries?1:null,
    arithmetic=(numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
     1e-9*Math.max(1,Math.abs(v))))||(dateSeries&&length===1);
-  if(dateSeries&&arithmetic)hasDateSeries=true;
+  const extrapolate=fillMode==='auto'&&arithmetic,
+   textSeries=fillMode==='auto'?labeledFillSequence(source):null;
+  if(dateSeries&&extrapolate)hasDateSeries=true;
   for(let i=0;i<steps;i++){
    const sequenceIndex=reverse?-1-i:length+i,
     sourceIndex=((sequenceIndex%length)+length)%length,origin=source[sourceIndex],
     row=vertical?(reverse?a.r1-1-i:a.r2+1+i):a.r1+cross,
     col=vertical?a.c1+cross:(reverse?a.c1-1-i:a.c2+1+i);
    let value=origin.cell.value;
-   if(arithmetic){
+   if(extrapolate){
     const result=nums[0]+step*sequenceIndex;
     if(!Number.isFinite(result)||Math.abs(result)>1e15)
      throw Error('Числовая последовательность выходит за пределы допустимых значений');
     if(dateSeries&&(result<1||result>2958465))
      throw Error('Дата выходит за допустимые пределы календаря');
     value=String(Number(result.toPrecision(14)));
-   }else if(value.startsWith('='))
+   }else if(textSeries)value=textSeries(sequenceIndex);
+   else if(value.startsWith('='))
     value=translateFormula(value,row-origin.row,col-origin.col);
    prepared.push({ref:cellName(row,col),value,style:structuredClone(origin.cell.style||{})});
   }
