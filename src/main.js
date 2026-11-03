@@ -1556,8 +1556,21 @@ function qoPhotoInspectorHTML(){const selected=qoPhotoSelection(),o=selected.len
  ${qoPhotoColorPanel()}<h4>Коррекция фонового фото</h4>${[['brightness','Яркость'],['contrast','Контраст'],['saturation','Насыщенность']].map(([key,label])=>`<label class="qs-adjust">${label}<output>${qoPhotoAdjust[key]}%</output><input type="range" data-photo-adjust="${key}" min="0" max="200" value="${qoPhotoAdjust[key]}"></label>`).join('')}
  ${qoPhotoButton('reset','sun','Сбросить коррекцию')}</div>`}</aside>`;
 }
-function qoPhotoPage(){return `<main class="qo-photo-workspace qs-studio ${qoPhotoLeftOpen?'qs-left-open':''} ${qoPhotoRightOpen?'qs-right-open':''}" aria-label="Quantum Studio">
- <header class="qs-editor-toolbar"><div class="qs-toolbar-left">${qoPhotoButton('toggle-left','panel-left','Левая панель')}${qoPhotoButton('undo','undo','Отменить',!qoPhotoHistory.length?'disabled':'')}${qoPhotoButton('redo','redo','Повторить',!qoPhotoRedo.length?'disabled':'')}<span class="qs-divider"></span>${qoPhotoButton('select-tool','mouse-pointer','Выделение',qoPhotoTool==='select'?'aria-pressed="true"':'')}${qoPhotoButton('hand-tool','hand','Перемещение холста',qoPhotoTool==='hand'?'aria-pressed="true"':'')}${qoPhotoButton('brush-tool','brush','Кисть',qoPhotoTool==='brush'?'aria-pressed="true"':'')}${qoPhotoButton('picker-start','pipette','Пипетка')}${qoPhotoButton('add-text','type','Текст')}${qoPhotoButton('insert-image','image','Изображение')}</div><div class="qs-toolbar-right"><span class="qs-saved-indicator">${qoPhotoDraftSaved?'Черновик сохранён':'Скачайте QSTUDIO'}</span>${qoPhotoButton('toggle-right','sliders-horizontal','Свойства')}${qoPhotoButton('export-project','save','Проект QSTUDIO')}${qoPhotoButton('export','download','PNG')}</div></header>
+function qoPhotoPage(){
+ const history=qoWorkGroup('История',qoPhotoButton('undo','undo','Отменить',!qoPhotoHistory.length?'disabled':'')+qoPhotoButton('redo','redo','Повторить',!qoPhotoRedo.length?'disabled':''));
+ const navigation=qoWorkGroup('Панели',qoPhotoButton('toggle-left','panel-left','Левая панель')+qoPhotoButton('toggle-right','sliders-horizontal','Свойства'));
+ const selection=qoWorkGroup('Выделение',qoPhotoButton('select-tool','mouse-pointer','Выделение',qoPhotoTool==='select'?'aria-pressed="true"':'')+qoPhotoButton('hand-tool','hand','Перемещение холста',qoPhotoTool==='hand'?'aria-pressed="true"':''));
+ const drawing=qoWorkGroup('Рисование',qoPhotoButton('brush-tool','brush','Кисть',qoPhotoTool==='brush'?'aria-pressed="true"':'')+qoPhotoButton('picker-start','pipette','Пипетка'));
+ const insert=qoWorkGroup('Вставка',qoPhotoButton('add-text','type','Текст')+qoPhotoButton('insert-image','image','Изображение'));
+ const file=qoWorkGroup('Проект',qoPhotoButton('export-project','save','Сохранить QSTUDIO'));
+ const output=qoWorkGroup('Экспорт',qoPhotoButton('export','download','Скачать PNG'));
+ return `<main class="qo-photo-workspace qs-studio ${qoPhotoLeftOpen?'qs-left-open':''} ${qoPhotoRightOpen?'qs-right-open':''}" aria-label="Quantum Studio">
+ <div class="qo-office-toolbar qs-office-toolbar">
+ ${qoWorkTabBar('photo',[['home','Главная'],['file','Файл']])}
+ <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты Студии">
+ ${qoWorkPanel('photo','home',history+navigation+selection+drawing+insert)}
+ ${qoWorkPanel('photo','file',file+output+'<span class="qs-saved-indicator qs-ribbon-save">'+(qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер')+'</span>')}
+ </div></div>
  ${qoPhotoCropBar()}${qoPhotoPickerBar()}<section class="qs-editor-layout"><nav class="qs-nav" aria-label="Разделы редактора">
  ${qoPhotoSideButton('templates','layout-template','Шаблоны')}${qoPhotoSideButton('elements','shapes','Элементы')}${qoPhotoSideButton('text','type','Текст')}${qoPhotoSideButton('uploads','upload','Загрузки')}${qoPhotoSideButton('photos','image','Фото')}${qoPhotoSideButton('drawing','brush','Рисование')}${qoPhotoSideButton('layers','layers','Слои')}${qoPhotoSideButton('background','settings','Настройки')}</nav>
  ${qoPhotoSidebarHTML()}
