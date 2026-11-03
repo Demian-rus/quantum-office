@@ -89,6 +89,8 @@ async function qoDocxExport(html,layout,title){
    if(tag==='table'){
     const rows=Array.from(node.querySelectorAll('tr')).slice(0,200);
     let tbl='<w:tbl><w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(n=>'<w:'+n+' w:val="single" w:sz="4" w:color="A4B9AD"/>').join('')+'</w:tblBorders></w:tblPr>';
+    const columnCount=Math.max(1,...rows.map(r=>Array.from(r.cells).reduce((sum,c)=>sum+Math.min(12,Math.max(1,Number(c.getAttribute('colspan'))||1)),0)));
+    tbl+='<w:tblGrid>'+Array.from({length:Math.min(12,columnCount)},()=>'<w:gridCol w:w="2400"/>').join('')+'</w:tblGrid>';
     for(const row of rows){tbl+='<w:tr>';
      for(const cell of Array.from(row.cells).slice(0,12)){
       const span=Math.min(12,Math.max(1,+cell.getAttribute('colspan')||1));
