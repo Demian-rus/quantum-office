@@ -23,7 +23,7 @@ function qoHubSourceSheet(){
  return b&&s?{book:b,sheet:s}:null;
 }
 function qoHubCell(s,ref){return qoHubText(s.cells?.[ref]?.value,140);}
-function qoHubIsRoster(s){return qoHubKey(qoHubCell(s,'A1'))==='ученик';}
+function qoHubIsRoster(s){return ['ученик','ученики'].includes(qoHubKey(qoHubCell(s,'A1')));}
 function qoHubRoster(){
  const src=qoHubSourceSheet();if(!src||!qoHubIsRoster(src.sheet))return [];
  const s=src.sheet;
