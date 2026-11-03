@@ -9,8 +9,9 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  await page.goto(pathToFileURL(path.resolve(__dirname,'../Quantum-Office.html')).href);
  const source=await page.evaluate(()=>{
    const b=newWorkbook(),s=b.sheets[0];
-   b.name='Синтетическая книга';s.name='Ученики';s.cells.A1={value:'Ученики'};
-   s.cells.A2={value:'Пробный ученик'};s.cells.C2={value:'8 класс. Физика'};
+   b.name='Синтетическая книга';s.name='Ученики';s.cells.A1={value:'Ученики',style:{}};
+   s.cells.A2={value:'Пробный ученик',style:{}};s.cells.C2={value:'8 класс. Физика',style:{}};
+   s.cells.B2={value:'VK',style:{}};
    s.hyperlinks={B2:'https://example.org/teacher'};
    workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell='A2';persist();render();
    qoHubAttachCurrent();
