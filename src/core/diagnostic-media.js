@@ -107,7 +107,7 @@ function qdMediaDecorate(root){
       if(qdMediaSafe(q.answerMedia))chips.push('<span title="Есть иллюстрация ответа">▣ ответ</span>');
       if(chips.length){
         const preview=card.querySelector('.qd-card-preview');
-        if(preview)preview.insertAdjacentHTML('beforeend','<span class="qd-media-chips">'+chips.join('')+'</span>');
+        if(preview)preview.insertAdjacentHTML('afterbegin','<span class="qd-media-chips">'+chips.join('')+'</span>');
       }
     }
   }else if(qdMode==='run'){
