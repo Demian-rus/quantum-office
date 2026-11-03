@@ -1382,3 +1382,40 @@ body:has(.qo-document-workspace) .qo-editor-foot {
   border-bottom: 1px solid var(--qo-border);
   border-color: var(--qo-border);
 }
+
+/* TASK130 — Word-like navigation panel in Writer. */
+.qo-writer-body{display:flex;flex:1;min-height:0;min-width:0;position:relative;overflow:hidden}
+.qo-writer-body>.qo-editor-scroll{min-width:0;min-height:0;flex:1;overflow:auto}
+.qo-writer-navigation{display:flex;flex-direction:column;flex:0 0 266px;width:266px;min-width:0;min-height:0;overflow:hidden;background:var(--qo-surface);border-right:1px solid var(--qo-border);color:var(--qo-text);font-family:"Segoe UI",Arial,sans-serif}
+.qo-writer-navigation[hidden],.qo-writer-navigation [hidden]{display:none!important}
+.qo-writer-nav-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 14px 11px;border-bottom:1px solid var(--qo-border)}
+.qo-writer-nav-header strong{font-size:14px;font-weight:700}
+.qo-writer-nav-header button{width:26px;height:26px;border:0;border-radius:5px;background:transparent;color:var(--qo-text);font:19px/1 inherit;cursor:pointer}
+.qo-writer-nav-header button:hover{background:var(--qo-hover)}
+.qo-writer-nav-tabs{display:flex;gap:4px;padding:8px 9px;border-bottom:1px solid var(--qo-border)}
+.qo-writer-nav-tabs button{min-width:0;flex:1;padding:8px 3px;border:0;border-radius:6px;background:transparent;color:var(--qo-muted);font:600 11px "Segoe UI",sans-serif;cursor:pointer}
+.qo-writer-nav-tabs button[aria-selected="true"]{color:var(--qo-text);background:var(--qo-hover);box-shadow:inset 0 -2px 0 var(--qo-accent-border,#218a65)}
+.qo-writer-nav-view{overflow-y:auto;min-height:0;flex:1;padding:10px 10px 18px}
+.qo-writer-nav-meta,.qo-writer-nav-hint{padding:4px 5px 10px;color:var(--qo-muted);font-size:11px;line-height:1.45}
+.qo-writer-nav-empty{padding:9px 8px;font-size:12px;line-height:1.55;color:var(--qo-muted)}
+.qo-writer-heading-list{display:flex;flex-direction:column;gap:2px}
+.qo-writer-heading-link{display:flex;align-items:flex-start;gap:8px;min-width:0;width:100%;padding:9px 9px;background:transparent;border:0;border-radius:6px;text-align:left;color:var(--qo-text);font:12px/1.35 "Segoe UI",sans-serif;cursor:pointer}
+.qo-writer-heading-link:hover,.qo-writer-heading-link:focus-visible{background:var(--qo-hover)}
+.qo-writer-heading-level-2{padding-left:19px}
+.qo-writer-heading-level-3{padding-left:30px}
+.qo-writer-heading-symbol{display:inline-flex;align-items:center;justify-content:center;flex:0 0 19px;height:19px;border-radius:5px;background:var(--qo-hover);color:var(--qo-muted);font:700 10px "Segoe UI",sans-serif}
+.qo-writer-heading-link>span:last-child{overflow-wrap:anywhere;padding-top:2px}
+.qo-writer-nav-field{display:flex;flex-direction:column;gap:6px;margin-bottom:12px;color:var(--qo-text);font:600 11px "Segoe UI",sans-serif}
+.qo-writer-nav-field input{width:100%;height:34px;box-sizing:border-box;padding:7px 9px;border:1px solid var(--qo-border);border-radius:6px;background:var(--qo-bg);color:var(--qo-text);font:12px "Segoe UI",sans-serif}
+.qo-writer-nav-field input:focus-visible{outline:2px solid var(--qo-accent-border,#318e71);outline-offset:1px}
+.qo-writer-nav-matches{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2px 0 12px;color:var(--qo-muted);font-size:11px}
+.qo-writer-nav-matches>div{display:flex;gap:5px}
+.qo-writer-nav-matches button{width:29px;height:28px;border-radius:6px;border:1px solid var(--qo-border);color:var(--qo-text);background:var(--qo-bg);font-size:17px;cursor:pointer}
+.qo-writer-nav-replace-actions{display:flex;gap:6px;margin-bottom:9px}
+.qo-writer-nav-replace-actions button,#qo-writer-nav-undo-replace{flex:1;padding:8px 6px;border-radius:6px;border:1px solid var(--qo-border);font:600 11px "Segoe UI",sans-serif;color:var(--qo-text);background:var(--qo-bg);cursor:pointer}
+.qo-writer-nav-replace-actions button:last-child{background:var(--qo-accent-fill,#298e70);color:var(--qo-on-accent,#fff);border-color:transparent}
+#qo-writer-nav-undo-replace{width:100%;margin-bottom:12px}
+.qo-document-workspace .qo-paper::highlight(qo-writer-search){background:#f1dc80;color:inherit}
+.qo-document-workspace .qo-paper::highlight(qo-writer-current){background:#e9a951;color:#212019}
+@media(max-width:800px){.qo-writer-navigation{position:absolute;z-index:18;top:0;bottom:0;left:0;width:min(304px,87vw);max-width:87vw;box-shadow:8px 0 22px #0002}.qo-writer-body{overflow:hidden}}
+@media print{.qo-writer-navigation{display:none!important}.qo-writer-body{display:block!important;overflow:visible!important}}
