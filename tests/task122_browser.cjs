@@ -48,13 +48,14 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
    d.session.marks[q.id]='yes';
    qdRefresh();
  });
+ await page.locator('[data-qd-action="view"][data-view="list"]').click();
  await page.locator('[data-qd-action="save-result"]').first().click();
  const entry=await page.evaluate(()=>({global:qoHubResults().length,
    source:qoHubResults()[0]?.studentKey,docHistory:qdDoc().history.length}));
  assert.equal(entry.global,1);
  assert.equal(entry.docHistory,1);
  await page.evaluate(()=>{page='sheet';workspace.active=bookId;activeCell='A2';render();});
- await page.locator('[data-hub-action="toggle"]').click();
+ if(!(await page.locator('#qo-hub-sheet-panel').isVisible()))await page.locator('[data-hub-action="toggle"]').click();
  assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/История диагностик/);
  assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/100%/);
  assert.equal(await page.locator('.grid-cell[data-ref="A2"] .qo-hub-cell-badge').count(),1);
@@ -70,6 +71,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
    d.session.marks[qdQuestionList(d)[0].id]='partial';
    qdRefresh();
  });
+ await page.locator('[data-qd-action="view"][data-view="list"]').click();
  await page.locator('[data-qd-action="save-result"]').first().click();
  const stats=await page.evaluate(()=>({
    count:qoHubStudentResults(qoHubRoster()[0].id).length,
