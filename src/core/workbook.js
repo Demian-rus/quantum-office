@@ -991,6 +991,64 @@ export function replaceAllText(sheet,search,replacement){
  return matches.length;
 }
 
+/** TASK129: bounded read-only preview for replacement across one sheet or a book.
+ * Formula text is excluded. Each item describes one cell, not each occurrence. */
+export function planWorkbookReplacement(book,search,replacement,{sheetId=null,limit=500}={}){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const term=String(search??''),nextText=String(replacement??'');
+ if(!term)throw Error('Введите текст для поиска');
+ if(term.length>1000||nextText.length>10000)throw Error('Слишком длинный текст');
+ if(!Number.isInteger(limit)||limit<1||limit>500)throw Error('Недопустимый лимит предпросмотра');
+ const target=sheetId?book.sheets.filter(s=>s.id===sheetId):book.sheets;
+ if(sheetId&&!target.length)throw Error('Лист не найден');
+ const escaped=term.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
+ const pattern=new RegExp(escaped,'giu');
+ const items=[];
+ for(const sheet of target){
+  for(const ref of findCells(sheet,term)){
+   const before=getCell(sheet,ref).value;
+   if(before.startsWith('='))continue;
+   const after=before.replace(pattern,()=>nextText);
+   if(after===before)continue;
+   if(after.length>50000)throw Error('Результат превышает лимит ячейки');
+   if(after.startsWith('='))throw Error('Замена не должна превращать текст в формулу');
+   if(items.length>=limit)return {bookId:book.id,search:term,replacement:nextText,
+    items,truncated:true,scopeId:sheetId};
+   items.push({key:sheet.id+':'+ref,sheetId:sheet.id,sheetName:sheet.name,ref,before,after});
+  }
+ }
+ return {bookId:book.id,search:term,replacement:nextText,
+  items,truncated:false,scopeId:sheetId};
+}
+/** TASK129: all selected replacements validate on a clone before any real mutation.
+ * Caller wraps this once in transact() so one Undo reverts all edited sheets. */
+export function applyWorkbookReplacement(book,plan,selectedKeys){
+ if(!book||!plan||plan.bookId!==book.id||!Array.isArray(plan.items))
+  throw Error('Предпросмотр относится к другой книге');
+ if(plan.truncated)throw Error('Слишком много совпадений: уточните поиск перед заменой');
+ if(!Array.isArray(selectedKeys))throw Error('Не выбраны ячейки для замены');
+ const available=new Map(plan.items.map(x=>[x.key,x]));
+ const selected=new Set(selectedKeys);
+ if([...selected].some(key=>!available.has(key)))throw Error('Неизвестная ячейка в списке замены');
+ if(!selected.size)return {count:0,sheets:0};
+ const staged=structuredClone(book);
+ const affected=new Set();
+ for(const key of selected){
+  const item=available.get(key);
+  const sheet=staged.sheets.find(s=>s.id===item.sheetId);
+  if(!sheet||sheet.name!==item.sheetName||!validRef(item.ref)||
+     getCell(sheet,item.ref).value!==item.before)
+   throw Error('Книга изменилась после предпросмотра: повторите проверку');
+  if(typeof item.after!=='string'||item.after.length>50000||
+     item.after.startsWith('='))throw Error('Недопустимое новое значение');
+  setCell(sheet,item.ref,item.after);
+  affected.add(sheet.id);
+ }
+ validateWorkbook(staged);
+ book.sheets=staged.sheets;
+ return {count:selected.size,sheets:affected.size};
+}
+
 export function importCSV(text,name='Импорт CSV'){
  const grid=csvDecode(String(text).replace(/^\uFEFF/,''));const book=newWorkbook(name);const sheet=currentSheet(book);if(grid.length>LIMITS.rows)throw Error('Слишком много строк');
  for(let r=0;r<grid.length;r++){if(grid[r].length>LIMITS.columns)throw Error('Слишком много столбцов');for(let c=0;c<grid[r].length;c++){if(grid[r][c])setCell(sheet,cellName(r,c),grid[r][c]);}}

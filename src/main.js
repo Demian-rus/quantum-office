@@ -5,7 +5,7 @@ import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,ch
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
-import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
+import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,planWorkbookReplacement,applyWorkbookReplacement,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
@@ -717,6 +717,87 @@ function showWorkbookSearchResults(){
   }
  });
  overlay.querySelector('[data-qws-close]').focus();
+}
+/** TASK129: preview selected replacements before any mutation, including across sheets. */
+function closeBulkReplacePreview(){document.getElementById('qo-bulk-replace')?.remove();}
+function showBulkReplacePreview(){
+ if(!book()||!searchTerm){status('Введите текст для поиска',true);return;}
+ commitEditor();
+ let plan;
+ try{plan=planWorkbookReplacement(book(),searchTerm,replaceTerm,{
+  sheetId:searchScope==='sheet'?sheet()?.id:null,limit:500
+ });}
+ catch(error){status(error.message,true);return;}
+ closeBulkReplacePreview();
+ const overlay=document.createElement('div');
+ overlay.id='qo-bulk-replace';overlay.className='qo-bulk-replace-backdrop';
+ overlay.innerHTML='<section class="qo-bulk-replace-panel" role="dialog" aria-modal="true" aria-label="Предпросмотр замены">'+
+  '<header><strong>Предпросмотр замены</strong><button type="button" data-qbr-close aria-label="Закрыть">×</button></header>'+
+  '<div class="qo-bulk-replace-summary"></div>'+
+  '<div class="qo-bulk-replace-toolbar"><label><input type="checkbox" data-qbr-all checked> Выделить все</label><span class="qo-bulk-replace-selected"></span></div>'+
+  '<div class="qo-bulk-replace-list"></div>'+
+  '<footer><span>Формулы не изменяются · Ctrl+Z отменит всю операцию</span>'+
+  '<div class="qo-bulk-replace-actions"><button type="button" data-qbr-cancel>Отмена</button>'+
+  '<button type="button" data-qbr-apply>Заменить выбранные</button></div></footer></section>';
+ const summary=overlay.querySelector('.qo-bulk-replace-summary');
+ summary.textContent=plan.items.length+(plan.truncated?' первых совпадений (более 500)':' ячеек для замены')+
+  ' · '+(searchScope==='book'?'вся книга':'текущий лист');
+ if(plan.truncated){
+  const warning=document.createElement('p');warning.className='qo-bulk-replace-warning';
+  warning.textContent='Слишком много совпадений. Уточните поиск: частичная замена запрещена.';
+  summary.append(warning);
+ }
+ const list=overlay.querySelector('.qo-bulk-replace-list');
+ const all=overlay.querySelector('[data-qbr-all]');
+ const selected=overlay.querySelector('.qo-bulk-replace-selected');
+ const apply=overlay.querySelector('[data-qbr-apply]');
+ for(const item of plan.items){
+  const label=document.createElement('label');label.className='qo-bulk-replace-row';
+  const checkbox=document.createElement('input');checkbox.type='checkbox';
+  checkbox.className='qo-bulk-replace-check';checkbox.checked=!plan.truncated;
+  checkbox.value=item.key;
+  const location=document.createElement('strong');location.textContent=item.sheetName+' · '+item.ref;
+  const preview=document.createElement('span');preview.className='qo-bulk-replace-values';
+  const before=document.createElement('span');before.textContent=item.before;
+  const arrow=document.createElement('span');arrow.textContent='→';arrow.className='qo-bulk-replace-arrow';
+  const after=document.createElement('span');after.textContent=item.after;
+  preview.append(before,arrow,after);label.append(checkbox,location,preview);list.append(label);
+ }
+ const checkboxes=[...list.querySelectorAll('.qo-bulk-replace-check')];
+ function sync(){
+  const count=checkboxes.filter(input=>input.checked).length;
+  selected.textContent='Выбрано '+count+' из '+checkboxes.length;
+  all.checked=count===checkboxes.length&&checkboxes.length>0;
+  all.indeterminate=count>0&&count<checkboxes.length;
+  apply.disabled=count===0||plan.truncated;
+ }
+ list.addEventListener('change',sync);
+ all.addEventListener('change',()=>{for(const input of checkboxes)input.checked=all.checked;sync();});
+ apply.addEventListener('click',()=>{
+  const keys=checkboxes.filter(x=>x.checked).map(x=>x.value);
+  if(!keys.length)return;
+  try{
+   let result;
+   transact(()=>{result=applyWorkbookReplacement(book(),plan,keys);});
+   closeBulkReplacePreview();render();
+   status('Заменено '+result.count+' ячеек на '+result.sheets+' листах','success');
+  }catch(error){status(error.message,true);}
+ });
+ overlay.querySelector('[data-qbr-close]').addEventListener('click',closeBulkReplacePreview);
+ overlay.querySelector('[data-qbr-cancel]').addEventListener('click',closeBulkReplacePreview);
+ overlay.addEventListener('pointerdown',e=>{if(e.target===overlay)closeBulkReplacePreview();});
+ overlay.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeBulkReplacePreview();}
+  else if(e.key==='Tab'){
+   const items=[...overlay.querySelectorAll('button:not(:disabled),input:not(:disabled)')];
+   const current=items.indexOf(document.activeElement);
+   if(items.length){e.preventDefault();e.stopPropagation();
+    items[(current+(e.shiftKey?-1:1)+items.length)%items.length].focus();}
+  }
+ });
+ document.body.append(overlay);
+ if(plan.truncated){for(const item of checkboxes)item.disabled=true;all.disabled=true;}
+ sync();overlay.querySelector('[data-qbr-close]').focus();
 }
 function replaceAll(){if(!sheet()||!searchTerm){status('Введите текст для поиска',true);return;}
  commitEditor();const clone=structuredClone(sheet());try{const count=replaceAllText(clone,searchTerm,replaceTerm);
@@ -1994,7 +2075,7 @@ function ribbon(){
   button('chart-stacked100','С накоплением 100%','▥')+button('chart-line','Линейная диаграмма','⌁')+button('chart-scatter','Точечная XY','·')+button('chart-pie','Круговая диаграмма','◉')+button('charts-open','Мои диаграммы','▣'))+group('Листы',button('sheet-add','Новый лист','+'));
  if(activeRibbon==='view')contents=group('Печать',button('print-open','Печать таблицы','▤'))+group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('save-as','Сохранить как','⇩')+button('open-disk','Открыть с диска','↥')+button('backup','Архив','▤')+button('import','Импорт','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'))+group('Печать',button('print-open','Предпросмотр и печать','▤'));
- const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или ID" autocomplete="off"></label><label>Где <select id="find-scope" aria-label="Область поиска"><option value="sheet" ${searchScope==='sheet'?'selected':''}>Этот лист</option><option value="book" ${searchScope==='book'?'selected':''}>Вся книга</option></select></label><button data-action="find-next" title="Следующее совпадение">Далее ↵</button><button data-action="find-all" title="Показать найденные ячейки">Результаты</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all" title="Только текущий лист">Заменить здесь</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
+ const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или ID" autocomplete="off"></label><label>Где <select id="find-scope" aria-label="Область поиска"><option value="sheet" ${searchScope==='sheet'?'selected':''}>Этот лист</option><option value="book" ${searchScope==='book'?'selected':''}>Вся книга</option></select></label><button data-action="find-next" title="Следующее совпадение">Далее ↵</button><button data-action="find-all" title="Показать найденные ячейки">Результаты</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all" title="Только текущий лист">Заменить здесь</button><button data-action="replace-preview" title="Проверить ячейки и выбрать замены">Предпросмотр замены</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}<button type="button" class="qo-help-tab" data-action="help-open" aria-haspopup="dialog">Справка</button></div><div class="ribbon-controls">${contents}</div>${bordersPopup()}${qoFontMenu()}${finder}</div>`;
 }
 
@@ -2368,7 +2449,7 @@ function smartTableHelpPanel(){
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button><button class="qo-sheet-nav-button" data-action="sheet-navigator" title="Найти и открыть лист" aria-label="Найти и открыть лист">☷</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
 function render(){
- closeWorkbookSearchResults();closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
+ closeBulkReplacePreview();closeWorkbookSearchResults();closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
  const previousGrid=document.getElementById('grid-scroll');
  if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){
@@ -2844,7 +2925,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'print-use-selection':printSettingChange({area:selectedPrintArea(activeCell,rangeEnd)});break;
  case 'print-use-used':printSettingChange({area:null});break;
  case 'print-now':printNow();break;
- case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':closeWorkbookSearchResults();showFind=false;render();break;case 'find-next':nextMatch();break;case 'find-all':showWorkbookSearchResults();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-up':fillSelected('up');break;case 'fill-right':fillSelected('right');break;case 'fill-left':fillSelected('left');break;
+ case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':closeWorkbookSearchResults();showFind=false;render();break;case 'find-next':nextMatch();break;case 'find-all':showWorkbookSearchResults();break;case 'replace-preview':showBulkReplacePreview();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-up':fillSelected('up');break;case 'fill-right':fillSelected('right');break;case 'fill-left':fillSelected('left');break;
  case 'smart-help':case 'help-open':smartTableHelpOpen=true;render();document.querySelector('.qo-central-help')?.focus({preventScroll:true});break;case 'smart-help-close':case 'help-close':smartTableHelpOpen=false;render();break;case 'help-close-backdrop':if(e.target===target){smartTableHelpOpen=false;render();}break;
  case 'smart-create':createSelectedSmartTable();break;case 'smart-add-row':addSelectedSmartTableRow();break;case 'smart-remove':clearSelectedSmartTable();break;
  case 'filter-toggle':toggleAutoFilter();break;
