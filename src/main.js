@@ -1299,7 +1299,7 @@ function qoWriterPage(){
   '<span>Оценка: 1 / 2 / 3 · ответ: R</span></div>','qo-diag-guide-group');
  const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
  const navigator=qoWriterNavigationTools();
- const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
+ const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-docx','Word DOCX','file-text')+qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
  return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
  <div class="qo-office-toolbar">
  ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика']])}
@@ -1314,8 +1314,8 @@ function qoWriterPage(){
  <div class="qo-writer-body">${qoWriterNavigationHTML()}
  <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
  <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section></div>
- <input type="file" id="qo-writer-file" accept=".qdoc,.txt,.html,text/plain,text/html,application/json" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
- <footer class="qo-editor-foot qo-office-footer"><span id="qo-writer-layout-info">${f.paper} · ${f.orientation==='landscape'?'альбомная':'книжная'} · поля ${f.margin} мм</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / HTML / TXT</span></footer></main>`;
+ <input type="file" id="qo-writer-file" accept=".qdoc,.docx,.txt,.html,text/plain,text/html,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+ <footer class="qo-editor-foot qo-office-footer"><span id="qo-writer-layout-info">${f.paper} · ${f.orientation==='landscape'?'альбомная':'книжная'} · поля ${f.margin} мм</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / DOCX / HTML / TXT</span></footer></main>`;
 }
 function qoWriterRememberSelection(){
  const sel=window.getSelection(),node=sel?.anchorNode,editor=document.getElementById('qo-writer-page');
@@ -1377,6 +1377,14 @@ function qoWriterHTMLDocument(){
  const f=qoWriterLayout(),safe=qoSafeRich(qoWriter.html),[width,height]=qoWriterPaperSize(f);
  const style=`${qoWriterPageRules(f)}body{margin:0;font:${f.size}px/${f.line} '${f.font}',serif;color:#142a1d}main{max-width:${width}mm;margin:0 auto}h1,h2,h3{font-family:Arial,sans-serif;break-after:avoid}table{width:100%;table-layout:fixed;border-collapse:collapse;margin:14px 0}td,th{padding:7px;border:1px solid #9caea1}th{background:#edf5ef}img{display:block;max-width:100%;height:auto;margin:12px auto}div[data-qo-break="true"]{break-after:page;page-break-after:always;height:0}a{color:#176f58}@media screen{body{background:#edf2ee;padding:28px}main{min-height:${height}mm;background:white;padding:${f.margin}mm;box-shadow:0 3px 18px #0002}.document-running-head{max-width:${width}mm;box-sizing:border-box;padding:10px ${f.margin}mm;margin:0 auto;background:white;color:#547363;font:11px Arial,sans-serif;text-align:center}.document-running-foot{display:flex;justify-content:space-between;max-width:${width}mm;box-sizing:border-box;padding:8px ${f.margin}mm;margin:0 auto;background:white;color:#547363;font:11px Arial,sans-serif}}@media print{.document-running-head,.document-running-foot{display:none!important}body{background:white!important}main{max-width:none;width:100%;padding:0!important}}`;
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>'+esc(qoWriter.name)+'</title><style>'+style+'</style></head><body>'+ (f.header?'<div class="document-running-head">'+esc(f.header)+'</div>':'')+'<main>'+safe+'</main>'+(f.footer||f.pageNumber?'<div class="document-running-foot"><span>'+esc(f.footer)+'</span><span>'+(f.pageNumber?'Стр. 1':'')+'</span></div>':'')+'</body></html>';
+}
+async function qoWriterExportDocx(){
+ try{
+  qoPersistWriter();
+  const blob=await qoDocxExport(qoSafeRich(qoWriter.html),qoWriterLayout(),qoWriter.name);
+  download(`${safeFile(qoWriter.name)}.docx`,blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
+ }catch(error){status('Не удалось создать DOCX: '+error.message,true);}
 }
 function qoWriterExport(format){
  qoPersistWriter();
@@ -2807,6 +2815,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   qoWriter=qoNewWriter();render();qoPersistWriter();return;
  }
  if(action==='writer-import'){document.getElementById('qo-writer-file')?.click();return;}
+ if(action==='writer-export-docx'){qoWriterExportDocx();return;}
  if(action==='writer-export-html'){qoWriterExport('html');return;}
  if(action==='writer-export-txt'){qoWriterExport('txt');return;}
  if(action==='writer-print'){qoWriterPrint();return;}
@@ -3093,15 +3102,22 @@ app.addEventListener('input',e=>{
 app.addEventListener('change',async e=>{const t=e.target;
  if(t.id==='qo-writer-file'){
   const file=t.files?.[0];if(!file)return;
-  if(file.size>3_000_000){status('Размер документа ограничен 3 МБ',true);return;}
+  const kind=file.name.toLowerCase(),docx=kind.endsWith('.docx');
+  if(file.size>(docx?12_000_000:3_000_000)){status('Файл превышает допустимый размер',true);return;}
   try{
-   const raw=await file.text(),kind=file.name.toLowerCase();
-   if(kind.endsWith('.qdoc')){
-    const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
-    qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode,updated:Date.now()};
-   }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
+   if(docx){
+    const incoming=await qoDocxImport(file);
+    qoWriter={name:incoming.name,html:qoSafeRich(incoming.html),layout:{...qoWriterDefaults(),...incoming.layout},updated:Date.now()};
+    status('DOCX импортирован: базовое форматирование сохранено; сложные объекты Word могут отличаться.');
+   }else{
+    const raw=await file.text();
+    if(kind.endsWith('.qdoc')){
+     const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
+     qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode,updated:Date.now()};
+    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
+   }
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
-  }catch(error){status('Не удалось открыть документ: неверный формат или повреждённые данные',true);}return;
+  }catch(error){status('Не удалось открыть документ: '+error.message,true);}return;
  }
  if(t.id==='qo-writer-image-file'){
   const file=t.files?.[0];if(!file)return;
