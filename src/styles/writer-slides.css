@@ -1419,3 +1419,31 @@ body:has(.qo-document-workspace) .qo-editor-foot {
 .qo-document-workspace .qo-paper::highlight(qo-writer-current){background:#e9a951;color:#212019}
 @media(max-width:800px){.qo-writer-navigation{position:absolute;z-index:18;top:0;bottom:0;left:0;width:min(304px,87vw);max-width:87vw;box-shadow:8px 0 22px #0002}.qo-writer-body{overflow:hidden}}
 @media print{.qo-writer-navigation{display:none!important}.qo-writer-body{display:block!important;overflow:visible!important}}
+
+/* TASK131 — orientation-aware sheet, header/footer preview and print output. */
+.qo-document-workspace .qo-paper{
+ width:var(--qo-writer-paper-width,210mm);
+ min-height:var(--qo-writer-paper-height,297mm);
+}
+.qo-document-workspace .qo-writer-pagewrap{position:relative;isolation:isolate}
+.qo-writer-page-header,.qo-writer-page-footer{
+ position:absolute;z-index:1;left:var(--qo-writer-margin,20mm);
+ width:calc(var(--qo-writer-paper-width,210mm) - 2 * var(--qo-writer-margin,20mm));
+ box-sizing:border-box;font:11px/1.3 'Segoe UI',Arial,sans-serif;color:#658072;
+ pointer-events:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.qo-writer-page-header{top:9mm;text-align:center}
+.qo-writer-page-footer{bottom:9mm;display:flex;gap:14px;justify-content:space-between}
+.qo-writer-page-footer span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qo-writer-page-footer span:last-child{flex:none}
+.qo-writer-page-settings .qo-work-stack{gap:6px}
+.qo-writer-page-settings .qo-work-field select{min-width:104px;max-width:165px}
+.qo-writer-running-head .qo-work-field input[type=text]{height:27px;width:170px;max-width:100%;padding:3px 8px;border:1px solid var(--qo-border);border-radius:5px;background:var(--qo-surface);color:var(--qo-text);font:12px 'Segoe UI',Arial,sans-serif}
+.qo-writer-running-head .qo-work-field input:focus-visible{outline:2px solid var(--qo-accent-border);outline-offset:1px}
+.qo-writer-page-numbers{display:flex;align-items:center;gap:7px;font-size:12px;min-height:25px;white-space:nowrap;cursor:pointer}
+.qo-writer-page-numbers input{accent-color:var(--qo-accent,#22805c);width:15px;height:15px}
+@media print{
+ .qo-writer-page-header,.qo-writer-page-footer{display:none!important}
+ .qo-document-workspace .qo-paper{width:100%!important;min-height:0!important;padding:0!important;box-shadow:none!important;border:0!important;overflow:visible!important}
+ .qo-document-workspace .qo-writer-pagewrap{width:100%!important;max-width:none!important;overflow:visible!important}
+}
