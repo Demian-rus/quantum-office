@@ -1200,7 +1200,7 @@ if(!qoSlides||!Array.isArray(qoSlides.slides)||!qoSlides.slides.length)qoSlides=
 const qoSafeURL=s=>{try{const url=new URL(s);return ['https:','http:','mailto:'].includes(url.protocol)?url.href:null;}catch{return null;}};
 function qoSafeRich(html){
  const template=document.createElement('template');template.innerHTML=String(html||'').slice(0,2700000);
- const allow=new Set(['DIV','P','BR','H1','H2','H3','UL','OL','LI','B','STRONG','I','EM','U','S','SPAN','FONT','BLOCKQUOTE','A','TABLE','THEAD','TBODY','TFOOT','TR','TH','TD','IMG']);
+ const allow=new Set(['DIV','P','BR','H1','H2','H3','UL','OL','LI','B','STRONG','I','EM','U','S','SUP','SUB','SPAN','FONT','BLOCKQUOTE','A','TABLE','THEAD','TBODY','TFOOT','TR','TH','TD','IMG']);
  const out=document.createElement('div');
  function copyChildren(parent,dest){
   for(const node of parent.childNodes){
@@ -1345,21 +1345,22 @@ function qoWriterPage(){
  const f=qoWriterLayout();
  const sel=(options,v)=>options.map(([val,label])=>`<option value="${esc(String(val))}" ${String(val)===String(v)?'selected':''}>${esc(label)}</option>`).join('');
  const main=qoWorkGroup('Шрифт',`
- <div class="qo-work-stack"><div class="qo-work-inline"><label class="qo-work-field"><span>Семейство</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].map(x=>[x,x]),f.font)}</select></label>
+ <div class="qo-writer-main-tiles"><div class="qo-writer-choice-stack"><label class="qo-work-field"><span>Семейство</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].map(x=>[x,x]),f.font)}</select></label>
  <label class="qo-work-field"><span>Размер</span><input id="qo-writer-size" class="qo-writer-mini" type="number" min="8" max="96" step="1" value="${f.size}" title="Размер шрифта, пиксели" aria-label="Размер шрифта в пикселях"></label></div>
- <div class="qo-work-inline qo-style-line" role="group" aria-label="Форматирование текста"><button data-action="writer-cmd" data-command="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button><button data-action="writer-cmd" data-command="italic" title="Курсив (Ctrl+I)"><i>К</i></button><button data-action="writer-cmd" data-command="underline" title="Подчёркивание"><u>Ч</u></button><button data-action="writer-cmd" data-command="strikeThrough" title="Зачёркивание"><s>З</s></button><label class="qo-compact-color" title="Цвет текста"><input id="qo-writer-text-color" type="color" value="#263b31" aria-label="Цвет текста"></label><label class="qo-compact-color" title="Маркер текста"><input id="qo-writer-highlight" type="color" value="#fff49b" aria-label="Выделение маркером"></label></div></div>`);
- const paragraphs=qoWorkGroup('Абзац',`<div class="qo-work-stack"><div class="qo-work-inline">
+ <div class="qo-writer-icon-grid qo-style-line" role="group" aria-label="Форматирование текста"><button class="qo-icon-tile" data-action="writer-cmd" data-command="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="italic" title="Курсив (Ctrl+I)"><i>К</i></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="underline" title="Подчёркивание"><u>Ч</u></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="strikeThrough" title="Зачёркивание"><s>З</s></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="superscript" title="Надстрочный знак (степень)" aria-label="Надстрочный текст">x<sup>2</sup></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="subscript" title="Подстрочный знак (индекс)" aria-label="Подстрочный текст">x<sub>2</sub></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="removeFormat" title="Очистить форматирование выделенного текста" aria-label="Очистить форматирование">${qoWorkIcon('highlighter')}</button></div></div>`);
+ const colors=qoWorkGroup('Цвет',`<div class="qo-writer-icon-grid" role="group" aria-label="Цвет текста и маркер"><label class="qo-compact-color" title="Цвет текста"><input id="qo-writer-text-color" type="color" value="#263b31" aria-label="Цвет текста"></label><label class="qo-compact-color" title="Маркер текста"><input id="qo-writer-highlight" type="color" value="#fff49b" aria-label="Выделение маркером"></label></div>`);
+ const paragraphs=qoWorkGroup('Абзац',`<div class="qo-writer-main-tiles qo-writer-paragraph-tiles"><div class="qo-writer-choice-stack">
  <label class="qo-work-field"><span>Стиль</span><select id="qo-writer-block" title="Стиль абзаца" aria-label="Стиль абзаца">${sel([['p','Обычный текст'],['h1','Заголовок 1'],['h2','Заголовок 2'],['h3','Заголовок 3']],'p')}</select></label>
  <label class="qo-work-field"><span>Интервал</span><select id="qo-writer-line" class="qo-writer-small" title="Межстрочный интервал" aria-label="Межстрочный интервал">${sel([[1.2,'1,2'],[1.4,'1,4'],[1.55,'1,55'],[1.8,'1,8'],[2,'2,0']],f.line)}</select></label></div>
- <div class="qo-work-inline qo-work-mini-actions" role="group" aria-label="Списки и выравнивание">
- <button data-action="writer-cmd" data-command="insertUnorderedList" title="Маркированный список">${qoWorkIcon('bullet')}</button>
- <button data-action="writer-cmd" data-command="insertOrderedList" title="Нумерованный список">${qoWorkIcon('numbered')}</button>
+ <div class="qo-writer-icon-grid" role="group" aria-label="Списки и выравнивание">
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="insertUnorderedList" title="Маркированный список">${qoWorkIcon('bullet')}</button>
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="insertOrderedList" title="Нумерованный список">${qoWorkIcon('numbered')}</button>
  <span class="qo-mini-divider"></span>
- <button data-action="writer-cmd" data-command="justifyLeft" title="По левому краю">${qoWorkIcon('align-left')}</button>
- <button data-action="writer-cmd" data-command="justifyCenter" title="По центру">${qoWorkIcon('align-center')}</button>
- <button data-action="writer-cmd" data-command="justifyRight" title="По правому краю">${qoWorkIcon('align-right')}</button>
- <button data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button>
- <span class="qo-mini-divider"></span><button data-action="writer-indent-less" title="Уменьшить отступ слева на 5 мм" aria-label="Уменьшить отступ">⇤</button><button data-action="writer-indent-more" title="Увеличить отступ слева на 5 мм" aria-label="Увеличить отступ">⇥</button></div></div>`);
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyLeft" title="По левому краю">${qoWorkIcon('align-left')}</button>
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyCenter" title="По центру">${qoWorkIcon('align-center')}</button>
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyRight" title="По правому краю">${qoWorkIcon('align-right')}</button>
+ <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button>
+ <span class="qo-mini-divider"></span><button class="qo-icon-tile" data-action="writer-indent-less" title="Уменьшить отступ слева на 5 мм" aria-label="Уменьшить отступ">⇤</button><button class="qo-icon-tile" data-action="writer-indent-more" title="Увеличить отступ слева на 5 мм" aria-label="Увеличить отступ">⇥</button></div></div>`);
  const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-break','Разрыв','break'));
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
@@ -1392,7 +1393,7 @@ function qoWriterPage(){
  <div class="qo-office-toolbar">
  ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика']])}
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
- ${qoWorkPanel('writer','home',main+paragraphs)}
+ ${qoWorkPanel('writer','home',main+colors+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}

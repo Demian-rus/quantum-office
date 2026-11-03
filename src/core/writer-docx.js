@@ -39,6 +39,7 @@ function qoDocxRunProps(state){const props=[];
  if(state.b)props.push('<w:b/>');if(state.i)props.push('<w:i/>');if(state.u)props.push('<w:u w:val="single"/>');if(state.s)props.push('<w:strike/>');
  if(state.color)props.push('<w:color w:val="'+state.color+'"/>');
  if(state.highlight)props.push('<w:shd w:fill="'+state.highlight+'"/>');
+ if(state.vert)props.push('<w:vertAlign w:val="'+state.vert+'"/>');
  if(state.size)props.push('<w:sz w:val="'+Math.round(state.size*1.5)+'"/>');
  return props.length?'<w:rPr>'+props.join('')+'</w:rPr>':'';
 }
@@ -69,6 +70,7 @@ async function qoDocxExport(html,layout,title){
   const next={...state};
   if(['b','strong'].includes(tag))next.b=true;if(['i','em'].includes(tag))next.i=true;
   if(tag==='u')next.u=true;if(['s','strike'].includes(tag))next.s=true;
+  if(tag==='sup')next.vert='superscript';if(tag==='sub')next.vert='subscript';
   if(node.style?.fontWeight==='bold'||node.style?.fontWeight==='700')next.b=true;
   if(node.style?.fontStyle==='italic')next.i=true;
   if(node.style?.textDecorationLine?.includes('underline'))next.u=true;
@@ -193,6 +195,8 @@ async function qoDocxImport(file){
   if(qoDocxChild(props,'b')&&qoDocxAttr(qoDocxChild(props,'b'),'val')!=='0')marks.push('b');
   if(qoDocxChild(props,'i')&&qoDocxAttr(qoDocxChild(props,'i'),'val')!=='0')marks.push('i');
   if(qoDocxChild(props,'u'))marks.push('u');if(qoDocxChild(props,'strike'))marks.push('s');
+  const vert=qoDocxAttr(qoDocxChild(props,'vertAlign'),'val');
+  if(vert==='superscript')marks.push('sup');else if(vert==='subscript')marks.push('sub');
   const style=[];const color=qoDocxAttr(qoDocxChild(props,'color'),'val');if(/^[0-9a-f]{6}$/i.test(color))style.push('color:#'+color);
   const shading=qoDocxAttr(qoDocxChild(props,'shd'),'fill');if(/^[0-9a-f]{6}$/i.test(shading))style.push('background-color:#'+shading);
   const size=Number(qoDocxAttr(qoDocxChild(props,'sz'),'val'));if(Number.isFinite(size)&&size>=12&&size<=144)style.push('font-size:'+Math.round(size/1.5)+'px');
