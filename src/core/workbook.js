@@ -18,6 +18,45 @@ export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
 export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,smartTable:null,merges:[],hyperlinks:{},defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
+
+/** TASK126: duplicate the entire worksheet, including styling, layouts, charts and rules. */
+export function duplicateWorksheet(book,sheetId){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ if(book.sheets.length>=LIMITS.sheets)throw Error('Лимит: 25 листов');
+ const index=book.sheets.findIndex(s=>s.id===sheetId);
+ if(index<0)throw Error('Лист не найден');
+ const source=book.sheets[index];
+ const taken=new Set(book.sheets.map(s=>s.name.toLocaleLowerCase('ru-RU')));
+ let name=null;
+ for(let n=1;n<=1000;n++){
+  const suffix=n===1?' — копия':' — копия ('+n+')';
+  const candidate=source.name.slice(0,Math.max(1,31-suffix.length)).trimEnd()+suffix;
+  if(!taken.has(candidate.toLocaleLowerCase('ru-RU'))){name=candidate;break;}
+ }
+ if(!name)throw Error('Не удалось подобрать название копии');
+ const clone=structuredClone(source);
+ clone.id=uid();
+ clone.name=name;
+ if(Array.isArray(clone.charts))for(const item of clone.charts)item.id=uid();
+ if(Array.isArray(clone.conditionalRules))for(const item of clone.conditionalRules)item.id=uid();
+ if(Array.isArray(clone.validations))for(const item of clone.validations)item.id=uid();
+ book.sheets.splice(index+1,0,clone);
+ book.activeSheetId=clone.id;
+ return clone;
+}
+/** TASK126: move left/right without altering any names, formulas or active sheet ID. */
+export function moveWorksheet(book,sheetId,shift){
+ if(!book||!Array.isArray(book.sheets)||![1,-1].includes(shift))
+  throw Error('Неверные параметры перемещения листа');
+ const index=book.sheets.findIndex(s=>s.id===sheetId);
+ if(index<0)throw Error('Лист не найден');
+ const target=index+shift;
+ if(target<0||target>=book.sheets.length)return false;
+ const [moving]=book.sheets.splice(index,1);
+ book.sheets.splice(target,0,moving);
+ return true;
+}
+
 export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:3000,minRow:22,maxRow:2000,maxDefaultRow:300};
 const geometryCache=new WeakMap();
 export function invalidateGridGeometry(sheet){if(sheet&&typeof sheet==='object')geometryCache.delete(sheet);}
