@@ -3,7 +3,7 @@
 const QD_BANK_KEY='quantum-office.diagnostic-question-bank.v1';
 const QD_BANK_LIMIT=500;
 let qdBankOpen=false,qdBankQuery='',qdBankSubject='all',qdBankGrade='all',qdBankType='all',qdBankDifficulty='all',qdBankPage=0;
-let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
+/* Builder revision state is declared by diagnostics.js to preserve standalone legacy API tests. */
 
 function qdBankSafe(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return null;
