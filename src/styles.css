@@ -32,3 +32,13 @@
 @import "./styles/diagnostics120.css";
 @import "./styles/diagnostics121.css";
 @import "./styles/student-hub.css";
+
+
+/* TASK125: transient fill-mode picker. */
+.qo-fill-options{position:fixed;z-index:3000;font-family:inherit}
+.qo-fill-options-button{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--qo-border-strong);border-radius:5px;background:var(--qo-surface);color:var(--qo-text);box-shadow:0 2px 8px #0002;cursor:pointer;font-size:16px;line-height:1}
+.qo-fill-options-button:hover{background:var(--qo-hover)}
+.qo-fill-options-menu{position:absolute;min-width:198px;max-width:230px;padding:5px;border:1px solid var(--qo-border);border-radius:8px;background:var(--qo-surface);box-shadow:0 7px 24px #0003}
+.qo-fill-options-menu[hidden]{display:none!important}
+.qo-fill-options-menu button{display:block;width:100%;padding:9px 10px;text-align:left;font:inherit;font-size:12px;color:var(--qo-text);background:transparent;border:0;border-radius:5px;cursor:pointer}
+.qo-fill-options-menu button:hover,.qo-fill-options-menu button:focus-visible{background:var(--qo-hover)}

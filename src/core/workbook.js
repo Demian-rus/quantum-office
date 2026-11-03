@@ -606,11 +606,56 @@ function labeledFillSequence(source){
    String(Math.abs(number)).padStart(pad,'0')+first.suffix;
  };
 }
+/** TASK125: Infer ISO calendar dates, including leap days. */
+function isoDateFillSequence(source){
+ const dates=source.map(({cell})=>{
+  const v=cell.value;
+  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;
+  const d=new Date(v+'T00:00:00Z');
+  return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v?d.getTime():null;
+ });
+ if(dates.some(d=>d===null))return null;
+ const day=86400000,step=dates.length>1?(dates[1]-dates[0])/day:1;
+ if(!Number.isSafeInteger(step)||dates.some((d,i)=>d!==dates[0]+step*i*day))return null;
+ return index=>{
+  const ms=dates[0]+step*index*day,d=new Date(ms);
+  if(!Number.isFinite(ms)||!Number.isFinite(d.getTime())||d.getUTCFullYear()>9999||d.getUTCFullYear()<1)
+   throw Error('Дата выходит за допустимые пределы календаря');
+  return d.toISOString().slice(0,10);
+ };
+}
+/** TASK125: Russian day/month sequences, preserving input capitalization. */
+function namedFillSequence(source){
+ const groups=[
+  ['пн','вт','ср','чт','пт','сб','вс'],
+  ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'],
+  ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'],
+  ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
+ ];
+ const samples=source.map(e=>e.cell.value);
+ if(samples.some(v=>typeof v!=='string'||!v.trim()))return null;
+ const group=groups.find(g=>samples.every(v=>g.includes(v.toLocaleLowerCase('ru-RU'))));
+ if(!group)return null;
+ const numbers=samples.map(v=>group.indexOf(v.toLocaleLowerCase('ru-RU'))),length=group.length;
+ let step=1;
+ if(numbers.length>1){
+  step=(numbers[1]-numbers[0]+length)%length;
+  if(step>length/2)step-=length;
+  if(numbers.some((n,i)=>n!==((numbers[0]+step*i)%length+length)%length))return null;
+ }
+ const first=samples[0],upper=first===first.toLocaleUpperCase('ru-RU'),
+  capital=first[0]===first[0].toLocaleUpperCase('ru-RU');
+ return index=>{
+  const item=group[((numbers[0]+step*index)%length+length)%length];
+  return upper?item.toLocaleUpperCase('ru-RU'):
+   capital?item[0].toLocaleUpperCase('ru-RU')+item.slice(1):item;
+ };
+}
 /** TASK070: extend one rectangle through its Excel-like drag fill handle.
  * Numeric and prefixed-number sequences continue; formulas translate;
  * plain text cycles. Ctrl+drag copies source values. One atomic staged write. */
 export function extendFillHandle(sheet,from,to,direction,targetIndex,fillMode='auto'){
- if(!['auto','copy'].includes(fillMode))throw Error('Недопустимый режим автозаполнения');
+ if(!['auto','copy','values','formats'].includes(fillMode))throw Error('Недопустимый режим автозаполнения');
  if(!['up','down','left','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
  if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон для автозаполнения');
  const a=rectangle(from,to),vertical=direction==='up'||direction==='down',
@@ -654,15 +699,16 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex,fillMode='a
    step=numericSeries?nums[1]-nums[0]:dateSeries?1:null,
    arithmetic=(numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
     1e-9*Math.max(1,Math.abs(v))))||(dateSeries&&length===1);
-  const extrapolate=fillMode==='auto'&&arithmetic,
-   textSeries=fillMode==='auto'?labeledFillSequence(source):null;
+  const extrapolate=['auto','values'].includes(fillMode)&&arithmetic,
+   textSeries=['auto','values'].includes(fillMode)?(isoDateFillSequence(source)||namedFillSequence(source)||labeledFillSequence(source)):null;
   if(dateSeries&&extrapolate)hasDateSeries=true;
   for(let i=0;i<steps;i++){
    const sequenceIndex=reverse?-1-i:length+i,
     sourceIndex=((sequenceIndex%length)+length)%length,origin=source[sourceIndex],
     row=vertical?(reverse?a.r1-1-i:a.r2+1+i):a.r1+cross,
     col=vertical?a.c1+cross:(reverse?a.c1-1-i:a.c2+1+i);
-   let value=origin.cell.value;
+   const destRef=cellName(row,col),previous=getCell(sheet,destRef);
+   let value=fillMode==='formats'?previous.value:origin.cell.value;
    if(extrapolate){
     const result=nums[0]+step*sequenceIndex;
     if(!Number.isFinite(result)||Math.abs(result)>1e15)
@@ -671,15 +717,15 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex,fillMode='a
      throw Error('Дата выходит за допустимые пределы календаря');
     value=String(Number(result.toPrecision(14)));
    }else if(textSeries)value=textSeries(sequenceIndex);
-   else if(value.startsWith('='))
+   else if(fillMode!=='formats'&&value.startsWith('='))
     value=translateFormula(value,row-origin.row,col-origin.col);
-   prepared.push({ref:cellName(row,col),value,style:structuredClone(origin.cell.style||{})});
+   prepared.push({ref:destRef,value,style:structuredClone((fillMode==='values'?previous:origin.cell).style||{})});
   }
  }
  // Validate the full result on an isolated copy before changing the original sheet.
  const staged=structuredClone(sheet);
  for(const item of prepared){
-  checkValidatedInput(staged,item.ref,item.value);
+  if(fillMode!=='formats')checkValidatedInput(staged,item.ref,item.value);
   if(item.value||Object.keys(item.style).length)staged.cells[item.ref]={value:item.value,style:item.style};
   else delete staged.cells[item.ref];
  }
