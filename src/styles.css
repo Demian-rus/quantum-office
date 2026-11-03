@@ -42,3 +42,13 @@
 .qo-fill-options-menu[hidden]{display:none!important}
 .qo-fill-options-menu button{display:block;width:100%;padding:9px 10px;text-align:left;font:inherit;font-size:12px;color:var(--qo-text);background:transparent;border:0;border-radius:5px;cursor:pointer}
 .qo-fill-options-menu button:hover,.qo-fill-options-menu button:focus-visible{background:var(--qo-hover)}
+
+
+/* TASK126 — compact worksheet actions: right-click or one touch-friendly button. */
+.qo-sheet-more{height:27px;min-width:28px;padding:0 6px;border:1px solid var(--qo-border);border-radius:5px;background:var(--qo-surface);color:var(--qo-muted);font:inherit;font-size:20px;line-height:1;cursor:pointer;align-self:center}
+.qo-sheet-more:hover,.qo-sheet-more:focus-visible{background:var(--qo-hover);color:var(--qo-accent)}
+.qo-sheet-context{position:fixed;z-index:3050;width:218px;max-width:calc(100vw - 12px);padding:5px;border:1px solid var(--qo-border);border-radius:8px;background:var(--qo-surface);box-shadow:0 9px 25px #0003;color:var(--qo-text)}
+.qo-sheet-context-title{padding:7px 9px;border-bottom:1px solid var(--qo-border);margin-bottom:3px;font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qo-sheet-context button{display:block;width:100%;padding:9px 10px;text-align:left;border:0;background:transparent;color:var(--qo-text);border-radius:5px;font:inherit;font-size:12px;cursor:pointer}
+.qo-sheet-context button:not(:disabled):hover,.qo-sheet-context button:focus-visible{background:var(--qo-hover)}
+.qo-sheet-context button:disabled{opacity:.38;cursor:default}
