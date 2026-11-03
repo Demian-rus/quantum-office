@@ -77,3 +77,22 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .sheet-tab.is-reorder-source{opacity:.58}
 .sheet-tab.is-reorder-target{outline:2px solid var(--qo-accent,#50bb8c);outline-offset:-2px}
 @media(max-width:520px){.qo-sheet-navigator-panel footer span:last-child{display:none}.qo-sheet-navigator-panel{max-height:80vh}}
+
+
+/* TASK128 — workbook-wide search results; compact and theme-aware. */
+.find-bar #find-scope{min-width:102px;max-width:140px;height:28px;border:1px solid var(--qo-border);border-radius:5px;background:var(--qo-surface);color:var(--qo-text);font:inherit;font-size:12px}
+.qo-workbook-search-backdrop{position:fixed;inset:0;z-index:5700;display:flex;justify-content:center;align-items:center;padding:12px;background:rgba(0,0,0,.38)}
+.qo-workbook-search-panel{display:flex;flex-direction:column;width:min(660px,100%);max-height:min(650px,86vh);min-height:220px;background:var(--qo-surface);color:var(--qo-text);border:1px solid var(--qo-border);border-radius:12px;box-shadow:0 14px 60px #0005;overflow:hidden}
+.qo-workbook-search-panel header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 16px;border-bottom:1px solid var(--qo-border)}
+.qo-workbook-search-panel header strong{font-size:15px;font-weight:700}
+.qo-workbook-search-panel [data-qws-close]{border:none;border-radius:5px;min-width:28px;height:28px;font-size:23px;line-height:1;color:var(--qo-text);background:transparent;cursor:pointer}
+.qo-workbook-search-panel [data-qws-close]:hover{background:var(--qo-hover)}
+.qo-workbook-search-summary{padding:10px 16px;font-size:12px;color:var(--qo-muted);border-bottom:1px solid var(--qo-border)}
+.qo-workbook-search-list{flex:1;min-height:90px;padding:8px 12px;overflow-y:auto}
+.qo-workbook-search-hit{display:grid;grid-template-columns:minmax(125px,35%) 1fr;gap:12px;align-items:center;width:100%;padding:10px 9px;border:0;border-radius:7px;color:var(--qo-text);background:transparent;text-align:left;font:inherit;cursor:pointer}
+.qo-workbook-search-hit:hover,.qo-workbook-search-hit:focus-visible{background:var(--qo-hover)}
+.qo-workbook-search-hit strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+.qo-workbook-search-hit span{font-size:12px;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;color:var(--qo-muted)}
+.qo-workbook-search-panel footer{border-top:1px solid var(--qo-border);padding:10px 16px;font-size:11px;color:var(--qo-muted)}
+.qo-workbook-search-empty{padding:20px 10px;font-size:13px;color:var(--qo-muted)}
+@media(max-width:520px){.qo-workbook-search-hit{grid-template-columns:1fr;gap:3px}.qo-workbook-search-panel{max-height:82vh}.find-bar #find-scope{min-width:95px}}
