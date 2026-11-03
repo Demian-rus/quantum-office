@@ -35,6 +35,7 @@
 
 
 @import "./styles/office-ribbon.css";
+@import "./styles/office-tiles.css";
 /* TASK125: transient fill-mode picker. */
 .qo-fill-options{position:fixed;z-index:3000;font-family:inherit}
 .qo-fill-options-button{display:flex;align-items:center;justify-content:center;width:24px;height:24px;border:1px solid var(--qo-border-strong);border-radius:5px;background:var(--qo-surface);color:var(--qo-text);box-shadow:0 2px 8px #0002;cursor:pointer;font-size:16px;line-height:1}
