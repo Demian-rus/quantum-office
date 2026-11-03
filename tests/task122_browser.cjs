@@ -12,6 +12,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
    b.name='Учебный график';s.name='Ученики';
    s.cells['A1']={value:'Ученики'};s.cells['B1']={value:'Ссылка'};s.cells['C1']={value:'Информация'};
    s.cells['D1']={value:'Родитель'};s.cells['E1']={value:'Ссылка'};
+   s.cells['B2']={value:'Профиль'};
    s.hyperlinks={B2:'https://example.org/profile'};
    for(let n=2;n<=12;n++){
      s.cells['A'+n]={value:'Тестовый ученик '+n};
