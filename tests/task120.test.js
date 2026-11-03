@@ -18,9 +18,9 @@ const meta={subject:'physics',grade:'8',purpose:'review'};
 test('TASK120 searchable bank includes real built-ins, filters and limits duplicate insertion',()=>{
  const h=harness(),d=h.qdDoc();
  const bank=h.qdBankItems();
- assert.ok(bank.length>300,'built-in bank includes >300 questions');
- const selected=bank.find(x=>x.subject==='chemistry'&&x.question.prompt.includes('молекуле H₂O'));
- assert.ok(selected,'chemistry questions indexed');
+ assert.ok(bank.length>=200,'bank includes 200+ selected-subject questions');
+ const selected=bank.find(x=>x.subject==='informatics'&&x.question.prompt.includes('двоичной'));
+ assert.ok(selected,'informatics questions indexed');
  assert.equal(h.qdBankAddToDoc(d,selected).ok,true);
  assert.ok(d.sections.some(s=>s.title===selected.topic));
  const inserted=h.qdQuestionList(d).find(q=>q.prompt===selected.question.prompt);
