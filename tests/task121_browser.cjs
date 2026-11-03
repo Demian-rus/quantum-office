@@ -77,6 +77,29 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
  const tpl=await templateDownload;assert.match(tpl.suggestedFilename(),/\.qtplx$/);
  const tplPath=path.join(root,'task121-test.qtplx');await tpl.saveAs(tplPath);
  assert.ok(fs.statSync(tplPath).size>250);
+ // Restore complete template with media into a fresh personal library.
+ await page.evaluate(()=>localStorage.removeItem(QD_LIBRARY_KEY));
+ await page.locator('#qd-library-file').setInputFiles(tplPath);
+ await page.waitForFunction(()=>qdLibraryRead().length===1);
+ const imported=await page.evaluate(async()=>{
+   const q=qdLibraryRead()[0].sections[0].questions[0];
+   return {prompt:!!(await qdMediaGet(q.promptMedia.id)),answer:!!(await qdMediaGet(q.answerMedia.id))};
+ });
+ assert.deepEqual(imported,{prompt:true,answer:true});
+ // Bank archive must also carry images without leaking any pupil history.
+ await page.evaluate(()=>{
+   const d=qdDoc(),q=d.sections[0].questions[0];
+   qdBankSaveQuestion(d,q.id,'physics','8');
+ });
+ const bankDownload=page.waitForEvent('download');
+ await page.evaluate(()=>qdBankExport());
+ const bank=await bankDownload;assert.match(bank.suggestedFilename(),/\.qbankx$/);
+ const bankPath=path.join(root,'task121-test.qbankx');await bank.saveAs(bankPath);
+ assert.ok(fs.statSync(bankPath).size>250);
+ await page.evaluate(()=>localStorage.removeItem(QD_BANK_KEY));
+ await page.locator('#qd-bank-file').setInputFiles(bankPath);
+ await page.waitForFunction(()=>qdBankRead().length===1);
+ assert.equal(await page.evaluate(async()=>Boolean(await qdMediaGet(qdBankRead()[0].question.promptMedia.id))),true);
  for(const width of [1600,1100,650,390]){
    await page.setViewportSize({width,height:880});
    const metric=await page.evaluate(()=>({
@@ -87,7 +110,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
    assert.ok(metric.page<=metric.viewport+4,'horizontal overflow at '+width);
    assert.ok(metric.images.every(m=>!m.panel||m.right<=m.panel+1),'image escaped card at '+width);
  }
- fs.rmSync(target,{force:true});fs.rmSync(tplPath,{force:true});
+ fs.rmSync(target,{force:true});fs.rmSync(tplPath,{force:true});fs.rmSync(bankPath,{force:true});
  assert.deepEqual(errors,[]);
  console.log('PASS TASK121: file upload, screenshot paste, captions, compact, answer privacy, drawing, ZIP roundtrip and 390px');
  await browser.close();
