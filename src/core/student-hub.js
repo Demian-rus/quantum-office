@@ -200,6 +200,16 @@ function qoHubDiagDecorate(){
  const target=qdMode==='builder'?root.querySelector('.qd-roster'):qdMode==='run'?root.querySelector('.qd-session-panel'):null;
  if(!target||root.querySelector('.qo-hub-roster'))return;
  target.insertAdjacentHTML('afterend',qoHubRosterPanel());
+ if(qdMode==='run'&&qoHubSourceSheet()){
+   const student=qoHubMatches(qdDoc().session.student||'');
+   if(student.length===1&&!student[0].duplicate){
+     const anchor=root.querySelector('.qo-hub-roster');
+     if(anchor)anchor.insertAdjacentHTML('afterend',
+       '<details class="qd-panel qo-hub-inline-history"><summary>История ученика по всем диагностикам ('+
+        qoHubStudentResults(student[0].id).length+')</summary>'+
+        qoHubHistoryHTML(student[0])+'</details>');
+   }
+ }
 }
 function qoHubDecorate(){
  if(page==='sheet')qoHubSheetDecorate();
