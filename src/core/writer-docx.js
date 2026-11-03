@@ -17,11 +17,23 @@ const qoDocxColor=(color)=>{
 };
 function qoDocxRelationships(items){return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'+
  '<Relationships xmlns="'+QO_DOCX_PKGREL+'">'+items.map(x=>'<Relationship Id="'+x.id+'" Type="'+x.type+'" Target="'+qoDocxEscape(x.target)+'"'+(x.external?' TargetMode="External"':'')+'/>').join('')+'</Relationships>';}
+function qoDocxParagraphMetrics(node){
+ const read=(s,unit,low,high)=>{const match=new RegExp('^([+-]?(?:\\d+)(?:\\.\\d+)?)'+unit+'$').exec(s||'');
+  if(!match)return null;const n=Number(match[1]);return Number.isFinite(n)&&n>=low&&n<=high?n:null;};
+ return {left:read(node.style?.marginLeft,'mm',0,50),first:read(node.style?.textIndent,'mm',-20,30),
+  before:read(node.style?.marginTop,'pt',0,48),after:read(node.style?.marginBottom,'pt',0,48)};
+}
 function qoDocxParagraph(runHtml,tag='p',opts={}){
  const head=/^h[123]$/.test(tag)?'<w:pStyle w:val="Heading'+tag[1]+'"/>':tag==='blockquote'?'<w:pStyle w:val="Quote"/>':'';
  const align=opts.align&&['left','center','right','justify'].includes(opts.align)?'<w:jc w:val="'+(opts.align==='justify'?'both':opts.align)+'"/>':'';
  const list=opts.list?'<w:numPr><w:ilvl w:val="'+Math.min(6,opts.depth||0)+'"/><w:numId w:val="'+(opts.list==='ol'?2:1)+'"/></w:numPr>':'';
- return '<w:p><w:pPr>'+head+align+list+'</w:pPr>'+runHtml+'</w:p>';
+ const units=mm=>Math.round(mm*1440/25.4);
+ const hasIndent=opts.left!==null&&opts.left!==undefined||opts.first!==null&&opts.first!==undefined;
+ const left=opts.left??0,first=opts.first??0;
+ const indent=hasIndent?'<w:ind w:left="'+units(left)+'"'+(first<0?' w:hanging="'+units(-first)+'"':' w:firstLine="'+units(first)+'"')+'/>':'';
+ const hasSpacing=opts.before!==null&&opts.before!==undefined||opts.after!==null&&opts.after!==undefined;
+ const spacing=hasSpacing?'<w:spacing'+(opts.before!=null?' w:before="'+Math.round(opts.before*20)+'"':'')+(opts.after!=null?' w:after="'+Math.round(opts.after*20)+'"':'')+'/>' :'';
+ return '<w:p><w:pPr>'+head+align+list+indent+spacing+'</w:pPr>'+runHtml+'</w:p>';
 }
 function qoDocxRunProps(state){const props=[];
  if(state.b)props.push('<w:b/>');if(state.i)props.push('<w:i/>');if(state.u)props.push('<w:u w:val="single"/>');if(state.s)props.push('<w:strike/>');
@@ -82,7 +94,7 @@ async function qoDocxExport(html,layout,title){
    if(tag==='ul'||tag==='ol'){
     for(const li of node.children){if(li.tagName?.toLowerCase()!=='li')continue;
      const content=Array.from(li.childNodes).filter(n=>n.nodeType!==1||!['ul','ol'].includes(n.tagName.toLowerCase()));
-     xml+=qoDocxParagraph(content.map(n=>inline(n)).join(''),'p',{list:tag,depth});
+     xml+=qoDocxParagraph(content.map(n=>inline(n)).join(''),'p',{list:tag,depth,...qoDocxParagraphMetrics(li)});
      xml+=nodeBlocks(Array.from(li.children).filter(n=>['ul','ol'].includes(n.tagName.toLowerCase())),depth+1);
     }continue;
    }
@@ -103,7 +115,7 @@ async function qoDocxExport(html,layout,title){
    }
    if(['p','div','h1','h2','h3','blockquote'].includes(tag)){
     const children=Array.from(node.childNodes);
-    xml+=qoDocxParagraph(children.map(n=>inline(n)).join(''),tag,{align:node.style?.textAlign});continue;
+    xml+=qoDocxParagraph(children.map(n=>inline(n)).join(''),tag,{align:node.style?.textAlign,...qoDocxParagraphMetrics(node)});continue;
    }
    xml+=qoDocxParagraph(inline(node));
   }return xml;
@@ -215,6 +227,15 @@ async function qoDocxImport(file){
   const heading=/^Heading([123])$/i.exec(s);const tag=heading?'h'+heading[1]:s==='Title'?'h1':s==='Subtitle'?'h2':'p';
   const alignment=qoDocxAttr(qoDocxChild(pr,'jc'),'val');
   const align={both:'justify',center:'center',right:'right',left:'left'}[alignment];
+  const styles=[],indent=qoDocxChild(pr,'ind'),spacing=qoDocxChild(pr,'spacing');
+  const mm=twip=>Math.round(twip*25.4/1440*10)/10;
+  const left=qoDocxAttr(indent,'left'),first=qoDocxAttr(indent,'firstLine'),hanging=qoDocxAttr(indent,'hanging');
+  const before=qoDocxAttr(spacing,'before'),after=qoDocxAttr(spacing,'after');
+  if(left!==''&&Number.isFinite(Number(left)))styles.push('margin-left:'+mm(Number(left))+'mm');
+  if(first!==''&&Number.isFinite(Number(first)))styles.push('text-indent:'+mm(Number(first))+'mm');
+  else if(hanging!==''&&Number.isFinite(Number(hanging)))styles.push('text-indent:'+mm(-Number(hanging))+'mm');
+  if(before!==''&&Number.isFinite(Number(before)))styles.push('margin-top:'+Math.round(Number(before)/20*10)/10+'pt');
+  if(after!==''&&Number.isFinite(Number(after)))styles.push('margin-bottom:'+Math.round(Number(after)/20*10)/10+'pt');
   const parts=[];
   for(const node of Array.from(p.children||[])){
    if(node.localName==='r')parts.push(await runHTML(node));
@@ -226,7 +247,9 @@ async function qoDocxImport(file){
    else if(node.localName==='fldSimple'){parts.push(qoDocxEscape(node.textContent||''));}
   }
   const numPr=qoDocxChild(pr,'numPr'),numId=qoDocxAttr(qoDocxChild(numPr,'numId'),'val');
-  return {tag,html:'<'+tag+(align?' style="text-align:'+align+'"':'')+'>'+(parts.join('')||'<br>')+'</'+tag+'>',inner:parts.join(''),list:numId?((numFmt.get(numId)==='decimal')?'ol':'ul'):/^ListBullet/i.test(s)?'ul':/^ListNumber/i.test(s)?'ol':null};
+  if(align)styles.push('text-align:'+align);
+  const styleAttr=styles.length?' style="'+styles.join(';')+'"':'';
+  return {tag,html:'<'+tag+styleAttr+'>'+(parts.join('')||'<br>')+'</'+tag+'>',styleAttr,inner:parts.join(''),list:numId?((numFmt.get(numId)==='decimal')?'ol':'ul'):/^ListBullet/i.test(s)?'ul':/^ListNumber/i.test(s)?'ol':null};
  }
  async function tableHTML(table){let out='<table><tbody>';
   for(const row of qoDocxChildren(table,'tr').slice(0,200)){
@@ -247,7 +270,7 @@ async function qoDocxImport(file){
   if(node.localName!=='p')continue;
   const p=await paragraphHTML(node),type=p.list;
   if(type!==activeList){if(activeList)html+='</'+activeList+'>';if(type)html+='<'+type+'>';activeList=type;}
-  if(type)html+='<li>'+(p.inner||'<br>')+'</li>';
+  if(type)html+='<li'+p.styleAttr+'>'+(p.inner||'<br>')+'</li>';
   else html+=p.html;
  }
  if(activeList)html+='</'+activeList+'>';
