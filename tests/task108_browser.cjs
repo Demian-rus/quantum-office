@@ -16,7 +16,7 @@ const {pathToFileURL}=require('node:url');
    await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  };
  await library();
- assert.equal(await page.locator('.qd-library-card').count(),19);
+ assert.equal(await page.locator('.qd-library-card').count(),14);
  await page.locator('.qd-library-card').filter({hasText:'Молекулы и температура'})
     .locator('[data-qd-action="library-open"]').click();
  assert.ok((await page.locator('.qd-chat-card').count())>=20,'expanded physics8');

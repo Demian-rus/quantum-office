@@ -14,10 +14,10 @@ function harness(){
   '\nthis.api={QD_PRESETS,QD_PRESET_CURRICULUM,qdTemplate,qdLibraryItems,qdNormalize,qdCheckAnswer,qdLibraryLoad,qdDoc,qdQuestionList};',vm);
  return {...vm.api,writer};
 }
-test('TASK118 expands seven previous presets and registers twelve new subjects/grades',()=>{
+test('TASK122 retains only physics, math and informatics built-ins',()=>{
  const h=harness();
- assert.equal(h.QD_PRESETS.length,19);
- assert.equal(new Set(Array.from(h.QD_PRESETS,p=>p.id)).size,19);
+ assert.equal(h.QD_PRESETS.length,14);
+ assert.equal(new Set(Array.from(h.QD_PRESETS,p=>p.id)).size,14);
  assert.equal(Object.keys(h.QD_PRESET_CURRICULUM.upgrades).length,7);
  assert.equal(Object.keys(h.QD_PRESET_CURRICULUM.new).length,12);
  for(const id of ['physics8','physics7','physics9','math56','math7','informatics7','informatics9']){
@@ -26,7 +26,7 @@ test('TASK118 expands seven previous presets and registers twelve new subjects/g
   assert.ok(t.sections.length>=4,id+' must cover at least four topics');
  }
  const subjects=new Set(Array.from(h.QD_PRESETS,p=>p.subject));
- for(const p of ['physics','math','informatics','russian','biology','geography','chemistry'])assert.ok(subjects.has(p),p);
+ assert.deepEqual([...subjects].sort(),['informatics','math','physics']);
  assert.equal(h.writer.html,'<p>User document stays intact</p>');
 });
 test('TASK118 every builtin has nonempty answers, unique prompts and valid options',()=>{
@@ -63,20 +63,20 @@ test('TASK118 every builtin has nonempty answers, unique prompts and valid optio
   }
   total+=items.length;
  }
- assert.ok(total>=300,'expected at least 300 questions, got '+total);
- assert.ok(automatic>=70,'automatic checks should add useful variety');
+ assert.ok(total>=230,'expected at least 230 relevant questions, got '+total);
+ assert.ok(automatic>=55,'automatic checks remain diverse across the three teaching subjects');
  assert.ok(practical>=20,'preserve practice tasks');
 });
 test('TASK118 library shows complete counts, does not overwrite user templates',()=>{
  const h=harness(),items=h.qdLibraryItems();
- assert.equal(items.length,19);
- assert.equal(items.find(x=>x.id==='chemistry8atoms').subject,'chemistry');
+ assert.equal(items.length,14);
+ assert.equal(items.some(x=>x.subject==='chemistry'||x.subject==='russian'||x.subject==='biology'||x.subject==='geography'),false);
  assert.equal(items.find(x=>x.id==='physics8').count,h.qdQuestionList(h.qdTemplate('physics8')).length);
  const d=h.qdDoc();
  d.title='User original';
  d.students=[{id:'pupil',name:'Pupil'}];
  d.history=[{id:'history',student:'Pupil'}];
- assert.ok(h.qdLibraryItems().length===19);
+ assert.ok(h.qdLibraryItems().length===14);
  assert.equal(d.title,'User original');
  assert.equal(d.students.length,1);
  assert.equal(d.history.length,1);
