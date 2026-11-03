@@ -1001,7 +1001,7 @@ export function planWorkbookReplacement(book,search,replacement,{sheetId=null,li
  if(!Number.isInteger(limit)||limit<1||limit>500)throw Error('Недопустимый лимит предпросмотра');
  const target=sheetId?book.sheets.filter(s=>s.id===sheetId):book.sheets;
  if(sheetId&&!target.length)throw Error('Лист не найден');
- const escaped=term.replace(/[.*+?^$()|[\]{}\\]/g,'\\export function importCSV(text,name='Импорт CSV'){');
+ const escaped=term.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
  const pattern=new RegExp(escaped,'giu');
  const items=[];
  for(const sheet of target){
