@@ -32,7 +32,8 @@ const {pathToFileURL}=require('node:url');
    assert.deepEqual(dims,{tabs:30,ribbon:78,pageOverflow:false},kind);
   }
   await page.evaluate(()=>route('writer'));
-  assert.equal(await page.locator('.qo-work-group-caption').filter({hasText:'Цвет'}).count(),1);
+  assert.equal(await page.locator('.qo-writer-font-actions #qo-writer-text-color').count(),1);
+  assert.equal(await page.locator('.qo-writer-font-actions #qo-writer-highlight').count(),1);
   assert.equal(await page.locator('[data-command="superscript"]').isVisible(),true);
   assert.equal(await page.locator('[data-command="subscript"]').isVisible(),true);
   assert.equal(await page.locator('[data-command="removeFormat"]').isVisible(),true);
