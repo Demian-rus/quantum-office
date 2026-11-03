@@ -5,7 +5,7 @@ import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,ch
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
-import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
+import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
@@ -77,7 +77,7 @@ function qoPickFont(name){if(!FONT_FAMILIES.includes(name))return;
 
 let scrollLeft=0,scrollTop=0,undoStacks=new Map(),redoStacks=new Map(),statusMessage='',storeWarning=false;
 const directFiles=new Map(),dirtyFiles=new Set(),savingBooks=new Set();
-let searchTerm='',replaceTerm='',findIndex=-1,showFind=false;
+let searchTerm='',replaceTerm='',findIndex=-1,showFind=false,searchScope='sheet';
 let resizeDrag=null, filterColumn=null;
 let internalClipboard=null;
 let chartDrawerOpen=false,selectedChartId=null,chartDrag=null;
@@ -646,11 +646,78 @@ function sortFromContext(direction){
  sortRange(direction,{keyColumn:column,header});
 }
 
+/** TASK128: search the current worksheet or every worksheet in the active book. */
+function closeWorkbookSearchResults(){document.getElementById('qo-workbook-search-results')?.remove();}
+function searchHits(){
+ if(!book()||!searchTerm.trim())return {matches:[],truncated:false};
+ return findWorkbookCells(book(),searchTerm,{sheetId:searchScope==='sheet'?sheet()?.id:null,limit:500});
+}
+function jumpToSearchHit(hit){
+ const b=book();if(!b||!b.sheets.some(s=>s.id===hit.sheetId))return false;
+ closeWorkbookSearchResults();
+ if(b.activeSheetId!==hit.sheetId)selectWorksheetById(hit.sheetId);
+ const position=parseCell(hit.ref);if(!position)return false;
+ setSelection(hit.ref);ensureVisible(position.row,position.col);
+ document.getElementById('grid-scroll')?.focus({preventScroll:true});
+ return true;
+}
 function showSearch(){showFind=true;render();document.getElementById('find-term')?.focus();}
-function nextMatch(){if(!sheet()||!searchTerm.trim()){status('Введите текст для поиска',true);return;}
- const refs=findCells(sheet(),searchTerm);if(!refs.length){status('Совпадений нет',true);return;}
- const current=refs.indexOf(activeCell);findIndex=(current+1)%refs.length;
- const ref=refs[findIndex];setSelection(ref);const pos=parseCell(ref);ensureVisible(pos.row,pos.col);status(`Найдено ${refs.length} · ${findIndex+1} из ${refs.length}`);}
+function nextMatch(){
+ if(!sheet()||!searchTerm.trim()){status('Введите текст для поиска',true);return;}
+ try{
+  const result=searchHits(),matches=result.matches;
+  if(!matches.length){status('Совпадений нет',true);return;}
+  const current=matches.findIndex(x=>x.sheetId===sheet().id&&x.ref===activeCell);
+  findIndex=(current+1)%matches.length;
+  const hit=matches[findIndex];
+  jumpToSearchHit(hit);
+  status('Найдено: '+(result.truncated?'не менее ':'')+matches.length+
+   ' · '+(findIndex+1)+' из '+matches.length+' · '+hit.sheetName+'!'+hit.ref);
+ }catch(error){status(error.message,true);}
+}
+function showWorkbookSearchResults(){
+ if(!searchTerm.trim()){status('Введите текст для поиска',true);return;}
+ let result;
+ try{result=searchHits();}catch(error){status(error.message,true);return;}
+ closeWorkbookSearchResults();
+ const overlay=document.createElement('div');
+ overlay.id='qo-workbook-search-results';
+ overlay.className='qo-workbook-search-backdrop';
+ overlay.innerHTML='<section class="qo-workbook-search-panel" role="dialog" aria-modal="true" aria-label="Результаты поиска">'+
+  '<header><strong>Результаты поиска</strong><button type="button" data-qws-close aria-label="Закрыть">×</button></header>'+
+  '<div class="qo-workbook-search-summary"></div><div class="qo-workbook-search-list"></div>'+
+  '<footer>Нажмите на результат, чтобы открыть нужную ячейку.</footer></section>';
+ const summary=overlay.querySelector('.qo-workbook-search-summary');
+ summary.textContent=result.matches.length+
+  (result.truncated?' первых совпадений (показано не более 500)':' совпадений')+
+  ' · '+(searchScope==='book'?'вся книга':'текущий лист');
+ const list=overlay.querySelector('.qo-workbook-search-list');
+ for(const hit of result.matches){
+  const button=document.createElement('button');button.type='button';
+  button.className='qo-workbook-search-hit';
+  const where=document.createElement('strong');where.textContent=hit.sheetName+' · '+hit.ref;
+  const value=document.createElement('span');value.textContent=hit.value.length>160?hit.value.slice(0,157)+'…':hit.value;
+  value.title=hit.value.length>160?hit.value.slice(0,1000):hit.value;
+  button.append(where,value);
+  button.addEventListener('click',()=>{jumpToSearchHit(hit);status('Переход: '+hit.sheetName+'!'+hit.ref);});
+  list.append(button);
+ }
+ if(!result.matches.length){
+  const p=document.createElement('p');p.className='qo-workbook-search-empty';p.textContent='Совпадений нет';list.append(p);
+ }
+ document.body.append(overlay);
+ overlay.querySelector('[data-qws-close]').addEventListener('click',closeWorkbookSearchResults);
+ overlay.addEventListener('pointerdown',e=>{if(e.target===overlay)closeWorkbookSearchResults();});
+ overlay.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeWorkbookSearchResults();}
+  else if(e.key==='Tab'){
+   const items=[overlay.querySelector('[data-qws-close]'),...list.querySelectorAll('button')];
+   const i=items.indexOf(document.activeElement);
+   if(items.length){e.preventDefault();e.stopPropagation();items[(i+(e.shiftKey?-1:1)+items.length)%items.length].focus();}
+  }
+ });
+ overlay.querySelector('[data-qws-close]').focus();
+}
 function replaceAll(){if(!sheet()||!searchTerm){status('Введите текст для поиска',true);return;}
  commitEditor();const clone=structuredClone(sheet());try{const count=replaceAllText(clone,searchTerm,replaceTerm);
  if(count){transact(()=>{sheet().cells=clone.cells;});drawGrid();updateSelectionStats();}
@@ -1927,7 +1994,7 @@ function ribbon(){
   button('chart-stacked100','С накоплением 100%','▥')+button('chart-line','Линейная диаграмма','⌁')+button('chart-scatter','Точечная XY','·')+button('chart-pie','Круговая диаграмма','◉')+button('charts-open','Мои диаграммы','▣'))+group('Листы',button('sheet-add','Новый лист','+'));
  if(activeRibbon==='view')contents=group('Печать',button('print-open','Печать таблицы','▤'))+group('Закрепление',button('freeze-row','Верхняя строка','▔')+button('freeze-col','Первый столбец','▏')+button('freeze-at','По выбранной ячейке','◧')+button('freeze-clear','Снять закрепление','×'))+group('Размеры',button('column-width','Ширина столбца','↔')+button('column-fit','Автоподбор ширины','⇥')+button('row-height','Высота строки','↕')+button('row-reset','Стандартная высота','↺'))+group('Скрытие',button('hide-row','Скрыть строку','−')+button('show-rows','Показать строки','+')+button('hide-col','Скрыть столбец','−')+button('show-cols','Показать столбцы','+'))+group('Переход',button('goto','В начало','⌂','data-ref="A1"')+button('goto','Строка 100','↧','data-ref="A100"')+button('goto','Столбец Z','↦','data-ref="Z1"'))+group('Поиск',button('find-open','Найти','⌕'));
  if(activeRibbon==='file')contents=group('Документ',button('save','Сохранить','⇩')+button('save-as','Сохранить как','⇩')+button('open-disk','Открыть с диска','↥')+button('backup','Архив','▤')+button('import','Импорт','↥'))+group('Экспорт',button('csv','CSV','⇩')+button('xlsx','XLSX','⇩'))+group('Печать',button('print-open','Предпросмотр и печать','▤'));
- const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или число" autocomplete="off"></label><button data-action="find-next" title="Следующее совпадение">Следующее ↵</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all">Заменить все</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
+ const finder=showFind?`<div class="find-bar" role="search"><label>Найти <input id="find-term" value="${esc(searchTerm)}" placeholder="Текст или ID" autocomplete="off"></label><label>Где <select id="find-scope" aria-label="Область поиска"><option value="sheet" ${searchScope==='sheet'?'selected':''}>Этот лист</option><option value="book" ${searchScope==='book'?'selected':''}>Вся книга</option></select></label><button data-action="find-next" title="Следующее совпадение">Далее ↵</button><button data-action="find-all" title="Показать найденные ячейки">Результаты</button><label>Заменить на <input id="replace-term" value="${esc(replaceTerm)}" placeholder="Новое значение" autocomplete="off"></label><button data-action="replace-all" title="Только текущий лист">Заменить здесь</button><button data-action="find-close" aria-label="Закрыть поиск" title="Закрыть">×</button></div>`:'';
  return `<div class="ribbon"><div class="ribbon-tabs" role="tablist" aria-label="Инструменты таблицы">${tabs.map(([id,name])=>`<button role="tab" aria-selected="${activeRibbon===id}" class="${activeRibbon===id?'chosen':''}" data-action="ribbon" data-target="${id}">${name}</button>`).join('')}<button type="button" class="qo-help-tab" data-action="help-open" aria-haspopup="dialog">Справка</button></div><div class="ribbon-controls">${contents}</div>${bordersPopup()}${qoFontMenu()}${finder}</div>`;
 }
 
@@ -2301,7 +2368,7 @@ function smartTableHelpPanel(){
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button><button class="qo-sheet-nav-button" data-action="sheet-navigator" title="Найти и открыть лист" aria-label="Найти и открыть лист">☷</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
 function render(){
- closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
+ closeWorkbookSearchResults();closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
  const previousGrid=document.getElementById('grid-scroll');
  if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){
@@ -2777,7 +2844,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  case 'print-use-selection':printSettingChange({area:selectedPrintArea(activeCell,rangeEnd)});break;
  case 'print-use-used':printSettingChange({area:null});break;
  case 'print-now':printNow();break;
- case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':showFind=false;render();break;case 'find-next':nextMatch();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-up':fillSelected('up');break;case 'fill-right':fillSelected('right');break;case 'fill-left':fillSelected('left');break;
+ case 'ribbon':activeRibbon=target.dataset.target;activePalette=null;borderMenuOpen=false;render();break;case 'sort-asc':sortRange('asc');break;case 'sort-desc':sortRange('desc');break;case 'find-open':showSearch();break;case 'find-close':closeWorkbookSearchResults();showFind=false;render();break;case 'find-next':nextMatch();break;case 'find-all':showWorkbookSearchResults();break;case 'replace-all':replaceAll();break;case 'undo':undo();break;case 'redo':redo();break;case 'clear':clearSelected();break;case 'clear-format':clearSelectedFormat();break;case 'autosum':autoSum();break;case 'fill-down':fillSelected('down');break;case 'fill-up':fillSelected('up');break;case 'fill-right':fillSelected('right');break;case 'fill-left':fillSelected('left');break;
  case 'smart-help':case 'help-open':smartTableHelpOpen=true;render();document.querySelector('.qo-central-help')?.focus({preventScroll:true});break;case 'smart-help-close':case 'help-close':smartTableHelpOpen=false;render();break;case 'help-close-backdrop':if(e.target===target){smartTableHelpOpen=false;render();}break;
  case 'smart-create':createSelectedSmartTable();break;case 'smart-add-row':addSelectedSmartTableRow();break;case 'smart-remove':clearSelectedSmartTable();break;
  case 'filter-toggle':toggleAutoFilter();break;
@@ -3033,7 +3100,7 @@ if(t.id==='font-family-select'){if(FONT_FAMILIES.includes(t.value))qoPickFont(t.
   try{transact(()=>changeChart(sheet(),selectedChartId,{options:patch}));render();}
   catch(err){status(err.message,true);}return;
  }
- if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
+ if(t.id==='print-paper'){printSettingChange({paper:t.value});return;}if(t.id==='print-orientation'){printSettingChange({orientation:t.value});return;}if(t.id==='print-scale'){printSettingChange({scale:Number(t.value)});return;}if(t.id==='print-fit'){printSettingChange({fitWidth:t.checked});return;}if(t.id==='validation-cell-select'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));setSelection(activeCell);status('Значение выбрано из списка');}catch(err){status(err.message,true);}return;}if(t.id==='validation-kind'){document.getElementById('validation-list-row').hidden=t.value!=='list';document.getElementById('validation-number-row').hidden=t.value!=='number';return;}if(t.id==='cf-kind'){document.getElementById('cf-threshold-label').hidden=t.value==='scale';document.getElementById('cf-color-label').hidden=t.value==='scale';return;}if(t.id==='chart-title'){try{transact(()=>changeChart(sheet(),selectedChartId,{title:t.value}));render();}catch(err){status(err.message,true);}return;}if(t.id==='find-term'){searchTerm=t.value;}else if(t.id==='find-scope'){searchScope=t.value==='book'?'book':'sheet';findIndex=-1;}else if(t.id==='replace-term'){replaceTerm=t.value;}else if(t.id==='file-picker'){importFile(t.files?.[0]);t.value='';}else if(t.id==='book-name'){if(!book())return;const next=t.value.trim();if(next){transact(()=>{book().name=next});}else t.value=book().name;}else if(t.id==='text-color'){applySelectedColor('color',t.value);}else if(t.id==='fill-color'){applySelectedColor('bg',t.value);}else if(t.id==='palette-custom-color'){applySelectedColor(activePalette,t.value);activePalette=null;render();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else if(t.id==='formula-input'){try{transact(()=>setTypedCell(sheet(),activeCell,t.value));drawGrid();setSelection(activeCell);}catch(err){status(err.message||'Недопустимое значение',true);t.value=getCell(sheet(),activeCell).value;}}});
 app.addEventListener('keydown',e=>{if(e.target.id==='size-context-number'&&e.key==='Enter'){e.preventDefault();applyContextSize();return;}if(e.target.id==='size-context-number'&&e.key==='Escape'){e.preventDefault();sizeContext=null;document.getElementById('size-context-menu')?.remove();return;}if(e.target.id==='find-term'&&e.key==='Enter'){e.preventDefault();nextMatch();return;}if(e.target.id==='name-box'&&e.key==='Enter'){e.preventDefault();const val=e.target.value.toUpperCase().replaceAll('$',''),match=/^([A-Z]+[1-9]\d*)(?::([A-Z]+[1-9]\d*))?$/.exec(val);if(match&&parseCell(match[1])?.row<LIMITS.rows&&parseCell(match[1])?.col<LIMITS.columns&&rowVisible(sheet(),parseCell(match[1]).row)&&columnVisible(sheet(),parseCell(match[1]).col)){setSelection(match[1],match[2]&&parseCell(match[2])?.row<LIMITS.rows&&parseCell(match[2])?.col<LIMITS.columns?match[2]:match[1]);const p=parseCell(match[1]);ensureVisible(p.row,p.col);e.target.blur();document.getElementById('grid-scroll')?.focus({preventScroll:true});}else status('Неверный адрес ячейки',true);}if(e.target.id==='formula-input'&&e.key==='Enter'){e.target.blur();}});
 app.addEventListener('pointerdown',e=>{const handle=e.target.closest('[data-resize]');if(!handle||e.button!==0||!sheet())return;e.preventDefault();e.stopPropagation();commitEditor();mouseSelecting=false;
  const axis=handle.dataset.resize,index=Number(handle.dataset.index);resizeDrag={axis,index,start:axis==='col'?e.clientX:e.clientY,original:axis==='col'?columnWidth(sheet(),index):rowHeight(sheet(),index),value:null,sheetId:sheet().id};document.body.classList.add('is-resizing');});

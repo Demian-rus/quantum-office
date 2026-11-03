@@ -24,7 +24,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  await page.locator('[data-hub-action="toggle"]').click();
  assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/Связать текущий лист/);
  await page.locator('[data-hub-action="connect"]').click();
- assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/11 учеников/);
+ assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/11\s*учеников/);
  const summary=await page.evaluate(()=>({rows:qoHubRoster().length,bookId:qoHubSource()?.bookId,
    contacts:qoHubRoster()[0].studentUrl}));
  assert.equal(summary.rows,11,'must include A10–A12, not only A2–A9');
