@@ -23,7 +23,7 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.locator('.qo-sheet-navigator-result').count(),1);
   await page.locator('.qo-sheet-navigator-result').click();
   assert.equal(await page.evaluate(()=>sheet().name),'Саморазвитие');
-  await page.locator('#grid-scroll').click({position:{x:50,y:50}});
+  await page.evaluate(()=>{document.body.setAttribute('tabindex','-1');document.body.focus();});
   await page.keyboard.press('Control+PageDown');
   assert.equal(await page.evaluate(()=>sheet().name),'Сценарии');
   await page.keyboard.press('Control+PageUp');
