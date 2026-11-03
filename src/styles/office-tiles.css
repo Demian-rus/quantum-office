@@ -20,7 +20,7 @@
  font-weight:600;text-align:center
 }
 .qo-document-workspace .qo-writer-main-tiles{
- display:grid;grid-template-columns:minmax(155px,183px) max-content;align-items:center;
+ display:grid;grid-template-columns:minmax(185px,200px) max-content;align-items:center;
  gap:7px;min-height:62px;max-height:62px
 }
 .qo-document-workspace .qo-writer-paragraph-tiles{grid-template-columns:170px max-content}
