@@ -732,6 +732,19 @@ function qdBuilderTemplateDefaults(d){
   const grade=existing?.grade||preset?.grade||d.title.match(/(?:^|\D)([5-9])\s*класс/i)?.[1]||'8';
   return {my,existing,subject,grade,purpose:existing?.purpose||preset?.purpose||'diagnostic'};
 }
+let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
+function qdBuilderSignature(d){
+  return JSON.stringify({title:d.title,description:d.description,
+    sections:d.sections.map(s=>({title:s.title,questions:s.questions.map(q=>({
+      prompt:q.prompt,answer:q.answer,type:q.type,points:q.points,
+      partialCredit:q.partialCredit,choices:q.choices,numericAnswer:q.numericAnswer,tolerance:q.tolerance
+    }))}))});
+}
+function qdBuilderSaveStatus(){
+  const label=document.getElementById('qd-builder-save-state');
+  if(label)label.textContent=qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(qdDoc())?
+    'Все изменения сохранены в шаблоне':'Локальный черновик · шаблон не обновлён';
+}
 function qdBuilderTemplateMarkup(d){
   const meta=qdBuilderTemplateDefaults(d);
   const options=(values,selected)=>values.map(([key,label])=>'<option value="'+qdEsc(key)+
@@ -751,6 +764,11 @@ function qdBuilderTemplateMarkup(d){
         meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+
           '>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
     '</div>'+
+    '<div class="qd-builder-revisions"><label>Предыдущие версии выбранного шаблона'+
+      '<select id="qd-builder-template-revision">'+
+        qdTemplateVersionOptions(meta.existing?.id||'')+'</select></label>'+
+      '<button type="button" data-qd-action="builder-template-restore" '+(!meta.existing?'disabled':'')+
+        '>Восстановить версию в библиотеке</button></div>'+
     '<div class="qd-builder-save-actions">'+
       '<button type="button" class="qd-primary" data-qd-action="builder-template-save">Сохранить как новый шаблон</button>'+
       '<button type="button" data-qd-action="builder-template-update" '+(!meta.my.length?'disabled':'')+
@@ -773,6 +791,12 @@ function qdBuilderSaveTemplate(d,mode,target,fields){
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
+    <div class="qd-builder-actionbar">
+      <strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?
+        'Все изменения сохранены в шаблоне':'Локальный черновик · шаблон не обновлён'}</span>
+      <button data-qd-action="builder-quick-save" class="qd-primary" type="button">Сохранить шаблон</button>
+      <button data-qd-action="bank-open" type="button">Банк вопросов</button>
+    </div>
     <div class="qd-panel qd-meta">
       <label>Название диагностики<input data-qd-field="title" maxlength="120" value="${qdEsc(d.title)}"></label>
       <label>Описание<textarea data-qd-field="description" maxlength="600" rows="2">${qdEsc(d.description)}</textarea></label>
@@ -791,6 +815,7 @@ function qdBuilder(){
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
     ${qdBuilderUtilities(d)}
+    ${typeof qdBankMarkup==='function'?qdBankMarkup():''}
     ${qdBatchToolbar(d)}
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section ${qdCollapsedSections.has(s.id)?'qd-section-collapsed':''}" data-section="${qdEsc(s.id)}">
@@ -850,6 +875,12 @@ function qdBuilder(){
           <label>Допустимая абсолютная погрешность<input data-qd-field="tolerance" data-qid="${qdEsc(q.id)}"
             type="number" min="0" max="1000000000" step="any" value="${qdTolerance(q.tolerance)}"></label>
         </div>`:''}
+        <div class="qd-card-bank-tools"><label>Сложность для банка<select data-qd-bank-save-difficulty
+          aria-label="Сложность сохраняемого вопроса"><option value="unknown">Не указана</option>
+          <option value="easy">Лёгкая</option><option value="medium">Средняя</option>
+          <option value="hard">Сложная</option></select></label>
+          <button type="button" data-qd-action="bank-save-question"
+          data-qid="${qdEsc(q.id)}">Сохранить вопрос в банк</button></div>
         <div class="qd-settings">
           <label>Баллы за ответ<input data-qd-field="points" data-qid="${qdEsc(q.id)}" type="number" min="1" max="10" step="1" value="${qdPoints(q.points)}"></label>
           <label>За частичный ответ, %<input data-qd-field="partialCredit" data-qid="${qdEsc(q.id)}" type="number" min="0" max="100" step="5" value="${qdPartialCredit(q.partialCredit)}"></label>
@@ -1435,6 +1466,51 @@ function qdLibraryWrite(items){
   catch(_){return false;}
 }
 
+/* TASK120: bounded undo history for personal templates, outside the portable QTPL schema. */
+const QD_TEMPLATE_VERSIONS_KEY='quantum-office.diagnostic-template-versions.v1';
+function qdTemplateVersionsRead(){
+  try{
+    const data=JSON.parse(localStorage.getItem(QD_TEMPLATE_VERSIONS_KEY)||'{}');
+    if(!data||typeof data!=='object'||Array.isArray(data))return {};
+    const valid={};
+    for(const [id,versions] of Object.entries(data).slice(0,QD_LIMITS.templates)){
+      if(!Array.isArray(versions))continue;
+      valid[id]=versions.slice(0,5).filter(v=>v&&typeof v.id==='string'&&v.template&&qdLibrarySafe(v.template))
+        .map(v=>({id:v.id,date:qdText(v.date,60),template:qdLibrarySafe(v.template)}));
+    }
+    return valid;
+  }catch(_){return {};}
+}
+function qdTemplateRevisionRemember(item){
+  const data=qdTemplateVersionsRead(),previous=data[item.id]||[];
+  data[item.id]=[{id:qdNewId(),date:new Date().toISOString(),
+    template:qdLibrarySafe(item)},...previous].slice(0,5);
+  try{
+    localStorage.setItem(QD_TEMPLATE_VERSIONS_KEY,JSON.stringify(data));return {ok:true};
+  }catch(_){return {ok:false,message:'Недостаточно места для резервной версии шаблона; скачайте .qtpl'};}
+}
+function qdTemplateVersionOptions(templateId){
+  const versions=qdTemplateVersionsRead()[templateId]||[];
+  return '<option value="">'+(versions.length?'Выберите версию':'Нет предыдущих версий')+'</option>'+
+    versions.map((v,i)=>'<option value="'+qdEsc(v.id)+'">'+(i+1)+'. '+
+      qdEsc(qdDateLabel(v.date))+' — '+v.template.sections.reduce((n,s)=>n+s.questions.length,0)+
+      ' заданий</option>').join('');
+}
+function qdTemplateRevisionRestore(templateId,revisionId){
+  const items=qdLibraryRead(),index=items.findIndex(x=>x.id===templateId);
+  if(index<0)return {ok:false,message:'Свой шаблон не найден'};
+  const item=qdTemplateVersionsRead()[templateId]?.find(x=>x.id===revisionId);
+  if(!item)return {ok:false,message:'Версия не найдена'};
+  const previous=qdLibrarySafe({...item.template,id:templateId});
+  if(!previous)return {ok:false,message:'Повреждённая сохранённая версия'};
+  if(qdLibraryNameUsed(items,previous.title,templateId))
+    return {ok:false,message:'Название версии совпадает с другим шаблоном'};
+  const remembered=qdTemplateRevisionRemember(items[index]);
+  if(!remembered.ok)return remembered;
+  items[index]=previous;
+  if(!qdLibraryWrite(items))return {ok:false,message:'Не удалось восстановить шаблон из-за ограничения памяти'};
+  return {ok:true,questions:qdQuestionList(previous).length};
+}
 let qdLibraryEditingId='';
 function qdLibraryNameUsed(items,title,ignoreId=''){
   const normalized=qdPromptKey(title);
@@ -1456,6 +1532,8 @@ function qdLibraryUpdate(id,fields,d=qdDoc(),replaceQuestions=false){
     sections
   });
   if(!draft)return {ok:false,message:'Не удалось сохранить шаблон'};
+  const remembered=qdTemplateRevisionRemember(original);
+  if(!remembered.ok)return remembered;
   const next=items.slice();next[index]=draft;
   if(!qdLibraryWrite(next))return {ok:false,message:'Недостаточно места в локальном хранилище — скачайте .qtpl'};
   return {ok:true,questions:draft.sections.reduce((s,t)=>s+t.questions.length,0)};
@@ -1948,6 +2026,7 @@ function qdRibbonAction(action){
     d.students=blank.students;d.history=blank.history;d.session=blank.session;
     d.display={mode:'list',activeId:''};
     qdMode='builder';qoWriter.diagnosticMode='builder';
+    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
     qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
     qdStore();qdRefresh();return;
   }
@@ -2064,6 +2143,7 @@ function qdRefresh(){
     `<div class="qd-filebar" hidden>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden>
        <input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden>
+       <input id="qd-bank-file" type="file" accept=".qbank,application/json" hidden>
        </div>`;
   if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
@@ -2133,6 +2213,66 @@ function qdOnClick(event){
     qdRevealed.clear();qdRefresh();return;
   }
 
+  if(action==='bank-open'){
+    qdBankOpen=true;qdRefresh();
+    document.getElementById('qd-builder-bank')?.scrollIntoView({block:'start',behavior:'instant'});
+    return;
+  }
+  if(action==='bank-toggle'){
+    qdBankOpen=!qdBankOpen;qdBankPage=0;qdRefresh();return;
+  }
+  if(action==='bank-page-prev'||action==='bank-page-next'){
+    qdBankPage+=action==='bank-page-prev'?-1:1;qdBankRefresh();return;
+  }
+  if(action==='bank-add'){
+    const item=qdBankItems().find(x=>x.id===button.dataset.bankId);
+    const target=[...document.querySelectorAll('[data-qd-bank-section]')].find(el=>el.dataset.qdBankSection===button.dataset.bankId)?.value||'';
+    const result=qdBankAddToDoc(d,item,target);
+    if(!result.ok){status(result.message,true);return;}
+    qdStore();qdRefresh();status('Вопрос добавлен в раздел «'+result.section+'»');return;
+  }
+  if(action==='bank-save-question'){
+    const meta=qdBuilderTemplateDefaults(d);
+    const result=qdBankSaveQuestion(d,button.dataset.qid,
+      document.getElementById('qd-builder-template-subject')?.value||meta.subject,
+      document.getElementById('qd-builder-template-grade')?.value||meta.grade,
+      button.closest('.qd-edit-card')?.querySelector('[data-qd-bank-save-difficulty]')?.value||'unknown');
+    if(!result.ok){status(result.message,true);return;}
+    qdBankRefresh();status('Вопрос добавлен в личный банк');return;
+  }
+  if(action==='bank-remove'){
+    if(!confirm('Удалить свой вопрос из банка? В уже созданных диагностиках он останется.'))return;
+    if(!qdBankRemove(button.dataset.bankId)){status('Не удалось удалить вопрос',true);return;}
+    qdBankRefresh();status('Вопрос удалён из банка');return;
+  }
+  if(action==='bank-export'){qdBankExport();return;}
+  if(action==='bank-import'){document.getElementById('qd-bank-file')?.click();return;}
+  if(action==='builder-quick-save'){
+    const meta=qdBuilderTemplateDefaults(d);
+    const linked=qdLibraryRead().find(x=>x.id===qdBuilderLinkedTemplateId&&qdPromptKey(x.title)===qdPromptKey(d.title));
+    const fields={subject:meta.subject,grade:meta.grade,purpose:meta.purpose};
+    const result=qdBuilderSaveTemplate(d,linked?'update':'new',linked?.id||'',fields);
+    if(!result.ok){
+      status(result.message+' · Используйте форму сохранения внизу конструктора.',true);
+      document.querySelector('.qd-builder-save')?.scrollIntoView({block:'start',behavior:'instant'});
+      return;
+    }
+    qdBuilderLinkedTemplateId=linked?.id||result.id;
+    qdBuilderSavedSignature=qdBuilderSignature(d);
+    qdStore();qdRefresh();status(linked?'Изменения шаблона сохранены':'Создан собственный шаблон');
+    return;
+  }
+  if(action==='builder-template-restore'){
+    const target=document.getElementById('qd-builder-template-target')?.value||'';
+    const revision=document.getElementById('qd-builder-template-revision')?.value||'';
+    if(!target||!revision){status('Выберите свой шаблон и его предыдущую версию',true);return;}
+    if(!confirm('Восстановить выбранную версию своего шаблона в библиотеке? Текущая диагностика не изменится.'))return;
+    const result=qdTemplateRevisionRestore(target,revision);
+    if(!result.ok){status(result.message,true);return;}
+    if(qdBuilderLinkedTemplateId===target)qdBuilderSavedSignature='';
+    qdRefresh();status('Версия шаблона восстановлена в библиотеке. Текущая диагностика не изменена.');
+    return;
+  }
   if(action==='preview-chat'){
     qdDisplay(d).mode='list';qdMode='run';qoWriter.diagnosticMode='run';
     qdRevealed.clear();qdStore();qdRefresh();return;
@@ -2168,6 +2308,8 @@ function qdOnClick(event){
     const id=button.dataset.template,source=button.dataset.source;
     if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
     if(!qdLibraryLoad(d,id,source)){status('Шаблон не найден',true);return;}
+    qdBuilderLinkedTemplateId=source==='custom'?id:'';
+    qdBuilderSavedSignature=source==='custom'?qdBuilderSignature(d):'';
     qdMode='run';qoWriter.diagnosticMode='run';qdStore();qdRefresh();status('Шаблон открыт');return;
   }
   if(action==='library-edit'){
@@ -2216,6 +2358,8 @@ function qdOnClick(event){
     }
     const result=qdBuilderSaveTemplate(d,mode,target,fields);
     if(!result.ok){status(result.message||'Не удалось сохранить шаблон',true);return;}
+    qdBuilderLinkedTemplateId=mode==='new'?result.id:target;
+    qdBuilderSavedSignature=qdBuilderSignature(d);
     qdStore();qdRefresh();
     status(mode==='new'?'Создан новый шаблон в локальной библиотеке':
       'Обновлён мой шаблон: '+result.questions+' заданий');
@@ -2367,7 +2511,9 @@ function qdOnClick(event){
     const key=document.getElementById('qd-template-pick')?.value;
     if(!qdTemplate(key))return;
     if(!confirm('Заменить текущую диагностику шаблоном? Вопросы, ученики и история этого документа будут заменены. При необходимости сначала скачайте .qdiag.'))return;
-    qdApplyTemplate(d,key);qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
+    qdApplyTemplate(d,key);
+    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
+    qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
   if(action==='sample-auto'){
     if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
@@ -2387,7 +2533,8 @@ function qdOnClick(event){
   }
   if(action==='sample'){
     if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
-    qdSample();qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
+    qdSample();qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
+    qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
   }
 
   if(action==='section-collapse'){
@@ -2639,6 +2786,9 @@ function qdOnInput(event){
   if(event.target.id==='qd-search'){
     qdSearch=event.target.value.slice(0,160);qdApplyFilterUI();return;
   }
+  if(event.target.id==='qd-bank-search'){
+    qdBankQuery=event.target.value.slice(0,120);qdBankPage=0;qdBankRefresh();return;
+  }
   if(event.target.id==='qd-bulk-text'){
     qdBulkDraft=event.target.value.slice(0,QD_BULK_MAX_CHARS);
     const preview=document.getElementById('qd-bulk-preview');
@@ -2674,6 +2824,8 @@ function qdOnInput(event){
   }else if(field==='student-name')return;
   else return;
   qdStore();
+  if(['title','description','section','prompt','answer','choice-text','numericAnswer'].includes(field))
+    qdBuilderSaveStatus();
   if(field==='prompt'){
     const card=event.target.closest('.qd-edit-card');
     const preview=card?.querySelector('.qd-card-preview');
@@ -2689,6 +2841,13 @@ function qdOnChange(event){
     if(event.target.id==='qd-var-per-section')qdVariantOptions.perSection=Number(event.target.value);
     if(event.target.id==='qd-var-choices')qdVariantOptions.shuffleChoices=event.target.checked;
     qdVariantPreviewRefresh();return;
+  }
+  if(['qd-bank-subject','qd-bank-grade','qd-bank-type','qd-bank-difficulty'].includes(event.target.id)){
+    if(event.target.id==='qd-bank-subject')qdBankSubject=event.target.value;
+    if(event.target.id==='qd-bank-grade')qdBankGrade=event.target.value;
+    if(event.target.id==='qd-bank-type')qdBankType=event.target.value;
+    if(event.target.id==='qd-bank-difficulty')qdBankDifficulty=event.target.value;
+    qdBankPage=0;qdBankRefresh();return;
   }
   if(event.target.matches?.('[data-qd-template-select]')){
     const id=event.target.dataset.qdTemplateSelect;
@@ -2771,6 +2930,10 @@ function qdOnChange(event){
       if(grade)grade.value=item.grade;
       if(purpose)purpose.value=item.purpose;
     }
+    const versions=document.getElementById('qd-builder-template-revision');
+    if(versions)versions.innerHTML=qdTemplateVersionOptions(item?.id||'');
+    const restore=document.querySelector('[data-qd-action="builder-template-restore"]');
+    if(restore)restore.disabled=!item;
     return;
   }
   if(event.target.dataset.qdField==='history-filter'){
@@ -2824,6 +2987,17 @@ function qdOnChange(event){
     delete d.session.marks[q.id];delete d.session.responses[q.id];
     qdStore();qdRefresh();return;
   }
+  if(event.target.id==='qd-bank-file'){
+    const file=event.target.files?.[0];event.target.value='';
+    if(!file)return;
+    if(file.size>2_000_000){status('Файл банка превышает 2 МБ',true);return;}
+    file.text().then(raw=>{
+      const result=qdBankImport(raw);
+      if(!result.ok){status(result.message,true);return;}
+      qdBankRefresh();status('Импортировано своих вопросов: '+result.count);
+    }).catch(()=>status('Не удалось прочитать файл банка',true));
+    return;
+  }
   if(event.target.id==='qd-library-file'){
     const file=event.target.files?.[0];event.target.value='';
     if(!file)return;
@@ -2845,6 +3019,7 @@ function qdOnChange(event){
       throw Error('Неверный формат');
     if(!confirm('Заменить текущую диагностику содержимым файла?'))return;
     qoWriter.diagnostic=qdNormalize(parsed);qdVerified.add(qoWriter);
+    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
     qdMode='run';qoWriter.diagnosticMode='run';qdStudentFilter='';qdRevealed.clear();qdStore();qdRefresh();
   }).catch(()=>status('Не удалось открыть .qdiag: повреждённый или неподдерживаемый файл',true));
 }

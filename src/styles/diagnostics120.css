@@ -1,0 +1,96 @@
+/* TASK120 — compact, useful authoring commands instead of another full sidebar. */
+#qo-diag-root .qd-builder-actionbar{
+  display:flex;align-items:center;flex-wrap:wrap;gap:9px;
+  position:sticky;top:0;z-index:8;min-height:49px;
+  margin:0 0 10px;padding:8px 11px;
+  border:1px solid var(--qo-border);border-radius:10px;
+  background:var(--qo-surface);
+  box-shadow:0 3px 12px #1118270c;
+}
+#qo-diag-root .qd-builder-actionbar strong{font-size:12px;white-space:nowrap}
+#qo-diag-root .qd-builder-actionbar span{
+  flex:1 1 180px;min-width:120px;
+  color:var(--qo-muted);font-size:11px;
+}
+#qo-diag-root .qd-builder-actionbar button{min-height:31px;padding:5px 10px;font-size:11px}
+#qo-diag-root .qd-builder-revisions{
+  display:flex;align-items:end;gap:8px;flex-wrap:wrap;padding:11px 0 0;
+  border-top:1px solid var(--qo-border);
+}
+#qo-diag-root .qd-builder-revisions label{
+  flex:1 1 230px;min-width:0;max-width:410px;
+}
+#qo-diag-root .qd-builder-revisions label select{height:36px;max-width:100%}
+#qo-diag-root .qd-builder-revisions button{min-height:36px}
+#qo-diag-root .qd-card-bank-tools{display:flex;gap:8px;align-items:center;justify-content:flex-end}
+#qo-diag-root .qd-card-bank-tools label{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:11px}
+#qo-diag-root .qd-card-bank-tools select{height:30px;width:130px;max-width:100%;padding:4px}
+#qo-diag-root .qd-card-bank-tools button{
+  min-height:29px;font-size:11px;padding:5px 9px;
+}
+/* Bank content lives in the center, with bounded cards and controls. */
+#qo-diag-root .qd-bank{display:grid;gap:12px}
+#qo-diag-root .qd-bank-head{
+  display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:12px;
+}
+#qo-diag-root .qd-bank-head h2{font-size:15px;margin:0 0 3px}
+#qo-diag-root .qd-bank-head p{font-size:11px;line-height:1.5;color:var(--qo-muted);max-width:660px}
+#qo-diag-root .qd-bank-head>button{min-height:34px}
+#qo-diag-root .qd-bank-filters{
+  display:grid;grid-template-columns:minmax(170px,2fr) repeat(4,minmax(92px,1fr));
+  gap:9px;
+}
+#qo-diag-root .qd-bank-filters label{min-width:0}
+#qo-diag-root .qd-bank-filters input,
+#qo-diag-root .qd-bank-filters select{min-height:35px;height:35px;min-width:0;max-width:100%}
+#qo-diag-root .qd-bank-summary{
+  display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;
+  border-bottom:1px solid var(--qo-border);padding:0 0 8px;
+}
+#qo-diag-root .qd-bank-summary strong{font-size:12px}
+#qo-diag-root .qd-bank-summary span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-bank-portable{display:flex;flex-wrap:wrap;gap:7px}
+#qo-diag-root .qd-bank-portable button{font-size:11px;min-height:32px}
+#qo-diag-root .qd-bank-results{display:grid;gap:8px}
+#qo-diag-root .qd-bank-item{
+  display:grid;grid-template-columns:minmax(0,1fr) minmax(172px,200px);gap:12px;
+  padding:11px;border:1px solid var(--qo-border);border-radius:9px;
+  background:var(--qo-surface-alt);min-width:0;
+}
+#qo-diag-root .qd-bank-item-main{min-width:0}
+#qo-diag-root .qd-bank-item-main>p{
+  font-size:12px;line-height:1.5;overflow-wrap:anywhere;margin:8px 0;
+}
+#qo-diag-root .qd-bank-item-main details{
+  color:var(--qo-muted);font-size:11px;overflow-wrap:anywhere;
+}
+#qo-diag-root .qd-bank-item-main details summary{cursor:pointer}
+#qo-diag-root .qd-bank-item-main details p{margin:5px 0;font-size:11px;color:var(--qo-text)}
+#qo-diag-root .qd-bank-tags{display:flex;flex-wrap:wrap;gap:5px}
+#qo-diag-root .qd-bank-tags span{
+  font-size:10px;background:var(--qo-surface);padding:3px 6px;
+  border:1px solid var(--qo-border);border-radius:5px;
+}
+#qo-diag-root .qd-bank-item-actions{
+  display:flex;flex-direction:column;justify-content:center;align-items:stretch;gap:6px;
+  min-width:0;
+}
+#qo-diag-root .qd-bank-item-actions label{min-width:0}
+#qo-diag-root .qd-bank-item-actions select{
+  height:32px;min-height:32px;width:100%;min-width:0;
+}
+#qo-diag-root .qd-bank-item-actions button{min-height:32px;padding:5px 8px;font-size:11px}
+#qo-diag-root .qd-bank-pages{display:flex;align-items:center;justify-content:center;gap:12px}
+#qo-diag-root .qd-bank-pages button{min-height:32px;font-size:11px}
+#qo-diag-root .qd-bank-pages span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-bank>.qd-hint{margin:0}
+@media(max-width:1080px){
+ #qo-diag-root .qd-bank-filters{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:630px){
+ #qo-diag-root .qd-bank-item{grid-template-columns:minmax(0,1fr)}
+ #qo-diag-root .qd-bank-filters{grid-template-columns:minmax(0,1fr)}
+ #qo-diag-root .qd-bank-item-actions{flex-direction:row;flex-wrap:wrap;justify-content:flex-start}
+ #qo-diag-root .qd-bank-item-actions label{flex:1 1 170px}
+ #qo-diag-root .qd-builder-actionbar span{flex-basis:100%;order:2}
+}
