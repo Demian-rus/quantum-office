@@ -1220,12 +1220,20 @@ function qoSafeRich(html){
    if(node.tagName==='DIV'&&node.getAttribute('data-qo-break')==='true'){
     next.setAttribute('data-qo-break','true');next.setAttribute('contenteditable','false');dest.append(next);continue;
    }
+   if(node.tagName==='DIV'&&node.getAttribute('data-qo-toc')==='true'){
+    next.setAttribute('data-qo-toc','true');next.setAttribute('contenteditable','false');
+   }
+   if(['H1','H2','H3'].includes(node.tagName)&&QO_WRITER_TOC_ID.test(node.id))next.id=node.id;
    if(node.tagName==='TH'||node.tagName==='TD'){
     const colspan=Math.min(12,Math.max(1,+node.getAttribute('colspan')||1));
     if(colspan>1)next.setAttribute('colspan',String(colspan));
    }
 
-   if(node.tagName==='A'){const href=qoSafeURL(node.getAttribute('href'));if(href){next.setAttribute('href',href);next.setAttribute('target','_blank');next.setAttribute('rel','noopener noreferrer');}}
+   if(node.tagName==='A'){
+    const raw=node.getAttribute('href')||'';
+    if(/^#qo-toc-h-\d{1,6}$/.test(raw))next.setAttribute('href',raw);
+    else {const href=qoSafeURL(raw);if(href){next.setAttribute('href',href);next.setAttribute('target','_blank');next.setAttribute('rel','noopener noreferrer');}}
+   }
    const alignment=node.style?.textAlign;
    if(['left','center','right','justify'].includes(alignment))next.style.textAlign=alignment;
    if(['P','DIV','H1','H2','H3','LI','BLOCKQUOTE'].includes(node.tagName)){
@@ -1251,7 +1259,7 @@ function qoSafeRich(html){
  copyChildren(template.content,out);return out.innerHTML;
 }
 function qoPersistWriter(){
- const editor=document.getElementById('qo-writer-page');if(editor)qoWriter.html=qoSafeRich(editor.innerHTML);
+ const editor=document.getElementById('qo-writer-page');if(editor){qoWriterTocRefresh();qoWriter.html=qoSafeRich(editor.innerHTML);}
  const title=document.getElementById('qo-writer-title');if(title)qoWriter.name=title.value.trim().slice(0,120)||'Новый документ';
  qoWriter.updated=Date.now();try{localStorage.setItem(qoWriterKey,JSON.stringify(qoWriter));qoWriterSavedLocal=true;}catch{qoWriterSavedLocal=false;status('Документ не записан в браузере. Сохраните QDOC или HTML.',true);}updateSaveIndicator();
 }
@@ -1376,6 +1384,7 @@ function qoWriterPage(){
  <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button>
  <span class="qo-mini-divider"></span><button class="qo-icon-tile" data-action="writer-indent-less" title="Уменьшить отступ слева на 5 мм" aria-label="Уменьшить отступ">⇤</button><button class="qo-icon-tile" data-action="writer-indent-more" title="Увеличить отступ слева на 5 мм" aria-label="Увеличить отступ">⇥</button></div></div>`);
  const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-symbols','Символы','sigma')+qoWorkButton('writer-break','Разрыв','break'));
+ const tocTools=qoWorkGroup('Оглавление',qoWorkButton('writer-toc-insert','Создать оглавление','list')+qoWorkButton('writer-toc-update','Обновить оглавление','refresh-cw')+qoWorkButton('writer-toc-remove','Убрать оглавление','trash'));
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
  const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack qo-writer-page-settings"><div class="qo-work-inline"><label class="qo-work-field"><span>Формат</span><select id="qo-writer-paper" aria-label="Формат бумаги">${sel([['A4','A4'],['A5','A5'],['Letter','Letter']],f.paper)}</select></label><label class="qo-work-field"><span>Ориентация</span><select id="qo-writer-orientation" aria-label="Ориентация страницы">${sel([['portrait','Книжная'],['landscape','Альбомная']],f.orientation)}</select></label></div><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`,'qo-writer-page-settings');
@@ -1408,7 +1417,7 @@ function qoWriterPage(){
  ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика']])}
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
  ${qoWorkPanel('writer','home',main+extra+paragraphs)}
- ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
+ ${qoWorkPanel('writer','insert',insert+tocTools+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
@@ -2922,6 +2931,9 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(action==='writer-para-reset'){qoWriterParagraphApply('reset');return;}
  if(action==='writer-cmd'){qoWriterCommand(target.dataset.command);return;}
  if(action==='writer-symbols'){qoWriterOpenSymbols();return;}
+ if(action==='writer-toc-insert'){qoWriterTocInsert();return;}
+ if(action==='writer-toc-update'){qoWriterTocUpdate();return;}
+ if(action==='writer-toc-remove'){qoWriterTocRemove();return;}
  if(action==='writer-link'){
   const url=prompt('Адрес ссылки (https://...)');if(url===null)return;
   const safe=qoSafeURL(url.trim());if(!safe){status('Допустимы HTTPS, HTTP и mailto',true);return;}
