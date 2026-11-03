@@ -5,7 +5,7 @@ import {addChart,chartData,chartSVG,changeChart,removeChart,suggestChartRange,ch
 import {addConditionalRule,removeConditionalRule,prepareConditionalScales,conditionalFill} from './core/conditional.js';
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
-import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
+import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
@@ -734,6 +734,141 @@ window.addEventListener('keydown',e=>{
   if(items.length)items[(i+(e.key==='ArrowDown'?1:-1)+items.length)%items.length].focus();
   e.preventDefault();e.stopImmediatePropagation();
  }
+},true);
+
+/** TASK127: search and switch among worksheets without widening the ribbon. */
+function closeSheetNavigator(){
+ document.getElementById('qo-sheet-navigator')?.remove();
+}
+function selectWorksheetById(id){
+ const b=book();if(page!=='sheet'||!b||!b.sheets.some(s=>s.id===id))return false;
+ commitEditor();
+ if(b.activeSheetId!==id){
+  b.activeSheetId=id;changed();setSelection('A1');render();
+ }
+ return true;
+}
+function openSheetNavigator(){
+ if(page!=='sheet'||!book())return;
+ closeSheetContextMenu();closeSheetNavigator();
+ const b=book(),modal=document.createElement('div');
+ modal.id='qo-sheet-navigator';modal.className='qo-sheet-navigator-overlay';
+ modal.innerHTML='<section class="qo-sheet-navigator-panel" role="dialog" aria-modal="true" aria-label="Навигатор листов">'+
+  '<header><strong>Перейти к листу</strong><button type="button" data-nav-close aria-label="Закрыть">×</button></header>'+
+  '<div class="qo-sheet-navigator-search"><input type="search" aria-label="Поиск листов" placeholder="Название листа..." autocomplete="off"></div>'+
+  '<div class="qo-sheet-navigator-results" role="listbox" aria-label="Список листов"></div>'+
+  '<footer><span class="qo-sheet-navigator-count"></span><span>Ctrl + PageUp / PageDown — переключить лист</span></footer>'+
+  '</section>';
+ document.body.append(modal);
+ const input=modal.querySelector('input'),results=modal.querySelector('.qo-sheet-navigator-results'),
+  count=modal.querySelector('.qo-sheet-navigator-count');
+ function updateResults(){
+  const value=input.value.trim().toLocaleLowerCase('ru-RU');
+  const matches=b.sheets.map((item,i)=>({item,i})).filter(({item})=>item.name.toLocaleLowerCase('ru-RU').includes(value));
+  results.replaceChildren();
+  for(const {item,i} of matches){
+   const btn=document.createElement('button');
+   btn.type='button';btn.className='qo-sheet-navigator-result';
+   btn.setAttribute('role','option');
+   btn.setAttribute('aria-selected',String(item.id===b.activeSheetId));
+   btn.dataset.sheetId=item.id;
+   const number=document.createElement('span');number.className='qo-nav-index';number.textContent=String(i+1);
+   const name=document.createElement('span');name.className='qo-nav-name';name.textContent=item.name;
+   if(item.id===b.activeSheetId)btn.classList.add('is-current');
+   btn.append(number,name);
+   btn.addEventListener('click',()=>{closeSheetNavigator();selectWorksheetById(item.id);});
+   results.append(btn);
+  }
+  if(!matches.length){
+   const empty=document.createElement('p');empty.className='qo-nav-empty';empty.textContent='Ничего не найдено';results.append(empty);
+  }
+  count.textContent='Найдено '+matches.length+' из '+b.sheets.length;
+ }
+ input.addEventListener('input',updateResults);
+ modal.querySelector('[data-nav-close]').addEventListener('click',closeSheetNavigator);
+ modal.addEventListener('pointerdown',e=>{if(e.target===modal)closeSheetNavigator();});
+ modal.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){e.preventDefault();e.stopPropagation();closeSheetNavigator();}
+  else if(e.key==='Enter'){
+   const first=results.querySelector('.qo-sheet-navigator-result');
+   if(first){e.preventDefault();e.stopPropagation();first.click();}
+  }else if(e.key==='Tab'){
+   const focusables=[input,...results.querySelectorAll('button'),modal.querySelector('[data-nav-close]')];
+   const current=focusables.indexOf(document.activeElement);
+   const next=(current+(e.shiftKey?-1:1)+focusables.length)%focusables.length;
+   focusables[next].focus();e.preventDefault();e.stopPropagation();
+  }
+ });
+ updateResults();input.focus();
+}
+/** TASK127: spreadsheet-like keyboard tab switching, disabled during text editing. */
+window.addEventListener('keydown',e=>{
+ if(page!=='sheet'||!book()||document.getElementById('qo-sheet-navigator'))return;
+ if(!e.ctrlKey||e.altKey||e.metaKey||e.shiftKey||!['PageUp','PageDown'].includes(e.key))return;
+ if(editing||e.target instanceof HTMLInputElement||e.target instanceof HTMLTextAreaElement||
+    e.target?.isContentEditable)return;
+ const b=book(),index=b.sheets.findIndex(item=>item.id===b.activeSheetId);
+ if(index<0)return;
+ e.preventDefault();e.stopImmediatePropagation();
+ const next=Math.max(0,Math.min(b.sheets.length-1,index+(e.key==='PageDown'?1:-1)));
+ if(next!==index)selectWorksheetById(b.sheets[next].id);
+},true);
+app.addEventListener('click',e=>{
+ if(page!=='sheet'||!e.target.closest('[data-action="sheet-navigator"]'))return;
+ e.preventDefault();e.stopImmediatePropagation();openSheetNavigator();
+},true);
+
+/** TASK127: reorder tab on deliberate mouse drag; keep touch scrolling native. */
+let sheetTabDrag=null,suppressSheetTabClick=false;
+function clearSheetTabDrag(){
+ document.querySelectorAll('.sheet-tab.is-reorder-target,.sheet-tab.is-reorder-source').forEach(node=>{
+  node.classList.remove('is-reorder-target','is-reorder-source');
+ });
+ document.body.classList.remove('qo-sheet-tab-reordering');
+ sheetTabDrag=null;
+}
+function tabAtPointer(x,y){
+ const hit=document.elementFromPoint(x,y)?.closest('.sheet-tab');
+ return hit?.dataset.id&&book()?.sheets.some(s=>s.id===hit.dataset.id)?hit:null;
+}
+app.addEventListener('pointerdown',e=>{
+ if(page!=='sheet'||e.button!==0||e.pointerType!=='mouse'||editing||
+    e.target.closest('.sheet-tab-editor')||document.getElementById('qo-sheet-navigator'))return;
+ const tab=e.target.closest('.sheet-tab');
+ if(!tab)return;
+ sheetTabDrag={id:tab.dataset.id,x:e.clientX,y:e.clientY,active:false,destination:null};
+},true);
+window.addEventListener('pointermove',e=>{
+ const d=sheetTabDrag;if(!d||page!=='sheet')return;
+ if(!d.active){
+  if(Math.hypot(e.clientX-d.x,e.clientY-d.y)<8)return;
+  d.active=true;document.body.classList.add('qo-sheet-tab-reordering');
+  [...document.querySelectorAll('.sheet-tab')].find(tab=>tab.dataset.id===d.id)?.classList.add('is-reorder-source');
+ }
+ const target=tabAtPointer(e.clientX,e.clientY);
+ document.querySelectorAll('.sheet-tab.is-reorder-target').forEach(tab=>tab.classList.remove('is-reorder-target'));
+ d.destination=target&&target.dataset.id!==d.id?target.dataset.id:null;
+ if(d.destination)target.classList.add('is-reorder-target');
+},true);
+window.addEventListener('pointerup',e=>{
+ const d=sheetTabDrag;if(!d)return;
+ const target=d.active?tabAtPointer(e.clientX,e.clientY):null,
+  dest=target?.dataset.id!==d.id?target?.dataset.id:null;
+ clearSheetTabDrag();
+ if(!d.active)return;
+ suppressSheetTabClick=true;
+ if(!dest)return;
+ try{
+  commitEditor();
+  transact(()=>{reorderWorksheet(book(),d.id,dest);validateWorkbook(book());});
+  render();status('Лист перемещён');
+ }catch(error){status(error.message||'Не удалось переместить лист',true);}
+},true);
+window.addEventListener('pointercancel',clearSheetTabDrag,true);
+app.addEventListener('click',e=>{
+ if(!suppressSheetTabClick)return;
+ suppressSheetTabClick=false;
+ if(e.target.closest('.sheet-tab')){e.preventDefault();e.stopImmediatePropagation();}
 },true);
 function addSheet(){const b=book();if(!b)return;if(b.sheets.length>=LIMITS.sheets){status('Лимит: 25 листов');return;}
  let n=1;const names=new Set(b.sheets.map(s=>s.name.toLocaleLowerCase('ru-RU')));while(names.has(`лист ${n}`))n++;
@@ -2164,9 +2299,9 @@ function smartTableHelpPanel(){
  <h3>Сохранение</h3><p>QBOOK сохраняет структуру умной таблицы. XLSX сохраняет данные, оформление, формулы и автофильтр, но не создаёт полноценный объект Excel Table.</p>
  </div></section></div>`;
 }
-function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
+function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button><button class="qo-sheet-nav-button" data-action="sheet-navigator" title="Найти и открыть лист" aria-label="Найти и открыть лист">☷</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
 function render(){
- closeSheetContextMenu();closeFillOptions();qoCloseTheme();
+ closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
  const previousGrid=document.getElementById('grid-scroll');
  if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){

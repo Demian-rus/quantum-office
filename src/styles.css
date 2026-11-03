@@ -52,3 +52,28 @@
 .qo-sheet-context button{display:block;width:100%;padding:9px 10px;text-align:left;border:0;background:transparent;color:var(--qo-text);border-radius:5px;font:inherit;font-size:12px;cursor:pointer}
 .qo-sheet-context button:not(:disabled):hover,.qo-sheet-context button:focus-visible{background:var(--qo-hover)}
 .qo-sheet-context button:disabled{opacity:.38;cursor:default}
+
+
+/* TASK127 — navigator for books with many sheets (no new permanent sidebars). */
+.qo-sheet-nav-button{height:27px;min-width:28px;padding:0 5px;border:1px solid var(--qo-border);border-radius:5px;background:var(--qo-surface);color:var(--qo-text);font:inherit;font-size:19px;line-height:1;cursor:pointer;align-self:center}
+.qo-sheet-nav-button:hover,.qo-sheet-nav-button:focus-visible{background:var(--qo-hover);color:var(--qo-accent)}
+.qo-sheet-navigator-overlay{position:fixed;inset:0;z-index:5500;display:flex;justify-content:center;align-items:center;padding:12px;background:rgba(0,0,0,.38)}
+.qo-sheet-navigator-panel{display:flex;flex-direction:column;width:min(460px,100%);max-height:min(580px,90vh);min-height:210px;background:var(--qo-surface);color:var(--qo-text);border:1px solid var(--qo-border);border-radius:12px;box-shadow:0 14px 60px #0005;overflow:hidden}
+.qo-sheet-navigator-panel header{display:flex;align-items:center;justify-content:space-between;padding:15px 16px 11px;gap:12px;border-bottom:1px solid var(--qo-border)}
+.qo-sheet-navigator-panel header strong{font-size:15px;font-weight:700}
+.qo-sheet-navigator-panel [data-nav-close]{border:none;background:transparent;color:var(--qo-text);font-size:23px;line-height:1;min-width:28px;height:28px;border-radius:5px;cursor:pointer}
+.qo-sheet-navigator-panel [data-nav-close]:hover{background:var(--qo-hover)}
+.qo-sheet-navigator-search{padding:12px 16px}
+.qo-sheet-navigator-search input{width:100%;padding:10px 12px;border:1px solid var(--qo-border-strong,var(--qo-border));border-radius:7px;background:var(--qo-surface);color:var(--qo-text);font:inherit;font-size:13px;outline-offset:2px}
+.qo-sheet-navigator-results{overflow:auto;min-height:96px;flex:1;padding:0 10px 10px}
+.qo-sheet-navigator-result{display:flex;align-items:center;gap:11px;width:100%;min-height:40px;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:var(--qo-text);font:inherit;text-align:left;cursor:pointer}
+.qo-sheet-navigator-result:hover,.qo-sheet-navigator-result:focus-visible{background:var(--qo-hover);outline-offset:-2px}
+.qo-sheet-navigator-result.is-current{font-weight:700;background:var(--qo-hover)}
+.qo-nav-index{display:flex;align-items:center;justify-content:center;flex-shrink:0;width:29px;height:25px;border-radius:5px;background:var(--qo-hover);color:var(--qo-muted);font-size:11px;font-weight:600}
+.qo-nav-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.qo-nav-empty{padding:14px 10px;color:var(--qo-muted);font-size:13px}
+.qo-sheet-navigator-panel footer{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;border-top:1px solid var(--qo-border);padding:10px 16px;color:var(--qo-muted);font-size:11px}
+body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
+.sheet-tab.is-reorder-source{opacity:.58}
+.sheet-tab.is-reorder-target{outline:2px solid var(--qo-accent,#50bb8c);outline-offset:-2px}
+@media(max-width:520px){.qo-sheet-navigator-panel footer span:last-child{display:none}.qo-sheet-navigator-panel{max-height:80vh}}

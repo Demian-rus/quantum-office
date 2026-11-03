@@ -16,7 +16,7 @@ const {pathToFileURL}=require('node:url');
  assert.match(await page.locator('.qd-library-total').textContent(),/14 шаблонов/);
  await page.locator('#qd-library-subject').selectOption('physics');
  assert.equal(await page.locator('.qd-library-card').count(),5);
- assert.match(await page.locator('.qd-library-card').textContent(),/Электричество и цепи/);
+ assert.match((await page.locator('.qd-library-card').allTextContents()).join(' '),/Электричество и цепи/);
  await page.locator('#qd-library-subject').selectOption('all');
  await page.locator('#qd-library-grade').selectOption('8');
  assert.ok((await page.locator('.qd-library-card').count())>=5);
