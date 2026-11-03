@@ -54,7 +54,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
    source:qoHubResults()[0]?.studentKey,docHistory:qdDoc().history.length}));
  assert.equal(entry.global,1);
  assert.equal(entry.docHistory,1);
- await page.evaluate(()=>{page='sheet';workspace.active=bookId;activeCell='A2';render();});
+ await page.evaluate((id)=>{page='sheet';workspace.active=id;activeCell='A2';render();},bookId);
  if(!(await page.locator('#qo-hub-sheet-panel').isVisible()))await page.locator('[data-hub-action="toggle"]').click();
  assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/История диагностик/);
  assert.match(await page.locator('#qo-hub-sheet-panel').textContent(),/100%/);
