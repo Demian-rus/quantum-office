@@ -6,7 +6,8 @@ import {addConditionalRule,removeConditionalRule,prepareConditionalScales,condit
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
 import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,planWorkbookReplacement,applyWorkbookReplacement,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
-import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
+import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace,STORE_KEY,PREVIOUS_KEY} from './core/store.js';
+import {encodeOfficeBackup,decodeOfficeBackup} from './core/office-backup.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
@@ -216,15 +217,66 @@ async function openBookFromDisk(){
   status('Файл с диска открыт. Изменения записываются только по команде «Сохранить».');
  }catch(error){if(error.name!=='AbortError')status(error.message||'Ошибка открытия',true);}
 }
-function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Скачивание резервной копии запрошено. Проверьте загрузки.');}
-async function importFile(file){if(!file)return;if(file.size>15_000_000){status('Файл больше 15 МБ не поддерживается',true);return;}try{
+/* TASK134: full-project, versioned backup. Never say the download is a cloud save. */
+function backup(){
+ commitEditor();
+ if(page==='writer')qoPersistWriter();
+ if(page==='slides')qoPersistSlides();
+ if(page==='photo')qoPhotoPersist();
+ try{
+  const content=encodeOfficeBackup(workspace,qoWriter,qoSlides,qoPhotoState());
+  download('Quantum-Office-полный-архив-'+new Date().toISOString().slice(0,10)+'.qbackup',
+   content,'application/json;charset=utf-8');
+  status('Архив четырёх редакторов подготовлен к скачиванию. Проверьте папку загрузок.');
+ }catch(error){status('Архив не создан: '+(error.message||'ошибка сохранения'),true);}
+}
+/* A failed import must never leave half-restored documents or overwritten local drafts. */
+function qoRestoreOfficeBackup(snapshot){
+ const original={workspace,writer:qoWriter,slides:qoSlides,studio:qoPhotoState()};
+ const keys=[STORE_KEY,PREVIOUS_KEY,qoWriterKey,qoSlidesKey,qoPhotoStorageKey];
+ const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
+ const writer=structuredClone(snapshot.writer);
+ writer.html=qoSafeRich(writer.html);
+ const slides=structuredClone(snapshot.slides);
+ const studio=structuredClone(snapshot.studio);
+ try{
+  localStorage.setItem(qoWriterKey,JSON.stringify(writer));
+  localStorage.setItem(qoSlidesKey,JSON.stringify(slides));
+  localStorage.setItem(qoPhotoStorageKey,JSON.stringify(studio));
+  saveWorkspace(snapshot.workspace);
+  workspace=snapshot.workspace;qoWriter=writer;qoSlides=slides;
+  qoPhotoApplyState(studio);
+  qoPhotoHistory=[];qoPhotoRedo=[];qoWriterSelectionRange=null;
+  directFiles.clear();dirtyFiles.clear();page='home';
+  workspace.active=workspace.books[0]?.id??null;
+  storeWarning=false;qoPhotoDraftSaved=true;
+  render();
+  status('Все четыре раздела восстановлены из резервного архива.','success');
+ }catch(error){
+  for(const [key,value] of previous)try{
+   if(value===null)localStorage.removeItem(key);
+   else localStorage.setItem(key,value);
+  }catch{ /* Best-effort rollback when storage itself is unavailable. */ }
+  workspace=original.workspace;qoWriter=original.writer;qoSlides=original.slides;
+  try{qoPhotoApplyState(original.studio);}catch{}
+  try{render();}catch{}
+  throw Error('Восстановление прервано без применения неполного архива: '+error.message);
+ }
+}
+async function importFile(file){if(!file)return;const maxSize=file.name.toLowerCase().endsWith('.qbackup')?55_000_000:15_000_000;if(file.size>maxSize){status('Файл слишком большой для этого формата',true);return;}try{
  const name=file.name.toLowerCase(),text=name.endsWith('.xlsx')?'':await file.text();
  if(name.endsWith('.qbackup')){
-  const restored=decodeWorkspace(text);
-  if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;
-  workspace=restored;directFiles.clear();dirtyFiles.clear();
-  page='home';workspace.active=workspace.books[0]?.id??null;persist();render();
-  status('Черновики восстановлены из архива. Файлы на диске не привязаны.');return;
+  const restored=decodeOfficeBackup(text);
+  const detail=restored.legacy?
+   'Этот архив старого формата содержит только книги таблиц.':
+   'Архив содержит таблицы ('+restored.workspace.books.length+'), документ «Тексты», презентацию и проект Студии.';
+  if(!confirm(detail+'\n\nВосстановление заменит текущие черновики в указанных разделах. Сохраните их отдельную копию перед продолжением. Восстановить?'))return;
+  if(restored.legacy){
+   workspace=restored.workspace;directFiles.clear();dirtyFiles.clear();
+   page='home';workspace.active=workspace.books[0]?.id??null;
+   persist();render();status('Книги восстановлены из старого архива. Остальные редакторы не изменены.');
+  }else qoRestoreOfficeBackup(restored);
+  return;
  }
  let imported,importSummary=null;
  if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}
