@@ -3,7 +3,7 @@
   display:flex;align-items:center;justify-content:center;gap:6px;
   flex:0 0 auto;height:26px;padding:3px 10px;margin-right:4px;
   border:1px solid var(--qo-border);border-radius:7px;
-  color:var(--qo-text);background:var(--qo-surface);font:600 11px/1.2 inherit;
+  color:var(--qo-text);background:var(--qo-surface);font-size:11px;font-weight:600;line-height:1.2;
   cursor:pointer;white-space:nowrap;
 }
 .qo-hub-trigger-counter{
@@ -114,3 +114,12 @@
  #qo-diag-root .qo-hub-roster{padding:10px}
  #qo-diag-root .qo-hub-roster-row{flex-wrap:wrap}
 }
+
+#qo-diag-root .qo-hub-inline-history{
+  margin-top:8px;padding:11px 13px;border:1px solid var(--qo-border);
+  background:var(--qo-surface);border-radius:10px;
+}
+#qo-diag-root .qo-hub-inline-history>summary{
+  cursor:pointer;font-size:12px;font-weight:650;color:var(--qo-text);
+}
+#qo-diag-root .qo-hub-inline-history .qo-hub-history{margin-top:12px}
