@@ -44,6 +44,17 @@ export function duplicateWorksheet(book,sheetId){
  book.activeSheetId=clone.id;
  return clone;
 }
+/** TASK127: reorder a worksheet directly to another tab; data, references and active ID remain unchanged. */
+export function reorderWorksheet(book,sourceId,targetId){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const from=book.sheets.findIndex(s=>s.id===sourceId),
+  to=book.sheets.findIndex(s=>s.id===targetId);
+ if(from<0||to<0)throw Error('Лист не найден');
+ if(from===to)return false;
+ const [moving]=book.sheets.splice(from,1);
+ book.sheets.splice(to,0,moving);
+ return true;
+}
 /** TASK126: move left/right without altering any names, formulas or active sheet ID. */
 export function moveWorksheet(book,sheetId,shift){
  if(!book||!Array.isArray(book.sheets)||![1,-1].includes(shift))
