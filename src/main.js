@@ -1375,7 +1375,7 @@ function qoWriterPage(){
  <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyRight" title="По правому краю">${qoWorkIcon('align-right')}</button>
  <button class="qo-icon-tile" data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button>
  <span class="qo-mini-divider"></span><button class="qo-icon-tile" data-action="writer-indent-less" title="Уменьшить отступ слева на 5 мм" aria-label="Уменьшить отступ">⇤</button><button class="qo-icon-tile" data-action="writer-indent-more" title="Увеличить отступ слева на 5 мм" aria-label="Увеличить отступ">⇥</button></div></div>`);
- const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-break','Разрыв','break'));
+ const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-symbols','Символы','sigma')+qoWorkButton('writer-break','Разрыв','break'));
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
  const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack qo-writer-page-settings"><div class="qo-work-inline"><label class="qo-work-field"><span>Формат</span><select id="qo-writer-paper" aria-label="Формат бумаги">${sel([['A4','A4'],['A5','A5'],['Letter','Letter']],f.paper)}</select></label><label class="qo-work-field"><span>Ориентация</span><select id="qo-writer-orientation" aria-label="Ориентация страницы">${sel([['portrait','Книжная'],['landscape','Альбомная']],f.orientation)}</select></label></div><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`,'qo-writer-page-settings');
@@ -2921,6 +2921,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(action==='writer-indent-more'){qoWriterParagraphIndent(5);return;}
  if(action==='writer-para-reset'){qoWriterParagraphApply('reset');return;}
  if(action==='writer-cmd'){qoWriterCommand(target.dataset.command);return;}
+ if(action==='writer-symbols'){qoWriterOpenSymbols();return;}
  if(action==='writer-link'){
   const url=prompt('Адрес ссылки (https://...)');if(url===null)return;
   const safe=qoSafeURL(url.trim());if(!safe){status('Допустимы HTTPS, HTTP и mailto',true);return;}
