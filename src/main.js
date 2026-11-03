@@ -2193,7 +2193,7 @@ function startFillAutoScroll(){
  };
  fillScrollFrame=requestAnimationFrame(frame);
 }
-function endFillDrag(apply){
+function endFillDrag(apply,copyCells=false){
  const d=fillDrag;if(!d)return;
  fillDrag=null;
  if(fillScrollFrame!==null){cancelAnimationFrame(fillScrollFrame);fillScrollFrame=null;}
@@ -2208,8 +2208,8 @@ function endFillDrag(apply){
     count=Math.abs(d.target-edge)*width;
    if(count>10000)throw Error('Автозаполнение ограничено 10 000 ячеек');
    let out;transact(()=>{out=extendFillHandle(sheet(),
-    cellName(d.source.r1,d.source.c1),cellName(d.source.r2,d.source.c2),d.direction,d.target);});
-   setSelection(out.from,out.to);status('Автозаполнено: '+out.count+' ячеек');
+    cellName(d.source.r1,d.source.c1),cellName(d.source.r2,d.source.c2),d.direction,d.target,copyCells?'copy':'auto');});
+   setSelection(out.from,out.to);status('Автозаполнено: '+out.count+' ячеек'+(copyCells?' (копирование)':''));
   }catch(err){status(err.message,true);drawGrid();}
  }else refreshFillHandle();
 }
@@ -2584,7 +2584,7 @@ app.addEventListener('pointerdown',e=>{
  document.getElementById('grid-fill-handle').hidden=true;
 },true);
 window.addEventListener('pointermove',e=>{if(fillDrag){fillDrag.pointerX=e.clientX;fillDrag.pointerY=e.clientY;fillDragTargetAt(e.clientX,e.clientY);}});
-window.addEventListener('pointerup',()=>endFillDrag(true));
+window.addEventListener('pointerup',e=>endFillDrag(true,!!(e.ctrlKey||e.metaKey)));
 window.addEventListener('pointercancel',()=>endFillDrag(false));
 app.addEventListener('pointerdown',startChartPointerDrag,true);
 window.addEventListener('pointermove',previewChartPointerDrag);
