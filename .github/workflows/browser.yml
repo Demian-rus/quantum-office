@@ -47,6 +47,7 @@ jobs:
       - run: node tests/task129_browser.cjs
       - run: node tests/task130_writer_browser.cjs
       - run: node tests/task131_writer_browser.cjs
+      - run: node tests/task132_writer_browser.cjs
       - run: python tests/ui_smoke.py
       - run: python tests/xlsx_browser.py
       - run: python tests/filter_freeze_browser.py
