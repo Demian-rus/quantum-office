@@ -732,6 +732,7 @@ function qdBuilderTemplateDefaults(d){
   const grade=existing?.grade||preset?.grade||d.title.match(/(?:^|\D)([5-9])\s*класс/i)?.[1]||'8';
   return {my,existing,subject,grade,purpose:existing?.purpose||preset?.purpose||'diagnostic'};
 }
+let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
 function qdBuilderSignature(d){
   return JSON.stringify({title:d.title,description:d.description,
     sections:d.sections.map(s=>({title:s.title,questions:s.questions.map(q=>({
