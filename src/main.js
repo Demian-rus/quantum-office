@@ -2077,7 +2077,7 @@ function smartTableHelpPanel(){
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист">${esc(x.name)}</button>`).join('')}<button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
 function render(){
- qoCloseTheme();
+ closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
  const previousGrid=document.getElementById('grid-scroll');
  if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){
@@ -2193,6 +2193,74 @@ function startFillAutoScroll(){
  };
  fillScrollFrame=requestAnimationFrame(frame);
 }
+// TASK125: compact options appear only after a fill-drag, not in the ribbon.
+let pendingFillOptions=null;
+function closeFillOptions(){
+ document.getElementById('qo-fill-options')?.remove();
+ pendingFillOptions=null;
+}
+function selectFillOption(mode){
+ const d=pendingFillOptions,b=book();
+ if(!d||!b||b.id!==d.bookId||undoStacks.get(b.id)?.at(-1)!==d.undoSnapshot){
+  closeFillOptions();return;
+ }
+ try{
+  const baseSheet=d.undoSnapshot.sheets.find(x=>x.id===d.sheetId),
+   destination=b.sheets.find(x=>x.id===d.sheetId);
+  if(!baseSheet||!destination)throw Error('Исходный лист больше недоступен');
+  const rewritten=structuredClone(baseSheet);
+  const out=extendFillHandle(rewritten,cellName(d.source.r1,d.source.c1),
+   cellName(d.source.r2,d.source.c2),d.direction,d.target,mode);
+  const before=structuredClone(b);
+  destination.cells=rewritten.cells;
+  try{
+   invalidateGridGeometry(destination);
+   recalculator.reconcile(b,before);
+  }catch(err){
+   destination.cells=before.sheets.find(x=>x.id===d.sheetId).cells;
+   invalidateGridGeometry(destination);recalculator.reset();throw err;
+  }
+  changed();setSelection(out.from,out.to);
+  status(({auto:'Ряд продолжен',copy:'Ячейки скопированы',
+   formats:'Скопировано только оформление',values:'Заполнено без изменения оформления'})[mode]);
+  closeFillOptions();
+ }catch(err){status(err.message,true);}
+}
+function showFillOptions(d,mode){
+ closeFillOptions();
+ const b=book(),snapshot=undoStacks.get(b?.id)?.at(-1);
+ if(!b||!snapshot)return;
+ pendingFillOptions={...d,bookId:b.id,undoSnapshot:snapshot};
+ const holder=document.createElement('div');holder.id='qo-fill-options';
+ holder.className='qo-fill-options';
+ holder.innerHTML=`<button type="button" class="qo-fill-options-button" aria-label="Параметры автозаполнения" title="Выбрать режим автозаполнения" aria-expanded="false">▾</button>
+  <div class="qo-fill-options-menu" role="menu" hidden>
+   <button type="button" role="menuitem" data-fill-mode="auto">Продолжить ряд</button>
+   <button type="button" role="menuitem" data-fill-mode="copy">Копировать ячейки</button>
+   <button type="button" role="menuitem" data-fill-mode="formats">Только оформление</button>
+   <button type="button" role="menuitem" data-fill-mode="values">Без оформления</button>
+  </div>`;
+ document.body.append(holder);
+ const left=Math.max(8,Math.min(window.innerWidth-37,d.pointerX+6));
+ const top=Math.max(8,Math.min(window.innerHeight-34,d.pointerY+6));
+ holder.style.left=left+'px';holder.style.top=top+'px';
+ holder.querySelector('.qo-fill-options-button').addEventListener('click',()=>{
+  const pop=holder.querySelector('.qo-fill-options-menu');pop.hidden=!pop.hidden;
+  holder.querySelector('.qo-fill-options-button').setAttribute('aria-expanded',String(!pop.hidden));
+  if(!pop.hidden){
+   pop.style.left=Math.min(0,window.innerWidth-left-222)+'px';
+   pop.style.top=(top+205>window.innerHeight?'-204px':'26px');
+  }
+ });
+ holder.querySelectorAll('[data-fill-mode]').forEach(btn=>btn.addEventListener('click',()=>selectFillOption(btn.dataset.fillMode)));
+}
+document.addEventListener('pointerdown',e=>{
+ if(pendingFillOptions&&!e.target.closest('#qo-fill-options'))closeFillOptions();
+},true);
+document.addEventListener('keydown',e=>{
+ if(e.key==='Escape'&&pendingFillOptions){closeFillOptions();return;}
+ if(pendingFillOptions&&!e.target.closest?.('#qo-fill-options')&&!['Control','Shift','Alt','Meta'].includes(e.key))closeFillOptions();
+},true);
 function endFillDrag(apply,copyCells=false){
  const d=fillDrag;if(!d)return;
  fillDrag=null;
@@ -2210,6 +2278,7 @@ function endFillDrag(apply,copyCells=false){
    let out;transact(()=>{out=extendFillHandle(sheet(),
     cellName(d.source.r1,d.source.c1),cellName(d.source.r2,d.source.c2),d.direction,d.target,copyCells?'copy':'auto');});
    setSelection(out.from,out.to);status('Автозаполнено: '+out.count+' ячеек'+(copyCells?' (копирование)':''));
+   showFillOptions(d,copyCells?'copy':'auto');
   }catch(err){status(err.message,true);drawGrid();}
  }else refreshFillHandle();
 }
