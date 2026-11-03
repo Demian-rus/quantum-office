@@ -10,7 +10,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  const bookId=await page.evaluate(()=>{
    const b=newWorkbook(),s=b.sheets[0];
    b.name='Учебный график';s.name='Ученики';
-   s.cells['A1']={value:'Ученик'};s.cells['B1']={value:'Ссылка'};s.cells['C1']={value:'Информация'};
+   s.cells['A1']={value:'Ученики'};s.cells['B1']={value:'Ссылка'};s.cells['C1']={value:'Информация'};
    s.cells['D1']={value:'Родитель'};s.cells['E1']={value:'Ссылка'};
    s.hyperlinks={B2:'https://example.org/profile'};
    for(let n=2;n<=12;n++){
