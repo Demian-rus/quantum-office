@@ -3108,7 +3108,7 @@ app.addEventListener('change',async e=>{const t=e.target;
    if(docx){
     const incoming=await qoDocxImport(file);
     qoWriter={name:incoming.name,html:qoSafeRich(incoming.html),layout:{...qoWriterDefaults(),...incoming.layout},updated:Date.now()};
-    status('DOCX импортирован: базовое форматирование сохранено; сложные объекты Word могут отличаться.');
+
    }else{
     const raw=await file.text();
     if(kind.endsWith('.qdoc')){
@@ -3117,6 +3117,7 @@ app.addEventListener('change',async e=>{const t=e.target;
     }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
    }
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
+   if(docx)status('DOCX импортирован. Базовое форматирование сохранено; сложная вёрстка Word может отличаться.');
   }catch(error){status('Не удалось открыть документ: '+error.message,true);}return;
  }
  if(t.id==='qo-writer-image-file'){
