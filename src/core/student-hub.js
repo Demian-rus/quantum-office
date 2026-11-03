@@ -197,7 +197,8 @@ function qoHubRosterPanel(){
 function qoHubDiagDecorate(){
  const root=document.getElementById('qo-diag-root');
  if(!root)return;
- const target=qdMode==='builder'?root.querySelector('.qd-roster'):qdMode==='run'?root.querySelector('.qd-session-panel'):null;
+ const target=qdMode==='builder'?root.querySelector('.qd-roster'):
+   qdMode==='run'?(root.querySelector('.qd-session-drawer')||root.querySelector('.qd-session-panel')):null;
  if(!target||root.querySelector('.qo-hub-roster'))return;
  target.insertAdjacentHTML('afterend',qoHubRosterPanel());
  if(qdMode==='run'&&qoHubSourceSheet()){
