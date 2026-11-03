@@ -16,7 +16,7 @@ const {pathToFileURL}=require('node:url');
  const before=await page.evaluate(()=>({count:qdQuestionList().length,marks:{...qdDoc().session.marks}}));
  assert.equal(before.count,8);assert.equal(Object.values(before.marks).length,1);
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
- assert.equal(await page.locator('.qd-library-card').count(),19);
+ assert.equal(await page.locator('.qd-library-card').count(),14);
  const card=page.locator('.qd-library-card').filter({hasText:'Законы движения'});
  await card.locator('[data-qd-action="library-preview"]').click();
  assert.equal(await page.locator('.qd-library-preview').count(),1);
