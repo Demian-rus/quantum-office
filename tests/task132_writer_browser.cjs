@@ -26,7 +26,7 @@ const {pathToFileURL}=require('node:url');
    const rels=await zip.file('word/_rels/document.xml.rels').async('string');
    return {parts:Object.keys(zip.files).length,docx:!!zip.file('[Content_Types].xml'),
     headings:xml.includes('Heading1'),bold:xml.includes('<w:b/>'),
-    table:xml.includes('<w:tbl>'),list:xml.includes('<w:numPr>'),
+    table:xml.includes('<w:tbl>')&&xml.includes('<w:tblGrid>')&&xml.includes('<w:gridCol'),list:xml.includes('<w:numPr>'),
     size:xml.includes('w:orient="landscape"'),header:header.includes('черновик'),
     externalLink:rels.includes('https://example.org')};
   });
