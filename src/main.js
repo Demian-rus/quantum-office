@@ -6,7 +6,8 @@ import {addConditionalRule,removeConditionalRule,prepareConditionalScales,condit
 import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
 import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,planWorkbookReplacement,applyWorkbookReplacement,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
-import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace} from './core/store.js';
+import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace,STORE_KEY,PREVIOUS_KEY} from './core/store.js';
+import {encodeOfficeBackup,decodeOfficeBackup} from './core/office-backup.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
@@ -99,11 +100,32 @@ function status(message,tone=false){
  node.setAttribute('aria-live',severity==='error'?'assertive':'polite');node.setAttribute('aria-atomic','true');
  clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);
 }
-function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
- const linked=b&&directFiles.has(b.id);
- n.textContent=linked?(dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+(storeWarning?' · нет автосохранения браузера':''):
+let qoWriterSavedLocal=true,qoSlidesSavedLocal=true;
+function updateSaveIndicator(){
+ const n=document.querySelector('#storage-indicator');if(!n)return;
+ if(page==='writer'){
+  n.textContent=qoWriterSavedLocal?'● Черновик текста в браузере':'⚠ Текст не записан в браузер';
+  n.title='Локальная копия не заменяет файл QDOC или общую резервную копию';
+  return;
+ }
+ if(page==='slides'){
+  n.textContent=qoSlidesSavedLocal?'● Черновик презентации в браузере':'⚠ Презентация не записана в браузер';
+  n.title='Для надёжного хранения сохраните QSLIDES или резервную копию';
+  return;
+ }
+ if(page==='photo'){
+  n.textContent=qoPhotoDraftSaved?'● Проект Студии в браузере':'⚠ Проект Студии не записан';
+  n.title='Для надёжного хранения сохраните QSTUDIO или резервную копию';
+  return;
+ }
+ const b=book(),linked=b&&directFiles.has(b.id);
+ n.textContent=linked?
+  (dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+
+   (storeWarning?' · нет автосохранения браузера':''):
   storeWarning?'⚠ Черновик не записан':'● Черновик в браузере';
- n.title=storeWarning?'Локальная память браузера недоступна. Прямые сохранения на диск и резервные копии проверяйте отдельно.':'Черновики браузера не заменяют отдельные резервные копии.';
+ n.title=storeWarning?
+  'Локальная память браузера недоступна. Сделайте ручное сохранение.':
+  'Черновики браузера не заменяют отдельные резервные копии.';
 }
 function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
 function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}syncHistoryButtons();persist();if(page==='sheet'){if(chartDrawerOpen)refreshChartPreview();refreshSheetCharts();}}
@@ -216,15 +238,66 @@ async function openBookFromDisk(){
   status('Файл с диска открыт. Изменения записываются только по команде «Сохранить».');
  }catch(error){if(error.name!=='AbortError')status(error.message||'Ошибка открытия',true);}
 }
-function backup(){commitEditor();download(`Quantum-Office-архив-${new Date().toISOString().slice(0,10)}.qbackup`,encodeWorkspace(workspace),'application/json');status('Скачивание резервной копии запрошено. Проверьте загрузки.');}
-async function importFile(file){if(!file)return;if(file.size>15_000_000){status('Файл больше 15 МБ не поддерживается',true);return;}try{
+/* TASK134: full-project, versioned backup. Never say the download is a cloud save. */
+function backup(){
+ commitEditor();
+ if(page==='writer')qoPersistWriter();
+ if(page==='slides')qoPersistSlides();
+ if(page==='photo')qoPhotoPersist();
+ try{
+  const content=encodeOfficeBackup(workspace,qoWriter,qoSlides,qoPhotoState());
+  download('Quantum-Office-полный-архив-'+new Date().toISOString().slice(0,10)+'.qbackup',
+   content,'application/json;charset=utf-8');
+  status('Архив четырёх редакторов подготовлен к скачиванию. Проверьте папку загрузок.');
+ }catch(error){status('Архив не создан: '+(error.message||'ошибка сохранения'),true);}
+}
+/* A failed import must never leave half-restored documents or overwritten local drafts. */
+function qoRestoreOfficeBackup(snapshot){
+ const original={workspace,writer:qoWriter,slides:qoSlides,studio:qoPhotoState()};
+ const keys=[STORE_KEY,PREVIOUS_KEY,qoWriterKey,qoSlidesKey,qoPhotoStorageKey];
+ const previous=new Map(keys.map(key=>[key,localStorage.getItem(key)]));
+ const writer=structuredClone(snapshot.writer);
+ writer.html=qoSafeRich(writer.html);
+ const slides=structuredClone(snapshot.slides);
+ const studio=structuredClone(snapshot.studio);
+ try{
+  localStorage.setItem(qoWriterKey,JSON.stringify(writer));
+  localStorage.setItem(qoSlidesKey,JSON.stringify(slides));
+  localStorage.setItem(qoPhotoStorageKey,JSON.stringify(studio));
+  saveWorkspace(snapshot.workspace);
+  workspace=snapshot.workspace;qoWriter=writer;qoSlides=slides;
+  qoPhotoApplyState(studio);
+  qoPhotoHistory=[];qoPhotoRedo=[];qoWriterSelectionRange=null;
+  directFiles.clear();dirtyFiles.clear();page='home';
+  workspace.active=workspace.books[0]?.id??null;
+  storeWarning=false;qoPhotoDraftSaved=true;qoWriterSavedLocal=true;qoSlidesSavedLocal=true;
+  render();
+  status('Все четыре раздела восстановлены из резервного архива.','success');
+ }catch(error){
+  for(const [key,value] of previous)try{
+   if(value===null)localStorage.removeItem(key);
+   else localStorage.setItem(key,value);
+  }catch{ /* Best-effort rollback when storage itself is unavailable. */ }
+  workspace=original.workspace;qoWriter=original.writer;qoSlides=original.slides;
+  try{qoPhotoApplyState(original.studio);}catch{}
+  try{render();}catch{}
+  throw Error('Восстановление прервано без применения неполного архива: '+error.message);
+ }
+}
+async function importFile(file){if(!file)return;const maxSize=file.name.toLowerCase().endsWith('.qbackup')?55_000_000:15_000_000;if(file.size>maxSize){status('Файл слишком большой для этого формата',true);return;}try{
  const name=file.name.toLowerCase(),text=name.endsWith('.xlsx')?'':await file.text();
  if(name.endsWith('.qbackup')){
-  const restored=decodeWorkspace(text);
-  if(!confirm('Импорт архива заменит текущие черновики. Вы предварительно сохранили резервную копию?'))return;
-  workspace=restored;directFiles.clear();dirtyFiles.clear();
-  page='home';workspace.active=workspace.books[0]?.id??null;persist();render();
-  status('Черновики восстановлены из архива. Файлы на диске не привязаны.');return;
+  const restored=decodeOfficeBackup(text);
+  const detail=restored.legacy?
+   'Этот архив старого формата содержит только книги таблиц.':
+   'Архив содержит таблицы ('+restored.workspace.books.length+'), документ «Тексты», презентацию и проект Студии.';
+  if(!confirm(detail+'\n\nВосстановление заменит текущие черновики в указанных разделах. Сохраните их отдельную копию перед продолжением. Восстановить?'))return;
+  if(restored.legacy){
+   workspace=restored.workspace;directFiles.clear();dirtyFiles.clear();
+   page='home';workspace.active=workspace.books[0]?.id??null;
+   persist();render();status('Книги восстановлены из старого архива. Остальные редакторы не изменены.');
+  }else qoRestoreOfficeBackup(restored);
+  return;
  }
  let imported,importSummary=null;
  if(name.endsWith('.qbook')){imported=structuredClone(decodeBook(text));imported.id=newWorkbook().id;}
@@ -1180,7 +1253,7 @@ function qoSafeRich(html){
 function qoPersistWriter(){
  const editor=document.getElementById('qo-writer-page');if(editor)qoWriter.html=qoSafeRich(editor.innerHTML);
  const title=document.getElementById('qo-writer-title');if(title)qoWriter.name=title.value.trim().slice(0,120)||'Новый документ';
- qoWriter.updated=Date.now();try{localStorage.setItem(qoWriterKey,JSON.stringify(qoWriter));}catch{status('Документ слишком большой для автосохранения. Экспортируйте HTML.',true);}
+ qoWriter.updated=Date.now();try{localStorage.setItem(qoWriterKey,JSON.stringify(qoWriter));qoWriterSavedLocal=true;}catch{qoWriterSavedLocal=false;status('Документ не записан в браузере. Сохраните QDOC или HTML.',true);}updateSaveIndicator();
 }
 // TASK092: editor-specific contextual ribbon and native-looking compact icon controls.
 const qoWorkspaceTab={writer:'home',slides:'home',photo:'home'};
@@ -1417,7 +1490,7 @@ function qoWriterPrint(){
  document.head.append(style);window.print();
 }
 function qoSlide(){return qoSlides.slides[Math.max(0,Math.min(qoSlides.slides.length-1,qoSlides.active))];}
-function qoPersistSlides(){const title=document.getElementById('qo-slides-title');if(title)qoSlides.name=title.value.trim().slice(0,120)||'Новая презентация';qoSlides.updated=Date.now();try{localStorage.setItem(qoSlidesKey,JSON.stringify(qoSlides));}catch{status('Недостаточно места для презентации. Сохраните файл .qslides.',true);}}
+function qoPersistSlides(){const title=document.getElementById('qo-slides-title');if(title)qoSlides.name=title.value.trim().slice(0,120)||'Новая презентация';qoSlides.updated=Date.now();try{localStorage.setItem(qoSlidesKey,JSON.stringify(qoSlides));qoSlidesSavedLocal=true;}catch{qoSlidesSavedLocal=false;status('Презентация не записана в браузере. Сохраните QSLIDES.',true);}updateSaveIndicator();}
 function qoSlidePreview(slide,interactive){const items=slide.items.map(item=>{
  const dim=`left:${Number(item.x)}%;top:${Number(item.y)}%;width:${Number(item.w)}%;height:${Number(item.h)}%;`;
  if(item.kind==='image')return `<div class="qo-slide-object qo-slide-image${interactive&&qoSlides.selected===item.id?' selected':''}" style="${dim}" ${interactive?`data-slide-item="${esc(item.id)}"`:''}><img src="${esc(item.data)}" alt="Изображение слайда" draggable="false"></div>`;
@@ -1556,8 +1629,21 @@ function qoPhotoInspectorHTML(){const selected=qoPhotoSelection(),o=selected.len
  ${qoPhotoColorPanel()}<h4>Коррекция фонового фото</h4>${[['brightness','Яркость'],['contrast','Контраст'],['saturation','Насыщенность']].map(([key,label])=>`<label class="qs-adjust">${label}<output>${qoPhotoAdjust[key]}%</output><input type="range" data-photo-adjust="${key}" min="0" max="200" value="${qoPhotoAdjust[key]}"></label>`).join('')}
  ${qoPhotoButton('reset','sun','Сбросить коррекцию')}</div>`}</aside>`;
 }
-function qoPhotoPage(){return `<main class="qo-photo-workspace qs-studio ${qoPhotoLeftOpen?'qs-left-open':''} ${qoPhotoRightOpen?'qs-right-open':''}" aria-label="Quantum Studio">
- <header class="qs-editor-toolbar"><div class="qs-toolbar-left">${qoPhotoButton('toggle-left','panel-left','Левая панель')}${qoPhotoButton('undo','undo','Отменить',!qoPhotoHistory.length?'disabled':'')}${qoPhotoButton('redo','redo','Повторить',!qoPhotoRedo.length?'disabled':'')}<span class="qs-divider"></span>${qoPhotoButton('select-tool','mouse-pointer','Выделение',qoPhotoTool==='select'?'aria-pressed="true"':'')}${qoPhotoButton('hand-tool','hand','Перемещение холста',qoPhotoTool==='hand'?'aria-pressed="true"':'')}${qoPhotoButton('brush-tool','brush','Кисть',qoPhotoTool==='brush'?'aria-pressed="true"':'')}${qoPhotoButton('picker-start','pipette','Пипетка')}${qoPhotoButton('add-text','type','Текст')}${qoPhotoButton('insert-image','image','Изображение')}</div><div class="qs-toolbar-right"><span class="qs-saved-indicator">${qoPhotoDraftSaved?'Черновик сохранён':'Скачайте QSTUDIO'}</span>${qoPhotoButton('toggle-right','sliders-horizontal','Свойства')}${qoPhotoButton('export-project','save','Проект QSTUDIO')}${qoPhotoButton('export','download','PNG')}</div></header>
+function qoPhotoPage(){
+ const history=qoWorkGroup('История',qoPhotoButton('undo','undo','Отменить',!qoPhotoHistory.length?'disabled':'')+qoPhotoButton('redo','redo','Повторить',!qoPhotoRedo.length?'disabled':''));
+ const navigation=qoWorkGroup('Панели',qoPhotoButton('toggle-left','panel-left','Левая панель')+qoPhotoButton('toggle-right','sliders-horizontal','Свойства'));
+ const selection=qoWorkGroup('Выделение',qoPhotoButton('select-tool','mouse-pointer','Выделение',qoPhotoTool==='select'?'aria-pressed="true"':'')+qoPhotoButton('hand-tool','hand','Перемещение холста',qoPhotoTool==='hand'?'aria-pressed="true"':''));
+ const drawing=qoWorkGroup('Рисование',qoPhotoButton('brush-tool','brush','Кисть',qoPhotoTool==='brush'?'aria-pressed="true"':'')+qoPhotoButton('picker-start','pipette','Пипетка'));
+ const insert=qoWorkGroup('Вставка',qoPhotoButton('add-text','type','Текст')+qoPhotoButton('insert-image','image','Изображение'));
+ const file=qoWorkGroup('Проект',qoPhotoButton('export-project','save','Сохранить QSTUDIO'));
+ const output=qoWorkGroup('Экспорт',qoPhotoButton('export','download','Скачать PNG'));
+ return `<main class="qo-photo-workspace qs-studio ${qoPhotoLeftOpen?'qs-left-open':''} ${qoPhotoRightOpen?'qs-right-open':''}" aria-label="Quantum Studio">
+ <div class="qo-office-toolbar qs-office-toolbar">
+ ${qoWorkTabBar('photo',[['home','Главная'],['file','Файл']])}
+ <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты Студии">
+ ${qoWorkPanel('photo','home',history+navigation+selection+drawing+insert)}
+ ${qoWorkPanel('photo','file',file+output+'<span class="qs-saved-indicator qs-ribbon-save">'+(qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер')+'</span>')}
+ </div></div>
  ${qoPhotoCropBar()}${qoPhotoPickerBar()}<section class="qs-editor-layout"><nav class="qs-nav" aria-label="Разделы редактора">
  ${qoPhotoSideButton('templates','layout-template','Шаблоны')}${qoPhotoSideButton('elements','shapes','Элементы')}${qoPhotoSideButton('text','type','Текст')}${qoPhotoSideButton('uploads','upload','Загрузки')}${qoPhotoSideButton('photos','image','Фото')}${qoPhotoSideButton('drawing','brush','Рисование')}${qoPhotoSideButton('layers','layers','Слои')}${qoPhotoSideButton('background','settings','Настройки')}</nav>
  ${qoPhotoSidebarHTML()}
@@ -1571,7 +1657,7 @@ function qoPhotoState(){return {...(!qoPhotoHasBackgroundOpacity&&qoPhotoBackgro
 function qoPhotoSnapshot(){qoPhotoHistory.push(qoPhotoState());if(qoPhotoHistory.length>35)qoPhotoHistory.shift();qoPhotoRedo=[];}
 function qoPhotoLoadImageSrc(src){qoPhotoImageSrc=src||'';qoPhotoImage=null;if(src){const img=new Image();img.onload=()=>{if(qoPhotoImageSrc===src){qoPhotoImage=img;qoPhotoRender();}};img.src=src;}}
 function qoPhotoApplyState(v){v=validateStudioProject(v);qoPhotoCompare=false;qoPhotoStrokes=v.strokes||[];qoPhotoCanvasW=v.width||1100;qoPhotoCanvasH=v.height||650;qoPhotoBG=v.bg||'#ffffff';qoPhotoBackgroundOpacity=v.backgroundOpacity??1;qoPhotoHasBackgroundOpacity=Object.hasOwn(v,'backgroundOpacity');qoPhotoTransparent=!!v.transparent;qoPhotoAdjust=v.adjust||{brightness:100,contrast:100,saturation:100};qoPhotoFile=v.name||'Без названия';qoPhotoSelectedId=null;qoPhotoSelectedIds.clear();qoPhotoCounter=Math.max(qoPhotoCounter,...qoPhotoStrokes.map(o=>Number((o.id||'').split('-')[1])||0))+1;qoPhotoLoadImageSrc(v.imageSrc||'');}
-function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoPhotoDraftSaved?'Черновик сохранён':'Скачайте QSTUDIO · черновик не сохранён';}
+function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
 function qoPhotoObject(){return qoPhotoStrokes.find(o=>o.id===qoPhotoSelectedId)||null;}
 function qoPhotoBounds(o){const a=o.points?.[0]||[0,0],last=o.points?.at(-1)||a;
  if(o.tool==='text')return qoPhotoTextBounds(o);
