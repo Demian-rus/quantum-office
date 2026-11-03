@@ -1155,6 +1155,13 @@ function qoSafeRich(html){
    if(node.tagName==='A'){const href=qoSafeURL(node.getAttribute('href'));if(href){next.setAttribute('href',href);next.setAttribute('target','_blank');next.setAttribute('rel','noopener noreferrer');}}
    const alignment=node.style?.textAlign;
    if(['left','center','right','justify'].includes(alignment))next.style.textAlign=alignment;
+   if(['P','DIV','H1','H2','H3','LI','BLOCKQUOTE'].includes(node.tagName)){
+    const rules=[['marginLeft','mm',0,50],['textIndent','mm',-20,30],['marginTop','pt',0,48],['marginBottom','pt',0,48]];
+    for(const [property,unit,min,max] of rules){
+     const raw=node.style?.[property]||'',m=/^(-?\d+(?:\.\d{1,2})?)(mm|pt)$/.exec(raw);
+     if(m&&m[2]===unit&&Number(m[1])>=min&&Number(m[1])<=max)next.style[property]=m[1]+unit;
+    }
+   }
    if(node.tagName==='SPAN'||node.tagName==='FONT'){
     const color=(node.tagName==='FONT'?node.getAttribute('color'):node.style.color),fontSize=node.style.fontSize,bg=node.style.backgroundColor;
     if(bg&&CSS.supports('color',bg))next.style.backgroundColor=bg;
@@ -1278,11 +1285,19 @@ function qoWriterPage(){
  <button data-action="writer-cmd" data-command="justifyLeft" title="По левому краю">${qoWorkIcon('align-left')}</button>
  <button data-action="writer-cmd" data-command="justifyCenter" title="По центру">${qoWorkIcon('align-center')}</button>
  <button data-action="writer-cmd" data-command="justifyRight" title="По правому краю">${qoWorkIcon('align-right')}</button>
- <button data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button></div></div>`);
+ <button data-action="writer-cmd" data-command="justifyFull" title="По ширине">${qoWorkIcon('align-full')}</button>
+ <span class="qo-mini-divider"></span><button data-action="writer-indent-less" title="Уменьшить отступ слева на 5 мм" aria-label="Уменьшить отступ">⇤</button><button data-action="writer-indent-more" title="Увеличить отступ слева на 5 мм" aria-label="Увеличить отступ">⇥</button></div></div>`);
  const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-break','Разрыв','break'));
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
  const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack qo-writer-page-settings"><div class="qo-work-inline"><label class="qo-work-field"><span>Формат</span><select id="qo-writer-paper" aria-label="Формат бумаги">${sel([['A4','A4'],['A5','A5'],['Letter','Letter']],f.paper)}</select></label><label class="qo-work-field"><span>Ориентация</span><select id="qo-writer-orientation" aria-label="Ориентация страницы">${sel([['portrait','Книжная'],['landscape','Альбомная']],f.orientation)}</select></label></div><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`,'qo-writer-page-settings');
+ const paragraphMetrics=qoWorkGroup('Отступы абзаца',`<div class="qo-writer-paragraph-metrics">
+ <label class="qo-work-field"><span>Слева (мм)</span><input id="qo-writer-para-left" type="number" min="0" max="50" step="0.5" value="0" aria-label="Отступ абзаца слева, мм"></label>
+ <label class="qo-work-field"><span>Первая строка (мм)</span><input id="qo-writer-para-first" type="number" min="-20" max="30" step="0.5" value="0" aria-label="Отступ первой строки, мм"></label>
+ <label class="qo-work-field"><span>Перед (пт)</span><input id="qo-writer-para-before" type="number" min="0" max="48" step="0.5" value="0" aria-label="Интервал перед абзацем, пт"></label>
+ <label class="qo-work-field"><span>После (пт)</span><input id="qo-writer-para-after" type="number" min="0" max="48" step="0.5" value="0" aria-label="Интервал после абзаца, пт"></label>
+ <button type="button" data-action="writer-para-reset" title="Сбросить отступы и интервалы выбранных абзацев" aria-label="Сбросить настройки абзаца">${qoWorkIcon('undo')}</button>
+ </div>`,'qo-writer-para-group');
  const runningHeads=qoWorkGroup('Колонтитулы',`<div class="qo-work-stack qo-writer-running-head"><div class="qo-work-inline"><label class="qo-work-field"><span>Верхний</span><input id="qo-writer-header" type="text" maxlength="120" aria-label="Текст верхнего колонтитула" placeholder="Текст сверху" value="${esc(f.header)}"></label><label class="qo-work-field"><span>Нижний</span><input id="qo-writer-footer" type="text" maxlength="120" aria-label="Текст нижнего колонтитула" placeholder="Текст снизу" value="${esc(f.footer)}"></label></div><label class="qo-writer-page-numbers"><input id="qo-writer-page-number" type="checkbox" ${f.pageNumber?'checked':''}> Номера страниц при печати</label></div>`,'qo-writer-running-head');
  const diagTile=(action,label,icon)=>qoWorkButton(action,label,icon,'','qo-diag-tile');
  const diagnosticFiles=qoWorkGroup('Диагностика',
@@ -1306,7 +1321,7 @@ function qoWriterPage(){
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
  ${qoWorkPanel('writer','home',main+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
- ${qoWorkPanel('writer','layout',layout+runningHeads+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
+ ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
  ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates+diagnosticGuide)}
@@ -2801,6 +2816,9 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   if(action==='photo-export-project'){qoPhotoExportProject();return;}
   return;
  }
+ if(action==='writer-indent-less'){qoWriterParagraphIndent(-5);return;}
+ if(action==='writer-indent-more'){qoWriterParagraphIndent(5);return;}
+ if(action==='writer-para-reset'){qoWriterParagraphApply('reset');return;}
  if(action==='writer-cmd'){qoWriterCommand(target.dataset.command);return;}
  if(action==='writer-link'){
   const url=prompt('Адрес ссылки (https://...)');if(url===null)return;
@@ -3100,6 +3118,12 @@ app.addEventListener('input',e=>{
  }
  if(e.target.id==='qo-filter-search'){filterUiQuery=e.target.value;qoFilterRefreshChoices();return;}if(e.target.matches('[data-filter-index]')){const value=filterUiChoices[Number(e.target.dataset.filterIndex)];if(value!==undefined){if(e.target.checked)filterUiPicked.add(value);else filterUiPicked.delete(value);}qoFilterRefreshChoices();return;}if(e.target.id==='find-term')searchTerm=e.target.value;else if(e.target.id==='replace-term')replaceTerm=e.target.value;else if(e.target.id==='palette-hue'){paletteHue=Number(e.target.value);qoColorPickerPreview();}else if(e.target.id==='palette-hex'){if(qoSetCustomColor(e.target.value))qoColorPickerPreview();}});
 app.addEventListener('change',async e=>{const t=e.target;
+ if(page==='writer'&&t.id?.startsWith('qo-writer-para-')){
+  const kind=t.id.slice('qo-writer-para-'.length);
+  if(Object.hasOwn(QO_WRITER_PARAGRAPH_FIELDS,kind)){
+   qoWriterParagraphApply(kind,t.value);t.value=String(qoWriterParagraphMeasure(t.value,kind));return;
+  }
+ }
  if(t.id==='qo-writer-file'){
   const file=t.files?.[0];if(!file)return;
   const kind=file.name.toLowerCase(),docx=kind.endsWith('.docx');
@@ -3221,7 +3245,7 @@ window.addEventListener('pointerup',()=>{if(!resizeDrag)return;const d=resizeDra
  if(d.value!==null&&d.value!==d.original){transact(()=>{if(d.axis==='col')setColumnWidth(sheet(),d.index,d.value);else setRowHeight(sheet(),d.index,d.value);});status(`Размер: ${d.value} px`);}drawGrid();});
 window.addEventListener('pointercancel',()=>{if(!resizeDrag)return;const d=resizeDrag;resizeDrag=null;document.body.classList.remove('is-resizing');if(sheet()?.id===d.sheetId){if(d.axis==='col')setColumnWidth(sheet(),d.index,d.original);else setRowHeight(sheet(),d.index,d.original);drawGrid();}});
 app.addEventListener('dblclick',e=>{const handle=e.target.closest('[data-resize]');if(!handle)return;e.preventDefault();e.stopPropagation();if(handle.dataset.resize==='col')autoFitColumn(Number(handle.dataset.index));else resetRowHeight(Number(handle.dataset.index));},true);
-document.addEventListener('selectionchange',()=>{if(page==='writer')qoWriterRememberSelection();});
+document.addEventListener('selectionchange',()=>{if(page==='writer'){qoWriterRememberSelection();qoWriterParagraphSync();}});
 app.addEventListener('click',e=>{
  if(page!=='writer')return;
  if(e.target.matches('#qo-writer-page img'))qoWriterImageSelect(e.target);
