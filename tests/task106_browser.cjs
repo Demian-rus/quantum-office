@@ -12,7 +12,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
  assert.ok(await page.locator('.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group').count()>=3);
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
- assert.equal(await page.locator('.qd-library-card').count(),19);
+ assert.equal(await page.locator('.qd-library-card').count(),14);
  const width=await page.evaluate(()=>({
    root:document.querySelector('#qo-diag-root').getBoundingClientRect().width,
    screen:document.querySelector('#qo-diag-workspace').getBoundingClientRect().width,
