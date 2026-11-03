@@ -123,3 +123,35 @@
   cursor:pointer;font-size:12px;font-weight:650;color:var(--qo-text);
 }
 #qo-diag-root .qo-hub-inline-history .qo-hub-history{margin-top:12px}
+
+/* TASK123: compact progress overview and portable teacher-project backup. */
+.qo-hub-overview{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;
+  margin:13px 0;padding:0;
+}
+.qo-hub-overview>div{
+  display:flex;flex-direction:column;gap:3px;min-width:0;
+  padding:10px 11px;border:1px solid var(--qo-border);
+  border-radius:9px;background:var(--qo-surface-alt);
+}
+.qo-hub-overview strong{font-size:18px;line-height:1.1;font-variant-numeric:tabular-nums}
+.qo-hub-overview small{font-size:10px;line-height:1.35;color:var(--qo-muted)}
+.qo-hub-project{
+  display:grid;gap:10px;margin-top:12px;padding:13px 0 2px;
+  border-top:1px solid var(--qo-border);
+}
+.qo-hub-project strong{font-size:12px}
+.qo-hub-project p{
+  margin:4px 0 0;font-size:11px;line-height:1.5;
+  color:var(--qo-muted);
+}
+.qo-hub-project-actions{display:flex;flex-wrap:wrap;gap:7px}
+.qo-hub-project-actions button{
+  flex:1 1 125px;min-height:36px;padding:6px 9px;
+  text-align:center;font-size:11px;
+}
+.qo-hub-project-actions button:disabled{opacity:.5;cursor:not-allowed}
+@media(max-width:420px){
+  .qo-hub-overview{gap:6px}
+  .qo-hub-overview>div{padding:9px}
+}
