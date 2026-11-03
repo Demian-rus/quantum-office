@@ -1100,10 +1100,14 @@ const qoWriterKey='quantum-office-writer-v1',qoSlidesKey='quantum-office-slides-
 const qoNewWriter=()=>({name:'Новый документ',html:'<p><br></p>',updated:Date.now()});
 let qoWriter=qoDeskRead(qoWriterKey,qoNewWriter());
 if(!qoWriter||typeof qoWriter.name!=='string'||typeof qoWriter.html!=='string')qoWriter=qoNewWriter();
-const qoWriterDefaults=()=>({margin:20,font:'Georgia',size:16,line:1.55,pageNumber:true});
+const qoWriterDefaults=()=>({margin:20,font:'Georgia',size:16,line:1.55,paper:'A4',orientation:'portrait',header:'',footer:'',pageNumber:true});
 function qoWriterLayout(){
  const x=qoWriter.layout&&typeof qoWriter.layout==='object'?qoWriter.layout:{};
- return {margin:[12,15,20,25,30].includes(+x.margin)?+x.margin:20,
+ return {paper:['A4','A5','Letter'].includes(x.paper)?x.paper:'A4',
+  orientation:['portrait','landscape'].includes(x.orientation)?x.orientation:'portrait',
+  header:typeof x.header==='string'?x.header.slice(0,120).replace(/[\u0000-\u001f]/g,' '):'',
+  footer:typeof x.footer==='string'?x.footer.slice(0,120).replace(/[\u0000-\u001f]/g,' '):'',
+  margin:[12,15,20,25,30].includes(+x.margin)?+x.margin:20,
   font:['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].includes(x.font)?x.font:'Georgia',
   size:Number.isInteger(+x.size)&&+x.size>=8&&+x.size<=96?+x.size:16,
   line:[1.2,1.4,1.55,1.8,2].includes(+x.line)?+x.line:1.55,
@@ -1111,7 +1115,7 @@ function qoWriterLayout(){
 }
 qoWriter.layout=qoWriterLayout();
 let qoWriterSelectionRange=null,qoWriterSelectedImage=null;
-function qoWriterCSS(){const f=qoWriterLayout();return `--qo-writer-margin:${f.margin}mm;--qo-writer-font:'${f.font}';--qo-writer-size:${f.size}px;--qo-writer-line:${f.line}`;}
+function qoWriterCSS(){const f=qoWriterLayout(),[width,height]=qoWriterPaperSize(f);return `--qo-writer-margin:${f.margin}mm;--qo-writer-font:'${f.font}';--qo-writer-size:${f.size}px;--qo-writer-line:${f.line};--qo-writer-paper-width:${width}mm;--qo-writer-paper-height:${height}mm`;}
 
 const qoNewSlide=(i=1)=>({id:'slide-'+Date.now()+'-'+Math.random().toString(16).slice(2,8),bg:'#ffffff',items:[
  {id:'title',kind:'text',text:i===1?'Заголовок презентации':'Новый слайд',x:8,y:15,w:84,h:21,size:36,bold:true,color:'#193b32',align:'center'},
@@ -1256,7 +1260,7 @@ function qoWorkSwitchTab(kind,tab){
  document.querySelectorAll(`.qo-work-tabs [data-editor="${kind}"]`).forEach(el=>{const on=el.dataset.tab===tab;el.classList.toggle('active',on);el.setAttribute('aria-selected',String(on));});
  if(kind==='writer')qoDiagnosticVisibility();
 }
-function qoWriterStats(){const doc=document.getElementById('qo-writer-page'),out=document.getElementById('qo-writer-stats');if(!doc||!out)return;const value=doc.innerText.trim();out.textContent=`Слов: ${(value.match(/\S+/g)||[]).length} · Знаков: ${value.length}`;}
+function qoWriterStats(){const doc=document.getElementById('qo-writer-page'),out=document.getElementById('qo-writer-stats');if(!doc||!out)return;const value=doc.innerText.trim(),words=(value.match(/\S+/g)||[]).length,paragraphs=value.split(/\n+/).filter(Boolean).length;out.textContent=`Слов: ${words} · Знаков: ${value.length} · Абзацев: ${paragraphs} · Чтение: ~${Math.max(1,Math.ceil(words/180))} мин`;}
 function qoWriterPage(){
  const f=qoWriterLayout();
  const sel=(options,v)=>options.map(([val,label])=>`<option value="${esc(String(val))}" ${String(val)===String(v)?'selected':''}>${esc(label)}</option>`).join('');
@@ -1278,7 +1282,8 @@ function qoWriterPage(){
  const insert=qoWorkGroup('Объекты',qoWorkButton('writer-table','Таблица','table')+qoWorkButton('writer-image','Рисунок','image')+qoWorkButton('writer-link','Ссылка','link')+qoWorkButton('writer-break','Разрыв','break'));
  const tabtools=qoWorkGroup('Работа с таблицей',qoWorkButton('writer-add-row','Строка +','plus')+qoWorkButton('writer-add-col','Столбец +','plus')+qoWorkButton('writer-delete-row','Убрать строку','minus')+qoWorkButton('writer-delete-table','Удалить таблицу','trash'));
  const imagetools=qoWorkGroup('Выбранное изображение',`<label class="qo-work-field"><span>Ширина изображения</span><select id="qo-writer-img-width" class="qo-writer-small" disabled title="Нажмите на изображение в документе">${sel([[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']],100)}</select></label>`+qoWorkButton('writer-remove-image','Удалить фото','trash','id="qo-writer-remove-image" disabled'));
- const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack"><label class="qo-work-field"><span>Размер бумаги</span><div class="qo-work-value">A4 · 210 × 297 мм</div></label><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`);
+ const layout=qoWorkGroup('Параметры страницы',`<div class="qo-work-stack qo-writer-page-settings"><div class="qo-work-inline"><label class="qo-work-field"><span>Формат</span><select id="qo-writer-paper" aria-label="Формат бумаги">${sel([['A4','A4'],['A5','A5'],['Letter','Letter']],f.paper)}</select></label><label class="qo-work-field"><span>Ориентация</span><select id="qo-writer-orientation" aria-label="Ориентация страницы">${sel([['portrait','Книжная'],['landscape','Альбомная']],f.orientation)}</select></label></div><label class="qo-work-field"><span>Поля со всех сторон</span><select id="qo-writer-margin" class="qo-writer-small" title="Поля в миллиметрах">${sel([[12,'12 мм'],[15,'15 мм'],[20,'20 мм'],[25,'25 мм'],[30,'30 мм']],f.margin)}</select></label></div>`,'qo-writer-page-settings');
+ const runningHeads=qoWorkGroup('Колонтитулы',`<div class="qo-work-stack qo-writer-running-head"><div class="qo-work-inline"><label class="qo-work-field"><span>Верхний</span><input id="qo-writer-header" type="text" maxlength="120" aria-label="Текст верхнего колонтитула" placeholder="Текст сверху" value="${esc(f.header)}"></label><label class="qo-work-field"><span>Нижний</span><input id="qo-writer-footer" type="text" maxlength="120" aria-label="Текст нижнего колонтитула" placeholder="Текст снизу" value="${esc(f.footer)}"></label></div><label class="qo-writer-page-numbers"><input id="qo-writer-page-number" type="checkbox" ${f.pageNumber?'checked':''}> Номера страниц при печати</label></div>`,'qo-writer-running-head');
  const diagTile=(action,label,icon)=>qoWorkButton(action,label,icon,'','qo-diag-tile');
  const diagnosticFiles=qoWorkGroup('Диагностика',
    diagTile('writer-diag-new','Новая','new')+
@@ -1301,16 +1306,16 @@ function qoWriterPage(){
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
  ${qoWorkPanel('writer','home',main+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
- ${qoWorkPanel('writer','layout',layout+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
+ ${qoWorkPanel('writer','layout',layout+runningHeads+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
  ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates+diagnosticGuide)}
  </div></div>
  <div class="qo-writer-body">${qoWriterNavigationHTML()}
- <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap"><article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
+ <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
  <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section></div>
  <input type="file" id="qo-writer-file" accept=".qdoc,.txt,.html,text/plain,text/html,application/json" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
- <footer class="qo-editor-foot qo-office-footer"><span>A4 · ${f.margin} мм · ${esc(f.font)}</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / HTML / TXT</span></footer></main>`;
+ <footer class="qo-editor-foot qo-office-footer"><span id="qo-writer-layout-info">${f.paper} · ${f.orientation==='landscape'?'альбомная':'книжная'} · поля ${f.margin} мм</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / HTML / TXT</span></footer></main>`;
 }
 function qoWriterRememberSelection(){
  const sel=window.getSelection(),node=sel?.anchorNode,editor=document.getElementById('qo-writer-page');
@@ -1369,9 +1374,9 @@ function qoWriterImageSelect(img){
  if(img)img.classList.add('qo-writer-img-active');
 }
 function qoWriterHTMLDocument(){
- const f=qoWriterLayout(),safe=qoSafeRich(qoWriter.html);
- const style=`@page{size:A4;margin:${f.margin}mm}body{margin:0;font:${f.size}px/${f.line} '${f.font}',serif;color:#142a1d}main{max-width:${210-2*f.margin}mm;margin:0 auto}h1,h2,h3{font-family:Arial,sans-serif;break-after:avoid}table{width:100%;table-layout:fixed;border-collapse:collapse;margin:14px 0}td,th{padding:7px;border:1px solid #9caea1}th{background:#edf5ef}img{display:block;max-width:100%;height:auto;margin:12px auto}div[data-qo-break="true"]{break-after:page;page-break-after:always;height:0}a{color:#176f58}@media screen{body{background:#edf2ee;padding:28px}main{min-height:${297-2*f.margin}mm;background:white;padding:${f.margin}mm;box-shadow:0 3px 18px #0002}}`;
- return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>'+esc(qoWriter.name)+'</title><style>'+style+'</style></head><body><main>'+safe+'</main></body></html>';
+ const f=qoWriterLayout(),safe=qoSafeRich(qoWriter.html),[width,height]=qoWriterPaperSize(f);
+ const style=`${qoWriterPageRules(f)}body{margin:0;font:${f.size}px/${f.line} '${f.font}',serif;color:#142a1d}main{max-width:${width}mm;margin:0 auto}h1,h2,h3{font-family:Arial,sans-serif;break-after:avoid}table{width:100%;table-layout:fixed;border-collapse:collapse;margin:14px 0}td,th{padding:7px;border:1px solid #9caea1}th{background:#edf5ef}img{display:block;max-width:100%;height:auto;margin:12px auto}div[data-qo-break="true"]{break-after:page;page-break-after:always;height:0}a{color:#176f58}@media screen{body{background:#edf2ee;padding:28px}main{min-height:${height}mm;background:white;padding:${f.margin}mm;box-shadow:0 3px 18px #0002}.document-running-head{max-width:${width}mm;box-sizing:border-box;padding:10px ${f.margin}mm;margin:0 auto;background:white;color:#547363;font:11px Arial,sans-serif;text-align:center}.document-running-foot{display:flex;justify-content:space-between;max-width:${width}mm;box-sizing:border-box;padding:8px ${f.margin}mm;margin:0 auto;background:white;color:#547363;font:11px Arial,sans-serif}}@media print{.document-running-head,.document-running-foot{display:none!important}body{background:white!important}main{max-width:none;width:100%;padding:0!important}}`;
+ return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>'+esc(qoWriter.name)+'</title><style>'+style+'</style></head><body>'+ (f.header?'<div class="document-running-head">'+esc(f.header)+'</div>':'')+'<main>'+safe+'</main>'+(f.footer||f.pageNumber?'<div class="document-running-foot"><span>'+esc(f.footer)+'</span><span>'+(f.pageNumber?'Стр. 1':'')+'</span></div>':'')+'</body></html>';
 }
 function qoWriterExport(format){
  qoPersistWriter();
@@ -1385,7 +1390,7 @@ function qoWriterExport(format){
 }
 function qoWriterPrint(){
  qoPersistWriter();const style=document.getElementById('qo-writer-print-style')||document.createElement('style');
- style.id='qo-writer-print-style';style.textContent=`@media print{@page{size:A4;margin:${qoWriterLayout().margin}mm;${qoWriterLayout().pageNumber?'@bottom-right{content:counter(page);font:10px Arial;color:#567363}':''}}}`;
+ style.id='qo-writer-print-style';style.textContent=qoWriterPageRules(qoWriterLayout());
  document.head.append(style);window.print();
 }
 function qoSlide(){return qoSlides.slides[Math.max(0,Math.min(qoSlides.slides.length-1,qoSlides.active))];}
@@ -3075,6 +3080,9 @@ app.addEventListener('input',e=>{
  if(e.target.id==='qs-zoom'){qoPhotoZoomTo(Number(e.target.value)/100);return;}
  if(e.target.id==='qs-project-title'){qoPhotoFile=e.target.value.slice(0,120)||'Без названия';qoPhotoPersist();return;}
  if(e.target.matches('[data-photo-adjust]')){qoPhotoAdjust[e.target.dataset.photoAdjust]=Number(e.target.value);e.target.previousElementSibling.textContent=String(e.target.value)+'%';qoPhotoRender();qoPhotoPersist();return;}
+ if(e.target.id==='qo-writer-header'||e.target.id==='qo-writer-footer'){
+  const key=e.target.id==='qo-writer-header'?'header':'footer';qoWriter.layout[key]=e.target.value.slice(0,120);qoWriter.layout=qoWriterLayout();qoWriterUpdatePagePreview();qoPersistWriter();return;
+ }
  if(e.target.id==='qo-writer-page'||e.target.id==='qo-writer-title'){qoPersistWriter();if(e.target.id==='qo-writer-page')qoWriterStats();return;}
  if(e.target.id==='qo-slides-title'){qoPersistSlides();return;}
  if(e.target.id==='qo-slide-text'){
@@ -3103,10 +3111,11 @@ app.addEventListener('change',async e=>{const t=e.target;
    qoWriterInsert('<p><img src="'+img+'" alt="Изображение" style="width:75%"></p><p><br></p>');
   };reader.readAsDataURL(file);t.value='';return;
  }
- if(['qo-writer-margin','qo-writer-font','qo-writer-size','qo-writer-line'].includes(t.id)){
-  const key=t.id.replace('qo-writer-','');qoWriter.layout[key]=['font'].includes(key)?t.value:Number(t.value);
-  qoWriter.layout=qoWriterLayout();const el=document.getElementById('qo-writer-page');if(el)el.setAttribute('style',qoWriterCSS());qoPersistWriter();return;
+ if(['qo-writer-margin','qo-writer-font','qo-writer-size','qo-writer-line','qo-writer-paper','qo-writer-orientation'].includes(t.id)){
+  const key=t.id.replace('qo-writer-','');qoWriter.layout[key]=['font','paper','orientation'].includes(key)?t.value:Number(t.value);
+  qoWriter.layout=qoWriterLayout();qoWriterUpdatePagePreview();qoPersistWriter();return;
  }
+ if(t.id==='qo-writer-page-number'){qoWriter.layout.pageNumber=t.checked;qoWriter.layout=qoWriterLayout();qoWriterUpdatePagePreview();qoPersistWriter();return;}
  if(t.id==='qo-writer-text-color'||t.id==='qo-writer-highlight'){
   qoWriterFocusSelection();document.execCommand(t.id==='qo-writer-highlight'?'hiliteColor':'foreColor',false,t.value);qoWriterRememberSelection();qoPersistWriter();return;
  }
