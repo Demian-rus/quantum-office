@@ -1438,7 +1438,7 @@ const QD_PRESETS=[
   ...(typeof QD_PRESET_CURRICULUM==='object'?Object.entries(QD_PRESET_CURRICULUM.new)
     .map(([id,m])=>({id,subject:m.subject,grade:m.grade,purpose:m.purpose,
       label:m.label,description:m.description})) : [])
-];
+].filter(p=>['physics','math','informatics'].includes(p.subject));
 const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',
   russian:'Русский язык',biology:'Биология',geography:'География',
   chemistry:'Химия',other:'Другое'};
