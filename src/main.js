@@ -1344,11 +1344,25 @@ function qoWriterStats(){const doc=document.getElementById('qo-writer-page'),out
 function qoWriterPage(){
  const f=qoWriterLayout();
  const sel=(options,v)=>options.map(([val,label])=>`<option value="${esc(String(val))}" ${String(val)===String(v)?'selected':''}>${esc(label)}</option>`).join('');
- const main=qoWorkGroup('Шрифт',`
- <div class="qo-writer-main-tiles"><div class="qo-writer-choice-stack"><label class="qo-work-field"><span>Семейство</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].map(x=>[x,x]),f.font)}</select></label>
- <label class="qo-work-field"><span>Размер</span><input id="qo-writer-size" class="qo-writer-mini" type="number" min="8" max="96" step="1" value="${f.size}" title="Размер шрифта, пиксели" aria-label="Размер шрифта в пикселях"></label></div>
- <div class="qo-writer-icon-grid qo-style-line" role="group" aria-label="Форматирование текста"><button class="qo-icon-tile" data-action="writer-cmd" data-command="bold" title="Жирный (Ctrl+B)"><b>Ж</b></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="italic" title="Курсив (Ctrl+I)"><i>К</i></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="underline" title="Подчёркивание"><u>Ч</u></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="strikeThrough" title="Зачёркивание"><s>З</s></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="superscript" title="Надстрочный знак (степень)" aria-label="Надстрочный текст">x<sup>2</sup></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="subscript" title="Подстрочный знак (индекс)" aria-label="Подстрочный текст">x<sub>2</sub></button><button class="qo-icon-tile" data-action="writer-cmd" data-command="removeFormat" title="Очистить форматирование выделенного текста" aria-label="Очистить форматирование">${qoWorkIcon('highlighter')}</button></div></div>`);
- const colors=qoWorkGroup('Цвет',`<div class="qo-writer-icon-grid" role="group" aria-label="Цвет текста и маркер"><label class="qo-compact-color" title="Цвет текста"><input id="qo-writer-text-color" type="color" value="#263b31" aria-label="Цвет текста"></label><label class="qo-compact-color" title="Маркер текста"><input id="qo-writer-highlight" type="color" value="#fff49b" aria-label="Выделение маркером"></label></div>`);
+ const main=qoWorkGroup('Шрифт',`<div class="qo-writer-font-layout">
+  <div class="qo-writer-font-top">
+   <label class="qo-work-field qo-writer-font-family"><span>Шрифт</span><select id="qo-writer-font" class="qo-writer-font" title="Выбрать шрифт" aria-label="Семейство шрифта">${sel(['Georgia','Arial','Times New Roman','Segoe UI','Verdana','Calibri','Cambria','Tahoma','Trebuchet MS','Courier New','Comic Sans MS'].map(x=>[x,x]),f.font)}</select></label>
+   <label class="qo-work-field qo-writer-font-size"><span>Размер</span><input id="qo-writer-size" class="qo-writer-mini" type="number" min="8" max="96" step="1" value="${f.size}" title="Размер шрифта, пиксели" aria-label="Размер шрифта в пикселях"></label>
+  </div>
+  <div class="qo-writer-font-actions qo-style-line" role="group" aria-label="Начертание и цвет текста">
+   <button class="qo-icon-tile" data-action="writer-cmd" data-command="bold" title="Жирный (Ctrl+B)" aria-label="Жирный"><b>Ж</b></button>
+   <button class="qo-icon-tile" data-action="writer-cmd" data-command="italic" title="Курсив (Ctrl+I)" aria-label="Курсив"><i>К</i></button>
+   <button class="qo-icon-tile" data-action="writer-cmd" data-command="underline" title="Подчёркивание" aria-label="Подчёркивание"><u>Ч</u></button>
+   <button class="qo-icon-tile" data-action="writer-cmd" data-command="strikeThrough" title="Зачёркивание" aria-label="Зачёркивание"><s>З</s></button>
+   <label class="qo-writer-font-color qo-writer-text-color" title="Цвет текста" aria-label="Цвет текста"><span class="qo-writer-color-symbol">A</span><input id="qo-writer-text-color" type="color" value="#263b31" aria-label="Цвет текста"></label>
+   <label class="qo-writer-font-color qo-writer-marker-color" title="Цвет выделения" aria-label="Цвет выделения"><span class="qo-writer-marker-symbol">${qoWorkIcon('highlighter')}</span><input id="qo-writer-highlight" type="color" value="#fff49b" aria-label="Выделение маркером"></label>
+  </div>
+ </div>`);
+ const extra=qoWorkGroup('Дополнительно',`<div class="qo-writer-icon-grid" role="group" aria-label="Индексы и очистка оформления">
+  <button class="qo-icon-tile" data-action="writer-cmd" data-command="superscript" title="Надстрочный знак (степень)" aria-label="Надстрочный текст">x<sup>2</sup></button>
+  <button class="qo-icon-tile" data-action="writer-cmd" data-command="subscript" title="Подстрочный знак (индекс)" aria-label="Подстрочный текст">x<sub>2</sub></button>
+  <button class="qo-icon-tile" data-action="writer-cmd" data-command="removeFormat" title="Очистить форматирование выделенного текста" aria-label="Очистить форматирование">${qoWorkIcon('eraser')}</button>
+ </div>`);
  const paragraphs=qoWorkGroup('Абзац',`<div class="qo-writer-main-tiles qo-writer-paragraph-tiles"><div class="qo-writer-choice-stack">
  <label class="qo-work-field"><span>Стиль</span><select id="qo-writer-block" title="Стиль абзаца" aria-label="Стиль абзаца">${sel([['p','Обычный текст'],['h1','Заголовок 1'],['h2','Заголовок 2'],['h3','Заголовок 3']],'p')}</select></label>
  <label class="qo-work-field"><span>Интервал</span><select id="qo-writer-line" class="qo-writer-small" title="Межстрочный интервал" aria-label="Межстрочный интервал">${sel([[1.2,'1,2'],[1.4,'1,4'],[1.55,'1,55'],[1.8,'1,8'],[2,'2,0']],f.line)}</select></label></div>
@@ -1393,7 +1407,7 @@ function qoWriterPage(){
  <div class="qo-office-toolbar">
  ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика']])}
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
- ${qoWorkPanel('writer','home',main+colors+paragraphs)}
+ ${qoWorkPanel('writer','home',main+extra+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
