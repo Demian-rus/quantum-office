@@ -7,11 +7,17 @@ const QO_HUB_MAX_RESULTS=3000;
 let qoHubOpen=false,qoHubRosterOpen=false,qoHubQuery='',qoHubFocusName='';
 function qoHubText(v,n=120){return String(v??'').trim().slice(0,n);}
 function qoHubKey(name){return qoHubText(name,100).normalize('NFKC').replace(/\s+/g,' ').toLocaleLowerCase('ru-RU');}
+/* TASK137: continue to function in a session if browser storage is blocked.
+ * Never imply this fallback survived a browser restart. */
+const qoHubSessionMemory=new Map();
+let qoHubSavedPersistently=true;
 function qoHubRead(key,fallback){
- try{const x=JSON.parse(localStorage.getItem(key)||'null');return x??fallback;}catch(_){return fallback;}
+ try{const raw=localStorage.getItem(key);if(raw!==null)return JSON.parse(raw)??fallback;}catch(_){}
+ return qoHubSessionMemory.has(key)?qoHubSessionMemory.get(key):fallback;
 }
 function qoHubWrite(key,v){
- try{localStorage.setItem(key,JSON.stringify(v));return true;}catch(_){return false;}
+ try{localStorage.setItem(key,JSON.stringify(v));qoHubSessionMemory.delete(key);qoHubSavedPersistently=true;return true;}
+ catch(_){qoHubSessionMemory.set(key,structuredClone(v));qoHubSavedPersistently=false;return true;}
 }
 function qoHubSource(){const x=qoHubRead(QO_HUB_SOURCE_KEY,null);
  if(!x||typeof x.bookId!=='string'||typeof x.sheetId!=='string')return null;
@@ -51,8 +57,10 @@ function qoHubAttachCurrent(){
  if(!qoHubWrite(QO_HUB_SOURCE_KEY,{bookId:b.id,sheetId:s.id})){
    status('Не удалось сохранить связь с таблицей в браузере',true);return false;
  }
- qoHubOpen=true;
- status('Список учеников привязан: '+s.name+'. Изменения в таблице будут видны в диагностике.');
+ qoHubOpen=true;qoHubDecorate();
+ status(qoHubSavedPersistently?
+   'Список учеников привязан: '+s.name+'. Изменения в таблице будут видны в диагностике.':
+   'Связь действует только в этой вкладке: хранилище браузера недоступно. Сохраните проект.',!qoHubSavedPersistently);
  return true;
 }
 function qoHubResults(){
@@ -373,12 +381,12 @@ function qoHubOnClick(event){
  const type=b.dataset.hubAction;
  if(type==='toggle'){qoHubOpen=!qoHubOpen;qoHubDecorate();return;}
  if(type==='close'){qoHubOpen=false;qoHubDecorate();return;}
- if(type==='connect'){if(qoHubAttachCurrent())qoHubDecorate();return;}
+ if(type==='connect'){qoHubAttachCurrent();return;}
  if(type==='project-export'){qoHubExportProject();return;}
  if(type==='project-import'){document.getElementById('qo-hub-project-file')?.click();return;}
  if(type==='unlink'){
    if(confirm('Отключить источник учеников? Сохранённый журнал результатов останется в браузере.')){
-      localStorage.removeItem(QO_HUB_SOURCE_KEY);qoHubDecorate();
+      qoHubSessionMemory.delete(QO_HUB_SOURCE_KEY);try{localStorage.removeItem(QO_HUB_SOURCE_KEY);}catch(_){}qoHubDecorate();
    }return;
  }
  if(type==='open-card'){activeCell='A'+b.dataset.row;qoHubOpen=true;qoHubDecorate();return;}
