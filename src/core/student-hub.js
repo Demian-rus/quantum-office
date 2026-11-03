@@ -27,7 +27,7 @@ function qoHubIsRoster(s){return qoHubKey(qoHubCell(s,'A1'))==='ученик';}
 function qoHubRoster(){
  const src=qoHubSourceSheet();if(!src||!qoHubIsRoster(src.sheet))return [];
  const s=src.sheet;
- const entries=Object.keys(s.cells||{}).filter(x=>/^A[2-9]\d{0,4}$/.test(x))
+ const entries=Object.keys(s.cells||{}).filter(x=>/^A(?:[2-9]|[1-9]\d{1,4})$/.test(x))
     .map(x=>Number(x.slice(1))).filter(r=>r>=2&&r<=20000).sort((a,b)=>a-b);
  const counts=new Map();
  for(const r of entries){const name=qoHubCell(s,'A'+r);
