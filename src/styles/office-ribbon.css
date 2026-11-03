@@ -1,0 +1,60 @@
+/* TASK134: one ribbon geometry, based on the spreadsheet editor (40/30/78 px). */
+:root{
+ --qo-office-shell-height:40px;
+ --qo-office-tab-height:30px;
+ --qo-office-ribbon-height:78px;
+ --qo-office-ribbon-icon:29px;
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-office-toolbar{
+ height:109px;min-height:109px;max-height:109px;flex:0 0 109px;
+ box-sizing:border-box;background:var(--qo-surface-alt);
+ border-bottom:1px solid var(--qo-border);min-width:0;
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-tabs{
+ box-sizing:border-box;display:flex;align-items:stretch;
+ height:var(--qo-office-tab-height);min-height:var(--qo-office-tab-height);
+ max-height:var(--qo-office-tab-height);padding:0 8px;
+ border-bottom:1px solid var(--qo-border);
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-ribbon{
+ box-sizing:border-box;height:var(--qo-office-ribbon-height);
+ min-height:var(--qo-office-ribbon-height);max-height:var(--qo-office-ribbon-height);
+ overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;min-width:0;
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-panel.active{
+ box-sizing:border-box;min-height:var(--qo-office-ribbon-height);
+ height:var(--qo-office-ribbon-height);align-items:stretch;
+ padding:3px 8px 2px;
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-group-caption{
+ font-size:9px;line-height:12px;min-height:12px;font-weight:600;
+ color:var(--qo-muted);text-align:center;
+}
+:is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-tab{
+ height:var(--qo-office-tab-height);min-height:var(--qo-office-tab-height);
+ font-size:11px;font-weight:600;white-space:nowrap;
+}
+.qs-studio .qo-work-group{min-width:64px;gap:2px;padding:0 11px}
+.qs-studio .qo-work-group-body{display:flex;min-height:52px;gap:5px;align-items:center;justify-content:flex-start}
+.qs-studio .qs-btn{
+ display:inline-flex;align-items:center;justify-content:center;
+ width:var(--qo-office-ribbon-icon);min-width:var(--qo-office-ribbon-icon);
+ max-width:var(--qo-office-ribbon-icon);height:var(--qo-office-ribbon-icon);
+ min-height:var(--qo-office-ribbon-icon);padding:5px;
+ background:transparent;color:var(--qo-text);border:1px solid transparent;
+ border-radius:5px;box-sizing:border-box;cursor:pointer;flex:none;
+}
+.qs-studio .qs-btn>span{display:none!important}
+.qs-studio .qs-btn svg{display:block;width:17px;height:17px;flex:none}
+.qs-studio .qs-btn:hover:not(:disabled){background:var(--qo-hover);border-color:var(--qo-border)}
+.qs-studio .qs-btn[aria-pressed="true"]{background:var(--qo-accent-soft);color:var(--qo-accent);border-color:var(--qo-accent-border)}
+.qs-studio .qs-btn:disabled{opacity:.36;cursor:default}
+.qs-studio .qs-ribbon-save{align-self:center;margin-left:10px;padding:0 8px;color:var(--qo-muted);font-size:10px;white-space:nowrap}
+@media(max-width:700px){
+ :is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-tabs{overflow-x:auto;scrollbar-width:none}
+ .qs-studio .qo-work-group{min-width:52px;padding:0 8px}
+ .qs-studio .qo-work-panel.active{width:max-content;min-width:100%}
+}
+@media print{
+ .qs-studio .qo-office-toolbar{display:none!important}
+}
