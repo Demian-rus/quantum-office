@@ -953,6 +953,26 @@ export function findCells(sheet,query){
   .sort((a,b)=>{const x=parseCell(a),y=parseCell(b);return x.row-y.row||x.col-y.col;});
 }
 
+/** TASK128: search values and formula text across one worksheet or the entire workbook.
+ * Pure read-only operation with an explicit results cap for large workbooks. */
+export function findWorkbookCells(book,query,{sheetId=null,limit=500}={}){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const text=String(query??'').trim();
+ if(!text)return {matches:[],truncated:false};
+ if(text.length>1000)throw Error('Слишком длинный поисковый запрос');
+ if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Недопустимый лимит результатов');
+ const sources=sheetId?book.sheets.filter(s=>s.id===sheetId):book.sheets;
+ if(sheetId&&!sources.length)throw Error('Лист не найден');
+ const matches=[];
+ for(const sheet of sources){
+  for(const ref of findCells(sheet,text)){
+   if(matches.length>=limit)return {matches,truncated:true};
+   matches.push({sheetId:sheet.id,sheetName:sheet.name,ref,value:getCell(sheet,ref).value});
+  }
+ }
+ return {matches,truncated:false};
+}
+
 /** Replaces literal text without executing input as a regular expression.
  * Formulas are left unchanged; model mutations are bounded and all-or-nothing. */
 export function replaceAllText(sheet,search,replacement){
