@@ -1,0 +1,84 @@
+/* TASK136 — pixel-aligned Writer font group copied from Sheets' actual toolbar hierarchy.
+   Row 1: font family (wide) + font size (narrow).
+   Row 2: bold, italic, underline, strike, text color, marker. */
+.qo-document-workspace .qo-writer-font-layout{
+ display:grid;grid-template-rows:29px 29px;row-gap:4px;
+ width:280px;min-width:280px;max-width:280px;height:62px;min-height:62px;
+ align-content:center;box-sizing:border-box;
+}
+.qo-document-workspace .qo-writer-font-top{
+ display:grid;grid-template-columns:minmax(0,1fr) 56px;
+ gap:8px;align-items:center;height:29px;min-width:0;
+}
+.qo-document-workspace .qo-writer-font-top .qo-work-field{
+ display:flex;align-items:center;min-width:0;min-height:29px;margin:0!important;
+}
+.qo-document-workspace .qo-writer-font-top .qo-work-field>span{
+ position:absolute!important;width:1px!important;height:1px!important;padding:0!important;
+ margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;
+ white-space:nowrap!important;border:0!important;
+}
+.qo-document-workspace .qo-writer-font-top :is(#qo-writer-font,#qo-writer-size){
+ display:block;box-sizing:border-box;height:28px!important;min-height:28px!important;
+ max-height:28px!important;width:100%!important;min-width:0!important;max-width:100%!important;
+ border:1px solid var(--qo-border);border-radius:6px;
+ background:var(--qo-surface);color:var(--qo-text);font:11px/20px 'Segoe UI',Arial,sans-serif;
+ padding:2px 8px!important;margin:0!important;
+}
+.qo-document-workspace .qo-writer-font-top #qo-writer-size{
+ text-align:center;padding:2px 3px!important;
+ font-size:11px;line-height:20px;appearance:textfield;
+}
+.qo-document-workspace .qo-writer-font-top #qo-writer-size::-webkit-inner-spin-button,
+.qo-document-workspace .qo-writer-font-top #qo-writer-size::-webkit-outer-spin-button{
+ -webkit-appearance:none;margin:0;
+}
+.qo-document-workspace .qo-writer-font-actions{
+ display:grid!important;grid-template-columns:repeat(6,minmax(0,1fr));grid-template-rows:29px;
+ align-items:center;justify-items:center;gap:0!important;
+ height:29px!important;min-height:29px!important;max-height:29px!important;
+ min-width:0;
+}
+.qo-document-workspace .qo-writer-font-actions>:is(button,label){
+ display:flex;align-items:center;justify-content:center;position:relative;
+ box-sizing:border-box;width:29px!important;min-width:29px!important;max-width:29px!important;
+ height:29px!important;min-height:29px!important;max-height:29px!important;
+ padding:3px!important;margin:0!important;
+ border-radius:5px;border:1px solid transparent;background:transparent;
+ font:600 13px/1 'Segoe UI',Arial,sans-serif;color:var(--qo-text);cursor:pointer;
+}
+.qo-document-workspace .qo-writer-font-actions>:is(button,label):hover{
+ background:var(--qo-hover);border-color:var(--qo-border)
+}
+.qo-document-workspace .qo-writer-font-actions>:is(button,label):focus-within{
+ outline:2px solid var(--qo-accent-border);outline-offset:-1px;
+}
+.qo-document-workspace .qo-writer-font-actions button b,
+.qo-document-workspace .qo-writer-font-actions button i,
+.qo-document-workspace .qo-writer-font-actions button u,
+.qo-document-workspace .qo-writer-font-actions button s{font-size:14px}
+.qo-document-workspace .qo-writer-font-color input[type=color]{
+ position:absolute;inset:0;opacity:0;width:100%;height:100%;
+ padding:0;border:0;cursor:pointer;
+}
+.qo-document-workspace .qo-writer-color-symbol{
+ position:relative;display:flex;align-items:center;justify-content:center;
+ width:19px;height:22px;font:bold 16px/1 'Segoe UI',Arial,sans-serif;
+}
+.qo-document-workspace .qo-writer-color-symbol:after{
+ content:'';position:absolute;bottom:0;left:0;right:0;height:3px;
+ background:#263b31;border-radius:2px;
+}
+.qo-document-workspace .qo-writer-marker-symbol{position:relative;display:flex;align-items:center;justify-content:center;width:21px;height:23px}
+.qo-document-workspace .qo-writer-marker-symbol svg{width:18px;height:18px}
+.qo-document-workspace .qo-writer-marker-symbol:after{
+ content:'';position:absolute;bottom:0;left:1px;right:1px;height:3px;
+ background:#fff49b;border:1px solid #dbcb73;border-radius:2px;
+}
+.qo-document-workspace .qo-writer-font-layout,
+.qo-document-workspace .qo-writer-font-top,
+.qo-document-workspace .qo-writer-font-actions{overflow:visible}
+@media(max-width:700px){
+ .qo-document-workspace .qo-writer-font-layout{width:264px;min-width:264px;max-width:264px}
+ .qo-document-workspace .qo-writer-font-top{grid-template-columns:minmax(0,1fr) 54px;gap:7px}
+}
