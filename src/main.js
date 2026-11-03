@@ -100,11 +100,32 @@ function status(message,tone=false){
  node.setAttribute('aria-live',severity==='error'?'assertive':'polite');node.setAttribute('aria-atomic','true');
  clearTimeout(status.timer);status.timer=setTimeout(()=>node.classList.remove('active'),3100);
 }
-function updateSaveIndicator(){const n=document.querySelector('#storage-indicator'),b=book();if(!n)return;
- const linked=b&&directFiles.has(b.id);
- n.textContent=linked?(dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+(storeWarning?' · нет автосохранения браузера':''):
+let qoWriterSavedLocal=true,qoSlidesSavedLocal=true;
+function updateSaveIndicator(){
+ const n=document.querySelector('#storage-indicator');if(!n)return;
+ if(page==='writer'){
+  n.textContent=qoWriterSavedLocal?'● Черновик текста в браузере':'⚠ Текст не записан в браузер';
+  n.title='Локальная копия не заменяет файл QDOC или общую резервную копию';
+  return;
+ }
+ if(page==='slides'){
+  n.textContent=qoSlidesSavedLocal?'● Черновик презентации в браузере':'⚠ Презентация не записана в браузер';
+  n.title='Для надёжного хранения сохраните QSLIDES или резервную копию';
+  return;
+ }
+ if(page==='photo'){
+  n.textContent=qoPhotoDraftSaved?'● Проект Студии в браузере':'⚠ Проект Студии не записан';
+  n.title='Для надёжного хранения сохраните QSTUDIO или резервную копию';
+  return;
+ }
+ const b=book(),linked=b&&directFiles.has(b.id);
+ n.textContent=linked?
+  (dirtyFiles.has(b.id)?'● Изменено · не сохранено на диск':'✓ Файл проверен на диске')+
+   (storeWarning?' · нет автосохранения браузера':''):
   storeWarning?'⚠ Черновик не записан':'● Черновик в браузере';
- n.title=storeWarning?'Локальная память браузера недоступна. Прямые сохранения на диск и резервные копии проверяйте отдельно.':'Черновики браузера не заменяют отдельные резервные копии.';
+ n.title=storeWarning?
+  'Локальная память браузера недоступна. Сделайте ручное сохранение.':
+  'Черновики браузера не заменяют отдельные резервные копии.';
 }
 function persist(){try{saveWorkspace(workspace);storeWarning=false;}catch(e){storeWarning=true;status('Память браузера недоступна: сохраните .qbook и архив',true);}updateSaveIndicator();}
 function changed(){if(book()){book().updated=dateNow();dirtyFiles.add(book().id);}syncHistoryButtons();persist();if(page==='sheet'){if(chartDrawerOpen)refreshChartPreview();refreshSheetCharts();}}
@@ -249,7 +270,7 @@ function qoRestoreOfficeBackup(snapshot){
   qoPhotoHistory=[];qoPhotoRedo=[];qoWriterSelectionRange=null;
   directFiles.clear();dirtyFiles.clear();page='home';
   workspace.active=workspace.books[0]?.id??null;
-  storeWarning=false;qoPhotoDraftSaved=true;
+  storeWarning=false;qoPhotoDraftSaved=true;qoWriterSavedLocal=true;qoSlidesSavedLocal=true;
   render();
   status('Все четыре раздела восстановлены из резервного архива.','success');
  }catch(error){
@@ -1232,7 +1253,7 @@ function qoSafeRich(html){
 function qoPersistWriter(){
  const editor=document.getElementById('qo-writer-page');if(editor)qoWriter.html=qoSafeRich(editor.innerHTML);
  const title=document.getElementById('qo-writer-title');if(title)qoWriter.name=title.value.trim().slice(0,120)||'Новый документ';
- qoWriter.updated=Date.now();try{localStorage.setItem(qoWriterKey,JSON.stringify(qoWriter));}catch{status('Документ слишком большой для автосохранения. Экспортируйте HTML.',true);}
+ qoWriter.updated=Date.now();try{localStorage.setItem(qoWriterKey,JSON.stringify(qoWriter));qoWriterSavedLocal=true;}catch{qoWriterSavedLocal=false;status('Документ не записан в браузере. Сохраните QDOC или HTML.',true);}updateSaveIndicator();
 }
 // TASK092: editor-specific contextual ribbon and native-looking compact icon controls.
 const qoWorkspaceTab={writer:'home',slides:'home',photo:'home'};
@@ -1469,7 +1490,7 @@ function qoWriterPrint(){
  document.head.append(style);window.print();
 }
 function qoSlide(){return qoSlides.slides[Math.max(0,Math.min(qoSlides.slides.length-1,qoSlides.active))];}
-function qoPersistSlides(){const title=document.getElementById('qo-slides-title');if(title)qoSlides.name=title.value.trim().slice(0,120)||'Новая презентация';qoSlides.updated=Date.now();try{localStorage.setItem(qoSlidesKey,JSON.stringify(qoSlides));}catch{status('Недостаточно места для презентации. Сохраните файл .qslides.',true);}}
+function qoPersistSlides(){const title=document.getElementById('qo-slides-title');if(title)qoSlides.name=title.value.trim().slice(0,120)||'Новая презентация';qoSlides.updated=Date.now();try{localStorage.setItem(qoSlidesKey,JSON.stringify(qoSlides));qoSlidesSavedLocal=true;}catch{qoSlidesSavedLocal=false;status('Презентация не записана в браузере. Сохраните QSLIDES.',true);}updateSaveIndicator();}
 function qoSlidePreview(slide,interactive){const items=slide.items.map(item=>{
  const dim=`left:${Number(item.x)}%;top:${Number(item.y)}%;width:${Number(item.w)}%;height:${Number(item.h)}%;`;
  if(item.kind==='image')return `<div class="qo-slide-object qo-slide-image${interactive&&qoSlides.selected===item.id?' selected':''}" style="${dim}" ${interactive?`data-slide-item="${esc(item.id)}"`:''}><img src="${esc(item.data)}" alt="Изображение слайда" draggable="false"></div>`;
@@ -1636,7 +1657,7 @@ function qoPhotoState(){return {...(!qoPhotoHasBackgroundOpacity&&qoPhotoBackgro
 function qoPhotoSnapshot(){qoPhotoHistory.push(qoPhotoState());if(qoPhotoHistory.length>35)qoPhotoHistory.shift();qoPhotoRedo=[];}
 function qoPhotoLoadImageSrc(src){qoPhotoImageSrc=src||'';qoPhotoImage=null;if(src){const img=new Image();img.onload=()=>{if(qoPhotoImageSrc===src){qoPhotoImage=img;qoPhotoRender();}};img.src=src;}}
 function qoPhotoApplyState(v){v=validateStudioProject(v);qoPhotoCompare=false;qoPhotoStrokes=v.strokes||[];qoPhotoCanvasW=v.width||1100;qoPhotoCanvasH=v.height||650;qoPhotoBG=v.bg||'#ffffff';qoPhotoBackgroundOpacity=v.backgroundOpacity??1;qoPhotoHasBackgroundOpacity=Object.hasOwn(v,'backgroundOpacity');qoPhotoTransparent=!!v.transparent;qoPhotoAdjust=v.adjust||{brightness:100,contrast:100,saturation:100};qoPhotoFile=v.name||'Без названия';qoPhotoSelectedId=null;qoPhotoSelectedIds.clear();qoPhotoCounter=Math.max(qoPhotoCounter,...qoPhotoStrokes.map(o=>Number((o.id||'').split('-')[1])||0))+1;qoPhotoLoadImageSrc(v.imageSrc||'');}
-function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoPhotoDraftSaved?'Черновик сохранён':'Скачайте QSTUDIO · черновик не сохранён';}
+function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
 function qoPhotoObject(){return qoPhotoStrokes.find(o=>o.id===qoPhotoSelectedId)||null;}
 function qoPhotoBounds(o){const a=o.points?.[0]||[0,0],last=o.points?.at(-1)||a;
  if(o.tool==='text')return qoPhotoTextBounds(o);
