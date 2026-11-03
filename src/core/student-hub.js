@@ -132,6 +132,139 @@ function qoHubCardHTML(student){
    '<div class="qo-hub-card-actions"><button type="button" class="qo-hub-primary" data-hub-action="open-diagnostic" data-student="'+
       qoHubEsc(student.id)+'" '+(student.duplicate?'disabled':'')+'>Открыть диагностику</button></div></div>';
 }
+
+/* TASK123 — one-file portable backup of the linked workbook and central
+ * diagnostic ledger. The current QBOOK stays untouched. */
+const QO_HUB_PACKAGE_FORMAT='quantum-office-teacher-project-v1';
+const QO_HUB_PACKAGE_LIMIT=20*1024*1024;
+function qoHubScopedResults(src){
+ const prefix=src.book.id+'|'+src.sheet.id+'|';
+ return qoHubResults().filter(r=>r.id.startsWith(prefix)&&r.studentKey.startsWith(prefix));
+}
+function qoHubPackage(){
+ const src=qoHubSourceSheet();
+ if(!src)throw Error('Сначала свяжите лист учеников с диагностикой');
+ const copy=structuredClone(src.book);
+ // Use the existing QBOOK validator; never export a partially corrupt book.
+ const validated=decodeBook(encodeBook(copy));
+ return {format:QO_HUB_PACKAGE_FORMAT,version:1,createdAt:new Date().toISOString(),
+   book:validated,sheetId:src.sheet.id,results:qoHubScopedResults(src)};
+}
+function qoHubExportProject(){
+ try{
+   commitEditor();
+   const pack=qoHubPackage();
+   const payload=JSON.stringify(pack);
+   if(new Blob([payload]).size>QO_HUB_PACKAGE_LIMIT)throw Error('Проект превышает 20 МБ');
+   download(safeFile(pack.book.name)+'-преподаватель.qteacher',payload,'application/json;charset=utf-8');
+   status('Создан файл проекта: таблица учеников и '+pack.results.length+' результатов');
+ }catch(e){status('Не удалось скачать проект: '+e.message,true);}
+}
+function qoHubValidatedPackage(text){
+ if(typeof text!=='string'||text.length>QO_HUB_PACKAGE_LIMIT)throw Error('Слишком большой файл проекта');
+ let value;
+ try{value=JSON.parse(text);}catch(_){throw Error('Файл не является корректным JSON');}
+ if(value?.format!==QO_HUB_PACKAGE_FORMAT||value.version!==1||!value.book||
+     typeof value.sheetId!=='string'||!Array.isArray(value.results)||
+     value.results.length>QO_HUB_MAX_RESULTS)throw Error('Неверный формат проекта преподавателя');
+ const b=decodeBook(JSON.stringify({format:'quantum-office-book-v1',book:value.book}));
+ const sh=b.sheets.find(x=>x.id===value.sheetId);
+ if(!sh||!qoHubIsRoster(sh))throw Error('В архиве отсутствует связанный лист «Ученики»');
+ const oldPrefix=b.id+'|'+sh.id+'|';
+ const entries=value.results.map(row=>{
+   if(!row||typeof row.id!=='string'||typeof row.studentKey!=='string'||
+       !row.id.startsWith(oldPrefix)||!row.studentKey.startsWith(oldPrefix)||
+       !Number.isFinite(row.percent)||row.percent<0||row.percent>100||
+       !Array.isArray(row.topics)||row.topics.length>24)
+     throw Error('В журнале есть некорректная запись');
+   return {id:row.id,studentKey:row.studentKey,date:qoHubText(row.date,32),
+     title:qoHubText(row.title,120),percent:row.percent,
+     earned:Number.isFinite(row.earned)?row.earned:null,
+     possible:Number.isFinite(row.possible)?row.possible:null,
+     rated:Number.isFinite(row.rated)?Math.max(0,row.rated|0):0,
+     total:Number.isFinite(row.total)?Math.max(0,row.total|0):0,
+     topics:row.topics.map(t=>({
+       name:qoHubText(t.name,120),
+       rated:Number.isFinite(t.rated)?Math.max(0,t.rated|0):0,
+       total:Number.isFinite(t.total)?Math.max(0,t.total|0):0,
+       percent:Number.isFinite(t.percent)?Math.max(0,Math.min(100,t.percent|0)):0
+     }))};
+ });
+ if(new Set(entries.map(r=>r.id)).size!==entries.length)
+   throw Error('В архиве обнаружены повторяющиеся записи');
+ return {book:b,sheetId:sh.id,results:entries};
+}
+function qoHubRestoreProject(raw){
+ const data=qoHubValidatedPackage(raw);
+ if(!confirm('Восстановить проект «'+data.book.name+'» и '+data.results.length+
+   ' результатов? Будет создана НОВАЯ копия книги, существующие данные не перезапишутся.'))return false;
+ // Imported files are new copies; remap references to new workbook ID.
+ const fresh=structuredClone(data.book);
+ const nextId=newWorkbook().id;
+ const oldPrefix=data.book.id+'|'+data.sheetId+'|';
+ const newPrefix=nextId+'|'+data.sheetId+'|';
+ fresh.id=nextId;
+ fresh.name=qoHubText(fresh.name,88)+' — восстановлено';
+ const restored=data.results.map(r=>({...r,
+   id:newPrefix+r.id.slice(oldPrefix.length),
+   studentKey:newPrefix+r.studentKey.slice(oldPrefix.length)}));
+ const oldSource=localStorage.getItem(QO_HUB_SOURCE_KEY);
+ const oldResults=localStorage.getItem(QO_HUB_RESULT_KEY);
+ const oldWorkspace=workspace;
+ const nextResults=[...qoHubResults(),...restored];
+ if(nextResults.length>QO_HUB_MAX_RESULTS)throw Error('Журнал переполнен. Сначала сохраните общий CSV.');
+ const nextWorkspace=structuredClone(workspace);
+ nextWorkspace.books.unshift(fresh);nextWorkspace.active=fresh.id;
+ try{
+   saveWorkspace(nextWorkspace);
+   if(!qoHubWrite(QO_HUB_RESULT_KEY,nextResults)||
+      !qoHubWrite(QO_HUB_SOURCE_KEY,{bookId:fresh.id,sheetId:data.sheetId}))
+     throw Error('В браузере недостаточно места');
+   workspace=nextWorkspace;
+   page='sheet';activeCell=rangeEnd='A2';qoHubOpen=true;
+   render();
+   status('Проект восстановлен как отдельная книга. Результатов: '+restored.length);
+   return true;
+ }catch(e){
+   workspace=oldWorkspace;
+   try{saveWorkspace(oldWorkspace);}catch(_){}
+   try{
+     if(oldSource===null)localStorage.removeItem(QO_HUB_SOURCE_KEY);
+     else localStorage.setItem(QO_HUB_SOURCE_KEY,oldSource);
+     if(oldResults===null)localStorage.removeItem(QO_HUB_RESULT_KEY);
+     else localStorage.setItem(QO_HUB_RESULT_KEY,oldResults);
+   }catch(_){}
+   throw e;
+ }
+}
+async function qoHubReadProjectFile(file){
+ try{
+   if(file.size>QO_HUB_PACKAGE_LIMIT)throw Error('Файл превышает 20 МБ');
+   await file.text().then(qoHubRestoreProject);
+ }catch(e){status('Не удалось восстановить проект: '+(e.message||'ошибка'),true);}
+}
+function qoHubProjectControls(){
+ return '<section class="qo-hub-project"><div><strong>Резервная копия</strong>'+
+    '<p>Один файл: книга учеников, ссылки и общий журнал результатов. '+
+    'Диагностики и изображения сохраняются отдельно.</p></div>'+
+    '<div class="qo-hub-project-actions">'+
+    '<button type="button" data-hub-action="project-export" '+(!qoHubSourceSheet()?'disabled':'')+
+       '>Скачать проект</button>'+
+    '<button type="button" data-hub-action="project-import">Восстановить проект</button>'+
+    '<input type="file" id="qo-hub-project-file" accept=".qteacher,application/json" hidden></div></section>';
+}
+function qoHubOverviewHTML(){
+ const src=qoHubSourceSheet();
+ if(!src)return '';
+ const records=qoHubScopedResults(src);
+ const percent=records.length?Math.round(records.reduce((total,x)=>total+x.percent,0)/records.length):null;
+ const pupils=new Set(records.map(x=>x.studentKey)).size;
+ return '<div class="qo-hub-overview"><div><strong>'+qoHubRoster().length+'</strong><small>учеников</small></div>'+
+   '<div><strong>'+records.length+'</strong><small>проверок</small></div>'+
+   '<div><strong>'+(percent===null?'—':percent+'%')+'</strong><small>средний результат</small></div>'+
+   '<div><strong>'+pupils+'</strong><small>проверено учеников</small></div></div>';
+}
+
 function qoHubSheetDecorate(){
  const formula=document.querySelector('.sheet-page .formula-line');
  if(!formula)return;
@@ -153,10 +286,10 @@ function qoHubSheetDecorate(){
    qoHubIsRoster(current)?'Текущий лист содержит список учеников. Его можно подключить к диагностике.':
    'Откройте лист «Ученики» с именами в столбце A.')+'</p>'+
    '<button data-hub-action="connect" '+(!qoHubIsRoster(current)?'disabled':'')+'>Связать текущий лист</button></div>':
-   '<div class="qo-hub-summary">'+qoHubRoster().length+' учеников · '+qoHubResults().length+' сохранённых проверок</div>'+
+   qoHubOverviewHTML()+
    qoHubCardHTML(selected)+
    '<div class="qo-hub-backup"><button data-hub-action="export-all">Скачать общий журнал CSV</button>'+
-   '<button data-hub-action="unlink">Отключить связь</button></div>') ;
+   '<button data-hub-action="unlink">Отключить связь</button></div>')+qoHubProjectControls() ;
  const previous=document.getElementById('qo-hub-sheet-panel');previous?.remove();
  document.querySelector('.sheet-page')?.append(section);
  qoHubBadges();
@@ -241,6 +374,8 @@ function qoHubOnClick(event){
  if(type==='toggle'){qoHubOpen=!qoHubOpen;qoHubDecorate();return;}
  if(type==='close'){qoHubOpen=false;qoHubDecorate();return;}
  if(type==='connect'){if(qoHubAttachCurrent())qoHubDecorate();return;}
+ if(type==='project-export'){qoHubExportProject();return;}
+ if(type==='project-import'){document.getElementById('qo-hub-project-file')?.click();return;}
  if(type==='unlink'){
    if(confirm('Отключить источник учеников? Сохранённый журнал результатов останется в браузере.')){
       localStorage.removeItem(QO_HUB_SOURCE_KEY);qoHubDecorate();
@@ -266,6 +401,11 @@ function qoHubOnClick(event){
  }
 }
 document.addEventListener('click',qoHubOnClick,true);
+document.addEventListener('change',e=>{
+ if(e.target?.id!=='qo-hub-project-file')return;
+ e.stopImmediatePropagation();
+ const file=e.target.files?.[0];e.target.value='';if(file)qoHubReadProjectFile(file);
+},true);
 document.addEventListener('input',e=>{
  if(e.target?.id==='qo-hub-search'){qoHubQuery=e.target.value.slice(0,100);
     const list=document.querySelector('.qo-hub-roster-list');
