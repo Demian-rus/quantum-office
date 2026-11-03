@@ -1293,19 +1293,22 @@ function qoWriterPage(){
   '<span>Темы слева · вопросы по центру · результаты справа</span>'+
   '<span>Оценка: 1 / 2 / 3 · ответ: R</span></div>','qo-diag-guide-group');
  const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
+ const navigator=qoWriterNavigationTools();
  const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
  return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
  <div class="qo-office-toolbar">
- ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['file','Файл'],['diagnostic','Диагностика']])}
+ ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика']])}
  <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
  ${qoWorkPanel('writer','home',main+paragraphs)}
  ${qoWorkPanel('writer','insert',insert+tabtools+imagetools)}
  ${qoWorkPanel('writer','layout',layout+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
+ ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
  ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates+diagnosticGuide)}
  </div></div>
+ <div class="qo-writer-body">${qoWriterNavigationHTML()}
  <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap"><article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
- <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section>
+ <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section></div>
  <input type="file" id="qo-writer-file" accept=".qdoc,.txt,.html,text/plain,text/html,application/json" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
  <footer class="qo-editor-foot qo-office-footer"><span>A4 · ${f.margin} мм · ${esc(f.font)}</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / HTML / TXT</span></footer></main>`;
 }
@@ -2457,7 +2460,7 @@ function render(){
  }
  app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():page==='writer'?qoWriterPage():page==='slides'?qoSlidesPage():page==='photo'?qoPhotoPage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  // Keep the filter dialog inside the scrollable worksheet frame, below the ribbon.
- if(page==='writer'){qoWriterStats();qoDiagnosticMount();}
+ if(page==='writer'){qoWriterStats();qoWriterNavRefresh();qoDiagnosticMount();}
  if(page==='photo'){qoPhotoRender();const stage=document.getElementById('qs-stage');if(stage&&stageScroll){stage.scrollLeft=stageScroll[0];stage.scrollTop=stageScroll[1];}}
  document.title='Quantum Office — '+({writer:'Тексты',slides:'Презентации',photo:'Фото',sheet:'Таблицы',home:'Обзор',templates:'Шаблоны'}[page]||'Офис');
  const filterDialog=app.querySelector('.qo-filter-popup'),frame=app.querySelector('#grid-frame');
@@ -3351,4 +3354,5 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();editCell(e.key);}
 });
 window.addEventListener('beforeunload',()=>{if(editing)commitEditor();});
+qoWriterNavigationInstall();
 render();
