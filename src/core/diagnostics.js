@@ -1439,9 +1439,7 @@ const QD_PRESETS=[
     .map(([id,m])=>({id,subject:m.subject,grade:m.grade,purpose:m.purpose,
       label:m.label,description:m.description})) : [])
 ].filter(p=>['physics','math','informatics'].includes(p.subject));
-const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика',
-  russian:'Русский язык',biology:'Биология',geography:'География',
-  chemistry:'Химия',other:'Другое'};
+const QD_SUBJECTS={physics:'Физика',math:'Математика',informatics:'Информатика'};
 const QD_PURPOSES={diagnostic:'Входная диагностика',review:'Повторение',practice:'Тренировка',exam:'Контрольная'};
 function qdLibrarySafe(value){
   if(!value||typeof value!=='object'||Array.isArray(value))return null;
