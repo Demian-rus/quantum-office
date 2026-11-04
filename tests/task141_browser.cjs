@@ -96,7 +96,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
  for(const view of ['builder','library','run']){
   await mode(view).click();for(const width of [1440,768,390])await layout(width);
   await page.locator('#toast.active').waitFor({state:'hidden'});
-  if(view==='library'){await page.locator('#qd-library-source').selectOption('custom');await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library_mobile.png')});await layout(1440);await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library.png')});}
+  if(view==='library'){await action('navigation').click();await page.locator('#qd-library-source').selectOption('custom');await page.keyboard.press('Escape');await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library_mobile.png')});await layout(1440);await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library.png')});}
   if(view==='run'){await page.evaluate(()=>qdScrollToQuestion());await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_mobile.png')});}
  }
  if(!(await page.locator('.qd-run-setup').evaluate(el=>el.open)))await page.locator('.qd-run-setup>summary').click();

@@ -11,7 +11,7 @@ function harness(){
   status:()=>{},console,structuredClone,
   localStorage:{getItem:k=>saved.get(k)||null,setItem:(k,v)=>saved.set(k,v)}};
  runInNewContext(catalog+'\n'+engine+
-  '\nthis.api={qdDoc,qdTemplate,qdApplyTemplate,qdLibraryRead,qdLibraryItems,qdBuilderTemplateMarkup,qdBuilderSaveTemplate,qdQuestionList,qdNormalize};',vm);
+  '\nthis.api={qdDoc,qdTemplate,qdApplyTemplate,qdLibraryRead,qdLibraryItems,qdBuilderTemplateMarkup,qdBuilder,qdBuilderSaveTemplate,qdQuestionList,qdNormalize};',vm);
  return {...vm.api,writer};
 }
 test('TASK119 built-in can be corrected and saved as personal template without altering original',()=>{
@@ -56,10 +56,14 @@ test('TASK119 updating owned template preserves stable ID, rejects unknown IDs a
 test('TASK119 builder shows own save/update/export and metadata selectors even when empty',()=>{
  const h=harness(),d=h.qdDoc();
  const html=h.qdBuilderTemplateMarkup(d);
- assert.match(html,/Сохранить как новый шаблон/);
+ const editor=h.qdBuilder();
+ assert.match(editor,/data-qd-action="builder-quick-save"/);
+ assert.match(editor,/data-qd-action="save-copy"/);
+ assert.match(editor,/Сохранить как новый шаблон/);
  assert.match(html,/Обновить мой шаблон/);
  assert.match(html,/Скачать библиотеку \.qtpl/);
- assert.match(html,/закреплены вверху/); // TASK141 moved the primary save actions to the command bar.
+ assert.doesNotMatch(html,/закреплены вверху/); // TASK143 removes prose; actual actions are asserted above.
+ for(const id of ['subject','grade','purpose'])assert.ok(editor.includes('id="qd-builder-template-'+id+'"'));
  assert.match(html,/disabled/);
  assert.match(html,/Мой шаблон для обновления/);
 });

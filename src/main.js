@@ -1410,10 +1410,6 @@ function qoWriterPage(){
  const diagnosticTemplates=qoWorkGroup('Коллекция',
    diagTile('writer-diag-templates-import','Загрузить QTPL','folder')+
    diagTile('writer-diag-templates-export','Скачать QTPL','copy'),'qo-diag-tile-group');
- const diagnosticGuide=qoWorkGroup('Рабочие подсказки',
-  '<div class="qo-diag-ribbon-guide"><strong>Интерактивная диагностика</strong>'+
-  '<span>Темы слева · вопросы по центру · результаты справа</span>'+
-  '<span>Оценка: 1 / 2 / 3 · ответ: R</span></div>','qo-diag-guide-group');
  const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
  const navigator=qoWriterNavigationTools();
  const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-docx','Word DOCX','file-text')+qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
@@ -1426,7 +1422,7 @@ function qoWriterPage(){
  ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
- ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates+diagnosticGuide)}
+ ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates)}
  </div></div>
  <div class="qo-writer-body">${qoWriterNavigationHTML()}
  <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
