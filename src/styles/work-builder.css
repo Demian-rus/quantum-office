@@ -157,3 +157,22 @@
  .qw-visual-dialog .qw-visual-tools{max-height:112px}
  .qw-visual-dialog #qw-visual-stage,.qw-visual-dialog .qw-visual-canvas-footer{width:100%}
 }
+
+/* TASK146: educational constructions live in the independently scrolling inspector. */
+.qw-visual-dialog .qw-constructions{
+ display:flex;flex-wrap:wrap;align-items:end;gap:7px;
+ padding:10px 0;margin:6px 0;border-block:1px solid var(--qo-border);
+}
+.qw-visual-dialog .qw-constructions label{min-width:120px;max-width:190px}
+.qw-visual-dialog .qw-constructions button{flex:0 0 auto}
+.qw-visual-canvas-footer .qw-grid-step-label{
+ display:flex;align-items:center;gap:6px;font-size:12px;color:var(--qo-muted);
+}
+.qw-visual-canvas-footer .qw-grid-step-label select{width:90px;max-width:100%;padding:3px 4px}
+.qw-visual-canvas-footer{gap:14px}
+@media(max-width:570px){
+ .qw-visual-dialog .qw-constructions{gap:5px}
+ .qw-visual-dialog .qw-constructions button{font-size:11px}
+ .qw-visual-canvas-footer{gap:8px}
+ .qw-visual-canvas-footer .qw-grid-step-label select{width:68px}
+}
