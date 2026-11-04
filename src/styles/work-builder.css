@@ -217,3 +217,72 @@
 .qw-graph-objects{display:grid;gap:4px}
 .qw-graph-objects button{text-align:left;white-space:normal;overflow-wrap:anywhere}
 .qw-graph-objects [aria-pressed=true]{border-color:var(--qo-accent);background:var(--qo-accent-soft)}
+
+
+/* TASK149: desktop graph workbench with compact, responsibility-based controls. */
+@media(min-width:1001px){
+ .qw-visual-dialog.qw-visual-diagram>.qw-visual-body{grid-template-columns:254px minmax(0,1fr) 272px}
+ .qw-visual-dialog.qw-visual-graph>.qw-visual-body{grid-template-columns:246px minmax(0,1fr) 278px}
+}
+.qw-visual-diagram .qw-tool-group>div,
+.qw-visual-graph .qw-drawing-group>.qw-tool-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px
+}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile{
+ display:flex;align-items:center;justify-content:flex-start;
+ min-width:0;min-height:38px;padding:5px 6px;gap:5px;
+ font-size:10.5px;line-height:1.22;overflow-wrap:anywhere
+}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile svg,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile svg{width:16px;height:16px}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile span,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile span{min-width:0}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile[aria-pressed=true],
+.qw-visual-graph .qw-drawing-group .qw-tool-tile[aria-pressed=true]{font-weight:650}
+.qw-visual-dialog .qw-tool-group{padding-bottom:8px;margin-bottom:6px}
+.qw-visual-graph .qw-tool-group summary,
+.qw-visual-diagram .qw-tool-group summary{padding:7px 3px;font-size:11.5px;color:var(--qo-text)}
+.qw-visual-graph .qw-coordinate-group label,
+.qw-visual-graph .qw-template-group label{display:grid;gap:3px;min-width:0}
+.qw-visual-graph .qw-coordinate-group select,
+.qw-visual-graph .qw-template-group select,
+.qw-visual-graph #qw-graph-mode select{width:100%;min-width:0;max-width:100%;font-size:11.5px;text-overflow:ellipsis;padding:6px 24px 6px 7px}
+.qw-visual-graph .qw-coordinate-group .qw-muted{font-size:10px;line-height:1.45;margin:6px 2px;color:var(--qo-muted)}
+.qw-visual-graph .qw-template-group #qw-graph-mode{margin-top:8px}
+.qw-visual-graph .qw-template-group #qw-add-point{min-height:33px;font-size:11px;margin-top:8px}
+.qw-visual-graph #qw-finish-polyline{width:100%;margin-top:8px;min-height:30px;font-size:10.5px}
+.qw-visual-dialog .qw-inspector-section{
+ display:block;margin:0 0 9px;padding:0 0 10px;
+ border:0;border-bottom:1px solid var(--qo-border);border-radius:0
+}
+.qw-visual-dialog .qw-inspector-section>h2,
+.qw-visual-dialog .qw-inspector-section>summary{
+ display:list-item;margin:0 0 7px;padding:3px 0;
+ color:var(--qo-text);font-size:11.5px;font-weight:700
+}
+.qw-visual-dialog .qw-inspector-section>h2{display:block}
+.qw-visual-dialog .qw-inspector-section>summary{cursor:pointer}
+.qw-visual-dialog .qw-inspector-section :is(input,select){font-size:11.5px}
+.qw-visual-graph .qw-graph-range{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 7px}
+.qw-visual-graph .qw-graph-range label,
+.qw-visual-graph .qw-grid-quick label,
+.qw-visual-graph .qw-axis-titles label{display:grid;gap:3px;min-width:0;font-size:10.5px}
+.qw-visual-graph .qw-graph-range input,
+.qw-visual-graph .qw-grid-quick input,
+.qw-visual-graph .qw-axis-titles input{width:100%;min-height:29px;padding:4px 6px}
+.qw-visual-graph .qw-grid-quick{margin-top:8px}
+.qw-visual-graph .qw-grid-quick label{width:calc(50% - 4px)}
+.qw-visual-graph .qw-graph-flags{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 8px}
+.qw-visual-graph .qw-graph-flags .qw-check{display:flex;align-items:center;gap:5px;min-width:0;font-size:10.5px;line-height:1.2}
+.qw-visual-graph .qw-graph-flags input[type=checkbox]{width:15px;height:15px;flex:none}
+.qw-visual-graph .qw-axis-titles{display:grid;gap:6px}
+.qw-visual-graph .qw-function-settings{margin:0;padding:0;border:0;gap:6px}
+.qw-visual-graph .qw-selected-settings .qw-function-settings{grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+.qw-visual-graph .qw-point-list{margin-top:5px}
+.qw-visual-graph .qw-template-color label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.qw-visual-graph .qw-object-style{margin:0 0 10px;padding:9px;border:1px solid var(--qo-border);border-radius:6px;background:var(--qo-surface-alt)}
+.qw-visual-graph .qw-object-style h2{margin-bottom:7px}
+.qw-visual-graph .qw-paint-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px}
+.qw-visual-graph .qw-paint-row>label{display:flex;align-items:center;justify-content:space-between;gap:4px}
+.qw-visual-graph .qw-palette{max-width:112px}
