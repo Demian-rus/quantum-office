@@ -87,6 +87,34 @@ function qwTriangleConstruction(object,kind,vertexIndex=0){
  if(x<0||x>520||y<0||y>320)throw Error('Основание высоты вне холста — измените расположение фигуры');
  return {kind:'dashed',x:a.x,y:a.y,x2:Number(x.toFixed(4)),y2:Number(y.toFixed(4)),label:''};
 }
+/* Anchor drawing endpoints to nearby vertices/edges before falling back to the grid. */
+function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
+ const target={x:qwNum(point.x,0,520,0),y:qwNum(point.y,0,320,0)};
+ const anchors=[];
+ (Array.isArray(objects)?objects:[]).forEach((o,i)=>{
+  if(i===excludeIndex||!o)return;
+  const x=Math.min(o.x,o.x2),x2=Math.max(o.x,o.x2),
+   y=Math.min(o.y,o.y2),y2=Math.max(o.y,o.y2);
+  if(Array.isArray(o.vertices))anchors.push(...o.vertices);
+  else if(['block','rect','incline'].includes(o.kind)){
+   anchors.push({x,y},{x:x2,y},{x,y:y2},{x:x2,y:y2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else if(['circle','pulley'].includes(o.kind)){
+   anchors.push({x:(x+x2)/2,y:(y+y2)/2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else anchors.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
+ });
+ let best=null,distance=Infinity;
+ for(const a of anchors){
+  const n=Math.hypot(target.x-a.x,target.y-a.y);
+  if(n<distance){distance=n;best=a;}
+ }
+ if(best&&distance<=Math.min(step*.9,16))
+  return {x:qwNum(best.x,0,520,0),y:qwNum(best.y,0,320,0)};
+ return {x:Math.round(target.x/step)*step,y:Math.round(target.y/step)*step};
+}
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  return raw.map(o=>{
@@ -110,4 +138,4 @@ function qwValidateDiagram(raw){
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;[d.tasks[i],d.tasks[j]]=[d.tasks[j],d.tasks[i]];return true;}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {QW_TYPES,QW_LIMITS,qwProject,qwTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwTriangleConstruction};
+export {QW_TYPES,QW_LIMITS,qwProject,qwTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwTriangleConstruction,qwSnapDiagramPoint};
