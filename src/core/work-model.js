@@ -93,6 +93,7 @@ function qwValidateDiagram(raw){
   if(!o||!['line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
+  if(o.kind==='block')value.rotation=qwNum(o.rotation,-180,180,0);
   if(['triangle','rightTriangle','quadrilateral'].includes(o.kind)){
    if(o.vertices!==undefined&&(!Array.isArray(o.vertices)||o.vertices.length!==(o.kind==='quadrilateral'?4:3)))throw Error('Некорректные вершины геометрической фигуры');
    const vertices=qwGeometryVertices(o);
