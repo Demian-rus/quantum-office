@@ -21,7 +21,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   const tools=await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>({key:x.dataset.tool,text:x.textContent.trim(),title:x.title,aria:x.getAttribute('aria-label')})));
   assert.deepEqual(tools.slice(0,3).map(x=>x.key),['select','point','line']);
   assert.ok(tools.length>=18);
-  assert.ok(tools.every(x=>!x.text&&x.aria&&x.title));
+  assert.ok(tools.every(x=>x.text&&x.aria&&x.title));
   assert.equal(await p.locator('.qw-visual-tools [data-tool="incline"] svg').count(),1);
   await p.locator('#qw-diagram-preset').selectOption('incline');
   assert.ok(await p.locator('#qw-visual-stage [transform*="rotate(-25"]').count()>0);

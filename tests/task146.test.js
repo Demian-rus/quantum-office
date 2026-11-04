@@ -43,7 +43,7 @@ test('TASK146 visual dialog has stable sizing and an independent inspector',()=>
  const css=readFileSync(new URL('../src/styles/work-builder.css',import.meta.url),'utf8');
  const js=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
  assert.match(css,/\.qw-dialog\.qw-visual-dialog\{/);
- assert.match(css,/height:min\(850px,calc\(100dvh - 24px\)\)/);
+ assert.match(css,/height:min\(900px,calc\(100dvh - 24px\)\)/);
  assert.match(css,/\.qw-visual-dialog #qw-visual-properties\{/);
  assert.match(css,/overflow-y:auto/);
  assert.match(js,/qw-visual-canvas-footer/);

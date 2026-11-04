@@ -237,8 +237,8 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     captions+=label(sideText,at.x,at.y+6,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
-    const a=vertices[0],b=vertices[1],c=vertices[2],
-     ux=b.x-a.x,uy=b.y-a.y,vx=c.x-a.x,vy=c.y-a.y;
+    const origin=vertices[0],b=vertices[1],c=vertices[2],
+     ux=b.x-origin.x,uy=b.y-origin.y,vx=c.x-origin.x,vy=c.y-origin.y;
     if(Math.abs(ux*vx+uy*vy) <= Math.max(1,Math.hypot(ux,uy)*Math.hypot(vx,vy)*.02)){
     const [p0,p1,p2]=vertices,
      unit=v=>{const l=Math.hypot(v.x,v.y)||1;return {x:v.x/l,y:v.y/l};},
