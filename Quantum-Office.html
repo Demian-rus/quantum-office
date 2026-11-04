@@ -11598,6 +11598,12 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 }
 #qo-diag-root .qd-data-warning{padding:12px;border:1px solid var(--qo-warning);border-radius:7px;background:var(--qo-warning-soft);color:var(--qo-text);font-size:12px;line-height:1.6}
 #qo-diag-root .qd-data-warning p{margin:4px 0 8px}
+/* In the two-column conduct layout the left panels share one vertical flow.
+   A sticky first panel would cover the second while the questions scroll. */
+@media(max-width:1599px){#qo-diag-root:not(.qd-desk-builder) .qd-workbench>.qd-topic-navigator{position:static}}
+/* Keep the count on its own row so preset actions share a baseline even with
+   both authoring panels visible at 1280px. */
+#qo-diag-root .qd-builder-tools>.qd-count-pill{flex:0 0 100%;width:auto}
 
 </style></head><body><div id="app"></div><script>/*!
 
@@ -20623,7 +20629,13 @@ function qdDeskRefreshScores(){
  for(const selector of ['.qd-guided-status','.qd-guided-finish>span','.qd-results .qd-metrics','.qd-results .qd-progress','.qd-results .qd-percent','.qd-results .qd-topic-results']){
   const old=root.querySelector(selector),next=template.content.querySelector(selector);if(old&&next)old.replaceWith(next);
  }
- const queues=qdReviewQueues(qdDoc());
+ const d=qdDoc();
+ for(const button of root.querySelectorAll('.qd-topic-navigator [data-sid]')){
+  const section=d.sections.find(s=>s.id===button.dataset.sid);if(!section)continue;const result=qdScores(section.questions,d.session.marks,d.session.scores);
+  const meta=button.querySelector('.qd-side-topic-meta');if(meta)meta.textContent=section.questions.length+' заданий · '+result.rated+' оценено';
+  const bar=button.querySelector('.qd-side-mini-bar i');if(bar)bar.style.width=(result.total?Math.round(result.rated/result.total*100):0)+'%';
+ }
+ const queues=qdReviewQueues(d);
  const counters=root.querySelectorAll('.qd-review-sidebar .qd-side-stat strong');
  if(counters[0])counters[0].textContent=queues.pending.length;if(counters[1])counters[1].textContent=queues.review.length;
  const summary=root.querySelector('.qd-question-map>summary span'),stats=qdScores(qdQuestionList(),qdDoc().session.marks,qdDoc().session.scores);

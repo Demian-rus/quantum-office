@@ -43,7 +43,10 @@ const seed=require('./task142_fixture.cjs');
  assert.equal(await page.evaluate(id=>qdDoc().session.comments[id],firstId),'Верное объяснение, нужен пример.');assert.equal(await page.evaluate(()=>qdDisplay().activeId),thirdId);
  await mode('builder').click();await page.locator('[data-qd-field="prompt"][data-qid="'+firstId+'"]').fill('Изменённый черновик, снимок неизменен');await mode('run').click();assert.match(await page.evaluate(()=>qdDoc().sections[0].questions[0].prompt),/металлическая/);
  await page.locator('[data-qd-field="text-response"]').fill('Сравнить передачу энергии в одинаковых условиях.');await page.locator('[data-qd-field="score"]').fill('3');await page.locator('[data-qd-field="comment"]').click();
- await page.evaluate(()=>qdScrollToQuestion());await page.locator('#toast.active').waitFor({state:'hidden'});await page.screenshot({path:path.join(out,'after_run.png')});
+ assert.match(await page.locator('.qd-topic-navigator [data-sid]').last().innerText(),/1 оценено/);
+ await page.evaluate(()=>qdScrollToQuestion());
+ const rails=await page.evaluate(()=>{const a=document.querySelector('.qd-topic-navigator').getBoundingClientRect(),b=document.querySelector('.qd-review-sidebar').getBoundingClientRect();return {aBottom:a.bottom,bTop:b.top};});assert.ok(rails.aBottom<=rails.bTop+1,'conduct rails must never overlap while scrolled');
+ await page.locator('#toast.active').waitFor({state:'hidden'});await page.screenshot({path:path.join(out,'after_run.png')});
  await page.locator('[data-qd-field="score"]').fill('2.5');
  await action('save-result').first().click();assert.equal(await page.evaluate(()=>qdWorkingDoc().history.length),1);assert.equal(await page.evaluate(()=>qdWorkingDoc().history[0].summary.earned),8);
  // Responsive screens and browser-zoom-equivalent CSS viewports at a 1440 px surface.
@@ -55,7 +58,8 @@ const seed=require('./task142_fixture.cjs');
   if(view==='builder'&&v.width===390){await page.locator('#toast.active').waitFor({state:'hidden'});await page.screenshot({path:path.join(out,'after_mobile_inspector.png')});await page.keyboard.press('Escape');}
   if(view==='run'&&v.width===390){await page.locator('#toast.active').waitFor({state:'hidden'});await page.evaluate(()=>qdScrollToQuestion());await page.screenshot({path:path.join(out,'after_mobile_run.png')});}
  }}
- await page.setViewportSize({width:1440,height:1000});await mode('builder').click();await page.locator('.qd-outline-question').first().click();await page.evaluate(()=>{qoThemePreference='dark';qoApplyAppearance();});await page.screenshot({path:path.join(out,'after_dark.png')});
+ await page.setViewportSize({width:1440,height:1000});await mode('builder').click();await page.locator('.qd-outline-question').first().click();await page.evaluate(async()=>{qoThemePreference='dark';qoApplyAppearance();await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));});
+ const colors=await page.locator('[data-qd-action="blank"]').evaluate(el=>{const c=getComputedStyle(el);return {background:c.backgroundColor,surface:c.getPropertyValue('--qo-surface')};});assert.notEqual(colors.background,'rgb(255, 255, 255)','dark controls must finish transitioning before capture');await page.screenshot({path:path.join(out,'after_dark.png')});
  // Unrecognized or corrupted binaries must never overwrite the current Writer document.
  await page.evaluate(()=>{qoWorkspaceTab.writer='home';render();});const before=await page.evaluate(()=>qoWriter.html);
  for(const name of ['unknown.bin','archive.txt','broken.docx']){

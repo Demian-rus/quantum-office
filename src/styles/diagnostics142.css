@@ -108,3 +108,9 @@
 }
 #qo-diag-root .qd-data-warning{padding:12px;border:1px solid var(--qo-warning);border-radius:7px;background:var(--qo-warning-soft);color:var(--qo-text);font-size:12px;line-height:1.6}
 #qo-diag-root .qd-data-warning p{margin:4px 0 8px}
+/* In the two-column conduct layout the left panels share one vertical flow.
+   A sticky first panel would cover the second while the questions scroll. */
+@media(max-width:1599px){#qo-diag-root:not(.qd-desk-builder) .qd-workbench>.qd-topic-navigator{position:static}}
+/* Keep the count on its own row so preset actions share a baseline even with
+   both authoring panels visible at 1280px. */
+#qo-diag-root .qd-builder-tools>.qd-count-pill{flex:0 0 100%;width:auto}

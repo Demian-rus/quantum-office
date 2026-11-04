@@ -92,7 +92,13 @@ function qdDeskRefreshScores(){
  for(const selector of ['.qd-guided-status','.qd-guided-finish>span','.qd-results .qd-metrics','.qd-results .qd-progress','.qd-results .qd-percent','.qd-results .qd-topic-results']){
   const old=root.querySelector(selector),next=template.content.querySelector(selector);if(old&&next)old.replaceWith(next);
  }
- const queues=qdReviewQueues(qdDoc());
+ const d=qdDoc();
+ for(const button of root.querySelectorAll('.qd-topic-navigator [data-sid]')){
+  const section=d.sections.find(s=>s.id===button.dataset.sid);if(!section)continue;const result=qdScores(section.questions,d.session.marks,d.session.scores);
+  const meta=button.querySelector('.qd-side-topic-meta');if(meta)meta.textContent=section.questions.length+' заданий · '+result.rated+' оценено';
+  const bar=button.querySelector('.qd-side-mini-bar i');if(bar)bar.style.width=(result.total?Math.round(result.rated/result.total*100):0)+'%';
+ }
+ const queues=qdReviewQueues(d);
  const counters=root.querySelectorAll('.qd-review-sidebar .qd-side-stat strong');
  if(counters[0])counters[0].textContent=queues.pending.length;if(counters[1])counters[1].textContent=queues.review.length;
  const summary=root.querySelector('.qd-question-map>summary span'),stats=qdScores(qdQuestionList(),qdDoc().session.marks,qdDoc().session.scores);
