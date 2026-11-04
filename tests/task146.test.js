@@ -5,16 +5,15 @@ import {qwTask,qwValidateDiagram,qwTriangleConstruction} from '../src/core/work-
 import {qwGraphSVG,qwDiagramSVG} from '../src/core/work-content.js';
 
 function yAxisLabels(svg){
- return [...svg.matchAll(/<text x="66" y="[\d.]+".*?>([^<>]+)<\/text>/g)].map(x=>x[1]);
+ return [...svg.matchAll(/<text class="qw-axis-number" data-axis="y" data-value="([^"]+)"/g)].map(x=>x[1]);
 }
-test('TASK146 crowded vertical ticks use consistent minimum separation',()=>{
- const graph=qwTask('graph').graph;
- const svg=qwGraphSVG(graph);
- assert.deepEqual(yAxisLabels(svg),['0','2','4','6','8','10']);
- assert.match(svg, /<text x="66" y="266"[^>]*>0<\/text>/);
- assert.match(svg, /<text x="66" y="50"[^>]*>10<\/text>/);
+test('TASK146 all grid divisions remain while small axis numbers avoid duplicated origin',()=>{
+ const graph=qwTask('graph').graph,svg=qwGraphSVG(graph);
+ assert.deepEqual(yAxisLabels(svg),['1','2','3','4','5','6','7','8','9','10']);
+ assert.equal((svg.match(/data-value="0"/g)||[]).length,1);
+ assert.match(svg, /data-axis="y" data-value="10"/);
  const gridlines=(svg.match(/stroke="#d9dee4"/g)||[]).length;
- assert.ok(gridlines>=20);
+ assert.ok(gridlines>=20,'labels must not change the underlying grid step');
 });
 test('TASK146 vertex names stay outside triangle edges',()=>{
  const polygon=qwValidateDiagram([{kind:'triangle',x:100,y:50,x2:340,y2:250,label:'',edgeLabels:['6 см','5 см','4 см']}]);
