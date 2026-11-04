@@ -92,12 +92,15 @@ function qwGraphSVG(g,interactive=false){
  return qwSVG(parts.join(''),'Координатный график');
 }
 function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
-function qwDiagramSVG(objects,interactive=false){
+function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
+ const guides=interactive&&showGuides?
+  '<defs><pattern id="qw-geometry-guide" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#dce6ec" stroke-width="1"/></pattern></defs>'+
+  '<rect x="0" y="0" width="520" height="320" fill="url(#qw-geometry-guide)" pointer-events="none"/>':'';
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle')=>
   '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
   '" fill="#162735" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
- return qwSVG(objects.map((o,i)=>{
+ return qwSVG(guides+objects.map((o,i)=>{
   const a=' stroke="#162735" stroke-width="2" fill="none"',
    vertices=['triangle','rightTriangle','quadrilateral'].includes(o.kind)?qwGeometryVertices(o):null;
   const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
