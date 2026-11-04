@@ -31,6 +31,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-edge-index="0"]').fill('6 см');
   await page.locator('[data-edge-index="0"]').dispatchEvent('change');
   assert.match(await page.locator('#qw-visual-stage svg').textContent(),/6 см/);
+  await page.locator('[data-tool="select"]').click();
   const beforeVertex=await page.locator('[data-vertex-index="2"][data-vertex-field="x"]').inputValue();
   const handle=await page.locator('#qw-visual-stage [data-qw-vertex="2"]').boundingBox();
   await page.mouse.move(handle.x+handle.width/2,handle.y+handle.height/2);
