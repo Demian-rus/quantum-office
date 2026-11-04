@@ -412,6 +412,18 @@ function qwVisualEditor(kind){
   d.querySelectorAll('[data-visual-panel]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.visualPanel===panel)));
  }
  d.querySelectorAll('[data-visual-panel]').forEach(b=>b.onclick=()=>showPanel(d.dataset.panel===b.dataset.visualPanel?'':b.dataset.visualPanel));
+ // Capture at the document level: property forms are rebuilt after editing and may
+ // lose focus, but Ctrl+Z must still undo the active visual editor transaction.
+ const qwUndoHotkey=e=>{
+  if(!d.isConnected||!d.open){document.removeEventListener('keydown',qwUndoHotkey,true);return;}
+  if(!(e.ctrlKey||e.metaKey)||e.shiftKey||e.key.toLowerCase()!=='z'||e.defaultPrevented)return;
+  const editable=e.target instanceof Element&&e.target.closest('textarea,[contenteditable="true"],input:not([type="checkbox"]):not([type="radio"]):not([type="color"])');
+  if(editable)return;
+  e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();
+  d.querySelector('#qw-visual-undo').click();
+ };
+ document.addEventListener('keydown',qwUndoHotkey,true);
+ d.addEventListener('close',()=>document.removeEventListener('keydown',qwUndoHotkey,true),{once:true});
  d.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'&&!e.defaultPrevented&&!e.target.closest('textarea,[contenteditable="true"],input:not([type="checkbox"]):not([type="radio"]):not([type="color"])')){e.preventDefault();e.stopPropagation();d.querySelector('#qw-visual-undo').click();return;}if(e.key==='Escape'&&(polyline.length||drag||multi.size)){e.preventDefault();cancelDrag();polyline=[];selectOnly(-1);draw();return;}if(e.key==='Escape'&&d.dataset.panel&&matchMedia('(max-width:1000px)').matches){e.preventDefault();e.stopPropagation();showPanel('');d.querySelector('[data-visual-panel]').focus();}});
  props.addEventListener('focusin',e=>{if(kind==='graph'&&e.target.dataset.pointIndex!==undefined){selectOnly(Number(e.target.dataset.pointIndex));draw(false);}});
  stage.onpointerdown=e=>{
