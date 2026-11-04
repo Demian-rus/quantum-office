@@ -215,7 +215,7 @@ function qwExample(subject='physics'){
 }
 function qwVisualEditor(kind){
  const q=qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,tool=kind==='graph'?'point':'line',drag=null,history=[];
- const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы','<div class="qw-visual-tools">'+(kind==='graph'?'<label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)']],'custom')+'</select></label>':(['select','line','arrow','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].map((k,i)=>'<button type="button" data-tool="'+k+'" aria-pressed="'+(k===tool)+'">'+['Выбрать / двигать','Линия','Стрелка','Прямоугольник','Окружность','Точка','Подпись','Угол','Треугольник','Прямоугольный треугольник','Четырёхугольник'][i]+'</button>').join('')))+'<button type="button" id="qw-visual-undo">Отменить</button><button type="button" id="qw-visual-delete">Удалить выбранное</button></div><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div><div id="qw-visual-properties"></div>','<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
+ const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы','<div class="qw-visual-tools">'+(kind==='graph'?'<label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label>':(['select','line','arrow','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].map((k,i)=>'<button type="button" data-tool="'+k+'" aria-pressed="'+(k===tool)+'">'+['Выбрать / двигать','Линия','Стрелка','Прямоугольник','Окружность','Точка','Подпись','Угол','Треугольник','Прямоугольный треугольник','Четырёхугольник'][i]+'</button>').join('')))+'<button type="button" id="qw-visual-undo">Отменить</button><button type="button" id="qw-visual-delete">Удалить выбранное</button></div><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div><div id="qw-visual-properties"></div>','<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect();return {x:qwNum((e.clientX-b.left)/b.width*520,0,520,0),y:qwNum((e.clientY-b.top)/b.height*320,0,320,0)};};
   const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
@@ -236,13 +236,61 @@ function qwVisualEditor(kind){
  }else if(tool==='select'){if(!existing){history.pop();selected=-1;draw();return;}selected=Number(existing.dataset.qwObject);}else{if(value.length>=60){history.pop();return;}let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label){history.pop();return;}}value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selected=value.length-1;}
  drag={start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),moving:kind==='diagram'&&tool==='select'};stage.setPointerCapture(e.pointerId);draw(false);
  };
- stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];if(drag.moving){const a=drag.original,dx=qwNum(p.x-drag.start.x,-Math.min(a.x,a.x2),520-Math.max(a.x,a.x2),0),dy=qwNum(p.y-drag.start.y,-Math.min(a.y,a.y2),320-Math.max(a.y,a.y2),0);o.x=a.x+dx;o.x2=a.x2+dx;o.y=a.y+dy;o.y2=a.y2+dy;}else{o.x2=p.x;o.y2=p.y;}}draw(false);};
- stage.onpointerup=()=>{if(drag){drag=null;draw();}};stage.onpointercancel=()=>{if(drag){value=history.pop();drag=null;draw();}};
+ stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];if(drag.moving){
+    const a=drag.original,coords=a.vertices?.length?a.vertices:[{x:a.x,y:a.y},{x:a.x2,y:a.y2}],
+     dx=qwNum(p.x-drag.start.x,-Math.min(...coords.map(v=>v.x)),520-Math.max(...coords.map(v=>v.x)),0),
+     dy=qwNum(p.y-drag.start.y,-Math.min(...coords.map(v=>v.y)),320-Math.max(...coords.map(v=>v.y)),0);
+    o.x=a.x+dx;o.x2=a.x2+dx;o.y=a.y+dy;o.y2=a.y2+dy;
+    if(a.vertices)o.vertices=a.vertices.map(v=>({...v,x:v.x+dx,y:v.y+dy}));
+   }else{o.x2=p.x;o.y2=p.y;}}draw(false);};
+ stage.onpointerup=()=>{
+   if(drag){
+    if(kind==='diagram'&&!drag.moving&&['triangle','rightTriangle','quadrilateral'].includes(value[selected]?.kind)){
+     const o=value[selected];if(Math.abs(o.x2-o.x)<12)o.x2=Math.min(520,o.x+90);
+     if(Math.abs(o.y2-o.y)<12)o.y2=Math.min(320,o.y+90);
+     o.vertices=qwGeometryVertices(o);
+    }
+    drag=null;draw();
+   }
+  };stage.onpointercancel=()=>{if(drag){value=history.pop();drag=null;draw();}};
  function remove(){if(selected<0)return;remember();if(kind==='graph')value.points.splice(selected,1);else value.splice(selected,1);selected=-1;draw();}
  stage.onkeydown=e=>{if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();remove();}};
  d.querySelector('#qw-visual-undo').onclick=()=>{if(history.length){value=history.pop();selected=-1;draw();}};d.querySelector('#qw-visual-delete').onclick=remove;
- d.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.tool){tool=t.dataset.tool;for(const b of d.querySelectorAll('[data-tool]'))b.setAttribute('aria-pressed',String(b===t));}if(t.id==='qw-add-point'&&value.points.length<40){remember();value.points.push({x:(value.xmin+value.xmax)/2,y:(value.ymin+value.ymax)/2,label:''});selected=value.points.length-1;draw();}if(t.dataset.pointDelete!==undefined){selected=Number(t.dataset.pointDelete);remove();}if(t.dataset.pointUp!==undefined){const i=Number(t.dataset.pointUp);if(i>0){remember();[value.points[i-1],value.points[i]]=[value.points[i],value.points[i-1]];draw();}}if(t.dataset.objectSelect!==undefined){selected=Number(t.dataset.objectSelect);tool='select';draw();}});
- d.addEventListener('change',e=>{const t=e.target;try{if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}if(t.id==='qw-graph-preset'&&t.value!=='custom'){remember();value=qwGraphDefault();const ps={v:[[0,0],[2,6],[6,6],[9,0]],x:[[0,2],[4,8],[9,8]],a:[[0,4],[5,4],[5,0],[9,0]],p:[[1,9],[2,5],[4,2.5],[9,1]],i:[[0,0],[3,3],[8,8]]};value.points=ps[t.value].map(([x,y])=>({x,y,label:''}));value.xlabel={v:'t, с',x:'t, с',a:'t, с',p:'V, л',i:'U, В'}[t.value];value.ylabel={v:'v, м/с',x:'x, м',a:'a, м/с²',p:'p, кПа',i:'I, А'}[t.value];value.smooth=t.value==='p';selected=-1;draw();}}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
+ d.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.tool){tool=t.dataset.tool;for(const b of d.querySelectorAll('[data-tool]'))b.setAttribute('aria-pressed',String(b===t));}if(t.id==='qw-add-point'&&kind==='graph'&&value.points.length<40){remember();value.points.push({...qwSnapGraphPoint(value,(value.xmin+value.xmax)/2,(value.ymin+value.ymax)/2),label:''});selected=value.points.length-1;draw();}if(t.dataset.pointDelete!==undefined){selected=Number(t.dataset.pointDelete);remove();}if(t.dataset.pointUp!==undefined){const i=Number(t.dataset.pointUp);if(i>0){remember();[value.points[i-1],value.points[i]]=[value.points[i],value.points[i-1]];draw();}}if(t.dataset.objectSelect!==undefined){selected=Number(t.dataset.objectSelect);tool='select';draw();}});
+ d.addEventListener('change',e=>{const t=e.target;try{if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}
+   if(t.dataset.vertexIndex!==undefined&&value[selected]?.vertices){
+    const next=structuredClone(value),vertex=next[selected].vertices[Number(t.dataset.vertexIndex)],
+     key=t.dataset.vertexField;
+    if(!vertex||!['label','x','y'].includes(key))throw Error('Неизвестный параметр вершины');
+    vertex[key]=key==='label'?t.value:Number(t.value);
+    const validated=qwValidateDiagram(next);remember();value=validated;draw();
+   }
+   if(t.id==='qw-curve-family'){
+    const next=structuredClone(value);next.curveFamily=t.value;
+    const validated=qwValidateGraph(next);remember();value=validated;draw();
+   }
+   if(t.dataset.curveParam||t.id==='qw-curve-trig'){
+    const next=structuredClone(value);
+    if(t.dataset.curveParam)next.curve[t.dataset.curveParam]=Number(t.value);
+    else next.curve.trig=t.value;
+    const validated=qwValidateGraph(next);remember();value=validated;draw(false);
+   }if(t.id==='qw-graph-preset'&&t.value!=='custom'){
+    remember();value=qwGraphDefault();
+    const ps={v:[[0,0],[2,6],[6,6],[9,0]],x:[[0,2],[4,8],[9,8]],a:[[0,4],[5,4],[5,0],[9,0]],p:[[1,9],[2,5],[4,2.5],[9,1]],i:[[0,0],[3,3],[8,8]]};
+    if(ps[t.value]){
+     value.points=ps[t.value].map(([x,y])=>({x,y,label:''}));
+     value.xlabel={v:'t, с',x:'t, с',a:'t, с',p:'V, л',i:'U, В'}[t.value];
+     value.ylabel={v:'v, м/с',x:'x, м',a:'a, м/с²',p:'p, кПа',i:'I, А'}[t.value];
+     value.smooth=t.value==='p';
+    }else if(t.value==='parabola'){
+     Object.assign(value,{xmin:-5,xmax:5,ymin:-2,ymax:10,xlabel:'x',ylabel:'y',curveFamily:'quadratic'});
+     value.curve={...value.curve,a:0.4,b:0,c:0};
+    }else if(t.value==='sin'||t.value==='cos'){
+     Object.assign(value,{xmin:-6,xmax:6,ymin:-4,ymax:4,xlabel:'x',ylabel:'y',step:1,curveFamily:'trigonometric'});
+     value.curve={...value.curve,trig:t.value,amplitude:3,frequency:1,phase:0,offset:0};
+    }
+    selected=-1;draw();
+   }}}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
  d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}catch(e){hint.textContent=e.message;}};draw();
 }
 function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();qwCorrupt='';qwDoc=qwProject();qwSelected='';qwPersist();qwRender();}
