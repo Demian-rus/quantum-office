@@ -19,6 +19,7 @@ jobs:
       - run: python -m playwright install --with-deps chromium
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
+      - run: node tests/task146_browser.cjs
       - run: node tests/task143_browser.cjs
       - run: node tests/task142_browser.cjs
       - run: node tests/task141_browser.cjs
@@ -199,4 +200,11 @@ jobs:
         with:
           name: task145-math-geometry-evidence
           path: evidence/task145
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task146-drawing-workbench-evidence
+          path: evidence/task146
           if-no-files-found: ignore
