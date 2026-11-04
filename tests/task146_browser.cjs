@@ -6,7 +6,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
-  const page=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
+  const page=await browser.newPage({viewport:{width:1440,height:720},acceptDownloads:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="work"]').click();
@@ -37,8 +37,8 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   assert.notEqual(current,previous,'vertex drag must persist rather than reset on pointerup');
   await page.screenshot({path:path.join(out,'geometry_labels.png')});
   await page.locator('[data-tool="line"]').click();
-  for(let i=0;i<22;i++){
-   const b=await stage.boundingBox(),x=b.x+b.width*(.08+(i%11)*.074),y=b.y+b.height*(.18+Math.floor(i/11)*.35);
+  for(let i=0;i<54;i++){
+   const b=await stage.boundingBox(),x=b.x+b.width*(.08+(i%11)*.074),y=b.y+b.height*(.18+Math.floor(i/11)*.12);
    await page.mouse.move(x,y);await page.mouse.down();
    await page.mouse.move(x+b.width*.025,y+b.height*.04,{steps:2});await page.mouse.up();
   }
