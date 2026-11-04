@@ -143,8 +143,9 @@ function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=2
  return {x:best.x,y:best.y};
 }
 function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
+ const spacing=[10,20,40].includes(showGuides)?showGuides:20;
  const guides=interactive&&showGuides?
-  '<defs><pattern id="qw-geometry-guide" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#dce6ec" stroke-width="1"/></pattern></defs>'+
+  '<defs><pattern id="qw-geometry-guide" width="'+spacing+'" height="'+spacing+'" patternUnits="userSpaceOnUse"><path d="M'+spacing+' 0L0 0 0 '+spacing+'" fill="none" stroke="#dce6ec" stroke-width="0.7"/></pattern></defs>'+
   '<rect x="0" y="0" width="520" height="320" fill="url(#qw-geometry-guide)" pointer-events="none"/>':'';
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle')=>
