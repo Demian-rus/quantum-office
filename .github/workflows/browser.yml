@@ -31,6 +31,7 @@ jobs:
       - run: node tests/task148_browser.cjs
       - run: node tests/task148_graph_browser.cjs
       - run: python tests/task148_pdf.py
+      - run: node tests/task149_browser.cjs
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
@@ -237,3 +238,10 @@ jobs:
           name: task148-visual-editing-evidence
           path: evidence/task148
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-desktop-graph-evidence
+          path: evidence/task149
+          if-no-files-found: ignore
