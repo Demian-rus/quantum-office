@@ -40,6 +40,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-qd-action="mode"][data-mode="builder"]').first().click();
   await page.locator('[data-qd-field="title"]').fill('Моя проверка');
   await page.locator('#qo-diag-file').setInputFiles(output);
+  await page.locator('#qo-diag-root h1').filter({hasText:'Физика'}).waitFor();
   assert.match(await page.locator('#qo-diag-root h1').textContent(),/Физика/);
   await page.locator('[data-editor="writer"][data-tab="home"]').click();
   assert.equal(await page.locator('#qo-writer-edit-scroll').isVisible(),true);
