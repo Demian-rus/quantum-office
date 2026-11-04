@@ -23,29 +23,35 @@ function qwGraphSVG(g,interactive=false){
  const fmt=v=>{const n=Number(v.toPrecision(6));return Object.is(n,-0)?'0':String(n);};
  parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
  for(const axis of ['x','y']){
-  const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis);
+  const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis),
+   tickCount=Math.max(1,Math.ceil((max-min)/step)),
+   longest=Math.max(String(Number(min.toPrecision(5))).length,String(Number(max.toPrecision(5))).length),
+   gap=(axis==='x'?b.right-b.left:b.bottom-b.top)/tickCount,
+   stride=Math.max(1,Math.ceil((axis==='x'?longest*9+9:21)/Math.max(gap,1)));
   for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){
-   const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(8,label.length*7.4);
+   const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(11,label.length*9);
    if(axis==='x'){
     if(g.grid)parts.push(line(p.x,b.top,p.x,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(p.x,axisY-3,p.x,axisY+3,'stroke="#333"'));
+    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
     const tx=Math.max(b.left+w/2,Math.min(b.right-w/2,p.x));
-    const rect={x:tx-w/2,y:b.bottom+7,w,h:16};occupied.push(rect);
-    parts.push('<text x="'+tx+'" y="'+(b.bottom+20)+'" font-size="13" text-anchor="middle" fill="#263746">'+label+'</text>');
+    const rect={x:tx-w/2,y:b.bottom+5,w,h:21};occupied.push(rect);
+    parts.push('<text x="'+tx+'" y="'+(b.bottom+20)+'" font-size="16" text-anchor="middle" fill="#263746">'+label+'</text>');
    }else{
     if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
+    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
     const ty=Math.max(b.top+8,Math.min(b.bottom-8,p.y));
-    const rect={x:b.left-17-w,y:ty-8,w,h:16};occupied.push(rect);
-    parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="13" text-anchor="end" fill="#263746">'+label+'</text>');
+    const rect={x:b.left-17-w,y:ty-10,w,h:20};occupied.push(rect);
+    parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="16" text-anchor="end" fill="#263746">'+label+'</text>');
    }
   }
  }
  parts.push(line(b.left,axisY,b.right+8,axisY,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'),
   line(axisX,b.bottom,axisX,b.top-8,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'));
  // Both axis titles have their own outer margin; never put them on top of the scale or tick labels.
- parts.push('<text x="500" y="309" font-size="16" text-anchor="end" fill="#111">'+qwEsc(g.xlabel)+'</text>',
-  '<text x="10" y="24" font-size="16" fill="#111">'+qwEsc(g.ylabel)+'</text>');
+ parts.push('<text x="500" y="309" font-size="19" text-anchor="end" fill="#111">'+qwEsc(g.xlabel)+'</text>',
+  '<text x="10" y="24" font-size="19" fill="#111">'+qwEsc(g.ylabel)+'</text>');
  if(g.curveFamily!=='points'){
   let d='',drawing=false;
   for(let i=0;i<=300;i++){
@@ -70,7 +76,7 @@ function qwGraphSVG(g,interactive=false){
  });
  ps.forEach((p,i)=>{
   const label=g.points[i].label;if(!label)return;
-  const w=Math.max(12,Array.from(label).length*8.5),h=17;
+  const w=Math.max(12,Array.from(label).length*10),h=20;
   const options=[
    {x:p.x+10,y:p.y-24,w,h},{x:p.x+10,y:p.y+8,w,h},
    {x:p.x-w-10,y:p.y-24,w,h},{x:p.x-w-10,y:p.y+8,w,h}
@@ -88,7 +94,7 @@ function qwGraphSVG(g,interactive=false){
   if(!best)return;
   best={...best,x:Math.max(b.left,Math.min(best.x,b.right-w)),y:Math.max(b.top,Math.min(best.y,b.bottom-h))};
   occupied.push(best);
-  parts.push('<text x="'+best.x+'" y="'+(best.y+14)+'" font-size="16" fill="#142b42" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>');
+  parts.push('<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="#142b42" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>');
  });
  return qwSVG(parts.join(''),'Координатный график');
 }
