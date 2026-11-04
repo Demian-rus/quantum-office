@@ -11766,6 +11766,10 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 @media(max-width:1199px){#qo-work-workspace{padding:10px}.qw-frame{grid-template-columns:minmax(0,1fr)}.qw-frame>.qw-left,.qw-frame>.qw-right{display:none}.qw-center{max-width:960px}.qw-frame .qw-mobile{display:block}.qw-frame .qw-drawer-close{display:block;align-self:end;position:sticky;top:0;z-index:2}.qw-left-open>.qw-left,.qw-right-open>.qw-right{display:flex;position:fixed;top:160px;bottom:32px;height:auto;width:300px;max-width:calc(100vw - 24px);z-index:30;box-shadow:var(--qo-shadow)}.qw-left-open>.qw-left{left:12px}.qw-right-open>.qw-right{right:12px}}
 @media(max-width:570px){#qo-work-workspace{padding:8px}.qw-center-head{position:static}.qw-frame h1{font-size:18px}.qw-center{padding-inline:0}.qw-paper-task{padding:14px;font-size:13px}.qw-paper-task>header{flex-wrap:wrap}.qw-task-flow figure{float:none;max-width:100%;margin:10px 0}.qw-task-flow{display:flex;flex-direction:column}.qw-task-flow figure{order:2}.qw-dialog-body{padding:10px}.qw-graph-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.qw-point-list>div{grid-template-columns:16px 1fr 1fr 1fr 26px 26px;gap:3px}.qw-point-list input{padding:5px 3px}.qw-point-list button{padding:4px}.qw-settings{grid-template-columns:1fr}.qw-dialog footer{flex-wrap:wrap}.qw-answer-preview i{max-width:calc(100% / 31)}.qw-answer-preview .qw-answer-box{max-width:70%}}
 
+/* The additional Writer tab must scroll rather than compress its neighbours. */
+.qo-document-workspace .qo-work-tabs .qo-work-tab{flex:0 0 auto;min-width:max-content}
+.qo-document-workspace .qo-work-tabs{overflow-x:auto;scrollbar-width:none}
+
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -22059,6 +22063,7 @@ function qwRemember(){const value=JSON.stringify(qwDoc);if(qwUndo.at(-1)!==value
 function qwPersist(){
  if(qwCorrupt)return false;
  try{localStorage.setItem(QW_KEY,JSON.stringify(qwDoc));qwStorageError='';}catch(e){qwStorageError='Черновик не записан. Скачайте QWORK.';}
+ if(typeof page!=='undefined')qwFooter(qwActive());
  const el=document.getElementById('qw-save-state');if(el)el.textContent=qwStorageError|| (qwExported===JSON.stringify(qwDoc)?'Экспортирован QWORK':'Черновик на устройстве');return !qwStorageError;
 }
 function qwChange(fn){qwRemember();fn();qwPersist();qwRender();}
