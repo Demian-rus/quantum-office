@@ -92,6 +92,67 @@ function qwGraphSVG(g,interactive=false){
  return qwSVG(parts.join(''),'Координатный график');
 }
 function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
-function qwDiagramSVG(objects,interactive=false){return qwSVG(objects.map((o,i)=>{const a=' stroke="#162735" stroke-width="2" fill="none"',minX=Math.min(o.x,o.x2),minY=Math.min(o.y,o.y2),w=Math.abs(o.x2-o.x),h=Math.abs(o.y2-o.y);let s='';if(o.kind==='line'||o.kind==='arrow')s='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+(o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+'/>';if(o.kind==='rect')s='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';if(o.kind==='circle')s='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';if(o.kind==='point')s='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';if(o.kind==='angle'){const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;let delta=angle-start;while(delta>Math.PI)delta-=2*Math.PI;while(delta< -Math.PI)delta+=2*Math.PI;s='<path d="M'+o.x2+' '+o.y+'L'+o.x+' '+o.y+'L'+o.x2+' '+o.y2+'"'+a+'/><path d="M'+(o.x+r*Math.cos(start))+' '+(o.y+r*Math.sin(start))+'A'+r+' '+r+' 0 0 '+(delta>=0?1:0)+' '+(o.x+r*Math.cos(angle))+' '+(o.y+r*Math.sin(angle))+'"'+a+'/>';}
- return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+s+(o.label?'<text x="'+(o.x+5)+'" y="'+(o.y-7)+'" fill="#162735" font-size="20">'+qwEsc(o.label)+'</text>':'')+(interactive?'<rect x="'+(minX-7)+'" y="'+(minY-16)+'" width="'+Math.max(w+14,35)+'" height="'+Math.max(h+25,28)+'" fill="transparent" stroke="none"/>':'')+'</g>';}).join(''));}
+function qwDiagramSVG(objects,interactive=false){
+ const numeric=v=>Number(v.toFixed(3));
+ const label=(value,x,y,size=18,anchor='middle')=>
+  '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
+  '" fill="#162735" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
+ return qwSVG(objects.map((o,i)=>{
+  const a=' stroke="#162735" stroke-width="2" fill="none"',
+   vertices=['triangle','rightTriangle','quadrilateral'].includes(o.kind)?qwGeometryVertices(o):null;
+  const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
+  const minX=Math.min(...all.map(p=>p.x)),minY=Math.min(...all.map(p=>p.y)),
+   maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
+   w=maxX-minX,h=maxY-minY;
+  let shape='',captions='';
+  if(o.kind==='line'||o.kind==='arrow'){
+   shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
+    (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+'/>';
+  }
+  if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
+  if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
+  if(o.kind==='point')shape='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';
+  if(o.kind==='angle'){
+   const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;
+   let delta=angle-start;while(delta>Math.PI)delta-=2*Math.PI;while(delta< -Math.PI)delta+=2*Math.PI;
+   shape='<path d="M'+o.x2+' '+o.y+'L'+o.x+' '+o.y+'L'+o.x2+' '+o.y2+'"'+a+'/>'+
+    '<path d="M'+(o.x+r*Math.cos(start))+' '+(o.y+r*Math.sin(start))+
+    'A'+r+' '+r+' 0 0 '+(delta>=0?1:0)+' '+(o.x+r*Math.cos(angle))+' '+(o.y+r*Math.sin(angle))+'"'+a+'/>';
+  }
+  if(vertices){
+   shape='<polygon points="'+vertices.map(p=>p.x+','+p.y).join(' ')+'"'+a+'/>';
+   const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
+    cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
+   vertices.forEach(p=>{
+    shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
+    if(p.label){
+     const dx=p.x-cx,dy=p.y-cy,scale=Math.max(1,Math.hypot(dx,dy)),
+      lx=Math.max(14,Math.min(506,p.x+dx/scale*19)),
+      ly=Math.max(20,Math.min(310,p.y+dy/scale*19+5));
+     captions+=label(p.label,lx,ly,20);
+    }
+   });
+   if(o.kind==='rightTriangle'&&vertices.length===3){
+    const [p0,p1,p2]=vertices,
+     unit=v=>{const l=Math.hypot(v.x,v.y)||1;return {x:v.x/l,y:v.y/l};},
+     u=unit({x:p1.x-p0.x,y:p1.y-p0.y}),v=unit({x:p2.x-p0.x,y:p2.y-p0.y}),r=12;
+    shape+='<path d="M'+numeric(p0.x+u.x*r)+' '+numeric(p0.y+u.y*r)+
+     'L'+numeric(p0.x+(u.x+v.x)*r)+' '+numeric(p0.y+(u.y+v.y)*r)+
+     'L'+numeric(p0.x+v.x*r)+' '+numeric(p0.y+v.y*r)+'"'+a+'/>';
+   }
+   if(o.label)captions+=label(o.label,cx,cy+7,17);
+  }else if(o.label){
+   if(o.kind==='text')captions+=label(o.label,o.x,o.y,19,'start');
+   else if(o.kind==='point')captions+=label(o.label,Math.min(500,o.x+13),Math.max(19,o.y-9),19,'start');
+   else{
+    const midX=(o.x+o.x2)/2,midY=(o.y+o.y2)/2,
+     dx=o.x2-o.x,dy=o.y2-o.y,mag=Math.hypot(dx,dy)||1;
+    captions+=label(o.label,midX-dy/mag*14,midY+dx/mag*14-5,18);
+   }
+  }
+  const hit=interactive?'<rect x="'+(minX-9)+'" y="'+(minY-23)+
+   '" width="'+Math.max(w+18,30)+'" height="'+Math.max(h+35,28)+'" fill="transparent" stroke="none"/>':'';
+  return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+shape+captions+hit+'</g>';
+ }).join(''));
+}
 export {qwMath,qwMathML,qwTokens,qwContentHTML,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
