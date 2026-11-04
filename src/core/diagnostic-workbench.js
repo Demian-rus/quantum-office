@@ -122,6 +122,7 @@ function qdDeskMenu(qid,sid,x,y){
 if(typeof window!=='undefined'){
  window.addEventListener('pointerdown',e=>{if(!e.target.closest('#qd-context-menu'))document.getElementById('qd-context-menu')?.remove();for(const menu of document.querySelectorAll('.qd-library-menu[open]'))if(!menu.contains(e.target))menu.open=false;});
  window.addEventListener('keydown',e=>{
+  if(e.defaultPrevented||e.isComposing)return;
   if(typeof page==='undefined'||page!=='writer'||qoWorkspaceTab.writer!=='diagnostic'||document.querySelector('dialog[open]'))return;
   if(e.key==='Escape'){document.getElementById('qd-context-menu')?.remove();for(const menu of document.querySelectorAll('.qd-library-menu[open]'))menu.open=false;if(qdMode==='builder'&&qdDesk.properties&&innerWidth<1200){qdDesk.properties=false;qdDeskRemember();qdRefresh();}return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&qdMode==='builder'){
