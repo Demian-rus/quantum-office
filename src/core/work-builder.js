@@ -78,7 +78,7 @@ function qwPrintTextPDF(teacher=false){
  const html='<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+title+
   '</title><style>'+css+'</style></head><body><h1>'+title+'</h1>'+
   '<h2>'+subject+(project.topic?' · '+qwEsc(project.topic):'')+
-  (project.variant?' · Вариант '+qwEsc(project.variant):'')+(teacher?' · С ответами':'')+'</h2>'+
+  (project.grade?' · '+qwEsc(project.grade)+' класс':'')+(project.variant?' · Вариант '+qwEsc(project.variant):'')+(teacher?' · С ответами':'')+'</h2>'+
   (project.instructions?'<p>'+qwContentHTML(project.instructions)+'</p>':'')+
   tasks+'</body></html>';
  const frame=document.createElement('iframe');frame.title='PDF с выделяемым текстом';
@@ -110,6 +110,7 @@ function qwBankRead(){
 }
 function qwBankSave(){
  const q=qwCurrent();if(!q)return;
+ if(!q.prompt.trim()){status('Заполните условие задания перед сохранением в банк',true);return;}
  const fields='<div class="qw-settings">'+
   '<label>Предмет<select id="qw-bank-new-subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label>'+
   '<label>Класс<input id="qw-bank-new-grade" maxlength="24" value="'+qwEsc(q.grade||qwDoc.grade)+'"></label>'+
