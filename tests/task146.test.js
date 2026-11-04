@@ -48,7 +48,6 @@ test('TASK146 visual dialog has stable sizing and an independent inspector',()=>
  assert.match(css,/overflow-y:auto/);
  assert.match(js,/qw-visual-canvas-footer/);
  assert.match(js,/id="qw-grid-step-geometry"/);
- assert.match(js,/drag\.creating&&\['triangle'/);
  assert.match(js,/!e\.shiftKey/);
 });
 

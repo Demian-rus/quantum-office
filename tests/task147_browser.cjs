@@ -40,8 +40,8 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
    if(!before){
     await panel('tools');
     assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Физика']);
-    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','arrow','text','rect','circle','angle','triangle','rightTriangle','quadrilateral','dashed','block','incline','pulley','rope','spring','ground']);
-    assert.equal(await p.locator('[data-tool] span').count(),18);
+    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','arrow','text','rect','circle','angle','triangle','rightTriangle','quadrilateral','dashed','block','incline','pulley','movablePulley','rope','spring','ground']);
+    assert.equal(await p.locator('[data-tool] span').count(),19);
     await p.locator('.qw-tool-group summary').first().click();sameBox(stable,await stage.boundingBox(),'collapse must not resize canvas');
     await p.locator('.qw-tool-group summary').first().click();
     await p.locator('#qw-visual-tools').evaluate(e=>e.scrollTop=e.scrollHeight);sameBox(stable,await stage.boundingBox(),'tools scroll independent');
