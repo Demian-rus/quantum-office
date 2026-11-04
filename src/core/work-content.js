@@ -193,7 +193,13 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    }
    shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
   }
-  if(o.kind==='block')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='block'){
+   const cx=minX+w/2,cy=minY+h/2,angle=Number(o.rotation)||0;
+   shape='<g transform="rotate('+angle+' '+numeric(cx)+' '+numeric(cy)+')">'+
+    '<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>'+
+    '<path d="M'+numeric(minX+w*.12)+' '+numeric(minY+h*.14)+'h'+numeric(w*.34)+'" stroke="#a1adba" stroke-width="1"/>'+
+    '</g>';
+  }
   if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
   if(o.kind==='pulley'){
    const rad=Math.max(8,Math.min(w,h)/2),cx=minX+w/2,cy=minY+h/2;
@@ -245,6 +251,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    if(o.label)captions+=label(o.label,cx,cy+7,17);
   }else if(o.label){
    if(o.kind==='text')captions+=label(o.label,o.x,o.y,19,'start');
+   else if(o.kind==='block'||o.kind==='pulley')captions+=label(o.label,(o.x+o.x2)/2,(o.y+o.y2)/2+6,18);
    else if(o.kind==='point'){
     const at=qwGeometryCaptionLocation(o.label,{x:o.x,y:o.y},{x:o.x-260,y:o.y-160},allSegments,allPoints,placedLabels,19);
     captions+=label(o.label,at.x,at.y+7,19);
