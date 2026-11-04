@@ -128,8 +128,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    shape='<polygon points="'+vertices.map(p=>p.x+','+p.y).join(' ')+'"'+a+'/>';
    const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
     cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
-   vertices.forEach(p=>{
+   vertices.forEach((p,j)=>{
     shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
+    if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
      const dx=p.x-cx,dy=p.y-cy,scale=Math.max(1,Math.hypot(dx,dy)),
       lx=Math.max(14,Math.min(506,p.x+dx/scale*19)),
@@ -146,12 +147,16 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     captions+=label(sideText,tx,ty,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
+    const a=vertices[0],b=vertices[1],c=vertices[2],
+     ux=b.x-a.x,uy=b.y-a.y,vx=c.x-a.x,vy=c.y-a.y;
+    if(Math.abs(ux*vx+uy*vy) <= Math.max(1,Math.hypot(ux,uy)*Math.hypot(vx,vy)*.02)){
     const [p0,p1,p2]=vertices,
      unit=v=>{const l=Math.hypot(v.x,v.y)||1;return {x:v.x/l,y:v.y/l};},
      u=unit({x:p1.x-p0.x,y:p1.y-p0.y}),v=unit({x:p2.x-p0.x,y:p2.y-p0.y}),r=12;
     shape+='<path d="M'+numeric(p0.x+u.x*r)+' '+numeric(p0.y+u.y*r)+
      'L'+numeric(p0.x+(u.x+v.x)*r)+' '+numeric(p0.y+(u.y+v.y)*r)+
      'L'+numeric(p0.x+v.x*r)+' '+numeric(p0.y+v.y*r)+'"'+a+'/>';
+    }
    }
    if(o.label)captions+=label(o.label,cx,cy+7,17);
   }else if(o.label){
@@ -165,7 +170,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   }
   const hit=interactive?'<rect x="'+(minX-9)+'" y="'+(minY-23)+
    '" width="'+Math.max(w+18,30)+'" height="'+Math.max(h+35,28)+'" fill="transparent" stroke="none"/>':'';
-  return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+shape+captions+hit+'</g>';
+  return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+hit+shape+captions+'</g>';
  }).join(''));
 }
 export {qwMath,qwMathML,qwTokens,qwContentHTML,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
