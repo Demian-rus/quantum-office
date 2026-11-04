@@ -63,7 +63,8 @@ test('TASK145 online PDF is selectable HTML and SVG, without identity prompt',()
  const printer=readFileSync(new URL('../src/core/work-print.js',import.meta.url),'utf8');
  assert.match(builder,/function qwPrintTextPDF/);
  assert.match(builder,/@page\{size:A4/);
- assert.match(builder,/frame\.contentWindow\.print\(\)/);
- assert.match(builder,/qwTaskPreview\(q,i\)/);
+ assert.match(builder,/win\.focus\(\);win\.print\(\)/);
+ assert.match(builder,/function qwPrintDocumentHTML/);
+ assert.match(builder,/qwTaskPreview\(q,i,d\.layout\)/);
  assert.doesNotMatch(printer,/if\(d\.identity\)\{text\('ФИО/);
 });
