@@ -73,6 +73,9 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-action="work-pdf-student"]').click();const pdf=await pdfDownload;
   const pdfPath=path.join(out,'example.pdf');await pdf.saveAs(pdfPath);
   assert.equal(fs.readFileSync(pdfPath).subarray(0,5).toString(),'%PDF-');
+  await action('preview').click();await page.locator('#qw-pages canvas').first().waitFor();
+  await page.screenshot({path:path.join(out,'a4_preview.png')});
+  await page.locator('#qw-dialog [data-qw-close]').click();
   assert.deepEqual(errors,[]);
   console.log('PASS TASK145 browser: labeled geometry, construction grid, function curves, snapping, QWORK and PDF');
  }finally{await browser.close();}
