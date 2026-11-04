@@ -66,3 +66,13 @@
 /* The additional Writer tab must scroll rather than compress its neighbours. */
 .qo-document-workspace .qo-work-tabs .qo-work-tab{flex:0 0 auto;min-width:max-content}
 .qo-document-workspace .qo-work-tabs{overflow-x:auto;scrollbar-width:none}
+
+/* TASK145: compact searchable library, including long task prompts and mobile filters. */
+.qw-bank-filters{display:grid;grid-template-columns:minmax(180px,2fr) repeat(4,minmax(100px,1fr));gap:7px;align-items:center}
+.qw-bank-filters input,.qw-bank-filters select{width:100%;min-width:0}
+#qw-bank-count{margin:9px 0;color:var(--qo-muted);font-size:12px}
+.qw-bank-item>div{min-width:0;flex:1;display:grid;gap:3px;overflow-wrap:anywhere}
+.qw-bank-item small{font-size:11px;color:var(--qo-muted);line-height:1.4}
+.qw-bank-item button{flex:none}
+@media(max-width:900px){.qw-bank-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.qw-bank-filters input{grid-column:1/-1}}
+@media(max-width:570px){.qw-bank-item{flex-wrap:wrap}.qw-bank-item>div{flex-basis:100%}.qw-bank-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
