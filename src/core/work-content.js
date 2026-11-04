@@ -12,43 +12,76 @@ function qwMathML(n){const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';if(n.t==='row')retu
  return tag(/[0-9]/.test(n.v)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(n.v)?'mi':'mo',qwEsc(n.v));}
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
-/* Printable coordinate plot. Tick values live outside the plotting area; point labels avoid axes and each other. */
-function qwGraphSVG(g,interactive=false){
- const b=QW_PLOT,parts=[],occupied=[],
- axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x,
- axisY=qwPlotXY(g,{x:0,y:Math.max(g.ymin,Math.min(g.ymax,0))}).y;
- const line=(x,y,x2,y2,extra='')=>'<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" '+extra+'/>';
- const overlap=(a,v)=>Math.max(0,Math.min(a.x+a.w,v.x+v.w)-Math.max(a.x,v.x))*Math.max(0,Math.min(a.y+a.h,v.y+v.h)-Math.max(a.y,v.y));
- const fmt=v=>{const n=Number(v.toPrecision(6));return Object.is(n,-0)?'0':String(n);};
- parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
+/* Axes use true coordinate positions. Tick marks and labels have independent
+   density: labels never determine the grid spacing or collide at the origin. */
+function qwAxisLayout(g){
+ const b=QW_PLOT;
+ const axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x;
+ const axisY=qwPlotXY(g,{x:0,y:Math.max(g.ymin,Math.min(g.ymax,0))}).y;
+ const math=g.xmin<0&&g.xmax>0&&g.ymin<0&&g.ymax>0;
+ const font=math?12:13;
+ const ticks={x:[],y:[]};
+ const zeroX=g.xmin<=0&&g.xmax>=0,zeroY=g.ymin<=0&&g.ymax>=0;
  for(const axis of ['x','y']){
-  const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis),
-   tickCount=Math.max(1,Math.ceil((max-min)/step)),
-   longest=Math.max(String(Number(min.toPrecision(5))).length,String(Number(max.toPrecision(5))).length),
-   gap=(axis==='x'?b.right-b.left:b.bottom-b.top)/tickCount,
-   stride=Math.max(1,Math.ceil((axis==='x'?longest*10+12:30)/Math.max(gap,1)));
-  for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){
-   const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(11,label.length*9);
-   if(axis==='x'){
-    if(g.grid)parts.push(line(p.x,b.top,p.x,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
-    parts.push(line(p.x,axisY-3,p.x,axisY+3,'stroke="#333"'));
-    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
-    const tx=Math.max(b.left+w/2,Math.min(b.right-w/2,p.x));
-    const rect={x:tx-w/2,y:b.bottom+5,w,h:21};occupied.push(rect);
-    parts.push('<text x="'+tx+'" y="'+(b.bottom+20)+'" font-size="16" text-anchor="middle" fill="#263746">'+label+'</text>');
-   }else{
-    if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
-    parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
-    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
-    const ty=p.y;
-    const rect={x:b.left-17-w,y:ty-11,w,h:22};occupied.push(rect);
-    parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="16" text-anchor="end" fill="#263746">'+label+'</text>');
-   }
+  const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis);
+  const span=max-min,pixels=axis==='x'?b.right-b.left:b.bottom-b.top;
+  const longest=Math.max(String(Number(min.toPrecision(6))).length,String(Number(max.toPrecision(6))).length);
+  const gap=pixels*step/span;
+  const desired=axis==='x'?Math.max(22,(longest+1)*font*.64+8):font+7;
+  const stride=Math.max(1,Math.ceil(desired/Math.max(1,gap)));
+  let count=0;
+  for(let n=Math.ceil((min-1e-8)/step);n*step<=max+step*.00001&&count++<30;n++){
+   const v=Number((n*step).toPrecision(9));
+   const p=qwPlotXY(g,{x:v,y:v});
+   const isZero=Math.abs(v)<step*1e-7;
+   let numbered=n%stride===0;
+   // The shared origin receives exactly one 0, on X.
+   if(axis==='y'&&isZero&&zeroX)numbered=false;
+   if(axis==='x'&&isZero&&zeroY)numbered=true;
+   const label=Object.is(v,-0)?'0':String(v);
+   const w=Math.max(8,label.length*font*.63);
+   ticks[axis].push({value:v,pos:axis==='x'?p.x:p.y,label,numbered,w});
   }
  }
- parts.push(line(b.left,axisY,b.right+8,axisY,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'),
-  line(axisX,b.bottom,axisX,b.top-8,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'));
- // Both axis titles have their own outer margin; never put them on top of the scale or tick labels.
+ return {axisX,axisY,font,ticks,math};
+}
+function qwGraphSVG(g,interactive=false){
+ const b=QW_PLOT,parts=[],occupied=[],layout=qwAxisLayout(g),
+  {axisX,axisY,font,ticks}=layout;
+ const line=(x,y,x2,y2,extra='')=>'<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" '+extra+'/>';
+ const overlap=(a,v)=>Math.max(0,Math.min(a.x+a.w,v.x+v.w)-Math.max(a.x,v.x))*Math.max(0,Math.min(a.y+a.h,v.y+v.h)-Math.max(a.y,v.y));
+ parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
+ // Every grid line and small tick is retained even when a number is omitted.
+ for(const t of ticks.x){
+  if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
+  parts.push(line(t.pos,axisY-3,t.pos,axisY+3,'stroke="#333"'));
+ }
+ for(const t of ticks.y){
+  if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'stroke="#d9dee4" stroke-width="0.8"'));
+  parts.push(line(axisX-3,t.pos,axisX+3,t.pos,'stroke="#333"'));
+ }
+ // Arrows deliberately extend beyond the rectangular grid.
+ parts.push(line(b.left,axisY,b.right+16,axisY,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'),
+  line(axisX,b.bottom,axisX,b.top-16,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'));
+ const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
+ const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
+ const numberBoxes=[];
+ for(const t of ticks.x){
+  if(!t.numbered)continue;
+  const origin=Math.abs(t.value)<1e-8&&axisX>b.left+25;
+  const x=t.pos+(origin?4:0);
+  const box={x:x-t.w/2,y:xBaseline-font,w:t.w,h:font+2};
+  if(numberBoxes.some(v=>overlap(v,box)>0))continue;
+  numberBoxes.push(box);occupied.push(box);
+  parts.push('<text class="qw-axis-number" data-axis="x" data-value="'+t.value+'" x="'+x+'" y="'+xBaseline+'" font-size="'+font+'" text-anchor="middle" fill="#263746">'+t.label+'</text>');
+ }
+ for(const t of ticks.y){
+  if(!t.numbered)continue;
+  const y=t.pos+font*.34,box={x:yLabelX-t.w,y:y-font,w:t.w,h:font+2};
+  if(numberBoxes.some(v=>overlap(v,box)>0))continue;
+  numberBoxes.push(box);occupied.push(box);
+  parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#263746">'+t.label+'</text>');
+ }
  parts.push('<text x="500" y="309" font-size="19" text-anchor="end" fill="#111">'+qwEsc(g.xlabel)+'</text>',
   '<text x="10" y="24" font-size="19" fill="#111">'+qwEsc(g.ylabel)+'</text>');
  if(g.curveFamily!=='points'){
@@ -293,4 +326,4 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   return '<g '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
  }).join(''));
 }
-export {qwMath,qwMathML,qwTokens,qwContentHTML,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
+export {qwMath,qwMathML,qwTokens,qwContentHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
