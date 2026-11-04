@@ -44,8 +44,94 @@ function qwSymbols(){const groups={...(typeof QO_WRITER_SYMBOLS==='object'?QO_WR
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,teacher,options);download(safeFile(qwDoc.title)+(teacher?'_преподаватель':'_ученик')+'.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(){const d=qwDialog('Предпросмотр A4','<div class="qw-row"><label class="qw-check"><input type="checkbox" id="qw-teacher">Для преподавателя</label>'+['answers','criteria','comments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-print-option="'+k+'" checked>'+['Ответы','Критерии','Комментарии'][i]+'</label>').join('')+'</div><div id="qw-pages">Подготовка страниц…</div>',qwButton('preview-pdf','Скачать PDF','class="qw-primary"')+'<span>PDF 180 dpi · текст растрирован</span>');const options=()=>Object.fromEntries([...d.querySelectorAll('[data-print-option]')].map(e=>[e.dataset.printOption,e.checked]));let seq=0;const paint=async()=>{const n=++seq;try{const pages=await qwRenderPages(qwDoc,d.querySelector('#qw-teacher').checked,options());if(d.isConnected&&n===seq)d.querySelector('#qw-pages').replaceChildren(...pages);}catch(e){d.querySelector('#qw-pages').textContent=e.message;}};d.querySelectorAll('input').forEach(e=>e.onchange=paint);d.querySelector('[data-qw-action="preview-pdf"]').onclick=()=>qwExportPDF(d.querySelector('#qw-teacher').checked,options());await paint();}
-function qwBankRead(){const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];const xs=JSON.parse(raw);if(!Array.isArray(xs)||xs.length>100)throw Error('Повреждён банк работ');return xs.map(x=>({id:qwText(x.id,80),subject:x.subject==='math'?'math':'physics',task:qwValidate({...qwProject(),tasks:[x.task]}).tasks[0]}));}
-function qwBank(){let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}const diagnostic=typeof qdBankRead==='function'?qdBankRead():[];const d=qwDialog('Банк заданий','<div class="qw-row"><input id="qw-bank-search" type="search" placeholder="Найти задание" aria-label="Поиск заданий"><select id="qw-bank-subject" aria-label="Предмет">'+qwOptions([['all','Все предметы'],['physics','Физика'],['math','Математика']],'all')+'</select><select id="qw-bank-type" aria-label="Тип задания">'+qwOptions([['all','Все типы'],...Object.entries(QW_TYPES)],'all')+'</select></div><div id="qw-bank-list"></div>');const refresh=()=>{const text=d.querySelector('input').value.toLocaleLowerCase(),subject=d.querySelector('#qw-bank-subject').value,type=d.querySelector('#qw-bank-type').value;d.querySelector('#qw-bank-list').innerHTML=xs.filter(x=>(subject==='all'||x.subject===subject)&&(type==='all'||x.task.type===type)&&x.task.prompt.toLocaleLowerCase().includes(text)).map(x=>'<div class="qw-bank-item"><span>'+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+'</span><button type="button" data-bank-add="'+qwEsc(x.id)+'">Вставить</button><button type="button" data-bank-delete="'+qwEsc(x.id)+'">Удалить</button></div>').join('')+(diagnostic.length?'<h3>Банк диагностики</h3>'+diagnostic.filter(x=>String(x.prompt||'').toLocaleLowerCase().includes(text)).slice(0,30).map((x,i)=>'<div class="qw-bank-item"><span>'+qwEsc(x.prompt)+'</span><button type="button" data-diag-bank="'+qwEsc(x.id)+'">Вставить</button></div>').join(''):'')||'<p>Нет заданий</p>';};d.querySelectorAll('input,select').forEach(e=>e.oninput=refresh);d.onclick=e=>{const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');if(add){const q=add.dataset.bankAdd?xs.find(x=>x.id===add.dataset.bankAdd)?.task:qwFromDiagnostic(diagnostic.find(x=>x.id===add.dataset.diagBank)||{});if(q&&qwDoc.tasks.length<80){qwChange(()=>{const copy=structuredClone(q);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}}if(del&&confirm('Удалить задание из банка?')){const next=xs.filter(x=>x.id!==del.dataset.bankDelete);try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;refresh();}catch(e){status('Не удалось изменить банк',true);}}};refresh();}
+function qwBankRead(){
+ const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];
+ const xs=JSON.parse(raw);if(!Array.isArray(xs)||xs.length>500)throw Error('Повреждён банк заданий');
+ return xs.map(x=>{
+  const task=qwValidate({...qwProject(),tasks:[x.task]}).tasks[0];
+  return {id:qwText(x.id,80),subject:x.subject==='math'?'math':'physics',
+   grade:qwText(x.grade??task.grade,24).trim(),exam:['general','oge','ege'].includes(x.exam)?x.exam:task.exam,
+   topic:qwText(x.topic??task.topic,120).trim(),subtopic:qwText(x.subtopic??task.subtopic,120).trim(),
+   origin:['original','adapted','generated'].includes(x.origin)?x.origin:task.origin,task};
+ });
+}
+function qwBankSave(){
+ const q=qwCurrent();if(!q)return;
+ const fields='<div class="qw-settings">'+
+  '<label>Предмет<select id="qw-bank-new-subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label>'+
+  '<label>Класс<input id="qw-bank-new-grade" maxlength="24" value="'+qwEsc(q.grade||qwDoc.grade)+'"></label>'+
+  '<label>Назначение<select id="qw-bank-new-exam">'+qwOptions([['general','Обычная работа'],['oge','ОГЭ'],['ege','ЕГЭ']],q.exam)+'</select></label>'+
+  '<label>Тема<input id="qw-bank-new-topic" maxlength="120" placeholder="Механика" value="'+qwEsc(q.topic||qwDoc.topic)+'"></label>'+
+  '<label>Подтема<input id="qw-bank-new-subtopic" maxlength="120" placeholder="Кинематика" value="'+qwEsc(q.subtopic)+'"></label>'+
+  '<label>Происхождение<select id="qw-bank-new-origin">'+qwOptions([['original','Авторская задача'],['adapted','Самостоятельный аналог'],['generated','С помощью ИИ']],q.origin)+'</select></label></div>';
+ const d=qwDialog('Сохранить задание в банк',fields,qwButton('confirm-bank-save','Добавить','class="qw-primary"'));
+ d.querySelector('[data-qw-action="confirm-bank-save"]').onclick=()=>{
+  try{
+   const xs=qwBankRead();if(xs.length>=500)throw Error('Достигнут лимит 500 заданий. Создайте резервную копию банка.');
+   const get=k=>d.querySelector('#qw-bank-new-'+k).value;
+   const metadata={subject:get('subject'),grade:get('grade').trim().slice(0,24),exam:get('exam'),
+    topic:get('topic').trim().slice(0,120),subtopic:get('subtopic').trim().slice(0,120),origin:get('origin')};
+   const task=structuredClone(q);Object.assign(task,{grade:metadata.grade,exam:metadata.exam,
+    topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
+   xs.push({id:qwId(),...metadata,task});
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify(xs));
+   d.close();status('Задание сохранено в банке');
+  }catch(e){status('Банк: '+e.message,true);}
+ };
+}
+function qwBank(){
+ let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
+ const diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
+ const filters='<div class="qw-row qw-bank-filters">'+
+  '<input id="qw-bank-search" type="search" placeholder="Условие, тема или подтема" aria-label="Поиск заданий">'+
+  '<select id="qw-bank-subject" aria-label="Предмет">'+qwOptions([['all','Все предметы'],['physics','Физика'],['math','Математика']],'all')+'</select>'+
+  '<select id="qw-bank-grade" aria-label="Класс">'+qwOptions([['all','Все классы'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select>'+
+  '<select id="qw-bank-exam" aria-label="Экзамен">'+qwOptions([['all','Все назначения'],['general','Практика'],['oge','ОГЭ'],['ege','ЕГЭ']],'all')+'</select>'+
+  '<select id="qw-bank-type" aria-label="Тип задания">'+qwOptions([['all','Все типы'],...Object.entries(QW_TYPES)],'all')+'</select>'+
+  '</div><p id="qw-bank-count" role="status"></p><div id="qw-bank-list"></div>';
+ const d=qwDialog('Банк заданий',filters);
+ const refresh=()=>{
+  const search=d.querySelector('#qw-bank-search').value.toLocaleLowerCase('ru-RU').trim();
+  const pick=k=>d.querySelector('#qw-bank-'+k).value;
+  const subject=pick('subject'),grade=pick('grade'),exam=pick('exam'),type=pick('type');
+  const shown=xs.filter(x=>(subject==='all'||x.subject===subject)&&
+   (grade==='all'||x.grade===grade)&&(exam==='all'||x.exam===exam)&&
+   (type==='all'||x.task.type===type)&&
+   [x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer].some(v=>String(v||'').toLocaleLowerCase('ru-RU').includes(search)));
+  d.querySelector('#qw-bank-count').textContent='Найдено: '+shown.length+' · Всего своих: '+xs.length;
+  const items=shown.map(x=>{
+   const tags=[x.subject==='math'?'Математика':'Физика',x.grade?x.grade+' кл.':'',
+    x.exam==='oge'?'ОГЭ':x.exam==='ege'?'ЕГЭ':'',x.topic,x.subtopic].filter(Boolean).join(' · ');
+   return '<div class="qw-bank-item"><div><span>'+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+
+    '</span><small style="display:block">'+qwEsc(tags)+'</small></div>'+
+    '<button type="button" data-bank-add="'+qwEsc(x.id)+'">Вставить</button>'+
+    '<button type="button" data-bank-delete="'+qwEsc(x.id)+'">Удалить</button></div>';
+  }).join('');
+  const diag=diagnostic.filter(x=>String(x.question?.prompt||x.prompt||'').toLocaleLowerCase('ru-RU').includes(search)).slice(0,30);
+  const other=diag.length?'<h3>Задания из диагностики</h3>'+diag.map(x=>
+   '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
+   '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Вставить</button></div>').join(''):'';
+  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p>Заданий не найдено</p>';
+ };
+ d.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',refresh));
+ d.onclick=e=>{
+  const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');
+  if(add){
+   const own=add.dataset.bankAdd?xs.find(x=>x.id===add.dataset.bankAdd)?.task:null;
+   const item=add.dataset.diagBank?diagnostic.find(x=>x.id===add.dataset.diagBank):null;
+   const task=own||(item?qwFromDiagnostic(item.question||item):null);
+   if(task&&qwDoc.tasks.length<80){
+    qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();
+   }else status('Задание недоступно или превышен лимит 80 заданий',true);
+  }
+  if(del&&confirm('Удалить задание из личного банка?')){
+   const next=xs.filter(x=>x.id!==del.dataset.bankDelete);
+   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;refresh();}
+   catch(e){status('Не удалось изменить банк',true);}
+  }
+ };
+ refresh();
+}
 function qwExample(subject='physics'){
  const d=qwProject();d.title=subject==='math'?'Математика · тренировочная работа':'Физика · движение и тепловые явления';d.subject=subject;d.topic='Тренировочный вариант';d.instructions='Запишите краткие ответы и оформите решения. Графики и схемы используйте для обоснования.';
  const data=subject==='math'?[['short','Вычислите \\(\\frac{3}{4}+\\frac{1}{8}\\).','7/8'],['extended','Решите уравнение \\(x^{2}-5x+6=0\\). Обоснуйте ответ.','2; 3'],['graph','По графику определите значение y при x = 4.','6'],['diagram','Найдите площадь прямоугольника со сторонами 6 см и 4 см.','24 см²'],['blanks','Заполните: \\(\\sqrt{81}\\) = [[blank:3]], \\(2^{5}\\) = [[blank:4]].','9; 32'],['combined','По графику функции определите промежутки возрастания и убывания, найдите наибольшее значение. Обоснуйте ответ.','Возрастает на [0; 2], убывает на [6; 9], наибольшее значение — 6.']]:[['short','Тело прошло 120 м за 15 с. Найдите среднюю скорость \\(v=\\frac{s}{t}\\), м/с.','8'],['extended','Воду массой 2 кг нагрели от 20 °C до 30 °C. Удельная теплоёмкость воды 4200 Дж/(кг·°C). Найдите количество теплоты и запишите формулу \\(Q=cm\\Delta t\\).','84 000 Дж'],['graph','На рисунке приведена зависимость скорости от времени. Найдите путь за первые 6 с.','30 м'],['diagram','На тело действуют две силы. Изобразите и опишите направление равнодействующей.','Вдоль большей силы'],['blanks','Заполните обозначения: сила — [[blank:3]], энергия — [[blank:3]], единица давления — [[blank:4]].','F; E; Па'],['combined','Ученик исследовал движение тележки по горизонтальной дорожке. Датчик регистрировал скорость через равные промежутки времени, а программа построила график зависимости v(t). Направление движения тележки приняли за положительное. Во время опыта тележка разгонялась, затем некоторое время двигалась с постоянной скоростью и наконец тормозила. Масса тележки и состояние поверхности дорожки не менялись.\n\nПеред началом работы ученик проверил показания датчика на неподвижной тележке. Опыт повторили три раза при одинаковых настройках привода. Полученные графики имели одинаковую форму, однако отдельные показания скорости немного различались. На рисунке приведён один из результатов измерений; значения времени указаны в секундах, скорости — в метрах в секунду.\n\nа) Укажите интервал равномерного движения и значение скорости на нём. б) Сравните модули ускорения при разгоне и торможении. в) Найдите путь тележки за весь показанный промежуток времени и объясните геометрический смысл расчёта. г) Предложите способ оценки погрешности результата по повторным измерениям.','Равномерное движение от 2 до 6 с; скорость 6 м/с. Модули ускорения: 3 м/с² при разгоне и 2 м/с² при торможении. Площадь под графиком — путь; за 9 с путь равен 39 м. Погрешность можно оценить по разбросу повторных измерений.']];
@@ -93,7 +179,7 @@ function qwAction(action,button){
  if(action==='delete'){if(!confirm('Удалить задание '+(qwDoc.tasks.indexOf(q)+1)+'?'))return;qwChange(()=>{qwDoc.tasks=qwDoc.tasks.filter(t=>t.id!==q.id);qwSelected='';});return;}
  if(action==='math'){qwFormula();return;}if(action==='symbols'){qwSymbols();return;}if(action==='blank'){qwInsert('[[blank:6]]');return;}
  if(action==='graph'||action==='diagram'){qwVisualEditor(action);return;}if(action==='image'){document.getElementById('qw-image').click();return;}
- if(action==='bank-save'){try{const items=qwBankRead();if(items.length>=100)throw Error('Максимум 100 заданий в банке');items.push({id:qwId(),subject:qwDoc.subject,task:structuredClone(q)});localStorage.setItem(QW_BANK_KEY,JSON.stringify(items));status('Задание сохранено в банке');}catch(e){status('Банк: '+e.message,true);}return;}
+ if(action==='bank-save'){qwBankSave();return;}
 }
 if(typeof document!=='undefined'){
  document.addEventListener('click',e=>{if(!qwActive()||e.target.closest('#qw-dialog'))return;const b=e.target.closest('[data-qw-action],[data-action^="work-"]');if(!b)return;e.preventDefault();e.stopPropagation();qwAction(b.dataset.qwAction||b.dataset.action.slice(5),b);},true);
