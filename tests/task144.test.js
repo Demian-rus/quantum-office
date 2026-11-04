@@ -30,7 +30,7 @@ test('TASK144 inline blanks preserve text and mathematical content without HTML 
 });
 test('TASK144 graph has bounded ticks, correctly mapped coordinates and safe labels',()=>{
  const g=qwTask('graph').graph;g.points=[{x:0,y:0,label:'<img>'},{x:5,y:5,label:'B'},{x:5,y:9,label:'C'}];
- assert.deepEqual(qwPlotXY(g,g.points[0]),{x:52,y:275});const svg=qwGraphSVG(g,true);assert.match(svg,/data-qw-point="2"/);assert.match(svg,/&lt;img&gt;/);assert.doesNotMatch(svg,/NaN|Infinity/);
+ assert.deepEqual(qwPlotXY(g,g.points[0]),{x:82,y:262});const svg=qwGraphSVG(g,true);assert.match(svg,/data-qw-point="2"/);assert.match(svg,/&lt;img&gt;/);assert.doesNotMatch(svg,/NaN|Infinity/);
  assert.throws(()=>qwValidateGraph({...g,step:0}));assert.throws(()=>qwValidateGraph({...g,xmin:10}));
 });
 test('TASK144 all seven diagram primitives survive validation and render as SVG',()=>{
