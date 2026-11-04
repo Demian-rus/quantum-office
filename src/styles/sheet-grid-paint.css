@@ -1,0 +1,18 @@
+/* TASK140 — exact-size cell painting and unobscured frozen-row scrollbar. */
+.grid-frame .grid-cell,.grid-frame .rowhead,.grid-frame .colhead{
+ box-sizing:border-box;
+}
+.grid-frame .grid-cell{
+ background-clip:border-box;
+ border-radius:0;
+}
+.grid-frame .grid-cell.is-selected::after{
+ inset:0;
+}
+.grid-frame .grid-cell.is-merged{
+ background-clip:border-box;
+}
+.grid-frame>.grid-scroll{
+ overflow:auto;
+ scrollbar-gutter:stable;
+}
