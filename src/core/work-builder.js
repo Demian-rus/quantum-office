@@ -42,64 +42,66 @@ function qwRender(){
 }
 function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q)p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
 function qwDialog(title,body,footer=''){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();document.body.append(d);d.showModal();return d;}
-function qwSettings(){const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label><label>Макет PDF<select data-meta="layout">'+qwOptions([['worksheet','Контрольная / самостоятельная'],['exam','Компактный ОГЭ / ЕГЭ']],qwDoc.layout)+'</select></label><label class="qw-settings-wide">Инструкция<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=e.type==='checkbox'?e.checked:qwText(e.value,e.dataset.meta==='instructions'?4000:160);qwDoc.title=qwDoc.title.trim()||'Новая работа';});d.close();};}
+function qwSettings(){const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label><label>Макет PDF<select data-meta="layout">'+qwOptions([['worksheet','Контрольная / самостоятельная'],['exam','Компактный ОГЭ / ЕГЭ']],qwDoc.layout)+'</select></label><label>Экзамен<select data-meta="exam">'+qwOptions([['oge','ОГЭ'],['ege','ЕГЭ']],qwDoc.exam)+'</select></label><label class="qw-settings-wide">Инструкция<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=e.type==='checkbox'?e.checked:qwText(e.value,e.dataset.meta==='instructions'?4000:160);qwDoc.title=qwDoc.title.trim()||'Новая работа';});d.close();};}
 function qwInsert(text){const el=document.getElementById('qw-prompt'),q=qwCurrent();if(!el||!q)return;qwRemember();const a=el.selectionStart??el.value.length,b=el.selectionEnd??a;el.setRangeText(text,a,b,'end');q.prompt=el.value.slice(0,16000);qwPersist();qwPreviewSelected();el.focus();}
 function qwFormula(){const d=qwDialog('Формула','<div class="qw-row">'+['\\frac{a}{b}','x^{2}','a_{1}','\\sqrt{x}','(a+b)','\\Delta t'].map(v=>'<button type="button" data-formula="'+qwEsc(v)+'">'+qwContentHTML('\\('+v+'\\)')+'</button>').join('')+'</div><label>Выражение<input id="qw-formula-source" maxlength="600" value="\\frac{a}{b}"></label><div id="qw-formula-preview"></div><p class="qw-muted">Дробь: \\frac{a}{b} · корень: \\sqrt{x} · индексы: x^{2}, a_{1}</p>',qwButton('formula-insert','Вставить','class="qw-primary"'));const input=d.querySelector('input'),view=d.querySelector('#qw-formula-preview'),ok=d.querySelector('[data-qw-action="formula-insert"]');const update=()=>{try{view.innerHTML='<math xmlns="http://www.w3.org/1998/Math/MathML">'+qwMathML(qwMath(input.value))+'</math>';ok.disabled=false;}catch(e){view.textContent=e.message;ok.disabled=true;}};input.oninput=update;for(const e of d.querySelectorAll('[data-formula]'))e.onclick=()=>{input.value=e.dataset.formula;update();};ok.onclick=()=>{const s=input.value;d.close();qwInsert('\\('+s+'\\)');};update();}
 function qwSymbols(){const groups={...(typeof QO_WRITER_SYMBOLS==='object'?QO_WRITER_SYMBOLS:{}),'Греческие':['α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','π','ρ','σ','τ','υ','φ','χ','ψ','ω','Γ','Δ','Θ','Λ','Π','Σ','Φ','Ψ','Ω'],'Единицы':['м','с','кг','Н','Дж','Вт','Па','В','А','Ом','м/с','м/с²','Дж/(кг·°C)']};const d=qwDialog('Символы',Object.entries(groups).map(([k,vs])=>'<h3>'+qwEsc(k)+'</h3><div class="qw-symbols">'+vs.map(v=>'<button type="button" data-symbol="'+qwEsc(v)+'">'+qwEsc(v)+'</button>').join('')+'</div>').join(''));for(const e of d.querySelectorAll('[data-symbol]'))e.onclick=()=>{d.close();qwInsert(e.dataset.symbol);};}
 /* Online publishing: browser's native print-to-PDF preserves selectable text and vector SVG.
    The older one-click raster PDF exporter remains available as a compatibility fallback. */
-function qwPrintTextPDF(teacher=false){
- const project=qwValidate(qwDoc),title=qwEsc(project.title),subject=project.subject==='math'?'Математика':'Физика';
- const tasks=project.tasks.map((q,i)=>{
-  const answer=teacher?'<div class="qw-teacher-notes"><strong>Ответ:</strong> '+qwContentHTML(q.answer||'—')+
-   (q.criteria?'<p><strong>Критерии:</strong> '+qwContentHTML(q.criteria)+'</p>':'')+
-   (q.comment?'<p><strong>Комментарий:</strong> '+qwContentHTML(q.comment)+'</p>':'')+'</div>':'';
-  return '<section class="qw-print-section">'+qwTaskPreview(q,i)+answer+'</section>';
+/* Unified high-quality browser PDF. Native font shaping and vector SVG are kept. */
+function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
+ const d=qwValidate(project),exam=d.layout==='exam',subject=d.subject==='math'?'Математика':'Физика';
+ const tasks=d.tasks.map((q,i)=>{
+  if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));
+  const notes=teacher?'<div class="qw-teacher-notes">'+
+   (options.answers!==false?'<p><b>Ответ:</b> '+qwContentHTML(q.answer||'—')+'</p>':'')+
+   (options.criteria!==false&&q.criteria?'<p><b>Критерии:</b> '+qwContentHTML(q.criteria)+'</p>':'')+
+   (options.comments!==false&&q.comment?'<p><b>Комментарий:</b> '+qwContentHTML(q.comment)+'</p>':'')+'</div>':'';
+  return '<section class="qw-print-section">'+qwTaskPreview(q,i,d.layout)+notes+'</section>';
  }).join('');
- const css=String.raw`
-  @page{size:A4;margin:16mm 15mm}
-  html,body{margin:0;padding:0;background:#fff;color:#111;font:11pt/1.42 Arial,"Liberation Sans",sans-serif}
-  h1{font-size:17pt;margin:0 0 2mm}h2{font-size:10pt;font-weight:normal;color:#555;margin:0 0 7mm}
-  .qw-paper-task{border:0;margin:0 0 7mm;padding:0;break-inside:auto}
-  .qw-paper-task header{display:flex;justify-content:space-between;gap:8mm;margin:0 0 3mm;break-after:avoid}
-  .qw-paper-task header b{font-size:12pt}.qw-paper-task header span{font-size:9pt;color:#444}
-  .qw-task-flow{display:flex;align-items:flex-start;gap:5mm;min-width:0}
-  .qw-task-flow>div{min-width:0;flex:1;white-space:normal;overflow-wrap:anywhere}
-  .qw-task-flow figure{margin:0;max-width:48%;flex:none;break-inside:avoid}
-  .qw-task-flow figure img,.qw-task-flow figure svg{width:100%;height:auto;display:block}
-  .qw-figure-right figure{order:2}.qw-figure-below{display:block}.qw-figure-below figure{max-width:100%;margin:3mm 0;width:100%}
-  .qw-answer-preview{display:flex;align-items:center;gap:2mm;margin:3mm 0;font-size:10pt}
-  .qw-answer-preview span{display:inline-block;border-bottom:1px solid #333;min-width:35mm;height:6mm}
-  .qw-answer-preview i{display:inline-block;width:6mm;height:7mm;border:1px solid #555}
-  .qw-answer-preview .qw-answer-box{min-width:38mm}
-  .qw-inline-blank{display:inline-block;border-bottom:1px solid #333;max-width:100%;height:1em}
-  .qw-solution-preview{max-height:140mm;border:1px solid #aaa;box-sizing:border-box;break-inside:avoid}
-  .qw-solution-lines{background:repeating-linear-gradient(to bottom,transparent 0,transparent 6.5mm,#ddd 6.6mm)}
-  .qw-solution-grid{background-image:linear-gradient(#ddd 1px,transparent 1px),linear-gradient(90deg,#ddd 1px,transparent 1px);background-size:5mm 5mm}
-  .qw-teacher-notes{background:#f7f7f7;border-left:3px solid #555;padding:3mm;margin:0 0 7mm;break-inside:avoid}
-  .qw-teacher-notes p{margin:2mm 0 0}.qw-print-section{break-inside:auto}
-  math{font-size:1.02em}img,svg{break-inside:avoid}
-  `;
- const html='<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+title+
-  '</title><style>'+css+'</style></head><body><h1>'+title+'</h1>'+
-  '<h2>'+subject+(project.topic?' · '+qwEsc(project.topic):'')+
-  (project.grade?' · '+qwEsc(project.grade)+' класс':'')+(project.variant?' · Вариант '+qwEsc(project.variant):'')+(teacher?' · С ответами':'')+'</h2>'+
-  (project.instructions?'<p>'+qwContentHTML(project.instructions)+'</p>':'')+
-  tasks+'</body></html>';
- const frame=document.createElement('iframe');frame.title='PDF с выделяемым текстом';
- frame.style.cssText='position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:0';
+ const styles="@page{size:A4;margin:14mm 15mm}\n*{box-sizing:border-box}\nhtml{margin:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}\nbody{margin:0;font:10.8pt/1.48 \"Arial\",\"Liberation Sans\",sans-serif;color:#111}\n.qw-print-document{margin:0;padding:0}\n.qw-print-title{font-size:15pt;line-height:1.3;margin:0 0 2.5mm;font-weight:700}\n.qw-print-meta{font-size:9pt;line-height:1.4;margin:0 0 7mm;color:#444}\n.qw-print-intro{margin:0 0 5mm;line-height:1.4;white-space:pre-wrap}\n.qw-print-section{break-inside:auto}\n.qw-paper-task{border:0;margin:0 0 6mm;padding:0;background:white;color:#111;overflow-wrap:anywhere}\n.qw-paper-task>header{display:flex;justify-content:space-between;gap:8mm;margin:0 0 2mm;break-after:avoid}\n.qw-paper-task>header b{font-size:10.5pt}\n.qw-paper-task>header span{font-size:9pt;color:#444}\n.qw-task-flow{display:block;min-height:0}\n.qw-task-flow::after{content:\"\";display:block;clear:both}\n.qw-task-flow .qw-task-text{white-space:normal;overflow-wrap:anywhere;min-width:0}\n.qw-task-flow figure{float:right;margin:0 0 2mm 4mm;max-width:42%;break-inside:avoid}\n.qw-task-flow figure svg,.qw-task-flow figure img{display:block;width:100%;height:auto}\n.qw-figure-left figure{float:left;margin:0 4mm 2mm 0}\n.qw-figure-below figure{float:none;max-width:100%;margin:2mm 0;width:100%}\n.qw-answer-preview{display:flex;align-items:center;gap:2mm;margin:3mm 0 0;font-size:9.5pt}\n.qw-answer-preview span{display:inline-block;flex:1;border-bottom:1px solid #333;height:5mm;min-width:25mm}\n.qw-answer-preview i{display:inline-block;width:6mm;height:6.5mm;border:1px solid #777}\n.qw-answer-preview .qw-answer-box{width:32mm}\n.qw-inline-blank{display:inline-block;border-bottom:1px solid #333;height:1em;max-width:100%}\n.qw-solution-preview{max-height:140mm;margin:3mm 0 0;break-inside:avoid}\n.qw-solution-lines{background:repeating-linear-gradient(to bottom,transparent 0,transparent 6.5mm,#ddd 6.6mm)}\n.qw-solution-grid{background-image:linear-gradient(#ddd 1px,transparent 1px),linear-gradient(90deg,#ddd 1px,transparent 1px);background-size:5mm 5mm}\n.qw-teacher-notes{margin:2mm 0 6mm;padding:2.5mm 3mm;border-left:2px solid #777;background:#f9f9f9;font-size:9pt;break-inside:avoid}\n.qw-teacher-notes p{margin:0 0 1.5mm}\nmath{display:inline-block;vertical-align:-.22em;font:1.1em/1.25 \"Cambria Math\",\"STIX Two Math\",\"Times New Roman\",serif;margin:0 .16em;white-space:nowrap}\nmath mfrac{font-size:1.04em}\n.qw-exam-header{font:9pt/1.4 \"Times New Roman\",\"Liberation Serif\",serif;color:#222;margin:0 0 6mm;text-align:right}\n.qw-exam-task{font:10.5pt/1.28 \"Times New Roman\",\"Liberation Serif\",serif;margin:0 0 5.5mm;break-inside:avoid-page}\n.qw-exam-grid{display:grid;grid-template-columns:6mm minmax(0,1fr);gap:1.7mm}\n.qw-exam-number{font-weight:bold;font-size:10.5pt;line-height:1.3}\n.qw-exam-body{min-width:0}\n.qw-exam-task .qw-task-flow figure{max-width:37%;margin:0 0 1.4mm 3.5mm}\n.qw-exam-task .qw-figure-left figure{margin:0 3.5mm 1.4mm 0}\n.qw-exam-task .qw-figure-below figure{max-width:100%;margin:2mm 0}\n.qw-exam-task .qw-task-text{line-height:1.3}\n.qw-exam-task math{font-size:1.02em}\n@media screen{\n html{background:#e8edf2}\n body{padding:12px}\n .qw-print-document{width:210mm;max-width:none;min-height:297mm;margin:0 auto;padding:14mm 15mm;background:white;box-shadow:0 2px 8px #1f2b3740}\n}\n@media print{\n html,body{background:white;margin:0;padding:0}\n .qw-print-document{padding:0;margin:0;max-width:none;box-shadow:none}\n .qw-exam-task{break-inside:avoid-page}\n}";
+ const header=exam?'<div class="qw-exam-header">'+qwEsc(subject)+' · '+(d.exam==='oge'?'ОГЭ':'ЕГЭ')+
+  (d.variant?' · Вариант '+qwEsc(d.variant):'')+'</div>':
+  '<h1 class="qw-print-title">'+qwEsc(d.title)+'</h1>'+
+  '<div class="qw-print-meta">'+qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+
+  (d.variant?' · Вариант '+qwEsc(d.variant):'')+(teacher?' · Для преподавателя':'')+'</div>'+
+  (d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
+ return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
+  '</title><style>'+styles+'</style></head><body class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '"><main class="qw-print-document">'+header+tasks+'</main></body></html>';
+}
+function qwPrintTextPDF(teacher=false,options){
+ let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
+ const frame=document.createElement('iframe');frame.title='Подготовка PDF';
+ frame.style.cssText='position:fixed;left:-9999px;top:0;width:794px;height:1123px;opacity:0;pointer-events:none';
  document.body.append(frame);
  frame.onload=()=>{
-  try{frame.contentWindow.addEventListener('afterprint',()=>frame.remove(),{once:true});frame.contentWindow.focus();frame.contentWindow.print();
-   status('В окне печати выберите «Сохранить как PDF» — текст останется выделяемым');}
-  catch(e){status('Не удалось открыть печать PDF: '+e.message,true);}
+  try{const win=frame.contentWindow;win.addEventListener('afterprint',()=>frame.remove(),{once:true});
+   win.focus();win.print();status('В окне печати выберите «Сохранить как PDF»');}
+  catch(e){status('PDF: '+e.message,true);frame.remove();}
  };
  frame.srcdoc=html;
-
 }
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,teacher,options);download(safeFile(qwDoc.title)+(teacher?'_преподаватель':'_ученик')+'.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
-async function qwPreview(){const d=qwDialog('Предпросмотр A4','<div class="qw-row"><label class="qw-check"><input type="checkbox" id="qw-teacher">Для преподавателя</label>'+['answers','criteria','comments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-print-option="'+k+'" checked>'+['Ответы','Критерии','Комментарии'][i]+'</label>').join('')+'</div><div id="qw-pages">Подготовка страниц…</div>',qwButton('preview-text-pdf','PDF с текстом','class="qw-primary"')+qwButton('preview-pdf','PDF (растровый)')+'<span>PDF с текстом: выберите «Сохранить как PDF» в диалоге печати</span>');const options=()=>Object.fromEntries([...d.querySelectorAll('[data-print-option]')].map(e=>[e.dataset.printOption,e.checked]));let seq=0;const paint=async()=>{const n=++seq;try{const pages=await qwRenderPages(qwDoc,d.querySelector('#qw-teacher').checked,options());if(d.isConnected&&n===seq)d.querySelector('#qw-pages').replaceChildren(...pages);}catch(e){d.querySelector('#qw-pages').textContent=e.message;}};d.querySelectorAll('input').forEach(e=>e.onchange=paint);d.querySelector('[data-qw-action="preview-pdf"]').onclick=()=>qwExportPDF(d.querySelector('#qw-teacher').checked,options());d.querySelector('[data-qw-action="preview-text-pdf"]').onclick=()=>qwPrintTextPDF(d.querySelector('#qw-teacher').checked);await paint();}
+async function qwPreview(){
+ const d=qwDialog('Предпросмотр PDF','<div class="qw-row qw-preview-options">'+
+  '<label class="qw-check"><input type="checkbox" id="qw-teacher">Для преподавателя</label>'+
+  ['answers','criteria','comments'].map((k,i)=>'<label class="qw-check" data-teacher-option><input type="checkbox" data-print-option="'+k+'" checked>'+['Ответы','Критерии','Комментарии'][i]+'</label>').join('')+
+  '</div><div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div>',
+  qwButton('preview-pdf','Скачать PDF','class="qw-primary"'));
+ d.classList.add('qw-print-preview-dialog');
+ const options=()=>Object.fromEntries([...d.querySelectorAll('[data-print-option]')].map(e=>[e.dataset.printOption,e.checked]));
+ const refresh=()=>{
+  const teacher=d.querySelector('#qw-teacher').checked;
+  d.querySelectorAll('[data-teacher-option]').forEach(e=>e.hidden=!teacher);
+  try{d.querySelector('#qw-print-preview-frame').srcdoc=qwPrintDocumentHTML(qwDoc,teacher,options());}
+  catch(e){d.querySelector('#qw-pages').textContent=e.message;}
+ };
+ d.querySelectorAll('input').forEach(e=>e.onchange=refresh);
+ d.querySelector('[data-qw-action="preview-pdf"]').onclick=()=>qwPrintTextPDF(d.querySelector('#qw-teacher').checked,options());
+ refresh();
+}
 function qwBankNormalize(x){
  if(!x||typeof x!=='object'||!x.task)throw Error('Некорректная запись банка');
  const task=qwValidate({...qwProject(),tasks:[x.task]}).tasks[0];
