@@ -85,12 +85,12 @@ function qwPrintTextPDF(teacher=false){
  frame.style.cssText='position:fixed;width:1px;height:1px;opacity:0;pointer-events:none;left:-9999px;top:0';
  document.body.append(frame);
  frame.onload=()=>{
-  try{frame.contentWindow.focus();frame.contentWindow.print();
+  try{frame.contentWindow.addEventListener('afterprint',()=>frame.remove(),{once:true});frame.contentWindow.focus();frame.contentWindow.print();
    status('В окне печати выберите «Сохранить как PDF» — текст останется выделяемым');}
   catch(e){status('Не удалось открыть печать PDF: '+e.message,true);}
  };
  frame.srcdoc=html;
- window.addEventListener('afterprint',()=>{frame.remove();},{once:true});
+
 }
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,teacher,options);download(safeFile(qwDoc.title)+(teacher?'_преподаватель':'_ученик')+'.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
