@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {qwProject,qwTask,qwValidate,qwValidateDiagram} from '../src/core/work-model.js';
+import {qwProject,qwTask,qwValidate,qwValidateDiagram,qwSnapDiagramPoint} from '../src/core/work-model.js';
 import {qwDiagramSVG,qwMath,qwMathML} from '../src/core/work-content.js';
 
 test('TASK146 accepts two document layout modes with backward-compatible QWORK',()=>{
@@ -65,4 +65,17 @@ test('TASK146 has only one PDF button and icon-first physics drawing palette',()
  assert.match(source,/const QW_VISUAL_TOOLS=\[/);
  assert.match(source,/\['select','Выбрать и переместить'\],\['point','Точка'\],\['line','Отрезок'\]/);
  assert.match(source,/function qwPhysicsPreset/);
+});
+
+test('TASK146 magnetic endpoints connect to nearby block and pulley anchors',()=>{
+ const objects=qwValidateDiagram([
+  {kind:'block',x:200,y:150,x2:280,y2:210,label:'m',rotation:0},
+  {kind:'pulley',x:340,y:90,x2:420,y2:170,label:''},
+  {kind:'point',x:122,y:96,x2:122,y2:96,label:'A'}
+ ]);
+ assert.deepEqual(qwSnapDiagramPoint({x:203,y:152},objects,20),{x:200,y:150});
+ assert.deepEqual(qwSnapDiagramPoint({x:381,y:93},objects,20),{x:380,y:90});
+ assert.deepEqual(qwSnapDiagramPoint({x:124,y:98},objects,20),{x:122,y:96});
+ assert.deepEqual(qwSnapDiagramPoint({x:127,y:121},objects,20),{x:120,y:120});
+ assert.deepEqual(qwSnapDiagramPoint({x:205,y:153},objects,20,0),{x:200,y:160});
 });
