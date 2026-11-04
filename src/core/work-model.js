@@ -8,12 +8,12 @@ function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t
 function qwTask(type='short'){
  return {id:qwId(),type:Object.hasOwn(QW_TYPES,type)?type:'short',part:'Часть 1',prompt:'',answer:'',criteria:'',comment:'',grade:'',exam:'general',topic:'',subtopic:'',origin:'original',points:2,answerVisible:true,answerStyle:'line',boxes:6,solutionVisible:['extended','combined'].includes(type),solutionHeight:110,solutionStyle:'lines',figure:['graph','diagram','combined'].includes(type)?type==='diagram'?'diagram':'graph':'none',position:'right',figureWidth:220,pageBreak:false,graph:qwGraphDefault(),diagram:[],image:''};
 }
-function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:false,tasks:[]};}
+function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:false,layout:'worksheet',exam:'ege',tasks:[]};}
 function qwValidate(raw){
  if(!raw||raw.format!=='quantum-work'||raw.version!==1||!Array.isArray(raw.tasks)||raw.tasks.length>QW_LIMITS.tasks)throw Error('Неподдерживаемый проект QWORK');
  const d=qwProject(),ids=new Set();
  for(const key of ['title','grade','topic','variant','instructions'])d[key]=qwText(raw[key],key==='instructions'?4000:key==='title'||key==='topic'?160:24);
- d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity!==false;
+ d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity===true;d.layout=raw.layout==='exam'?'exam':'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
  d.tasks=raw.tasks.map(raw=>{
   if(!raw||typeof raw!=='object'||!Object.hasOwn(QW_TYPES,raw.type)||typeof raw.prompt!=='string'||raw.prompt.length>QW_LIMITS.text)throw Error('Повреждено задание');
   const q=qwTask(raw.type);q.id=qwText(raw.id,80)||qwId();if(ids.has(q.id))throw Error('Повторяющийся ID задания');ids.add(q.id);
@@ -74,12 +74,54 @@ function qwGeometryVertices(object){
  if(object.kind==='rightTriangle')return [{x,y:y2,label:'A'},{x:x2,y:y2,label:'B'},{x,y,label:'C'}];
  return [{x,y:y2,label:'A'},{x:x2,y:y2,label:'B'},{x:x2,y,label:'C'},{x,y,label:'D'}];
 }
+/** Exact median/altitude from a triangle vertex to the opposite side. Returns a static
+ * auxiliary dashed line; subsequent vertex moves do not automatically mutate it. */
+function qwTriangleConstruction(object,kind,vertexIndex=0){
+ if(!object||!['triangle','rightTriangle'].includes(object.kind))throw Error('Сначала выберите треугольник');
+ if(!['median','altitude'].includes(kind)||![0,1,2].includes(vertexIndex))throw Error('Неизвестное построение');
+ const vs=qwGeometryVertices(object),a=vs[vertexIndex],b=vs[(vertexIndex+1)%3],c=vs[(vertexIndex+2)%3];
+ const dx=c.x-b.x,dy=c.y-b.y,length2=dx*dx+dy*dy;
+ if(length2<1e-8)throw Error('Противоположная сторона должна иметь ненулевую длину');
+ const t=kind==='median'?.5:((a.x-b.x)*dx+(a.y-b.y)*dy)/length2;
+ const x=b.x+t*dx,y=b.y+t*dy;
+ if(x<0||x>520||y<0||y>320)throw Error('Основание высоты вне холста — измените расположение фигуры');
+ return {kind:'dashed',x:a.x,y:a.y,x2:Number(x.toFixed(4)),y2:Number(y.toFixed(4)),label:''};
+}
+/* Anchor drawing endpoints to nearby vertices/edges before falling back to the grid. */
+function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
+ const target={x:qwNum(point.x,0,520,0),y:qwNum(point.y,0,320,0)};
+ const anchors=[];
+ (Array.isArray(objects)?objects:[]).forEach((o,i)=>{
+  if(i===excludeIndex||!o)return;
+  const x=Math.min(o.x,o.x2),x2=Math.max(o.x,o.x2),
+   y=Math.min(o.y,o.y2),y2=Math.max(o.y,o.y2);
+  if(Array.isArray(o.vertices))anchors.push(...o.vertices);
+  else if(['block','rect','incline'].includes(o.kind)){
+   anchors.push({x,y},{x:x2,y},{x,y:y2},{x:x2,y:y2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else if(['circle','pulley'].includes(o.kind)){
+   anchors.push({x:(x+x2)/2,y:(y+y2)/2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else anchors.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
+ });
+ let best=null,distance=Infinity;
+ for(const a of anchors){
+  const n=Math.hypot(target.x-a.x,target.y-a.y);
+  if(n<distance){distance=n;best=a;}
+ }
+ if(best&&distance<=Math.min(step*.9,16))
+  return {x:qwNum(best.x,0,520,0),y:qwNum(best.y,0,320,0)};
+ return {x:Math.round(target.x/step)*step,y:Math.round(target.y/step)*step};
+}
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  return raw.map(o=>{
-  if(!o||!['line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].includes(o.kind))throw Error('Неизвестная фигура');
+  if(!o||!['line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
+  if(o.kind==='block')value.rotation=qwNum(o.rotation,-180,180,0);
   if(['triangle','rightTriangle','quadrilateral'].includes(o.kind)){
    if(o.vertices!==undefined&&(!Array.isArray(o.vertices)||o.vertices.length!==(o.kind==='quadrilateral'?4:3)))throw Error('Некорректные вершины геометрической фигуры');
    const vertices=qwGeometryVertices(o);
@@ -96,4 +138,4 @@ function qwValidateDiagram(raw){
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;[d.tasks[i],d.tasks[j]]=[d.tasks[j],d.tasks[i]];return true;}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {QW_TYPES,QW_LIMITS,qwProject,qwTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices};
+export {QW_TYPES,QW_LIMITS,qwProject,qwTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwTriangleConstruction,qwSnapDiagramPoint};

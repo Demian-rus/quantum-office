@@ -8,7 +8,8 @@ function qwMath(source){
  function atom(depth){while(s[i]===' ')i++;if(s[i]==='{'){i++;const n=group(depth,'}');if(s[i++]!=='}')throw Error('Закройте скобку формулы');return n;}if(i>=s.length)throw Error('Заполните аргумент формулы');return {t:'text',v:s[i++]};}
  const result=group();if(i<s.length)throw Error('Некорректная формула');return result;
 }
-function qwMathML(n){const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';if(n.t==='row')return tag('mrow',n.list.map(qwMathML).join(''));if(n.t==='frac')return tag('mfrac',qwMathML(n.a)+qwMathML(n.b));if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a));if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a)+qwMathML(n.b));return tag(/[0-9]/.test(n.v)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(n.v)?'mi':'mo',qwEsc(n.v));}
+function qwMathML(n){const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';if(n.t==='row')return tag('mrow',n.list.map(qwMathML).join(''));if(n.t==='frac')return tag('mfrac',qwMathML(n.a)+qwMathML(n.b));if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a));if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a)+qwMathML(n.b));if(/[=+−\-×÷<>≤≥≠]/.test(n.v))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(n.v)+'</mo>';
+ return tag(/[0-9]/.test(n.v)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(n.v)?'mi':'mo',qwEsc(n.v));}
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
 /* Printable coordinate plot. Tick values live outside the plotting area; point labels avoid axes and each other. */
@@ -27,7 +28,7 @@ function qwGraphSVG(g,interactive=false){
    tickCount=Math.max(1,Math.ceil((max-min)/step)),
    longest=Math.max(String(Number(min.toPrecision(5))).length,String(Number(max.toPrecision(5))).length),
    gap=(axis==='x'?b.right-b.left:b.bottom-b.top)/tickCount,
-   stride=Math.max(1,Math.ceil((axis==='x'?longest*9+9:21)/Math.max(gap,1)));
+   stride=Math.max(1,Math.ceil((axis==='x'?longest*10+12:30)/Math.max(gap,1)));
   for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){
    const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(11,label.length*9);
    if(axis==='x'){
@@ -41,8 +42,8 @@ function qwGraphSVG(g,interactive=false){
     if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
     if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
-    const ty=Math.max(b.top+8,Math.min(b.bottom-8,p.y));
-    const rect={x:b.left-17-w,y:ty-10,w,h:20};occupied.push(rect);
+    const ty=p.y;
+    const rect={x:b.left-17-w,y:ty-11,w,h:22};occupied.push(rect);
     parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="16" text-anchor="end" fill="#263746">'+label+'</text>');
    }
   }
@@ -99,10 +100,66 @@ function qwGraphSVG(g,interactive=false){
  return qwSVG(parts.join(''),'Координатный график');
 }
 function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
+
+/* Position geometry captions outside edges and away from already placed captions.
+   Uses SVG coordinates, so preview and exported documents have identical placement. */
+function qwGeometrySegmentIntersectsBox(a,b,r){
+ const dx=b.x-a.x,dy=b.y-a.y;
+ let near=0,far=1;
+ for(const [p,q] of [[-dx,a.x-r.x],[dx,r.x+r.w-a.x],[-dy,a.y-r.y],[dy,r.y+r.h-a.y]]){
+  if(Math.abs(p)<1e-9){if(q<0)return false;continue;}
+  const t=q/p;
+  if(p<0){if(t>far)return false;near=Math.max(near,t);}
+  else{if(t<near)return false;far=Math.min(far,t);}
+ }
+ return near<=far;
+}
+function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=20){
+ const width=Math.max(18,[...String(value)].length*size*.65),height=size+4;
+ const norm=Math.hypot(away.x,away.y)||1,theta=Math.atan2(away.y,away.x);
+ const shifts=[0,-.35,.35,-.7,.7,-1.05,1.05,-1.45,1.45,Math.PI];
+ let best={x:base.x,y:base.y,score:Infinity,box:null};
+ for(const distance of [27,35,44,55,70]){
+  for(const shift of shifts){
+   const x=base.x+Math.cos(theta+shift)*distance,
+    y=base.y+Math.sin(theta+shift)*distance,
+    rect={x:x-width/2,y:y-height/2,w:width,h:height};
+   const outside=Math.max(0,12-rect.x)+Math.max(0,rect.x+rect.w-508)+
+    Math.max(0,14-rect.y)+Math.max(0,rect.y+rect.h-306);
+   const cross=segments.reduce((n,[a,b])=>n+(qwGeometrySegmentIntersectsBox(a,b,{
+    x:rect.x-3,y:rect.y-3,w:rect.w+6,h:rect.h+6})?1:0),0);
+   const overlap=placed.reduce((n,r)=>{
+    const x=Math.max(0,Math.min(rect.x+rect.w,r.x+r.w)-Math.max(rect.x,r.x)),
+     y=Math.max(0,Math.min(rect.y+rect.h,r.y+r.h)-Math.max(rect.y,r.y));
+    return n+x*y;
+   },0);
+   const nearPoint=points.reduce((n,p)=>n+(Math.max(0,14-Math.hypot(p.x-x,p.y-y))**2),0);
+   const outward=(x-base.x)*away.x+(y-base.y)*away.y;
+   const score=outside*1000+cross*8000+overlap*55+nearPoint*35+
+    (outward<0?150:0)+distance*.5+Math.abs(shift)*12;
+   if(score<best.score)best={x,y,score,box:rect};
+  }
+ }
+ if(best.box)placed.push(best.box);
+ return {x:best.x,y:best.y};
+}
 function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
+ const spacing=[10,20,40].includes(showGuides)?showGuides:20;
  const guides=interactive&&showGuides?
-  '<defs><pattern id="qw-geometry-guide" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#dce6ec" stroke-width="1"/></pattern></defs>'+
+  '<defs><pattern id="qw-geometry-guide" width="'+spacing+'" height="'+spacing+'" patternUnits="userSpaceOnUse"><path d="M'+spacing+' 0L0 0 0 '+spacing+'" fill="none" stroke="#dce6ec" stroke-width="0.7"/></pattern></defs>'+
   '<rect x="0" y="0" width="520" height="320" fill="url(#qw-geometry-guide)" pointer-events="none"/>':'';
+ const allSegments=[],allPoints=[],placedLabels=[];
+ const addPolygon=pts=>{pts.forEach((p,i)=>{allSegments.push([p,pts[(i+1)%pts.length]]);allPoints.push(p);});};
+ for(const item of objects){
+  if(['triangle','rightTriangle','quadrilateral'].includes(item.kind))addPolygon(qwGeometryVertices(item));
+  else if(['line','arrow','dashed','rope','spring','ground'].includes(item.kind)){
+   allSegments.push([{x:item.x,y:item.y},{x:item.x2,y:item.y2}]);
+   allPoints.push({x:item.x,y:item.y},{x:item.x2,y:item.y2});
+  }else if(['rect','block','incline'].includes(item.kind)){
+   const x=Math.min(item.x,item.x2),x2=Math.max(item.x,item.x2),y=Math.min(item.y,item.y2),y2=Math.max(item.y,item.y2);
+   addPolygon(item.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x:x2,y:y2},{x,y:y2}]);
+  }else if(item.kind==='point')allPoints.push({x:item.x,y:item.y});
+ }
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle')=>
   '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
@@ -115,10 +172,40 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
    w=maxX-minX,h=maxY-minY;
   let shape='',captions='';
-  if(o.kind==='line'||o.kind==='arrow'||o.kind==='dashed'){
+  if(['line','arrow','dashed','rope','ground'].includes(o.kind)){
    shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
     (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+
     (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
+   if(o.kind==='ground'){
+    const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
+    for(let i=0;i<=Math.floor(length/14);i++){
+     const t=i*14/length,x=o.x+dx*t,y=o.y+dy*t;
+     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-dy/length*10-dx/length*5)+'" y2="'+numeric(y+dx/length*10-dy/length*5)+'" stroke="#91a0ae" stroke-width="1"/>';
+    }
+   }
+  }
+  if(o.kind==='spring'){
+   const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+   let path='M'+o.x+' '+o.y;
+   for(let j=1;j<=19;j++){
+    const t=j/20,offset=(j===1||j===19)?0:(j%2?8:-8);
+    path+=' L'+numeric(o.x+dx*t-uy*offset)+' '+numeric(o.y+dy*t+ux*offset);
+   }
+   shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
+  }
+  if(o.kind==='block'){
+   const cx=minX+w/2,cy=minY+h/2,angle=Number(o.rotation)||0;
+   shape='<g transform="rotate('+angle+' '+numeric(cx)+' '+numeric(cy)+')">'+
+    '<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>'+
+    '<path d="M'+numeric(minX+w*.12)+' '+numeric(minY+h*.14)+'h'+numeric(w*.34)+'" stroke="#a1adba" stroke-width="1"/>'+
+    '</g>';
+  }
+  if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='pulley'){
+   const rad=Math.max(8,Math.min(w,h)/2),cx=minX+w/2,cy=minY+h/2;
+   shape='<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="'+numeric(rad)+'" fill="white" stroke="#162735" stroke-width="2"/>'+
+    '<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="3.5" fill="#162735"/>'+
+    '<line x1="'+numeric(cx)+'" y1="'+numeric(cy-rad)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-12)+'" stroke="#162735" stroke-width="2"/>';
   }
   if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
   if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
@@ -134,23 +221,20 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    shape='<polygon points="'+vertices.map(p=>p.x+','+p.y).join(' ')+'"'+a+'/>';
    const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
     cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
+   const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
    vertices.forEach((p,j)=>{
     shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
     if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
-     const dx=p.x-cx,dy=p.y-cy,scale=Math.max(1,Math.hypot(dx,dy)),
-      lx=Math.max(14,Math.min(506,p.x+dx/scale*19)),
-      ly=Math.max(20,Math.min(310,p.y+dy/scale*19+5));
-     captions+=label(p.label,lx,ly,20);
+     const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},allSegments,allPoints,placedLabels,20);
+     captions+=label(p.label,at.x,at.y+7,20);
     }
    });
    vertices.forEach((p,i)=>{
     const sideText=o.edgeLabels?.[i];if(!sideText)return;
-    const other=vertices[(i+1)%vertices.length],mx=(p.x+other.x)/2,my=(p.y+other.y)/2,
-     dx=mx-cx,dy=my-cy,mag=Math.max(1,Math.hypot(dx,dy));
-    const tx=Math.max(22,Math.min(498,mx+dx/mag*20)),
-     ty=Math.max(20,Math.min(302,my+dy/mag*20+6));
-    captions+=label(sideText,tx,ty,17);
+    const other=vertices[(i+1)%vertices.length],mid={x:(p.x+other.x)/2,y:(p.y+other.y)/2};
+    const at=qwGeometryCaptionLocation(sideText,mid,{x:mid.x-cx,y:mid.y-cy},allSegments,allPoints,placedLabels,17);
+    captions+=label(sideText,at.x,at.y+6,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
     const a=vertices[0],b=vertices[1],c=vertices[2],
@@ -167,11 +251,16 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    if(o.label)captions+=label(o.label,cx,cy+7,17);
   }else if(o.label){
    if(o.kind==='text')captions+=label(o.label,o.x,o.y,19,'start');
-   else if(o.kind==='point')captions+=label(o.label,Math.min(500,o.x+13),Math.max(19,o.y-9),19,'start');
+   else if(o.kind==='block'||o.kind==='pulley')captions+=label(o.label,(o.x+o.x2)/2,(o.y+o.y2)/2+6,18);
+   else if(o.kind==='point'){
+    const at=qwGeometryCaptionLocation(o.label,{x:o.x,y:o.y},{x:o.x-260,y:o.y-160},allSegments,allPoints,placedLabels,19);
+    captions+=label(o.label,at.x,at.y+7,19);
+   }
    else{
     const midX=(o.x+o.x2)/2,midY=(o.y+o.y2)/2,
      dx=o.x2-o.x,dy=o.y2-o.y,mag=Math.hypot(dx,dy)||1;
-    captions+=label(o.label,midX-dy/mag*14,midY+dx/mag*14-5,18);
+    const pos=qwGeometryCaptionLocation(o.label,{x:midX,y:midY},{x:-dy/mag,y:dx/mag},allSegments,allPoints,placedLabels,18);
+    captions+=label(o.label,pos.x,pos.y+7,18);
    }
   }
   const hit=interactive?'<rect x="'+(minX-9)+'" y="'+(minY-23)+
