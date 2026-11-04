@@ -45,14 +45,19 @@ test('TASK145 math diagram supports independently labeled triangles and quadrila
  assert.deepEqual(xs.map(o=>o.vertices.length),[3,3,4]);
  assert.deepEqual(xs[0].vertices.map(v=>v.label),['A','B','C']);
  assert.equal(qwGeometryVertices(xs[1]).length,3);
- xs[0].vertices[2].label='Γ';
+ xs[0].vertices[2].label='Γ';xs[0].edgeLabels[0]='6 см';
  const svg=qwDiagramSVG(xs,true);
  assert.match(svg,/<polygon points="/);
  assert.match(svg,/Γ/);
  assert.match(svg,/paint-order="stroke"/);
+ assert.match(svg,/6 см/);
+ assert.match(svg,/data-qw-vertex="2"/);
+ assert.match(svg,/qw-geometry-guide/);
+ assert.doesNotMatch(qwDiagramSVG(xs),/data-qw-vertex|qw-geometry-guide/);
  assert.match(svg,/data-qw-object="2"/);
  const copy=qwValidateDiagram(xs);
  assert.equal(copy[0].vertices[2].label,'Γ');
+ assert.equal(copy[0].edgeLabels[0],'6 см');
 });
 
 test('TASK145 malformed geometric vertices are rejected',()=>{
