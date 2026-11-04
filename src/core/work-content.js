@@ -28,15 +28,15 @@ function qwGraphSVG(g,interactive=false){
    if(axis==='x'){
     if(g.grid)parts.push(line(p.x,b.top,p.x,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(p.x,axisY-3,p.x,axisY+3,'stroke="#333"'));
-    if(p.x<b.left+w/2-1||p.x>b.right-w/2+1)continue;
-    const rect={x:p.x-w/2,y:b.bottom+7,w,h:16};occupied.push(rect);
-    parts.push('<text x="'+p.x+'" y="'+(b.bottom+20)+'" font-size="13" text-anchor="middle" fill="#263746">'+label+'</text>');
+    const tx=Math.max(b.left+w/2,Math.min(b.right-w/2,p.x));
+    const rect={x:tx-w/2,y:b.bottom+7,w,h:16};occupied.push(rect);
+    parts.push('<text x="'+tx+'" y="'+(b.bottom+20)+'" font-size="13" text-anchor="middle" fill="#263746">'+label+'</text>');
    }else{
     if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
-    if(p.y<b.top+7||p.y>b.bottom-7)continue;
-    const rect={x:b.left-17-w,y:p.y-8,w,h:16};occupied.push(rect);
-    parts.push('<text x="'+(b.left-16)+'" y="'+(p.y+4)+'" font-size="13" text-anchor="end" fill="#263746">'+label+'</text>');
+    const ty=Math.max(b.top+8,Math.min(b.bottom-8,p.y));
+    const rect={x:b.left-17-w,y:ty-8,w,h:16};occupied.push(rect);
+    parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="13" text-anchor="end" fill="#263746">'+label+'</text>');
    }
   }
  }
