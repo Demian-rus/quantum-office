@@ -17,6 +17,17 @@ jobs:
       - run: npm ci
       - run: python -m pip install playwright==1.56.0 openpyxl
       - run: python -m playwright install --with-deps chromium
+      # Rebuild the exact TASK147 baseline for reproducible before screenshots.
+      - uses: actions/checkout@v4
+        with:
+          ref: 700751d2b8775f724304131e570e1c1678892f1b
+          path: task147-baseline
+      - run: node scripts/build.mjs
+        working-directory: task147-baseline
+      - run: node tests/task147_browser.cjs --before
+        env:
+          QW_BEFORE_HTML: ${{ github.workspace }}/task147-baseline/Quantum-Office.html
+      - run: node tests/task147_browser.cjs
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
@@ -209,3 +220,10 @@ jobs:
           name: task146-drawing-workbench-evidence
           path: evidence/task146
           if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task147-visual-editor-evidence
+          path: evidence/task147
+          if-no-files-found: error

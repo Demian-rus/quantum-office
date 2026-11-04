@@ -11770,6 +11770,144 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qo-document-workspace .qo-work-tabs .qo-work-tab{flex:0 0 auto;min-width:max-content}
 .qo-document-workspace .qo-work-tabs{overflow-x:auto;scrollbar-width:none}
 
+/* TASK145: compact searchable library, including long task prompts and mobile filters. */
+.qw-bank-filters{display:grid;grid-template-columns:minmax(180px,2fr) repeat(4,minmax(100px,1fr));gap:7px;align-items:center}
+.qw-bank-filters input,.qw-bank-filters select{width:100%;min-width:0}
+#qw-bank-count{margin:9px 0;color:var(--qo-muted);font-size:12px}
+.qw-bank-item>div{min-width:0;flex:1;display:grid;gap:3px;overflow-wrap:anywhere}
+.qw-bank-item small{font-size:11px;color:var(--qo-muted);line-height:1.4}
+.qw-bank-item button{flex:none}
+@media(max-width:900px){.qw-bank-filters{grid-template-columns:repeat(2,minmax(0,1fr))}.qw-bank-filters input{grid-column:1/-1}}
+@media(max-width:570px){.qw-bank-item{flex-wrap:wrap}.qw-bank-item>div{flex-basis:100%}.qw-bank-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* TASK145 geometry and function controls keep the canvas dominant and exact properties compact. */
+.qw-function-settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:8px;margin:8px 0 13px;padding:9px;border:1px solid var(--qo-border);border-radius:7px}
+.qw-function-settings label{min-width:0}
+.qw-function-settings select,.qw-function-settings input{width:100%;min-width:0}
+.qw-vertex-list{display:grid;gap:7px;margin:8px 0 12px}
+.qw-vertex-list>div{display:grid;grid-template-columns:minmax(95px,1.3fr) repeat(2,minmax(70px,1fr));gap:7px;align-items:end}
+.qw-vertex-list input{min-width:0;width:100%}
+.qw-visual-tools{gap:5px}
+.qw-visual-tools [data-tool]{white-space:normal;max-width:190px;line-height:1.25}
+#qw-visual-properties details{margin:10px 0;padding:9px;border:1px solid var(--qo-border);border-radius:6px}
+#qw-visual-properties details summary{font-weight:600;cursor:pointer}
+@media(max-width:570px){.qw-vertex-list>div{grid-template-columns:minmax(0,1.3fr) repeat(2,minmax(0,.75fr))}.qw-function-settings{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Geometry annotations remain compact in both large and narrow editors. */
+.qw-edge-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:7px;margin-top:12px;padding-top:10px;border-top:1px solid var(--qo-border)}
+.qw-edge-list label{min-width:0}
+.qw-edge-list input{width:100%;min-width:0}
+.qw-visual-tools #qw-snap-geometry{accent-color:var(--qo-accent)}
+.qw-visual-tools .qw-check{white-space:nowrap;font-size:12px}
+
+/* TASK147: fixed three-zone workbench; drawers overlay the same canvas on narrow screens. */
+.qw-dialog.qw-visual-dialog{display:flex;flex-direction:column;width:min(1360px,calc(100vw - 24px));height:min(900px,calc(100dvh - 24px));max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:hidden}
+.qw-visual-dialog>header,.qw-visual-dialog>footer{flex:0 0 auto;position:relative}
+.qw-visual-dialog>.qw-visual-body{flex:1;min-height:0;display:grid;grid-template-columns:184px minmax(0,1fr) 286px;gap:10px;padding:10px;overflow:hidden;position:relative}
+.qw-visual-panel-nav{display:none}
+.qw-visual-dialog .qw-visual-tools{display:block;min-width:0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:4px 6px 8px 0;margin:0;border-right:1px solid var(--qo-border)}
+.qw-visual-dialog .qw-tool-group{padding:0 0 10px;margin:0 0 8px;border-bottom:1px solid var(--qo-border)}
+.qw-visual-dialog .qw-tool-group summary{font-size:11px;font-weight:700;cursor:pointer;padding:6px 2px;color:var(--qo-muted)}
+.qw-visual-dialog h2{font-size:12px;line-height:1.4;margin:0 0 8px}
+.qw-visual-dialog .qw-tool-group>div{display:grid;gap:3px}
+.qw-visual-dialog .qw-visual-tools .qw-tool-tile{display:flex;align-items:center;justify-content:start;gap:7px;width:100%;max-width:none;min-height:33px;padding:5px 6px;text-align:left;font-weight:500;line-height:1.25}
+.qw-visual-dialog :is(button,.qw-tool-tile) svg{width:18px;height:18px;pointer-events:none;flex:none}
+.qw-visual-dialog .qw-tool-tile[aria-pressed=true],.qw-visual-dialog .qw-object-list button[aria-pressed=true]{background:var(--qo-accent-soft);color:var(--qo-accent);border-color:var(--qo-accent-border)}
+.qw-visual-tools #qw-add-point{display:flex;align-items:center;gap:6px;margin-top:10px;width:100%}
+.qw-visual-tools .qw-muted{margin:10px 0 0}
+.qw-visual-canvas{min-width:0;min-height:0;display:flex;flex-direction:column;gap:8px;background:var(--qo-bg);border-radius:6px;padding:8px}
+.qw-visual-stage-space{flex:1;min-height:0;min-width:0;container-type:size;display:grid;place-items:center}
+.qw-visual-dialog #qw-visual-stage{flex:none;width:min(100%,calc((100cqh - 2px)*1.625));max-width:100%;margin:0;box-shadow:var(--qo-shadow)}
+.qw-visual-dialog #qw-visual-stage svg{width:100%;height:auto;aspect-ratio:520/320}
+.qw-visual-dialog .qw-visual-canvas-footer{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;flex:none;gap:10px;min-height:30px;border-top:1px solid var(--qo-border);padding-top:8px}
+.qw-visual-dialog .qw-visual-canvas-footer label{display:flex;align-items:center;gap:6px;font-size:11px;cursor:pointer;color:var(--qo-text)}
+.qw-visual-canvas-footer input{accent-color:var(--qo-accent)}
+.qw-visual-canvas-footer .qw-grid-step-label select{width:76px;padding:3px 4px}
+.qw-visual-inspector{display:flex;flex-direction:column;min-width:0;min-height:0;border-left:1px solid var(--qo-border)}
+.qw-visual-dialog #qw-visual-properties{flex:1;min-height:0;min-width:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;padding:4px 8px 12px 10px;overflow-wrap:anywhere}
+.qw-visual-dialog #qw-visual-properties:focus-visible{outline:2px solid var(--qo-focus);outline-offset:-2px}
+.qw-visual-dialog #qw-visual-properties :is(label,input,select,.qw-row){min-width:0;max-width:100%}
+.qw-visual-dialog #qw-visual-properties>.qw-row label{width:100%}
+.qw-visual-dialog .qw-graph-settings{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:0 0 12px}
+.qw-visual-dialog .qw-graph-settings .qw-check{grid-column:1/-1}
+.qw-visual-dialog .qw-function-settings{grid-template-columns:repeat(2,minmax(0,1fr));padding:10px 0;border:0;border-block:1px solid var(--qo-border);border-radius:0}
+.qw-function-settings h2,.qw-function-settings>label:first-of-type:last-of-type{grid-column:1/-1}
+.qw-visual-dialog .qw-point-list>div{grid-template-columns:18px minmax(0,1fr) minmax(0,1fr) 27px 27px;gap:4px;padding:7px 0;border-bottom:1px solid var(--qo-border)}
+.qw-point-list [data-point-field=label]{grid-column:2/4;grid-row:2}
+.qw-visual-dialog .qw-point-list :is(input,button){padding:4px;min-width:0}
+.qw-visual-dialog .qw-point-list button{display:grid;place-items:center}
+.qw-visual-dialog .qw-object-list{display:grid;gap:4px;align-content:start}
+.qw-object-list button{text-align:left;overflow-wrap:anywhere}
+.qw-visual-dialog .qw-vertex-list>div{grid-template-columns:minmax(0,1.2fr) repeat(2,minmax(0,1fr));gap:5px}
+.qw-visual-dialog .qw-edge-list{grid-template-columns:1fr}
+.qw-visual-dialog .qw-constructions{display:flex;flex-wrap:wrap;gap:6px;padding:10px 0;margin:8px 0;border-block:1px solid var(--qo-border)}
+.qw-constructions label{width:100%}
+.qw-visual-actions{display:flex;align-items:center;justify-content:flex-end;flex:none;gap:6px;padding:10px 8px;border-top:1px solid var(--qo-border);background:var(--qo-surface-alt)}
+.qw-visual-actions button{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.qw-visual-dialog #qw-visual-delete,.qw-visual-dialog [data-point-delete]{color:var(--qo-danger)}
+@media(max-width:1000px){
+ .qw-dialog.qw-visual-dialog{width:calc(100vw - 12px);height:calc(100dvh - 12px);max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px)}
+ .qw-visual-dialog>.qw-visual-body{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto minmax(0,1fr);gap:6px;padding:6px}
+ .qw-visual-panel-nav{display:flex;align-items:center;gap:4px;grid-area:1/1}
+ .qw-visual-panel-nav button{padding:6px}
+ .qw-visual-panel-nav [aria-expanded=true]{background:var(--qo-accent-soft);color:var(--qo-accent);border-color:var(--qo-accent-border)}
+ .qw-visual-canvas{grid-area:2/1/3/3;padding:6px}
+ .qw-visual-inspector{display:contents}
+ .qw-visual-actions{grid-area:1/2;padding:0;border:0;background:transparent}
+ .qw-visual-actions button{padding:6px;min-height:32px}
+ .qw-visual-actions button span{display:none}
+ .qw-visual-dialog .qw-visual-tools,.qw-visual-dialog #qw-visual-properties{display:none;position:absolute;z-index:2;top:44px;bottom:6px;margin:0;padding:10px;border:1px solid var(--qo-border-strong);border-radius:6px;background:var(--qo-surface-raised);box-shadow:var(--qo-shadow);max-width:calc(100% - 12px)}
+ .qw-visual-dialog .qw-visual-tools{left:6px;width:218px}
+ .qw-visual-dialog #qw-visual-properties{right:6px;width:286px}
+ .qw-visual-dialog[data-panel=tools] .qw-visual-tools,.qw-visual-dialog[data-panel=properties] #qw-visual-properties{display:block}
+}
+
+.qw-paper-task math{
+  display:inline-block;vertical-align:-.22em;margin:0 .16em;
+  font:1.08em/1.25 "Cambria Math","STIX Two Math","Times New Roman",serif;
+}
+.qw-paper-task math mfrac{font-size:1.04em}
+.qw-paper-task.qw-exam-task{padding:12px 14px;border:0;box-shadow:none;font:14px/1.42 "Times New Roman","Liberation Serif",serif}
+.qw-exam-grid{display:grid;grid-template-columns:27px minmax(0,1fr);gap:6px}
+.qw-exam-number{font-weight:700;line-height:1.3}
+.qw-exam-body{min-width:0}
+.qw-exam-body .qw-task-flow{font-size:14px;line-height:1.42}
+.qw-exam-task .qw-task-flow figure{max-width:39%;margin:0 0 6px 10px}
+.qw-exam-task .qw-figure-below figure{max-width:100%;margin:8px 0}
+.qw-exam-task .qw-figure-left figure{margin:0 10px 6px 0}
+.qw-print-preview-dialog{
+  display:flex;flex-direction:column;width:min(940px,calc(100vw - 16px));
+  max-width:none;height:min(890px,calc(100dvh - 20px));max-height:calc(100dvh - 20px);
+  overflow:hidden;
+}
+.qw-print-preview-dialog>header,.qw-print-preview-dialog>footer{flex:0 0 auto;position:relative}
+.qw-print-preview-dialog>.qw-dialog-body{
+  flex:1 1 auto;min-height:0;display:flex;flex-direction:column;
+  padding:10px;overflow:hidden;
+}
+.qw-print-preview-dialog .qw-preview-options{flex:0 0 auto;align-items:center;margin-bottom:9px}
+.qw-print-preview-dialog [data-teacher-option][hidden]{display:none!important}
+.qw-print-preview-dialog #qw-pages{
+  display:block;flex:1 1 auto;min-height:0;overflow:hidden;
+  padding:0;background:#e8edf2;
+}
+.qw-print-preview-dialog #qw-print-preview-frame{
+  display:block;width:100%;height:100%;border:0;
+  background:#e8edf2;
+}
+@media(max-width:570px){
+ .qw-paper-task.qw-exam-task{padding:10px 9px}
+ .qw-print-preview-dialog>.qw-dialog-body{padding:6px}
+}
+
+.qw-visual-dialog .qw-diagram-presets{
+ display:flex;flex-wrap:wrap;gap:8px;align-items:end;margin:0 0 10px;
+ padding:0 0 8px;border-bottom:1px solid var(--qo-border);
+}
+.qw-visual-dialog .qw-diagram-presets label{width:min(100%,260px);max-width:100%}
+.qw-visual-dialog .qw-object-rotation{margin:4px 0 10px}
+.qw-visual-dialog .qw-object-rotation label{width:min(100%,220px)}
+
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -21933,20 +22071,22 @@ const QW_LIMITS={tasks:80,text:16000,points:40,objects:60,pages:80,bytes:1800000
 function qwId(){return 'w'+Date.now().toString(36)+Math.random().toString(36).slice(2,9);}
 function qwText(v,max=16000){return typeof v==='string'?v.slice(0,max):'';}
 function qwNum(v,min,max,fallback){return Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;}
-function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t, с',ylabel:'v, м/с',grid:true,connected:true,smooth:false,points:[]};}
+function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t, с',ylabel:'v, м/с',grid:true,connected:true,smooth:false,snapToGrid:true,curveFamily:'points',curve:{a:1,b:0,c:0,amplitude:3,frequency:1,phase:0,offset:0,trig:'sin'},points:[]};}
 function qwTask(type='short'){
- return {id:qwId(),type:Object.hasOwn(QW_TYPES,type)?type:'short',part:'Часть 1',prompt:'',answer:'',criteria:'',comment:'',points:2,answerVisible:true,answerStyle:'line',boxes:6,solutionVisible:['extended','combined'].includes(type),solutionHeight:110,solutionStyle:'lines',figure:['graph','diagram','combined'].includes(type)?type==='diagram'?'diagram':'graph':'none',position:'right',figureWidth:220,pageBreak:false,graph:qwGraphDefault(),diagram:[],image:''};
+ return {id:qwId(),type:Object.hasOwn(QW_TYPES,type)?type:'short',part:'Часть 1',prompt:'',answer:'',criteria:'',comment:'',grade:'',exam:'general',topic:'',subtopic:'',origin:'original',points:2,answerVisible:true,answerStyle:'line',boxes:6,solutionVisible:['extended','combined'].includes(type),solutionHeight:110,solutionStyle:'lines',figure:['graph','diagram','combined'].includes(type)?type==='diagram'?'diagram':'graph':'none',position:'right',figureWidth:220,pageBreak:false,graph:qwGraphDefault(),diagram:[],image:''};
 }
-function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:true,tasks:[]};}
+function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:false,layout:'worksheet',exam:'ege',tasks:[]};}
 function qwValidate(raw){
  if(!raw||raw.format!=='quantum-work'||raw.version!==1||!Array.isArray(raw.tasks)||raw.tasks.length>QW_LIMITS.tasks)throw Error('Неподдерживаемый проект QWORK');
  const d=qwProject(),ids=new Set();
  for(const key of ['title','grade','topic','variant','instructions'])d[key]=qwText(raw[key],key==='instructions'?4000:key==='title'||key==='topic'?160:24);
- d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity!==false;
+ d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity===true;d.layout=raw.layout==='exam'?'exam':'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
  d.tasks=raw.tasks.map(raw=>{
   if(!raw||typeof raw!=='object'||!Object.hasOwn(QW_TYPES,raw.type)||typeof raw.prompt!=='string'||raw.prompt.length>QW_LIMITS.text)throw Error('Повреждено задание');
   const q=qwTask(raw.type);q.id=qwText(raw.id,80)||qwId();if(ids.has(q.id))throw Error('Повторяющийся ID задания');ids.add(q.id);
   for(const key of ['part','prompt','answer','criteria','comment'])q[key]=qwText(raw[key],key==='part'?120:QW_LIMITS.text);
+   for(const key of ['grade','topic','subtopic'])q[key]=qwText(raw[key],key==='grade'?24:120).trim();
+   q.exam=['general','oge','ege'].includes(raw.exam)?raw.exam:'general';q.origin=['original','adapted','generated'].includes(raw.origin)?raw.origin:'original';
   q.points=qwNum(raw.points,0,100,2);q.answerVisible=raw.answerVisible!==false;q.solutionVisible=raw.solutionVisible===true;q.pageBreak=raw.pageBreak===true;
   q.answerStyle=['line','box','boxes'].includes(raw.answerStyle)?raw.answerStyle:'line';q.boxes=Math.round(qwNum(raw.boxes,1,30,6));q.solutionHeight=qwNum(raw.solutionHeight,24,500,110);q.solutionStyle=['lines','grid','blank'].includes(raw.solutionStyle)?raw.solutionStyle:'lines';
   q.figure=['none','graph','diagram','image'].includes(raw.figure)?raw.figure:'none';q.position=['left','right','below'].includes(raw.position)?raw.position:'right';q.figureWidth=qwNum(raw.figureWidth,120,470,220);
@@ -21961,13 +22101,106 @@ function qwValidateGraph(raw){
  const g=qwGraphDefault();
  for(const k of ['xmin','xmax','ymin','ymax','step']){const n=Number(raw[k]);if(!Number.isFinite(n)||Math.abs(n)>1000000)throw Error('Некорректный диапазон графика');g[k]=n;}
  if(g.xmax<=g.xmin||g.ymax<=g.ymin||g.step<=0)throw Error('Проверьте диапазоны и шаг сетки');
- g.xlabel=qwText(raw.xlabel,30);g.ylabel=qwText(raw.ylabel,30);g.grid=raw.grid!==false;g.connected=raw.connected!==false;g.smooth=raw.smooth===true;
+ g.xlabel=qwText(raw.xlabel,30);g.ylabel=qwText(raw.ylabel,30);g.grid=raw.grid!==false;g.connected=raw.connected!==false;g.smooth=raw.smooth===true;g.snapToGrid=raw.snapToGrid!==false;g.curveFamily=['points','quadratic','trigonometric'].includes(raw.curveFamily)?raw.curveFamily:'points';
+ const c=raw.curve&&typeof raw.curve==='object'?raw.curve:{};
+ for(const k of ['a','b','c','amplitude','frequency','phase','offset']){
+  const value=c[k]===undefined?g.curve[k]:Number(c[k]);
+  if(!Number.isFinite(value)||Math.abs(value)>1000)throw Error('Некорректный параметр функции');
+  g.curve[k]=value;
+ }
+ g.curve.trig=c.trig==='cos'?'cos':'sin';
  if(!Array.isArray(raw.points)||raw.points.length>QW_LIMITS.points)throw Error('Максимум 40 точек');
  g.points=raw.points.map(p=>{if(!p||!Number.isFinite(Number(p.x))||!Number.isFinite(Number(p.y))||Number(p.x)<g.xmin||Number(p.x)>g.xmax||Number(p.y)<g.ymin||Number(p.y)>g.ymax)throw Error('Точка вне диапазона графика');return {x:Number(p.x),y:Number(p.y),label:qwText(p.label,30)};});return g;
 }
+function qwGraphGridStep(g,axis){const span=g[axis+'max']-g[axis+'min'];return Math.max(g.step,span/20);}
+function qwSnapGraphPoint(g,x,y){
+ const clamp=(v,min,max)=>Math.min(max,Math.max(min,v));
+ const snap=(v,axis)=>{
+  const lo=g[axis+'min'],hi=g[axis+'max'],step=qwGraphGridStep(g,axis);
+  const value=clamp(Number(v),lo,hi);
+  if(!g.snapToGrid)return Number(value.toFixed(6));
+  // Grid lines are anchored at multiples of the visible tick spacing.
+  const first=Math.ceil((lo-1e-9)/step),last=Math.floor((hi+1e-9)/step);
+  if(first>last)return Number(value.toFixed(6));
+  const snapped=Math.min(last,Math.max(first,Math.round(value/step)))*step;
+  return Number(clamp(snapped,lo,hi).toFixed(6));
+ };
+ return {x:snap(x,'x'),y:snap(y,'y')};
+}
+function qwEvaluateCurve(graph,x){
+ const p=graph.curve;
+ if(graph.curveFamily==='quadratic')return p.a*x*x+p.b*x+p.c;
+ if(graph.curveFamily==='trigonometric')return p.amplitude*Math[p.trig==='cos'?'cos':'sin'](p.frequency*x+p.phase)+p.offset;
+ return NaN;
+}
+function qwGeometryVertices(object){
+ if(Array.isArray(object.vertices)&&object.vertices.length>=3)return object.vertices;
+ const x=Math.min(object.x,object.x2),x2=Math.max(object.x,object.x2),
+  y=Math.min(object.y,object.y2),y2=Math.max(object.y,object.y2);
+ if(object.kind==='triangle')return [{x,y:y2,label:'A'},{x:x2,y:y2,label:'B'},{x:(x+x2)/2,y,label:'C'}];
+ if(object.kind==='rightTriangle')return [{x,y:y2,label:'A'},{x:x2,y:y2,label:'B'},{x,y,label:'C'}];
+ return [{x,y:y2,label:'A'},{x:x2,y:y2,label:'B'},{x:x2,y,label:'C'},{x,y,label:'D'}];
+}
+/** Exact median/altitude from a triangle vertex to the opposite side. Returns a static
+ * auxiliary dashed line; subsequent vertex moves do not automatically mutate it. */
+function qwTriangleConstruction(object,kind,vertexIndex=0){
+ if(!object||!['triangle','rightTriangle'].includes(object.kind))throw Error('Сначала выберите треугольник');
+ if(!['median','altitude'].includes(kind)||![0,1,2].includes(vertexIndex))throw Error('Неизвестное построение');
+ const vs=qwGeometryVertices(object),a=vs[vertexIndex],b=vs[(vertexIndex+1)%3],c=vs[(vertexIndex+2)%3];
+ const dx=c.x-b.x,dy=c.y-b.y,length2=dx*dx+dy*dy;
+ if(length2<1e-8)throw Error('Противоположная сторона должна иметь ненулевую длину');
+ const t=kind==='median'?.5:((a.x-b.x)*dx+(a.y-b.y)*dy)/length2;
+ const x=b.x+t*dx,y=b.y+t*dy;
+ if(x<0||x>520||y<0||y>320)throw Error('Основание высоты вне холста — измените расположение фигуры');
+ return {kind:'dashed',x:a.x,y:a.y,x2:Number(x.toFixed(4)),y2:Number(y.toFixed(4)),label:''};
+}
+/* Anchor drawing endpoints to nearby vertices/edges before falling back to the grid. */
+function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
+ const target={x:qwNum(point.x,0,520,0),y:qwNum(point.y,0,320,0)};
+ const anchors=[];
+ (Array.isArray(objects)?objects:[]).forEach((o,i)=>{
+  if(i===excludeIndex||!o)return;
+  const x=Math.min(o.x,o.x2),x2=Math.max(o.x,o.x2),
+   y=Math.min(o.y,o.y2),y2=Math.max(o.y,o.y2);
+  if(Array.isArray(o.vertices))anchors.push(...o.vertices);
+  else if(['block','rect','incline'].includes(o.kind)){
+   anchors.push({x,y},{x:x2,y},{x,y:y2},{x:x2,y:y2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else if(['circle','pulley'].includes(o.kind)){
+   anchors.push({x:(x+x2)/2,y:(y+y2)/2},
+    {x:(x+x2)/2,y},{x:(x+x2)/2,y:y2},
+    {x,y:(y+y2)/2},{x:x2,y:(y+y2)/2});
+  }else anchors.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
+ });
+ let best=null,distance=Infinity;
+ for(const a of anchors){
+  const n=Math.hypot(target.x-a.x,target.y-a.y);
+  if(n<distance){distance=n;best=a;}
+ }
+ if(best&&distance<=Math.min(step*.9,16))
+  return {x:qwNum(best.x,0,520,0),y:qwNum(best.y,0,320,0)};
+ return {x:Math.round(target.x/step)*step,y:Math.round(target.y/step)*step};
+}
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
- return raw.map(o=>{if(!o||!['line','arrow','rect','circle','point','text','angle'].includes(o.kind))throw Error('Неизвестная фигура');for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');return {kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};});
+ return raw.map(o=>{
+  if(!o||!['line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
+  for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
+  const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
+  if(o.kind==='block')value.rotation=qwNum(o.rotation,-180,180,0);
+  if(['triangle','rightTriangle','quadrilateral'].includes(o.kind)){
+   if(o.vertices!==undefined&&(!Array.isArray(o.vertices)||o.vertices.length!==(o.kind==='quadrilateral'?4:3)))throw Error('Некорректные вершины геометрической фигуры');
+   const vertices=qwGeometryVertices(o);
+   value.vertices=vertices.map(p=>{
+    if(!p||!Number.isFinite(Number(p.x))||!Number.isFinite(Number(p.y)))throw Error('Неверные координаты вершины');
+    return {x:qwNum(p.x,0,520,0),y:qwNum(p.y,0,320,0),label:qwText(p.label,20)};
+   });
+   if(o.edgeLabels!==undefined&&(!Array.isArray(o.edgeLabels)||o.edgeLabels.length!==vertices.length))throw Error('Некорректные подписи сторон');
+   value.edgeLabels=vertices.map((_,i)=>qwText(o.edgeLabels?.[i],40));
+  }
+  return value;
+ });
 }
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;[d.tasks[i],d.tasks[j]]=[d.tasks[j],d.tasks[i]];return true;}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
@@ -21983,24 +22216,266 @@ function qwMath(source){
  function atom(depth){while(s[i]===' ')i++;if(s[i]==='{'){i++;const n=group(depth,'}');if(s[i++]!=='}')throw Error('Закройте скобку формулы');return n;}if(i>=s.length)throw Error('Заполните аргумент формулы');return {t:'text',v:s[i++]};}
  const result=group();if(i<s.length)throw Error('Некорректная формула');return result;
 }
-function qwMathML(n){const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';if(n.t==='row')return tag('mrow',n.list.map(qwMathML).join(''));if(n.t==='frac')return tag('mfrac',qwMathML(n.a)+qwMathML(n.b));if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a));if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a)+qwMathML(n.b));return tag(/[0-9]/.test(n.v)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(n.v)?'mi':'mo',qwEsc(n.v));}
+function qwMathML(n){const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';if(n.t==='row')return tag('mrow',n.list.map(qwMathML).join(''));if(n.t==='frac')return tag('mfrac',qwMathML(n.a)+qwMathML(n.b));if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a));if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a)+qwMathML(n.b));if(/[=+−\-×÷<>≤≥≠]/.test(n.v))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(n.v)+'</mo>';
+ return tag(/[0-9]/.test(n.v)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(n.v)?'mi':'mo',qwEsc(n.v));}
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
-const QW_PLOT={left:52,right:490,top:28,bottom:275};
+/* Printable coordinate plot. Tick values live outside the plotting area; point labels avoid axes and each other. */
+const QW_PLOT={left:82,right:451,top:46,bottom:262};
 function qwPlotXY(g,p){return {x:QW_PLOT.left+(p.x-g.xmin)/(g.xmax-g.xmin)*(QW_PLOT.right-QW_PLOT.left),y:QW_PLOT.bottom-(p.y-g.ymin)/(g.ymax-g.ymin)*(QW_PLOT.bottom-QW_PLOT.top)};}
 function qwGraphSVG(g,interactive=false){
- const b=QW_PLOT,parts=[],axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x,axisY=qwPlotXY(g,{x:0,y:Math.max(g.ymin,Math.min(g.ymax,0))}).y;
+ const b=QW_PLOT,parts=[],occupied=[],
+ axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x,
+ axisY=qwPlotXY(g,{x:0,y:Math.max(g.ymin,Math.min(g.ymax,0))}).y;
  const line=(x,y,x2,y2,extra='')=>'<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" '+extra+'/>';
- for(const axis of ['x','y']){const min=g[axis+'min'],max=g[axis+'max'],step=Math.max(g.step,(max-min)/20);for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){const p=qwPlotXY(g,{x:v,y:v}),label=Number(v.toPrecision(5));if(axis==='x'){if(g.grid)parts.push(line(p.x,b.top,p.x,b.bottom,'stroke="#ddd"'));parts.push(line(p.x,axisY-3,p.x,axisY+3,'stroke="#333"'));parts.push('<text x="'+p.x+'" y="'+(b.bottom+18)+'" text-anchor="middle">'+label+'</text>');}else{if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#ddd"'));parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));parts.push('<text x="'+(b.left-9)+'" y="'+(p.y+4)+'" text-anchor="end">'+label+'</text>');}}}
- parts.push(line(b.left,axisY,b.right+8,axisY,'stroke="#111" stroke-width="1.5" marker-end="url(#qw-arrow)"'),line(axisX,b.bottom,axisX,b.top-7,'stroke="#111" stroke-width="1.5" marker-end="url(#qw-arrow)"'));
- parts.push('<text x="490" y="314" text-anchor="end">'+qwEsc(g.xlabel)+'</text><text x="12" y="16">'+qwEsc(g.ylabel)+'</text>');
- const ps=g.points.map(p=>qwPlotXY(g,p));if(g.connected&&ps.length>1){let d='M'+ps[0].x+','+ps[0].y;for(let i=1;i<ps.length;i++){const a=ps[i-1],p=ps[i];d+=g.smooth?' C'+((a.x+p.x)/2)+','+a.y+' '+((a.x+p.x)/2)+','+p.y+' '+p.x+','+p.y:' L'+p.x+','+p.y;}parts.push('<path d="'+d+'" fill="none" stroke="#142b42" stroke-width="2.4"/>');}
- ps.forEach((p,i)=>parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?6:3.5)+'" fill="#142b42"/><text x="'+(p.x+8)+'" y="'+(p.y-8)+'">'+qwEsc(g.points[i].label)+'</text></g>'));
+ const overlap=(a,v)=>Math.max(0,Math.min(a.x+a.w,v.x+v.w)-Math.max(a.x,v.x))*Math.max(0,Math.min(a.y+a.h,v.y+v.h)-Math.max(a.y,v.y));
+ const fmt=v=>{const n=Number(v.toPrecision(6));return Object.is(n,-0)?'0':String(n);};
+ parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
+ for(const axis of ['x','y']){
+  const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis),
+   tickCount=Math.max(1,Math.ceil((max-min)/step)),
+   longest=Math.max(String(Number(min.toPrecision(5))).length,String(Number(max.toPrecision(5))).length),
+   gap=(axis==='x'?b.right-b.left:b.bottom-b.top)/tickCount,
+   stride=Math.max(1,Math.ceil((axis==='x'?longest*10+12:30)/Math.max(gap,1)));
+  for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){
+   const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(11,label.length*9);
+   if(axis==='x'){
+    if(g.grid)parts.push(line(p.x,b.top,p.x,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
+    parts.push(line(p.x,axisY-3,p.x,axisY+3,'stroke="#333"'));
+    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
+    const tx=Math.max(b.left+w/2,Math.min(b.right-w/2,p.x));
+    const rect={x:tx-w/2,y:b.bottom+5,w,h:21};occupied.push(rect);
+    parts.push('<text x="'+tx+'" y="'+(b.bottom+20)+'" font-size="16" text-anchor="middle" fill="#263746">'+label+'</text>');
+   }else{
+    if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
+    parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
+    if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
+    const ty=p.y;
+    const rect={x:b.left-17-w,y:ty-11,w,h:22};occupied.push(rect);
+    parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="16" text-anchor="end" fill="#263746">'+label+'</text>');
+   }
+  }
+ }
+ parts.push(line(b.left,axisY,b.right+8,axisY,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'),
+  line(axisX,b.bottom,axisX,b.top-8,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'));
+ // Both axis titles have their own outer margin; never put them on top of the scale or tick labels.
+ parts.push('<text x="500" y="309" font-size="19" text-anchor="end" fill="#111">'+qwEsc(g.xlabel)+'</text>',
+  '<text x="10" y="24" font-size="19" fill="#111">'+qwEsc(g.ylabel)+'</text>');
+ if(g.curveFamily!=='points'){
+  let d='',drawing=false;
+  for(let i=0;i<=300;i++){
+   const x=g.xmin+(g.xmax-g.xmin)*i/300,y=qwEvaluateCurve(g,x);
+   if(!Number.isFinite(y)||y<g.ymin||y>g.ymax){drawing=false;continue;}
+   const p=qwPlotXY(g,{x,y});
+   d+=(drawing?' L':' M')+p.x.toFixed(2)+','+p.y.toFixed(2);drawing=true;
+  }
+  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="#186ba3" stroke-width="2.5" stroke-linecap="round"/>');
+ }
+ const ps=g.points.map(p=>qwPlotXY(g,p));
+ if(g.curveFamily==='points'&&g.connected&&ps.length>1){
+  let d='M'+ps[0].x+','+ps[0].y;
+  for(let i=1;i<ps.length;i++){
+   const a=ps[i-1],p=ps[i];
+   d+=g.smooth?' C'+((a.x+p.x)/2)+','+a.y+' '+((a.x+p.x)/2)+','+p.y+' '+p.x+','+p.y:' L'+p.x+','+p.y;
+  }
+  parts.push('<path d="'+d+'" fill="none" stroke="#142b42" stroke-width="2.4"/>');
+ }
+ ps.forEach((p,i)=>{
+  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:3.5)+'" fill="#142b42"/></g>');
+ });
+ ps.forEach((p,i)=>{
+  const label=g.points[i].label;if(!label)return;
+  const w=Math.max(12,Array.from(label).length*10),h=20;
+  const options=[
+   {x:p.x+10,y:p.y-24,w,h},{x:p.x+10,y:p.y+8,w,h},
+   {x:p.x-w-10,y:p.y-24,w,h},{x:p.x-w-10,y:p.y+8,w,h}
+  ];
+  let best=null,score=Infinity;
+  for(const rect of options){
+   const outside=Math.max(0,b.left-rect.x)+Math.max(0,rect.x+rect.w-b.right)+
+    Math.max(0,b.top-rect.y)+Math.max(0,rect.y+rect.h-b.bottom);
+   const conflict=occupied.reduce((sum,q)=>sum+overlap(rect,q),0);
+   const crossingAxis=(rect.x<axisX+3&&rect.x+rect.w>axisX-3?2:0)+
+    (rect.y<axisY+3&&rect.y+rect.h>axisY-3?2:0);
+   const next=outside*90+conflict*9+crossingAxis*7;
+   if(next<score){score=next;best=rect;}
+  }
+  if(!best)return;
+  best={...best,x:Math.max(b.left,Math.min(best.x,b.right-w)),y:Math.max(b.top,Math.min(best.y,b.bottom-h))};
+  occupied.push(best);
+  parts.push('<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="#142b42" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>');
+ });
  return qwSVG(parts.join(''),'Координатный график');
 }
 function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
-function qwDiagramSVG(objects,interactive=false){return qwSVG(objects.map((o,i)=>{const a=' stroke="#162735" stroke-width="2" fill="none"',minX=Math.min(o.x,o.x2),minY=Math.min(o.y,o.y2),w=Math.abs(o.x2-o.x),h=Math.abs(o.y2-o.y);let s='';if(o.kind==='line'||o.kind==='arrow')s='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+(o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+'/>';if(o.kind==='rect')s='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';if(o.kind==='circle')s='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';if(o.kind==='point')s='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';if(o.kind==='angle'){const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;let delta=angle-start;while(delta>Math.PI)delta-=2*Math.PI;while(delta< -Math.PI)delta+=2*Math.PI;s='<path d="M'+o.x2+' '+o.y+'L'+o.x+' '+o.y+'L'+o.x2+' '+o.y2+'"'+a+'/><path d="M'+(o.x+r*Math.cos(start))+' '+(o.y+r*Math.sin(start))+'A'+r+' '+r+' 0 0 '+(delta>=0?1:0)+' '+(o.x+r*Math.cos(angle))+' '+(o.y+r*Math.sin(angle))+'"'+a+'/>';}
- return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+s+(o.label?'<text x="'+(o.x+5)+'" y="'+(o.y-7)+'" fill="#162735" font-size="20">'+qwEsc(o.label)+'</text>':'')+(interactive?'<rect x="'+(minX-7)+'" y="'+(minY-16)+'" width="'+Math.max(w+14,35)+'" height="'+Math.max(h+25,28)+'" fill="transparent" stroke="none"/>':'')+'</g>';}).join(''));}
+
+/* Position geometry captions outside edges and away from already placed captions.
+   Uses SVG coordinates, so preview and exported documents have identical placement. */
+function qwGeometrySegmentIntersectsBox(a,b,r){
+ const dx=b.x-a.x,dy=b.y-a.y;
+ let near=0,far=1;
+ for(const [p,q] of [[-dx,a.x-r.x],[dx,r.x+r.w-a.x],[-dy,a.y-r.y],[dy,r.y+r.h-a.y]]){
+  if(Math.abs(p)<1e-9){if(q<0)return false;continue;}
+  const t=q/p;
+  if(p<0){if(t>far)return false;near=Math.max(near,t);}
+  else{if(t<near)return false;far=Math.min(far,t);}
+ }
+ return near<=far;
+}
+function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=20){
+ const width=Math.max(18,[...String(value)].length*size*.65),height=size+4;
+ const norm=Math.hypot(away.x,away.y)||1,theta=Math.atan2(away.y,away.x);
+ const shifts=[0,-.35,.35,-.7,.7,-1.05,1.05,-1.45,1.45,Math.PI];
+ let best={x:base.x,y:base.y,score:Infinity,box:null};
+ for(const distance of [27,35,44,55,70]){
+  for(const shift of shifts){
+   const x=base.x+Math.cos(theta+shift)*distance,
+    y=base.y+Math.sin(theta+shift)*distance,
+    rect={x:x-width/2,y:y-height/2,w:width,h:height};
+   const outside=Math.max(0,12-rect.x)+Math.max(0,rect.x+rect.w-508)+
+    Math.max(0,14-rect.y)+Math.max(0,rect.y+rect.h-306);
+   const cross=segments.reduce((n,[a,b])=>n+(qwGeometrySegmentIntersectsBox(a,b,{
+    x:rect.x-3,y:rect.y-3,w:rect.w+6,h:rect.h+6})?1:0),0);
+   const overlap=placed.reduce((n,r)=>{
+    const x=Math.max(0,Math.min(rect.x+rect.w,r.x+r.w)-Math.max(rect.x,r.x)),
+     y=Math.max(0,Math.min(rect.y+rect.h,r.y+r.h)-Math.max(rect.y,r.y));
+    return n+x*y;
+   },0);
+   const nearPoint=points.reduce((n,p)=>n+(Math.max(0,14-Math.hypot(p.x-x,p.y-y))**2),0);
+   const outward=(x-base.x)*away.x+(y-base.y)*away.y;
+   const score=outside*1000+cross*8000+overlap*55+nearPoint*35+
+    (outward<0?150:0)+distance*.5+Math.abs(shift)*12;
+   if(score<best.score)best={x,y,score,box:rect};
+  }
+ }
+ if(best.box)placed.push(best.box);
+ return {x:best.x,y:best.y};
+}
+function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
+ const spacing=[10,20,40].includes(showGuides)?showGuides:20;
+ const guides=interactive&&showGuides?
+  '<defs><pattern id="qw-geometry-guide" width="'+spacing+'" height="'+spacing+'" patternUnits="userSpaceOnUse"><path d="M'+spacing+' 0L0 0 0 '+spacing+'" fill="none" stroke="#dce6ec" stroke-width="0.7"/></pattern></defs>'+
+  '<rect x="0" y="0" width="520" height="320" fill="url(#qw-geometry-guide)" pointer-events="none"/>':'';
+ const allSegments=[],allPoints=[],placedLabels=[];
+ const addPolygon=pts=>{pts.forEach((p,i)=>{allSegments.push([p,pts[(i+1)%pts.length]]);allPoints.push(p);});};
+ for(const item of objects){
+  if(['triangle','rightTriangle','quadrilateral'].includes(item.kind))addPolygon(qwGeometryVertices(item));
+  else if(['line','arrow','dashed','rope','spring','ground'].includes(item.kind)){
+   allSegments.push([{x:item.x,y:item.y},{x:item.x2,y:item.y2}]);
+   allPoints.push({x:item.x,y:item.y},{x:item.x2,y:item.y2});
+  }else if(['rect','block','incline'].includes(item.kind)){
+   const x=Math.min(item.x,item.x2),x2=Math.max(item.x,item.x2),y=Math.min(item.y,item.y2),y2=Math.max(item.y,item.y2);
+   addPolygon(item.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x:x2,y:y2},{x,y:y2}]);
+  }else if(item.kind==='point')allPoints.push({x:item.x,y:item.y});
+ }
+ const numeric=v=>Number(v.toFixed(3));
+ const label=(value,x,y,size=18,anchor='middle')=>
+  '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
+  '" fill="#162735" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
+ return qwSVG(guides+objects.map((o,i)=>{
+  const a=' stroke="#162735" stroke-width="2" fill="none"',
+   vertices=['triangle','rightTriangle','quadrilateral'].includes(o.kind)?qwGeometryVertices(o):null;
+  const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
+  const minX=Math.min(...all.map(p=>p.x)),minY=Math.min(...all.map(p=>p.y)),
+   maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
+   w=maxX-minX,h=maxY-minY;
+  let shape='',captions='';
+  if(['line','arrow','dashed','rope','ground'].includes(o.kind)){
+   shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
+    (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+
+    (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
+   if(o.kind==='ground'){
+    const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
+    for(let i=0;i<=Math.floor(length/14);i++){
+     const t=i*14/length,x=o.x+dx*t,y=o.y+dy*t;
+     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-dy/length*10-dx/length*5)+'" y2="'+numeric(y+dx/length*10-dy/length*5)+'" stroke="#91a0ae" stroke-width="1"/>';
+    }
+   }
+  }
+  if(o.kind==='spring'){
+   const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+   let path='M'+o.x+' '+o.y;
+   for(let j=1;j<=19;j++){
+    const t=j/20,offset=(j===1||j===19)?0:(j%2?8:-8);
+    path+=' L'+numeric(o.x+dx*t-uy*offset)+' '+numeric(o.y+dy*t+ux*offset);
+   }
+   shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
+  }
+  if(o.kind==='block'){
+   const cx=minX+w/2,cy=minY+h/2,angle=Number(o.rotation)||0;
+   shape='<g transform="rotate('+angle+' '+numeric(cx)+' '+numeric(cy)+')">'+
+    '<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>'+
+    '<path d="M'+numeric(minX+w*.12)+' '+numeric(minY+h*.14)+'h'+numeric(w*.34)+'" stroke="#a1adba" stroke-width="1"/>'+
+    '</g>';
+  }
+  if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='pulley'){
+   const rad=Math.max(8,Math.min(w,h)/2),cx=minX+w/2,cy=minY+h/2;
+   shape='<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="'+numeric(rad)+'" fill="white" stroke="#162735" stroke-width="2"/>'+
+    '<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="3.5" fill="#162735"/>'+
+    '<line x1="'+numeric(cx)+'" y1="'+numeric(cy-rad)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-12)+'" stroke="#162735" stroke-width="2"/>';
+  }
+  if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
+  if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
+  if(o.kind==='point')shape='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';
+  if(o.kind==='angle'){
+   const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;
+   let delta=angle-start;while(delta>Math.PI)delta-=2*Math.PI;while(delta< -Math.PI)delta+=2*Math.PI;
+   shape='<path d="M'+o.x2+' '+o.y+'L'+o.x+' '+o.y+'L'+o.x2+' '+o.y2+'"'+a+'/>'+
+    '<path d="M'+(o.x+r*Math.cos(start))+' '+(o.y+r*Math.sin(start))+
+    'A'+r+' '+r+' 0 0 '+(delta>=0?1:0)+' '+(o.x+r*Math.cos(angle))+' '+(o.y+r*Math.sin(angle))+'"'+a+'/>';
+  }
+  if(vertices){
+   shape='<polygon points="'+vertices.map(p=>p.x+','+p.y).join(' ')+'"'+a+'/>';
+   const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
+    cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
+   const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
+   vertices.forEach((p,j)=>{
+    shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
+    if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
+    if(p.label){
+     const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},allSegments,allPoints,placedLabels,20);
+     captions+=label(p.label,at.x,at.y+7,20);
+    }
+   });
+   vertices.forEach((p,i)=>{
+    const sideText=o.edgeLabels?.[i];if(!sideText)return;
+    const other=vertices[(i+1)%vertices.length],mid={x:(p.x+other.x)/2,y:(p.y+other.y)/2};
+    const at=qwGeometryCaptionLocation(sideText,mid,{x:mid.x-cx,y:mid.y-cy},allSegments,allPoints,placedLabels,17);
+    captions+=label(sideText,at.x,at.y+6,17);
+   });
+   if(o.kind==='rightTriangle'&&vertices.length===3){
+    const origin=vertices[0],b=vertices[1],c=vertices[2],
+     ux=b.x-origin.x,uy=b.y-origin.y,vx=c.x-origin.x,vy=c.y-origin.y;
+    if(Math.abs(ux*vx+uy*vy) <= Math.max(1,Math.hypot(ux,uy)*Math.hypot(vx,vy)*.02)){
+    const [p0,p1,p2]=vertices,
+     unit=v=>{const l=Math.hypot(v.x,v.y)||1;return {x:v.x/l,y:v.y/l};},
+     u=unit({x:p1.x-p0.x,y:p1.y-p0.y}),v=unit({x:p2.x-p0.x,y:p2.y-p0.y}),r=12;
+    shape+='<path d="M'+numeric(p0.x+u.x*r)+' '+numeric(p0.y+u.y*r)+
+     'L'+numeric(p0.x+(u.x+v.x)*r)+' '+numeric(p0.y+(u.y+v.y)*r)+
+     'L'+numeric(p0.x+v.x*r)+' '+numeric(p0.y+v.y*r)+'"'+a+'/>';
+    }
+   }
+   if(o.label)captions+=label(o.label,cx,cy+7,17);
+  }else if(o.label){
+   if(o.kind==='text')captions+=label(o.label,o.x,o.y,19,'start');
+   else if(o.kind==='block'||o.kind==='pulley')captions+=label(o.label,(o.x+o.x2)/2,(o.y+o.y2)/2+6,18);
+   else if(o.kind==='point'){
+    const at=qwGeometryCaptionLocation(o.label,{x:o.x,y:o.y},{x:o.x-260,y:o.y-160},allSegments,allPoints,placedLabels,19);
+    captions+=label(o.label,at.x,at.y+7,19);
+   }
+   else{
+    const midX=(o.x+o.x2)/2,midY=(o.y+o.y2)/2,
+     dx=o.x2-o.x,dy=o.y2-o.y,mag=Math.hypot(dx,dy)||1;
+    const pos=qwGeometryCaptionLocation(o.label,{x:midX,y:midY},{x:-dy/mag,y:dx/mag},allSegments,allPoints,placedLabels,18);
+    captions+=label(o.label,pos.x,pos.y+7,18);
+   }
+  }
+  const hit=interactive?'<rect x="'+(minX-9)+'" y="'+(minY-23)+
+   '" width="'+Math.max(w+18,30)+'" height="'+Math.max(h+35,28)+'" fill="transparent" stroke="none"/>':'';
+  return '<g '+(interactive?'data-qw-object="'+i+'"':'')+'>'+hit+shape+captions+'</g>';
+ }).join(''));
+}
 
 
 /* Portable PDF: paginated A4 canvases rendered at 180 dpi, embedded by pdf-lib.
@@ -22033,7 +22508,7 @@ async function qwRenderPages(project,teacher=false,options={answers:true,criteri
   }if(row.length)flush();
  }
  function area(height,style){let remaining=height;while(remaining>0){ensure(28);const h=Math.min(remaining,bottom-y);ctx.strokeStyle='#ccc';ctx.lineWidth=.4;if(style==='blank')ctx.strokeRect(M,y,W-2*M,h);else{for(let yy=y+12;yy<=y+h;yy+=style==='grid'?12:18){ctx.beginPath();ctx.moveTo(M,yy);ctx.lineTo(W-M,yy);ctx.stroke();}if(style==='grid')for(let xx=M;xx<=W-M;xx+=12){ctx.beginPath();ctx.moveTo(xx,y);ctx.lineTo(xx,y+h);ctx.stroke();}}ctx.strokeStyle='#222';y+=h;remaining-=h;if(remaining>0)newPage();}}
- newPage();if(d.topic){flow(d.topic,null,11,true);y+=6;}if(d.identity){text('ФИО: ____________________________________    Дата: ______________',M,y+10,10);y+=28;}if(d.instructions){flow(d.instructions,null,10);y+=12;}
+ newPage();if(d.topic){flow(d.topic,null,11,true);y+=6;}/* Online-first work: no mandatory personal-data fields in published PDF. */if(d.instructions){flow(d.instructions,null,10);y+=12;}
  let part='';for(let i=0;i<d.tasks.length;i++){
   activeTask=0;const q=d.tasks[i];if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));const image=q.figure!=='none'?await qwFigureImage(q):null;let imageW=Math.min(q.figureWidth,W-2*M),imageH=image?imageW*image.height/image.width:0;if(imageH>300){imageW*=300/imageH;imageH=300;}if(q.pageBreak&&i>0)newPage();ensure(70+imageH);if(q.part&&q.part!==part){flow(q.part,null,12,true);y+=7;part=q.part;}
   text('Задание '+(i+1)+' · '+QW_TYPES[q.type],M,y+11,10,true);text(q.points+' б.',W-M-34,y+11,10);y+=27;activeTask=i+1;
@@ -22072,10 +22547,15 @@ function qwOptions(values,current){return values.map(([k,v])=>'<option value="'+
 function qwField(key,label,value,type='text',extra=''){return '<label>'+label+'<input data-qw-field="'+key+'" type="'+type+'" value="'+qwEsc(value)+'" '+extra+'></label>';}
 function qwSelect(key,label,values,value){return '<label>'+label+'<select data-qw-field="'+key+'">'+qwOptions(values,value)+'</select></label>';}
 function qwCheck(key,label,on){return '<label class="qw-check"><input type="checkbox" data-qw-field="'+key+'" '+(on?'checked':'')+'>'+label+'</label>';}
-function qwToolbar(){return qoWorkGroup('Работа',qoWorkButton('work-new','Создать работу','new')+qoWorkButton('work-open','Открыть QWORK','folder')+qoWorkButton('work-save','Сохранить QWORK','save'))+qoWorkGroup('Готовый вариант',qoWorkButton('work-preview','Предпросмотр страниц','file-text')+qoWorkButton('work-pdf-student','PDF для ученика','download')+qoWorkButton('work-pdf-teacher','PDF для преподавателя','printer'));}
-function qwTaskPreview(q,index=0){
+function qwToolbar(){return qoWorkGroup('Работа',qoWorkButton('work-new','Создать работу','new')+qoWorkButton('work-open','Открыть QWORK','folder')+qoWorkButton('work-save','Сохранить QWORK','save'))+qoWorkGroup('Готовый вариант',qoWorkButton('work-preview','Предпросмотр','file-text')+qoWorkButton('work-pdf','Скачать PDF','download'));}
+function qwTaskPreview(q,index=0,layout=qwDoc.layout){
  const visual=q.figure==='graph'?qwGraphSVG(q.graph):q.figure==='diagram'?qwDiagramSVG(q.diagram):q.figure==='image'&&q.image?'<img alt="Иллюстрация задания" src="'+q.image+'">':'';
- return '<article class="qw-paper-task"><header><b>Задание '+(index+1)+'</b><span>'+qwEsc(QW_TYPES[q.type])+' · '+q.points+' б.</span></header><div class="qw-task-flow qw-figure-'+q.position+'">'+(visual?'<figure style="width:'+Math.min(q.figureWidth,470)+'px">'+visual+'</figure>':'')+'<div>'+qwContentHTML(q.prompt||'Условие не заполнено')+'</div></div>'+(q.answerVisible?'<div class="qw-answer-preview">Ответ: '+(q.answerStyle==='boxes'?Array.from({length:q.boxes},()=>'<i></i>').join(''):q.answerStyle==='box'?'<i class="qw-answer-box"></i>':'<span></span>')+'</div>':'')+(q.solutionVisible?'<div class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
+ const figure=visual?'<figure style="width:'+Math.min(q.figureWidth,470)+'px">'+visual+'</figure>':'';
+ const flow='<div class="qw-task-flow qw-figure-'+q.position+'">'+figure+'<div class="qw-task-text">'+qwContentHTML(q.prompt||'Условие не заполнено')+'</div></div>';
+ if(layout==='exam')return '<article class="qw-paper-task qw-exam-task"><div class="qw-exam-grid"><b class="qw-exam-number">'+(index+1)+'.</b><div class="qw-exam-body">'+flow+'</div></div></article>';
+ return '<article class="qw-paper-task qw-worksheet-task"><header><b>Задание '+(index+1)+'</b><span>'+qwEsc(QW_TYPES[q.type])+' · '+q.points+' б.</span></header>'+flow+
+  (q.answerVisible?'<div class="qw-answer-preview">Ответ: '+(q.answerStyle==='boxes'?Array.from({length:q.boxes},()=>'<i></i>').join(''):q.answerStyle==='box'?'<i class="qw-answer-box"></i>':'<span></span>')+'</div>':'')+
+  (q.solutionVisible?'<div class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
 function qwRender(){
  const host=document.getElementById('qo-work-root');if(!host)return;
@@ -22084,7 +22564,7 @@ function qwRender(){
  const q=qwCurrent(),old=host.querySelector('.qw-center')?.scrollTop||0;
  host.className='qw-frame'+(qwLeft?' qw-left-open':'')+(qwRight?' qw-right-open':'');
  host.innerHTML='<aside class="qw-left" aria-label="Структура работы">'+qwButton('close-panels','Закрыть','class="qw-drawer-close"')+'<header><strong>Задания</strong><span>'+qwDoc.tasks.length+' / 80</span></header><label>Новое задание<select id="qw-add-type">'+qwOptions(Object.entries(QW_TYPES),'short')+'</select></label><div class="qw-row">'+qwButton('add','+ Задание','class="qw-primary"')+qwButton('part','+ Часть')+'</div><nav>'+qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3>'+qwEsc(t.part||'Без части')+'</h3>':'')+'<button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(t.prompt)+'"><b>'+(i+1)+'</b><span>'+qwEsc(t.prompt||QW_TYPES[t.type])+'</span></button>').join('')+'</nav><div class="qw-row">'+qwButton('bank','Банк заданий')+qwButton('from-diag','Из диагностики')+'</div></aside>'+
- '<main class="qw-center"><div class="qw-center-head"><h1>'+qwEsc(qwDoc.title)+'</h1><div class="qw-row">'+qwButton('left','Задания','class="qw-mobile"')+qwButton('right','Свойства','class="qw-mobile"')+qwButton('settings','Параметры работы')+qwButton('preview','Предпросмотр')+qwButton('save','Сохранить QWORK','class="qw-primary"')+'</div><div class="qw-row"><span id="qw-save-state" role="status">'+qwEsc(qwStorageError||'Черновик на устройстве')+'</span>'+qwButton('undo','Отменить',qwUndo.length?'':'disabled')+qwButton('redo','Повторить',qwRedo.length?'':'disabled')+qwButton('example','Пример работы')+'</div></div>'+
+ '<main class="qw-center"><div class="qw-center-head"><h1>'+qwEsc(qwDoc.title)+'</h1><div class="qw-row">'+qwButton('left','Задания','class="qw-mobile"')+qwButton('right','Свойства','class="qw-mobile"')+qwButton('settings','Параметры работы')+qwButton('preview','Предпросмотр')+qwButton('pdf','Скачать PDF')+qwButton('save','Сохранить QWORK','class="qw-primary"')+'</div><div class="qw-row"><span id="qw-save-state" role="status">'+qwEsc(qwStorageError||'Черновик на устройстве')+'</span>'+qwButton('undo','Отменить',qwUndo.length?'':'disabled')+qwButton('redo','Повторить',qwRedo.length?'':'disabled')+qwButton('example','Пример работы')+'</div></div>'+
  (qwCorrupt?'<div class="qw-error" role="alert">'+qwEsc(qwStorageError)+qwButton('recovery','Скачать исходные данные')+qwButton('new','Новый проект')+'</div>':'')+
  (q?'<section class="qw-editor"><div class="qw-row"><strong>Задание '+(qwDoc.tasks.indexOf(q)+1)+'</strong>'+qwButton('up','↑','title="Переместить выше" '+(!qwDoc.tasks.indexOf(q)?'disabled':''))+qwButton('down','↓','title="Переместить ниже" '+(qwDoc.tasks.indexOf(q)===qwDoc.tasks.length-1?'disabled':''))+qwButton('duplicate','Копия')+qwButton('delete','Удалить')+'</div><label>Условие<textarea id="qw-prompt" data-qw-field="prompt" maxlength="16000" rows="7">'+qwEsc(q.prompt)+'</textarea></label><div class="qw-row qw-insert">'+qwButton('math','Формула')+qwButton('symbols','Символы')+qwButton('blank','Пустая вставка')+qwButton('graph','График')+qwButton('diagram','Схема')+qwButton('image','Изображение')+'</div></section><section class="qw-selected-preview" id="qw-task-preview" aria-label="Вид задания">'+qwTaskPreview(q,qwDoc.tasks.indexOf(q))+'</section>':'<div class="qw-empty"><h2>Нет заданий</h2>'+qwButton('add','Добавить задание','class="qw-primary"')+'</div>')+'</main>'+
  '<aside class="qw-right" aria-label="Свойства задания">'+qwButton('close-panels','Закрыть','class="qw-drawer-close"')+'<h2>Свойства задания'+(q?' № '+(qwDoc.tasks.indexOf(q)+1):'')+'</h2>'+(q?qwSelect('type','Тип',Object.entries(QW_TYPES),q.type)+qwField('part','Часть',q.part)+qwField('points','Баллы',q.points,'number','min="0" max="100"')+qwCheck('answerVisible','Поле ответа',q.answerVisible)+qwSelect('answerStyle','Формат ответа',[['line','Строка'],['box','Рамка'],['boxes','Ячейки']],q.answerStyle)+(q.answerStyle==='boxes'?qwField('boxes','Количество ячеек',q.boxes,'number','min="1" max="30"'):'')+qwCheck('solutionVisible','Место для решения',q.solutionVisible)+(q.solutionVisible?qwField('solutionHeight','Высота решения, пт',q.solutionHeight,'number','min="24" max="500"')+qwSelect('solutionStyle','Разлиновка',[['lines','Строки'],['grid','Клетка'],['blank','Без разлиновки']],q.solutionStyle):'')+qwSelect('figure','Иллюстрация',[['none','Нет'],['graph','График'],['diagram','Схема'],['image','Изображение']],q.figure)+(q.figure!=='none'?qwSelect('position','Расположение',[['left','Слева'],['right','Справа'],['below','Под условием']],q.position)+qwField('figureWidth','Ширина, пт',q.figureWidth,'number','min="120" max="470"'):'')+qwCheck('pageBreak','С новой страницы',q.pageBreak)+'<details><summary>Ответ и критерии</summary>'+['answer','criteria','comment'].map((k,i)=>'<label>'+['Ответ преподавателя','Критерии','Комментарий'][i]+'<textarea data-qw-field="'+k+'" rows="3" maxlength="16000">'+qwEsc(q[k])+'</textarea></label>').join('')+'</details>'+qwButton('bank-save','Сохранить задание в банк'):'<p>Нет выбранного задания</p>')+'</aside><input type="file" id="qw-file" accept=".qwork,application/json" hidden><input type="file" id="qw-image" accept="image/png,image/jpeg,image/webp" hidden>';
@@ -22092,48 +22572,396 @@ function qwRender(){
 }
 function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q)p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
 function qwDialog(title,body,footer=''){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();document.body.append(d);d.showModal();return d;}
-function qwSettings(){const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label><label class="qw-check"><input type="checkbox" data-meta="identity" '+(qwDoc.identity?'checked':'')+'>ФИО и дата</label><label class="qw-settings-wide">Инструкция<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=e.type==='checkbox'?e.checked:qwText(e.value,e.dataset.meta==='instructions'?4000:160);qwDoc.title=qwDoc.title.trim()||'Новая работа';});d.close();};}
+function qwSettings(){const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label><label>Макет PDF<select data-meta="layout">'+qwOptions([['worksheet','Контрольная / самостоятельная'],['exam','Компактный ОГЭ / ЕГЭ']],qwDoc.layout)+'</select></label><label>Экзамен<select data-meta="exam">'+qwOptions([['oge','ОГЭ'],['ege','ЕГЭ']],qwDoc.exam)+'</select></label><label class="qw-settings-wide">Инструкция<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=e.type==='checkbox'?e.checked:qwText(e.value,e.dataset.meta==='instructions'?4000:160);qwDoc.title=qwDoc.title.trim()||'Новая работа';});d.close();};}
 function qwInsert(text){const el=document.getElementById('qw-prompt'),q=qwCurrent();if(!el||!q)return;qwRemember();const a=el.selectionStart??el.value.length,b=el.selectionEnd??a;el.setRangeText(text,a,b,'end');q.prompt=el.value.slice(0,16000);qwPersist();qwPreviewSelected();el.focus();}
 function qwFormula(){const d=qwDialog('Формула','<div class="qw-row">'+['\\frac{a}{b}','x^{2}','a_{1}','\\sqrt{x}','(a+b)','\\Delta t'].map(v=>'<button type="button" data-formula="'+qwEsc(v)+'">'+qwContentHTML('\\('+v+'\\)')+'</button>').join('')+'</div><label>Выражение<input id="qw-formula-source" maxlength="600" value="\\frac{a}{b}"></label><div id="qw-formula-preview"></div><p class="qw-muted">Дробь: \\frac{a}{b} · корень: \\sqrt{x} · индексы: x^{2}, a_{1}</p>',qwButton('formula-insert','Вставить','class="qw-primary"'));const input=d.querySelector('input'),view=d.querySelector('#qw-formula-preview'),ok=d.querySelector('[data-qw-action="formula-insert"]');const update=()=>{try{view.innerHTML='<math xmlns="http://www.w3.org/1998/Math/MathML">'+qwMathML(qwMath(input.value))+'</math>';ok.disabled=false;}catch(e){view.textContent=e.message;ok.disabled=true;}};input.oninput=update;for(const e of d.querySelectorAll('[data-formula]'))e.onclick=()=>{input.value=e.dataset.formula;update();};ok.onclick=()=>{const s=input.value;d.close();qwInsert('\\('+s+'\\)');};update();}
 function qwSymbols(){const groups={...(typeof QO_WRITER_SYMBOLS==='object'?QO_WRITER_SYMBOLS:{}),'Греческие':['α','β','γ','δ','ε','ζ','η','θ','ι','κ','λ','μ','ν','ξ','π','ρ','σ','τ','υ','φ','χ','ψ','ω','Γ','Δ','Θ','Λ','Π','Σ','Φ','Ψ','Ω'],'Единицы':['м','с','кг','Н','Дж','Вт','Па','В','А','Ом','м/с','м/с²','Дж/(кг·°C)']};const d=qwDialog('Символы',Object.entries(groups).map(([k,vs])=>'<h3>'+qwEsc(k)+'</h3><div class="qw-symbols">'+vs.map(v=>'<button type="button" data-symbol="'+qwEsc(v)+'">'+qwEsc(v)+'</button>').join('')+'</div>').join(''));for(const e of d.querySelectorAll('[data-symbol]'))e.onclick=()=>{d.close();qwInsert(e.dataset.symbol);};}
+/* Online publishing: browser's native print-to-PDF preserves selectable text and vector SVG.
+   The older one-click raster PDF exporter remains available as a compatibility fallback. */
+/* Unified high-quality browser PDF. Native font shaping and vector SVG are kept. */
+function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
+ const d=qwValidate(project),exam=d.layout==='exam',subject=d.subject==='math'?'Математика':'Физика';
+ const tasks=d.tasks.map((q,i)=>{
+  if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));
+  const notes=teacher?'<div class="qw-teacher-notes">'+
+   (options.answers!==false?'<p><b>Ответ:</b> '+qwContentHTML(q.answer||'—')+'</p>':'')+
+   (options.criteria!==false&&q.criteria?'<p><b>Критерии:</b> '+qwContentHTML(q.criteria)+'</p>':'')+
+   (options.comments!==false&&q.comment?'<p><b>Комментарий:</b> '+qwContentHTML(q.comment)+'</p>':'')+'</div>':'';
+  return '<section class="qw-print-section">'+qwTaskPreview(q,i,d.layout)+notes+'</section>';
+ }).join('');
+ const styles="@page{size:A4;margin:14mm 15mm}\n*{box-sizing:border-box}\nhtml{margin:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}\nbody{margin:0;font:10.8pt/1.48 \"Arial\",\"Liberation Sans\",sans-serif;color:#111}\n.qw-print-document{margin:0;padding:0}\n.qw-print-title{font-size:15pt;line-height:1.3;margin:0 0 2.5mm;font-weight:700}\n.qw-print-meta{font-size:9pt;line-height:1.4;margin:0 0 7mm;color:#444}\n.qw-print-intro{margin:0 0 5mm;line-height:1.4;white-space:pre-wrap}\n.qw-print-section{break-inside:auto}\n.qw-paper-task{border:0;margin:0 0 6mm;padding:0;background:white;color:#111;overflow-wrap:anywhere}\n.qw-paper-task>header{display:flex;justify-content:space-between;gap:8mm;margin:0 0 2mm;break-after:avoid}\n.qw-paper-task>header b{font-size:10.5pt}\n.qw-paper-task>header span{font-size:9pt;color:#444}\n.qw-task-flow{display:block;min-height:0}\n.qw-task-flow::after{content:\"\";display:block;clear:both}\n.qw-task-flow .qw-task-text{white-space:normal;overflow-wrap:anywhere;min-width:0}\n.qw-task-flow figure{float:right;margin:0 0 2mm 4mm;max-width:42%;break-inside:avoid}\n.qw-task-flow figure svg,.qw-task-flow figure img{display:block;width:100%;height:auto}\n.qw-figure-left figure{float:left;margin:0 4mm 2mm 0}\n.qw-figure-below figure{float:none;max-width:100%;margin:2mm 0;width:100%}\n.qw-answer-preview{display:flex;align-items:center;gap:2mm;margin:3mm 0 0;font-size:9.5pt}\n.qw-answer-preview span{display:inline-block;flex:1;border-bottom:1px solid #333;height:5mm;min-width:25mm}\n.qw-answer-preview i{display:inline-block;width:6mm;height:6.5mm;border:1px solid #777}\n.qw-answer-preview .qw-answer-box{width:32mm}\n.qw-inline-blank{display:inline-block;border-bottom:1px solid #333;height:1em;max-width:100%}\n.qw-solution-preview{max-height:140mm;margin:3mm 0 0;break-inside:avoid}\n.qw-solution-lines{background:repeating-linear-gradient(to bottom,transparent 0,transparent 6.5mm,#ddd 6.6mm)}\n.qw-solution-grid{background-image:linear-gradient(#ddd 1px,transparent 1px),linear-gradient(90deg,#ddd 1px,transparent 1px);background-size:5mm 5mm}\n.qw-teacher-notes{margin:2mm 0 6mm;padding:2.5mm 3mm;border-left:2px solid #777;background:#f9f9f9;font-size:9pt;break-inside:avoid}\n.qw-teacher-notes p{margin:0 0 1.5mm}\nmath{display:inline-block;vertical-align:-.22em;font:1.1em/1.25 \"Cambria Math\",\"STIX Two Math\",\"Times New Roman\",serif;margin:0 .16em;white-space:nowrap}\nmath mfrac{font-size:1.04em}\n.qw-exam-header{font:9pt/1.4 \"Times New Roman\",\"Liberation Serif\",serif;color:#222;margin:0 0 6mm;text-align:right}\n.qw-exam-task{font:10.5pt/1.28 \"Times New Roman\",\"Liberation Serif\",serif;margin:0 0 5.5mm;break-inside:avoid-page}\n.qw-exam-grid{display:grid;grid-template-columns:6mm minmax(0,1fr);gap:1.7mm}\n.qw-exam-number{font-weight:bold;font-size:10.5pt;line-height:1.3}\n.qw-exam-body{min-width:0}\n.qw-exam-task .qw-task-flow figure{max-width:37%;margin:0 0 1.4mm 3.5mm}\n.qw-exam-task .qw-figure-left figure{margin:0 3.5mm 1.4mm 0}\n.qw-exam-task .qw-figure-below figure{max-width:100%;margin:2mm 0}\n.qw-exam-task .qw-task-text{line-height:1.3}\n.qw-exam-task math{font-size:1.02em}\n@media screen{\n html{background:#e8edf2}\n body{padding:12px}\n .qw-print-document{width:210mm;max-width:none;min-height:297mm;margin:0 auto;padding:14mm 15mm;background:white;box-shadow:0 2px 8px #1f2b3740}\n}\n@media print{\n html,body{background:white;margin:0;padding:0}\n .qw-print-document{padding:0;margin:0;max-width:none;box-shadow:none}\n .qw-exam-task{break-inside:avoid-page}\n}";
+ const header=exam?'<div class="qw-exam-header">'+qwEsc(subject)+' · '+(d.exam==='oge'?'ОГЭ':'ЕГЭ')+
+  (d.variant?' · Вариант '+qwEsc(d.variant):'')+'</div>':
+  '<h1 class="qw-print-title">'+qwEsc(d.title)+'</h1>'+
+  '<div class="qw-print-meta">'+qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+
+  (d.variant?' · Вариант '+qwEsc(d.variant):'')+(teacher?' · Для преподавателя':'')+'</div>'+
+  (d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
+ return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
+  '</title><style>'+styles+'</style></head><body class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '"><main class="qw-print-document">'+header+tasks+'</main></body></html>';
+}
+function qwPrintTextPDF(teacher=false,options){
+ let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
+ const frame=document.createElement('iframe');frame.title='Подготовка PDF';
+ frame.style.cssText='position:fixed;left:-9999px;top:0;width:794px;height:1123px;opacity:0;pointer-events:none';
+ document.body.append(frame);
+ frame.onload=()=>{
+  try{const win=frame.contentWindow;win.addEventListener('afterprint',()=>frame.remove(),{once:true});
+   win.focus();win.print();status('В окне печати выберите «Сохранить как PDF»');}
+  catch(e){status('PDF: '+e.message,true);frame.remove();}
+ };
+ frame.srcdoc=html;
+}
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,teacher,options);download(safeFile(qwDoc.title)+(teacher?'_преподаватель':'_ученик')+'.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
-async function qwPreview(){const d=qwDialog('Предпросмотр A4','<div class="qw-row"><label class="qw-check"><input type="checkbox" id="qw-teacher">Для преподавателя</label>'+['answers','criteria','comments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-print-option="'+k+'" checked>'+['Ответы','Критерии','Комментарии'][i]+'</label>').join('')+'</div><div id="qw-pages">Подготовка страниц…</div>',qwButton('preview-pdf','Скачать PDF','class="qw-primary"')+'<span>PDF 180 dpi · текст растрирован</span>');const options=()=>Object.fromEntries([...d.querySelectorAll('[data-print-option]')].map(e=>[e.dataset.printOption,e.checked]));let seq=0;const paint=async()=>{const n=++seq;try{const pages=await qwRenderPages(qwDoc,d.querySelector('#qw-teacher').checked,options());if(d.isConnected&&n===seq)d.querySelector('#qw-pages').replaceChildren(...pages);}catch(e){d.querySelector('#qw-pages').textContent=e.message;}};d.querySelectorAll('input').forEach(e=>e.onchange=paint);d.querySelector('[data-qw-action="preview-pdf"]').onclick=()=>qwExportPDF(d.querySelector('#qw-teacher').checked,options());await paint();}
-function qwBankRead(){const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];const xs=JSON.parse(raw);if(!Array.isArray(xs)||xs.length>100)throw Error('Повреждён банк работ');return xs.map(x=>({id:qwText(x.id,80),subject:x.subject==='math'?'math':'physics',task:qwValidate({...qwProject(),tasks:[x.task]}).tasks[0]}));}
-function qwBank(){let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}const diagnostic=typeof qdBankRead==='function'?qdBankRead():[];const d=qwDialog('Банк заданий','<div class="qw-row"><input id="qw-bank-search" type="search" placeholder="Найти задание" aria-label="Поиск заданий"><select id="qw-bank-subject" aria-label="Предмет">'+qwOptions([['all','Все предметы'],['physics','Физика'],['math','Математика']],'all')+'</select><select id="qw-bank-type" aria-label="Тип задания">'+qwOptions([['all','Все типы'],...Object.entries(QW_TYPES)],'all')+'</select></div><div id="qw-bank-list"></div>');const refresh=()=>{const text=d.querySelector('input').value.toLocaleLowerCase(),subject=d.querySelector('#qw-bank-subject').value,type=d.querySelector('#qw-bank-type').value;d.querySelector('#qw-bank-list').innerHTML=xs.filter(x=>(subject==='all'||x.subject===subject)&&(type==='all'||x.task.type===type)&&x.task.prompt.toLocaleLowerCase().includes(text)).map(x=>'<div class="qw-bank-item"><span>'+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+'</span><button type="button" data-bank-add="'+qwEsc(x.id)+'">Вставить</button><button type="button" data-bank-delete="'+qwEsc(x.id)+'">Удалить</button></div>').join('')+(diagnostic.length?'<h3>Банк диагностики</h3>'+diagnostic.filter(x=>String(x.prompt||'').toLocaleLowerCase().includes(text)).slice(0,30).map((x,i)=>'<div class="qw-bank-item"><span>'+qwEsc(x.prompt)+'</span><button type="button" data-diag-bank="'+qwEsc(x.id)+'">Вставить</button></div>').join(''):'')||'<p>Нет заданий</p>';};d.querySelectorAll('input,select').forEach(e=>e.oninput=refresh);d.onclick=e=>{const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');if(add){const q=add.dataset.bankAdd?xs.find(x=>x.id===add.dataset.bankAdd)?.task:qwFromDiagnostic(diagnostic.find(x=>x.id===add.dataset.diagBank)||{});if(q&&qwDoc.tasks.length<80){qwChange(()=>{const copy=structuredClone(q);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}}if(del&&confirm('Удалить задание из банка?')){const next=xs.filter(x=>x.id!==del.dataset.bankDelete);try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;refresh();}catch(e){status('Не удалось изменить банк',true);}}};refresh();}
+async function qwPreview(){
+ const d=qwDialog('Предпросмотр PDF','<div class="qw-row qw-preview-options">'+
+  '<label class="qw-check"><input type="checkbox" id="qw-teacher">Для преподавателя</label>'+
+  ['answers','criteria','comments'].map((k,i)=>'<label class="qw-check" data-teacher-option><input type="checkbox" data-print-option="'+k+'" checked>'+['Ответы','Критерии','Комментарии'][i]+'</label>').join('')+
+  '</div><div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div>',
+  qwButton('preview-pdf','Скачать PDF','class="qw-primary"'));
+ d.classList.add('qw-print-preview-dialog');
+ const options=()=>Object.fromEntries([...d.querySelectorAll('[data-print-option]')].map(e=>[e.dataset.printOption,e.checked]));
+ const refresh=()=>{
+  const teacher=d.querySelector('#qw-teacher').checked;
+  d.querySelectorAll('[data-teacher-option]').forEach(e=>e.hidden=!teacher);
+  try{d.querySelector('#qw-print-preview-frame').srcdoc=qwPrintDocumentHTML(qwDoc,teacher,options());}
+  catch(e){d.querySelector('#qw-pages').textContent=e.message;}
+ };
+ d.querySelectorAll('input').forEach(e=>e.onchange=refresh);
+ d.querySelector('[data-qw-action="preview-pdf"]').onclick=()=>qwPrintTextPDF(d.querySelector('#qw-teacher').checked,options());
+ refresh();
+}
+function qwBankNormalize(x){
+ if(!x||typeof x!=='object'||!x.task)throw Error('Некорректная запись банка');
+ const task=qwValidate({...qwProject(),tasks:[x.task]}).tasks[0];
+ return {id:qwText(x.id,80)||qwId(),subject:x.subject==='math'?'math':'physics',
+  grade:qwText(x.grade??task.grade,24).trim(),exam:['general','oge','ege'].includes(x.exam)?x.exam:task.exam,
+  topic:qwText(x.topic??task.topic,120).trim(),subtopic:qwText(x.subtopic??task.subtopic,120).trim(),
+  origin:['original','adapted','generated'].includes(x.origin)?x.origin:task.origin,task};
+}
+function qwBankRead(){
+ const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];
+ const xs=JSON.parse(raw);if(!Array.isArray(xs)||xs.length>500)throw Error('Повреждён банк заданий');
+ return xs.map(qwBankNormalize);
+}
+function qwBankSave(){
+ const q=qwCurrent();if(!q)return;
+ if(!q.prompt.trim()){status('Заполните условие задания перед сохранением в банк',true);return;}
+ const fields='<div class="qw-settings">'+
+  '<label>Предмет<select id="qw-bank-new-subject">'+qwOptions([['physics','Физика'],['math','Математика']],qwDoc.subject)+'</select></label>'+
+  '<label>Класс<input id="qw-bank-new-grade" maxlength="24" value="'+qwEsc(q.grade||qwDoc.grade)+'"></label>'+
+  '<label>Назначение<select id="qw-bank-new-exam">'+qwOptions([['general','Обычная работа'],['oge','ОГЭ'],['ege','ЕГЭ']],q.exam)+'</select></label>'+
+  '<label>Тема<input id="qw-bank-new-topic" maxlength="120" placeholder="Механика" value="'+qwEsc(q.topic||qwDoc.topic)+'"></label>'+
+  '<label>Подтема<input id="qw-bank-new-subtopic" maxlength="120" placeholder="Кинематика" value="'+qwEsc(q.subtopic)+'"></label>'+
+  '<label>Происхождение<select id="qw-bank-new-origin">'+qwOptions([['original','Авторская задача'],['adapted','Самостоятельный аналог'],['generated','С помощью ИИ']],q.origin)+'</select></label></div>';
+ const d=qwDialog('Сохранить задание в банк',fields,qwButton('confirm-bank-save','Добавить','class="qw-primary"'));
+ d.querySelector('[data-qw-action="confirm-bank-save"]').onclick=()=>{
+  try{
+   const xs=qwBankRead();if(xs.length>=500)throw Error('Достигнут лимит 500 заданий. Создайте резервную копию банка.');
+   const get=k=>d.querySelector('#qw-bank-new-'+k).value;
+   const metadata={subject:get('subject'),grade:get('grade').trim().slice(0,24),exam:get('exam'),
+    topic:get('topic').trim().slice(0,120),subtopic:get('subtopic').trim().slice(0,120),origin:get('origin')};
+   const task=structuredClone(q);Object.assign(task,{grade:metadata.grade,exam:metadata.exam,
+    topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
+   xs.push({id:qwId(),...metadata,task});
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify(xs));
+   d.close();status('Задание сохранено в банке');
+  }catch(e){status('Банк: '+e.message,true);}
+ };
+}
+function qwBank(){
+ let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
+ const diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
+ const filters='<div class="qw-row qw-bank-filters">'+
+  '<input id="qw-bank-search" type="search" placeholder="Условие, тема или подтема" aria-label="Поиск заданий">'+
+  '<select id="qw-bank-subject" aria-label="Предмет">'+qwOptions([['all','Все предметы'],['physics','Физика'],['math','Математика']],'all')+'</select>'+
+  '<select id="qw-bank-grade" aria-label="Класс">'+qwOptions([['all','Все классы'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select>'+
+  '<select id="qw-bank-exam" aria-label="Экзамен">'+qwOptions([['all','Все назначения'],['general','Практика'],['oge','ОГЭ'],['ege','ЕГЭ']],'all')+'</select>'+
+  '<select id="qw-bank-type" aria-label="Тип задания">'+qwOptions([['all','Все типы'],...Object.entries(QW_TYPES)],'all')+'</select>'+
+  '</div><p id="qw-bank-count" role="status"></p><div id="qw-bank-list"></div>';
+ const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
+  qwButton('bank-export','Экспорт банка')+qwButton('bank-import','Импорт банка'));
+ d.querySelector('[data-qw-action="bank-export"]').onclick=()=>{
+  download('QuantumOffice_банк_заданий.qwbank',JSON.stringify({format:'quantum-work-bank',version:1,items:xs},null,2),'application/json');
+ };
+ const fileInput=d.querySelector('#qw-bank-import-file');
+ d.querySelector('[data-qw-action="bank-import"]').onclick=()=>fileInput.click();
+ fileInput.onchange=async()=>{
+  const file=fileInput.files?.[0];fileInput.value='';if(!file)return;
+  try{
+   if(file.size>18000000)throw Error('Файл больше 18 МБ');
+   const data=JSON.parse(await file.text());
+   if(data?.format!=='quantum-work-bank'||data.version!==1||!Array.isArray(data.items)||data.items.length>500)throw Error('Неподдерживаемый формат QWBANK');
+   const incoming=data.items.map(qwBankNormalize);
+   const signature=x=>[x.subject,x.grade,x.exam,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
+   const seen=new Set(xs.map(signature));const additions=[];
+   for(const x of incoming){const key=signature(x);if(seen.has(key))continue;seen.add(key);additions.push({...x,id:qwId()});}
+   if(xs.length+additions.length>500)throw Error('Превышен лимит 500 заданий');
+   if(!additions.length){status('Новых заданий в файле нет');return;}
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify([...xs,...additions]));
+   xs=[...xs,...additions];refresh();status('Импортировано заданий: '+additions.length);
+  }catch(e){status('Импорт банка: '+e.message,true);}
+ };
+ const refresh=()=>{
+  const search=d.querySelector('#qw-bank-search').value.toLocaleLowerCase('ru-RU').trim();
+  const pick=k=>d.querySelector('#qw-bank-'+k).value;
+  const subject=pick('subject'),grade=pick('grade'),exam=pick('exam'),type=pick('type');
+  const shown=xs.filter(x=>(subject==='all'||x.subject===subject)&&
+   (grade==='all'||x.grade===grade)&&(exam==='all'||x.exam===exam)&&
+   (type==='all'||x.task.type===type)&&
+   [x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer].some(v=>String(v||'').toLocaleLowerCase('ru-RU').includes(search)));
+  d.querySelector('#qw-bank-count').textContent='Найдено: '+shown.length+' · Всего своих: '+xs.length;
+  const items=shown.map(x=>{
+   const tags=[x.subject==='math'?'Математика':'Физика',x.grade?x.grade+' кл.':'',
+    x.exam==='oge'?'ОГЭ':x.exam==='ege'?'ЕГЭ':'',x.topic,x.subtopic].filter(Boolean).join(' · ');
+   return '<div class="qw-bank-item"><div><span>'+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+
+    '</span><small style="display:block">'+qwEsc(tags)+'</small></div>'+
+    '<button type="button" data-bank-add="'+qwEsc(x.id)+'">Вставить</button>'+
+    '<button type="button" data-bank-delete="'+qwEsc(x.id)+'">Удалить</button></div>';
+  }).join('');
+  const diag=diagnostic.filter(x=>String(x.question?.prompt||x.prompt||'').toLocaleLowerCase('ru-RU').includes(search)).slice(0,30);
+  const other=diag.length?'<h3>Задания из диагностики</h3>'+diag.map(x=>
+   '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
+   '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Вставить</button></div>').join(''):'';
+  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p>Заданий не найдено</p>';
+ };
+ d.querySelectorAll('input,select').forEach(e=>e.addEventListener('input',refresh));
+ d.onclick=e=>{
+  const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');
+  if(add){
+   const own=add.dataset.bankAdd?xs.find(x=>x.id===add.dataset.bankAdd)?.task:null;
+   const item=add.dataset.diagBank?diagnostic.find(x=>x.id===add.dataset.diagBank):null;
+   const task=own||(item?qwFromDiagnostic(item.question||item):null);
+   if(task&&qwDoc.tasks.length<80){
+    qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();
+   }else status('Задание недоступно или превышен лимит 80 заданий',true);
+  }
+  if(del&&confirm('Удалить задание из личного банка?')){
+   const next=xs.filter(x=>x.id!==del.dataset.bankDelete);
+   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;refresh();}
+   catch(e){status('Не удалось изменить банк',true);}
+  }
+ };
+ refresh();
+}
 function qwExample(subject='physics'){
  const d=qwProject();d.title=subject==='math'?'Математика · тренировочная работа':'Физика · движение и тепловые явления';d.subject=subject;d.topic='Тренировочный вариант';d.instructions='Запишите краткие ответы и оформите решения. Графики и схемы используйте для обоснования.';
- const data=subject==='math'?[['short','Вычислите \\(\\frac{3}{4}+\\frac{1}{8}\\).','7/8'],['extended','Решите уравнение \\(x^{2}-5x+6=0\\). Обоснуйте ответ.','2; 3'],['graph','По графику определите значение y при x = 4.','6'],['diagram','Найдите площадь прямоугольника со сторонами 6 см и 4 см.','24 см²'],['blanks','Заполните: \\(\\sqrt{81}\\) = [[blank:3]], \\(2^{5}\\) = [[blank:4]].','9; 32'],['combined','По графику функции определите промежутки возрастания и убывания, найдите наибольшее значение. Обоснуйте ответ.','Возрастает на [0; 2], убывает на [6; 9], наибольшее значение — 6.']]:[['short','Тело прошло 120 м за 15 с. Найдите среднюю скорость \\(v=\\frac{s}{t}\\), м/с.','8'],['extended','Воду массой 2 кг нагрели от 20 °C до 30 °C. Удельная теплоёмкость воды 4200 Дж/(кг·°C). Найдите количество теплоты и запишите формулу \\(Q=cm\\Delta t\\).','84 000 Дж'],['graph','На рисунке приведена зависимость скорости от времени. Найдите путь за первые 6 с.','30 м'],['diagram','На тело действуют две силы. Изобразите и опишите направление равнодействующей.','Вдоль большей силы'],['blanks','Заполните обозначения: сила — [[blank:3]], энергия — [[blank:3]], единица давления — [[blank:4]].','F; E; Па'],['combined','Ученик исследовал движение тележки по горизонтальной дорожке. Датчик регистрировал скорость через равные промежутки времени, а программа построила график зависимости v(t). Направление движения тележки приняли за положительное. Во время опыта тележка разгонялась, затем некоторое время двигалась с постоянной скоростью и наконец тормозила. Масса тележки и состояние поверхности дорожки не менялись.\n\nПеред началом работы ученик проверил показания датчика на неподвижной тележке. Опыт повторили три раза при одинаковых настройках привода. Полученные графики имели одинаковую форму, однако отдельные показания скорости немного различались. На рисунке приведён один из результатов измерений; значения времени указаны в секундах, скорости — в метрах в секунду.\n\nа) Укажите интервал равномерного движения и значение скорости на нём. б) Сравните модули ускорения при разгоне и торможении. в) Найдите путь тележки за весь показанный промежуток времени и объясните геометрический смысл расчёта. г) Предложите способ оценки погрешности результата по повторным измерениям.','Равномерное движение от 2 до 6 с; скорость 6 м/с. Модули ускорения: 3 м/с² при разгоне и 2 м/с² при торможении. Площадь под графиком — путь; за 9 с путь равен 39 м. Погрешность можно оценить по разбросу повторных измерений.']];
- d.tasks=data.map(([type,prompt,answer],i)=>{const q=qwTask(type);q.prompt=prompt;q.answer=answer;q.criteria='1 балл — правильная зависимость; 1 балл — обоснование.';q.comment='Допустим другой обоснованный способ решения.';q.graph.points=[{x:0,y:0,label:'A'},{x:2,y:6,label:'B'},{x:6,y:6,label:'C'},{x:9,y:0,label:'D'}];if(subject==='math'){q.graph.xlabel='x';q.graph.ylabel='y';}q.diagram=[{kind:'rect',x:180,y:120,x2:330,y2:220,label:'Тело'},{kind:'arrow',x:330,y:170,x2:470,y2:170,label:'F₁'},{kind:'arrow',x:180,y:170,x2:80,y2:170,label:'F₂'}];if(subject==='math')q.diagram=[{kind:'rect',x:140,y:60,x2:370,y2:220,label:'A'},{kind:'text',x:230,y:250,x2:230,y2:250,label:'6 см'},{kind:'text',x:390,y:140,x2:390,y2:140,label:'4 см'}];if(i>3)q.part='Часть 2';if(type==='combined'){q.position='below';q.figureWidth=360;q.solutionHeight=170;}return q;});return d;
+ const data=subject==='math'?[['short','Вычислите \\(\\frac{3}{4}+\\frac{1}{8}\\).','7/8'],['extended','Решите уравнение \\(x^{2}-5x+6=0\\). Обоснуйте ответ.','2; 3'],['graph','По графику определите значение y при x = 4.','6'],['diagram','На рисунке изображён прямоугольный треугольник ABC. Катеты AB = 6 см и AC = 4 см. Найдите его площадь.','12 см²'],['blanks','Заполните: \\(\\sqrt{81}\\) = [[blank:3]], \\(2^{5}\\) = [[blank:4]].','9; 32'],['combined','По графику функции определите промежутки возрастания и убывания, найдите наибольшее значение. Обоснуйте ответ.','Возрастает на [0; 2], убывает на [6; 9], наибольшее значение — 6.']]:[['short','Тело прошло 120 м за 15 с. Найдите среднюю скорость \\(v=\\frac{s}{t}\\), м/с.','8'],['extended','Воду массой 2 кг нагрели от 20 °C до 30 °C. Удельная теплоёмкость воды 4200 Дж/(кг·°C). Найдите количество теплоты и запишите формулу \\(Q=cm\\Delta t\\).','84 000 Дж'],['graph','На рисунке приведена зависимость скорости от времени. Найдите путь за первые 6 с.','30 м'],['diagram','На тело действуют две силы. Изобразите и опишите направление равнодействующей.','Вдоль большей силы'],['blanks','Заполните обозначения: сила — [[blank:3]], энергия — [[blank:3]], единица давления — [[blank:4]].','F; E; Па'],['combined','Ученик исследовал движение тележки по горизонтальной дорожке. Датчик регистрировал скорость через равные промежутки времени, а программа построила график зависимости v(t). Направление движения тележки приняли за положительное. Во время опыта тележка разгонялась, затем некоторое время двигалась с постоянной скоростью и наконец тормозила. Масса тележки и состояние поверхности дорожки не менялись.\n\nПеред началом работы ученик проверил показания датчика на неподвижной тележке. Опыт повторили три раза при одинаковых настройках привода. Полученные графики имели одинаковую форму, однако отдельные показания скорости немного различались. На рисунке приведён один из результатов измерений; значения времени указаны в секундах, скорости — в метрах в секунду.\n\nа) Укажите интервал равномерного движения и значение скорости на нём. б) Сравните модули ускорения при разгоне и торможении. в) Найдите путь тележки за весь показанный промежуток времени и объясните геометрический смысл расчёта. г) Предложите способ оценки погрешности результата по повторным измерениям.','Равномерное движение от 2 до 6 с; скорость 6 м/с. Модули ускорения: 3 м/с² при разгоне и 2 м/с² при торможении. Площадь под графиком — путь; за 9 с путь равен 39 м. Погрешность можно оценить по разбросу повторных измерений.']];
+ d.tasks=data.map(([type,prompt,answer],i)=>{const q=qwTask(type);q.prompt=prompt;q.answer=answer;q.criteria='1 балл — правильная зависимость; 1 балл — обоснование.';q.comment='Допустим другой обоснованный способ решения.';q.graph.points=[{x:0,y:0,label:'A'},{x:2,y:6,label:'B'},{x:6,y:6,label:'C'},{x:9,y:0,label:'D'}];if(subject==='math'){q.graph.xlabel='x';q.graph.ylabel='y';}q.diagram=[{kind:'rect',x:180,y:120,x2:330,y2:220,label:'Тело'},{kind:'arrow',x:330,y:170,x2:470,y2:170,label:'F₁'},{kind:'arrow',x:180,y:170,x2:80,y2:170,label:'F₂'}];if(subject==='math'){q.diagram=qwValidateDiagram([{kind:'rightTriangle',x:130,y:70,x2:390,y2:260,label:'',vertices:[{x:130,y:260,label:'A'},{x:390,y:260,label:'B'},{x:130,y:70,label:'C'}],edgeLabels:['6 см','','4 см']}]);if(type==='graph'){Object.assign(q.graph,{xmin:-5,xmax:5,ymin:0,ymax:10,curveFamily:'quadratic',xlabel:'x',ylabel:'y',points:[]});q.graph.curve={...q.graph.curve,a:.375,b:0,c:0};}}if(i>3)q.part='Часть 2';if(type==='combined'){q.position='below';q.figureWidth=360;q.solutionHeight=170;}return q;});return d;
+}
+const QW_VISUAL_TOOLS=[
+ ['select','Выбрать и переместить'],['point','Точка'],['line','Отрезок'],
+ ['arrow','Вектор / стрелка'],['dashed','Пунктир'],['rope','Нить / верёвка'],
+ ['rect','Прямоугольник'],['circle','Окружность'],['text','Текстовая подпись'],
+ ['angle','Угол'],['triangle','Треугольник'],['rightTriangle','Прямоугольный треугольник'],
+ ['quadrilateral','Четырёхугольник'],['block','Брусок'],['incline','Наклонная плоскость'],
+ ['pulley','Блок со шкивом'],['spring','Пружина'],['ground','Опора']
+];
+function qwVisualIcon(kind){
+ const paths={
+ select:'<path d="M4 3l2 16 4-4 4 6 3-2-4-6 6-1z"/>',
+ point:'<circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/>',
+ line:'<path d="M4 19L20 5"/><circle cx="4" cy="19" r="1.5"/><circle cx="20" cy="5" r="1.5"/>',
+ arrow:'<path d="M4 19L20 5m-8 0h8v8"/>',
+ dashed:'<path stroke-dasharray="4 3" d="M3 18L21 6"/>',
+ rope:'<path d="M3 7q5-5 10 2t8 8"/>',
+ rect:'<rect x="3" y="6" width="18" height="12" rx="1"/>',
+ circle:'<circle cx="12" cy="12" r="9"/>',
+ text:'<path d="M4 6h16M12 6v14M9 20h6"/>',
+ angle:'<path d="M3 20l9-16 9 16"/><path d="M8 20a5 5 0 013.1-4.6"/>',
+ triangle:'<path d="M12 3L22 21H2z"/>',
+ rightTriangle:'<path d="M3 3v18h18zM3 16h5v5"/>',
+ quadrilateral:'<path d="M6 4l15 3-2 14-16-3z"/>',
+ block:'<rect x="4" y="7" width="16" height="14"/><path d="M4 7l4-4h13l-1 4"/>',
+ incline:'<path d="M3 20h18V5z"/>',
+ pulley:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4V1"/>',
+ spring:'<path d="M2 12h3l2-7 3 14 3-14 3 14 3-7h3"/>',
+ ground:'<path d="M2 12h20M5 12l-3 5m9-5l-3 5m9-5l-3 5"/>',
+ undo:'<path d="M9 4L4 9l5 5M4 9h10a6 6 0 010 12"/>',
+ up:'<path d="M12 20V4m-6 6l6-6 6 6"/>',
+ trash:'<path d="M4 6h16M9 3h6M7 6l1 15h8l1-15M10 9v8m4-8v8"/>'
+ };
+ return '<svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(paths[kind]||paths.line)+'</svg>';
+}
+function qwPhysicsPreset(kind){
+ const list={
+  surface:[
+   {kind:'ground',x:70,y:246,x2:450,y2:246,label:''},
+   {kind:'block',x:220,y:178,x2:320,y2:246,label:'m',rotation:0},
+   {kind:'arrow',x:270,y:178,x2:270,y2:100,label:'N'},
+   {kind:'arrow',x:270,y:212,x2:270,y2:295,label:'mg'}
+  ],
+  incline:[
+   {kind:'incline',x:80,y:90,x2:450,y2:260,label:''},
+   {kind:'block',x:230,y:135,x2:300,y2:175,label:'m',rotation:-25},
+   {kind:'arrow',x:272,y:145,x2:272,y2:235,label:'mg'}
+  ],
+  pulley:[
+   {kind:'ground',x:195,y:42,x2:327,y2:42,label:''},
+   {kind:'pulley',x:220,y:56,x2:300,y2:136,label:''},
+   {kind:'rope',x:220,y:96,x2:220,y2:211,label:''},
+   {kind:'rope',x:300,y:96,x2:300,y2:211,label:''},
+   {kind:'block',x:189,y:211,x2:251,y2:271,label:'m₁'},
+   {kind:'block',x:269,y:211,x2:331,y2:271,label:'m₂'}
+  ],
+  spring:[
+   {kind:'ground',x:68,y:245,x2:450,y2:245,label:''},
+   {kind:'rect',x:68,y:150,x2:84,y2:245,label:''},
+   {kind:'spring',x:84,y:209,x2:287,y2:209,label:'k'},
+   {kind:'block',x:287,y:166,x2:372,y2:245,label:'m'}
+  ]
+ };
+ if(!Object.hasOwn(list,kind))throw Error('Неизвестная готовая схема');
+ return qwValidateDiagram(list[kind]);
+}
+function qwVisualPalette(selected){
+ const titles={select:'Выделение / перемещение',point:'Точка',line:'Отрезок',arrow:'Стрелка',text:'Подпись',dashed:'Вспомогательная линия',pulley:'Блок',rope:'Нить'};
+ return [['Основные',['select','point','line','arrow','text']],['Геометрия',['rect','circle','angle','triangle','rightTriangle','quadrilateral','dashed']],['Физика',['block','incline','pulley','rope','spring','ground']]].map(([title,keys])=>
+  '<details class="qw-tool-group" open><summary>'+title+'</summary><div>'+keys.map(kind=>{
+   const title=titles[kind]||Object.fromEntries(QW_VISUAL_TOOLS)[kind];
+   return '<button type="button" class="qw-tool-tile" data-tool="'+kind+'" title="'+qwEsc(title)+'" aria-label="'+qwEsc(title)+'" aria-pressed="'+(selected===kind)+'">'+qwVisualIcon(kind)+'<span>'+qwEsc(title)+'</span></button>';
+  }).join('')+'</div></details>').join('');
 }
 function qwVisualEditor(kind){
- const q=qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,tool=kind==='graph'?'point':'line',drag=null,history=[];
- const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы','<div class="qw-visual-tools">'+(kind==='graph'?'<label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)']],'custom')+'</select></label>':(['select','line','arrow','rect','circle','point','text','angle'].map((k,i)=>'<button type="button" data-tool="'+k+'" aria-pressed="'+(k===tool)+'">'+['Выбрать / двигать','Линия','Стрелка','Прямоугольник','Окружность','Точка','Подпись','Угол'][i]+'</button>').join('')))+'<button type="button" id="qw-visual-undo">Отменить</button><button type="button" id="qw-visual-delete">Удалить выбранное</button></div><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div><div id="qw-visual-properties"></div>','<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
+ const q=qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,tool=kind==='graph'?'point':'select',drag=null,history=[],snapGeometry=true,geometryStep=20;
+ const panelButton=(panel,title)=>'<button type="button" data-visual-panel="'+panel+'" aria-controls="qw-visual-'+panel+'" aria-expanded="false">'+title+'</button>';
+ const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы',
+  '<nav class="qw-visual-panel-nav" aria-label="Панели редактора">'+panelButton('tools','Инструменты')+panelButton('properties','Свойства')+'</nav>'+
+  '<aside class="qw-visual-tools" id="qw-visual-tools" aria-label="Инструменты">'+
+  (kind==='graph'?'<section class="qw-tool-group"><h2>Шаблон графика</h2><label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label></section><section class="qw-tool-group"><h2>Построение</h2><div id="qw-graph-mode"></div><button type="button" id="qw-add-point">'+qwVisualIcon('point')+'<span>Добавить точку</span></button><p class="qw-muted">Щёлкните на плоскости, чтобы добавить точку. Перетаскивайте точки для перемещения.</p></section>':qwVisualPalette(tool))+'</aside>'+
+  '<section class="qw-visual-canvas" aria-label="Рабочий холст"><div class="qw-visual-stage-space"><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div></div>'+
+  (kind==='diagram'?'<div class="qw-visual-canvas-footer"><label class="qw-check"><input id="qw-snap-geometry" type="checkbox" checked>Сетка и привязка</label><label class="qw-grid-step-label">Шаг<select id="qw-grid-step-geometry" aria-label="Шаг сетки">'+qwOptions([['10','10 px'],['20','20 px'],['40','40 px']],'20')+'</select></label></div>':'')+'</section>'+
+  '<aside class="qw-visual-inspector" aria-label="Свойства и действия"><div id="qw-visual-properties" aria-label="Свойства выбранного объекта" tabindex="0"></div><div class="qw-visual-actions" aria-label="Действия с выделением"><button type="button" id="qw-visual-undo" aria-label="Отменить" title="Отменить последнее изменение" disabled>'+qwVisualIcon('undo')+'<span>Отменить</span></button><button type="button" id="qw-visual-delete" aria-label="Удалить выбранное" title="Удалить выбранный объект" disabled>'+qwVisualIcon('trash')+'<span>Удалить</span></button></div></aside>',
+  '<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
+ d.classList.add('qw-visual-dialog');d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
- const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect();return {x:qwNum((e.clientX-b.left)/b.width*520,0,520,0),y:qwNum((e.clientY-b.top)/b.height*320,0,320,0)};};
+ const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect(),x=qwNum((e.clientX-b.left)/b.width*520,0,520,0),y=qwNum((e.clientY-b.top)/b.height*320,0,320,0);return kind==='diagram'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
+  const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
  function remember(){history.push(structuredClone(value));history=history.slice(-30);}
- function draw(full=true){stage.innerHTML=kind==='graph'?qwGraphSVG(value,true):qwDiagramSVG(value,true);if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек':value.length+' / 60 фигур';if(!full)return;
-  if(kind==='graph')props.innerHTML='<div class="qw-graph-settings">'+['xmin','xmax','ymin','ymax','step','xlabel','ylabel'].map((k,i)=>'<label>'+['X от','X до','Y от','Y до','Шаг','Подпись X','Подпись Y'][i]+'<input data-graph-field="'+k+'" type="'+(i<5?'number':'text')+'" '+(i<5?'step="any"':'maxlength="30"')+' value="'+qwEsc(value[k])+'"></label>').join('')+['grid','connected','smooth'].map((k,i)=>'<label class="qw-check"><input data-graph-field="'+k+'" type="checkbox" '+(value[k]?'checked':'')+'>'+['Сетка','Соединять точки','Плавная линия'][i]+'</label>').join('')+'</div><button type="button" id="qw-add-point">Добавить точку</button><div class="qw-point-list">'+value.points.map((p,i)=>'<div data-point-row="'+i+'"><b>'+(i+1)+'</b>'+['x','y','label'].map(k=>'<input aria-label="'+k+' точки '+(i+1)+'" data-point-index="'+i+'" data-point-field="'+k+'" type="'+(k==='label'?'text':'number')+'" '+(k==='label'?'maxlength="30"':'step="any"')+' value="'+qwEsc(p[k])+'">').join('')+'<button type="button" data-point-up="'+i+'" '+(!i?'disabled':'')+' title="Раньше в ломаной">↑</button><button type="button" data-point-delete="'+i+'" aria-label="Удалить точку '+(i+1)+'">×</button></div>').join('')+'</div>';
-  else props.innerHTML='<div class="qw-row"><label>Подпись выбранной фигуры<input id="qw-object-label" maxlength="80" value="'+qwEsc(value[selected]?.label||'')+'" '+(selected<0?'disabled':'')+'></label></div><div class="qw-object-list">'+value.map((o,i)=>'<button type="button" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
+ function draw(full=true){const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(value,true):qwDiagramSVG(value,true,snapGeometry?geometryStep:false);if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек':value.length+' / 60 фигур';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));if(!full)return;
+  if(kind==='graph')props.innerHTML='<div class="qw-graph-settings">'+['xmin','xmax','ymin','ymax','step','xlabel','ylabel'].map((k,i)=>'<label>'+['X от','X до','Y от','Y до','Шаг','Подпись X','Подпись Y'][i]+'<input data-graph-field="'+k+'" type="'+(i<5?'number':'text')+'" '+(i<5?'step="any"':'maxlength="30"')+' value="'+qwEsc(value[k])+'"></label>').join('')+['snapToGrid','grid','connected','smooth'].map((k,i)=>'<label class="qw-check"><input data-graph-field="'+k+'" type="checkbox" '+(value[k]?'checked':'')+'>'+['Привязка к пересечениям сетки','Сетка','Соединять точки','Плавная линия'][i]+'</label>').join('')+'</div>'+
+   '<div class="qw-function-settings"><h2>Параметры '+({points:'линии',quadratic:'параболы',trigonometric:'функции'}[value.curveFamily])+'</h2>'+
+   (value.curveFamily==='quadratic'?['a','b','c'].map(k=>'<label>Коэффициент '+k+'<input data-curve-param="'+k+'" type="number" step="any" value="'+qwEsc(value.curve[k])+'"></label>').join(''):'')+
+   (value.curveFamily==='trigonometric'?'<label>Функция<select id="qw-curve-trig">'+qwOptions([['sin','sin'],['cos','cos']],value.curve.trig)+'</select></label>'+
+     ['amplitude','frequency','phase','offset'].map((k,i)=>'<label>'+['Амплитуда','Частота (рад)','Фаза (рад)','Смещение'][i]+'<input data-curve-param="'+k+'" type="number" step="any" value="'+qwEsc(value.curve[k])+'"></label>').join(''):'')+
+   '</div><h2>Точки</h2><div class="qw-point-list">'+value.points.map((p,i)=>'<div data-point-row="'+i+'"><b>'+(i+1)+'</b>'+['x','y','label'].map(k=>'<input aria-label="'+k+' точки '+(i+1)+'" data-point-index="'+i+'" data-point-field="'+k+'" type="'+(k==='label'?'text':'number')+'" '+(k==='label'?'maxlength="30"':'step="any"')+' value="'+qwEsc(p[k])+'">').join('')+'<button type="button" data-point-up="'+i+'" '+(!i?'disabled':'')+' title="Раньше в ломаной" aria-label="Переместить точку '+(i+1)+' раньше">'+qwVisualIcon('up')+'</button><button type="button" data-point-delete="'+i+'" aria-label="Удалить точку '+(i+1)+'" title="Удалить точку '+(i+1)+'">'+qwVisualIcon('trash')+'</button></div>').join('')+'</div>';
+  else props.innerHTML='<div class="qw-diagram-presets"><label>Готовые физические схемы<select id="qw-diagram-preset">'+qwOptions([['none','Выбрать схему'],['surface','Брусок на опоре'],['incline','Брусок на наклонной плоскости'],['pulley','Система с блоком'],['spring','Брусок и пружина']],'none')+'</select></label></div><div class="qw-row"><label>Подпись выбранной фигуры<input id="qw-object-label" maxlength="80" value="'+qwEsc(value[selected]?.label||'')+'" '+(selected<0?'disabled':'')+'></label></div>'+
+   (value[selected]?.kind==='block'?'<div class="qw-object-rotation"><label>Поворот бруска, °<input id="qw-block-rotation" type="number" min="-180" max="180" step="1" value="'+(value[selected].rotation||0)+'"></label></div>':'')+
+   (value[selected]?.vertices?'<details open><summary>Вершины и обозначения</summary><div class="qw-vertex-list">'+value[selected].vertices.map((p,i)=>'<div><label>Вершина '+(i+1)+'<input data-vertex-index="'+i+'" data-vertex-field="label" maxlength="20" value="'+qwEsc(p.label)+'"></label><label>X<input data-vertex-index="'+i+'" data-vertex-field="x" type="number" min="0" max="520" step="any" value="'+p.x+'"></label><label>Y<input data-vertex-index="'+i+'" data-vertex-field="y" type="number" min="0" max="320" step="any" value="'+p.y+'"></label></div>').join('')+'</div><div class="qw-edge-list">'+value[selected].vertices.map((p,i)=>'<label>Сторона '+qwEsc(p.label||String(i+1))+'–'+qwEsc(value[selected].vertices[(i+1)%value[selected].vertices.length].label||String((i+1)%value[selected].vertices.length+1))+'<input data-edge-index="'+i+'" maxlength="40" placeholder="Длина / обозначение" value="'+qwEsc(value[selected].edgeLabels?.[i]||'')+'"></label>').join('')+'</div></details>':'')+
+   (value[selected]&&['triangle','rightTriangle'].includes(value[selected].kind)?
+    '<div class="qw-constructions"><label>Из вершины<select id="qw-construction-vertex">'+qwOptions(value[selected].vertices.map((p,i)=>[String(i),p.label||'Вершина '+(i+1)]),'0')+'</select></label>'+
+    '<button type="button" data-construction="median">Провести медиану</button>'+
+    '<button type="button" data-construction="altitude">Провести высоту</button></div>':'')+
+   '<h2>Объекты</h2><div class="qw-object-list">'+value.map((o,i)=>'<button type="button" aria-pressed="'+(selected===i)+'" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(Object.fromEntries(QW_VISUAL_TOOLS)[o.kind]||o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
+  if(kind==='graph')d.querySelector('#qw-graph-mode').innerHTML='<label>Тип графика<select id="qw-curve-family">'+qwOptions([['points','По точкам'],['quadratic','Парабола'],['trigonometric','Тригонометрия']],value.curveFamily)+'</select></label>';
+  props.scrollTop=scroll;
  }
+ function showPanel(panel){
+  d.dataset.panel=panel;
+  d.querySelectorAll('[data-visual-panel]').forEach(b=>b.setAttribute('aria-expanded',String(b.dataset.visualPanel===panel)));
+ }
+ d.querySelectorAll('[data-visual-panel]').forEach(b=>b.onclick=()=>showPanel(d.dataset.panel===b.dataset.visualPanel?'':b.dataset.visualPanel));
+ d.addEventListener('keydown',e=>{if(e.key==='Escape'&&d.dataset.panel&&matchMedia('(max-width:1000px)').matches){e.preventDefault();e.stopPropagation();showPanel('');d.querySelector('[data-visual-panel]').focus();}});
+ props.addEventListener('focusin',e=>{if(kind==='graph'&&e.target.dataset.pointIndex!==undefined){selected=Number(e.target.dataset.pointIndex);draw(false);}});
  stage.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const p=point(e),existing=e.target.closest('[data-qw-point],[data-qw-object]');remember();if(kind==='graph'){
-  if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const b=QW_PLOT,xx=value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),yy=value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin);value.points.push({x:qwNum(Math.round(xx*100)/100,value.xmin,value.xmax,0),y:qwNum(Math.round(yy*100)/100,value.ymin,value.ymax,0),label:''});selected=value.points.length-1;}
+  if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const snapped=gridPoint(p);value.points.push({...snapped,label:''});selected=value.points.length-1;}
  }else if(tool==='select'){if(!existing){history.pop();selected=-1;draw();return;}selected=Number(existing.dataset.qwObject);}else{if(value.length>=60){history.pop();return;}let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label){history.pop();return;}}value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selected=value.length-1;}
- drag={start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),moving:kind==='diagram'&&tool==='select'};stage.setPointerCapture(e.pointerId);draw(false);
+ const vertexHandle=kind==='diagram'&&tool==='select'?e.target.closest('[data-qw-vertex]'):null;
+  drag={creating:kind==='diagram'&&tool!=='select',start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),
+   moving:kind==='diagram'&&tool==='select'&&!vertexHandle,vertexIndex:vertexHandle?Number(vertexHandle.dataset.qwVertex):-1};stage.setPointerCapture(e.pointerId);draw(false);
  };
- stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){const b=QW_PLOT;value.points[selected].x=qwNum(Math.round((value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin))*100)/100,value.xmin,value.xmax,0);value.points[selected].y=qwNum(Math.round((value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin))*100)/100,value.ymin,value.ymax,0);}else{const o=value[selected];if(drag.moving){const a=drag.original,dx=qwNum(p.x-drag.start.x,-Math.min(a.x,a.x2),520-Math.max(a.x,a.x2),0),dy=qwNum(p.y-drag.start.y,-Math.min(a.y,a.y2),320-Math.max(a.y,a.y2),0);o.x=a.x+dx;o.x2=a.x2+dx;o.y=a.y+dy;o.y2=a.y2+dy;}else{o.x2=p.x;o.y2=p.y;}}draw(false);};
- stage.onpointerup=()=>{if(drag){drag=null;draw();}};stage.onpointercancel=()=>{if(drag){value=history.pop();drag=null;draw();}};
+ stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];
+   if(drag.vertexIndex>=0&&o.vertices?.[drag.vertexIndex]){
+    o.vertices[drag.vertexIndex].x=p.x;o.vertices[drag.vertexIndex].y=p.y;
+    const v=o.vertices;o.x=Math.min(...v.map(q=>q.x));o.y=Math.min(...v.map(q=>q.y));
+    o.x2=Math.max(...v.map(q=>q.x));o.y2=Math.max(...v.map(q=>q.y));
+   }else if(drag.moving){
+    const a=drag.original,coords=a.vertices?.length?a.vertices:[{x:a.x,y:a.y},{x:a.x2,y:a.y2}],
+     dx=qwNum(p.x-drag.start.x,-Math.min(...coords.map(v=>v.x)),520-Math.max(...coords.map(v=>v.x)),0),
+     dy=qwNum(p.y-drag.start.y,-Math.min(...coords.map(v=>v.y)),320-Math.max(...coords.map(v=>v.y)),0);
+    o.x=a.x+dx;o.x2=a.x2+dx;o.y=a.y+dy;o.y2=a.y2+dy;
+    if(a.vertices)o.vertices=a.vertices.map(v=>({...v,x:v.x+dx,y:v.y+dy}));
+   }else{o.x2=p.x;o.y2=p.y;}}draw(false);};
+ stage.onpointerup=()=>{
+   if(drag){
+    if(kind==='diagram'&&drag.creating&&['triangle','rightTriangle','quadrilateral'].includes(value[selected]?.kind)){
+     const o=value[selected];if(Math.abs(o.x2-o.x)<12)o.x2=Math.min(520,o.x+90);
+     if(Math.abs(o.y2-o.y)<12)o.y2=Math.min(320,o.y+90);
+     o.vertices=qwGeometryVertices(o);
+    }
+    drag=null;draw();
+   }
+  };stage.onpointercancel=()=>{if(drag){value=history.pop();drag=null;draw();}};
  function remove(){if(selected<0)return;remember();if(kind==='graph')value.points.splice(selected,1);else value.splice(selected,1);selected=-1;draw();}
  stage.onkeydown=e=>{if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();remove();}};
  d.querySelector('#qw-visual-undo').onclick=()=>{if(history.length){value=history.pop();selected=-1;draw();}};d.querySelector('#qw-visual-delete').onclick=remove;
- d.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.tool){tool=t.dataset.tool;for(const b of d.querySelectorAll('[data-tool]'))b.setAttribute('aria-pressed',String(b===t));}if(t.id==='qw-add-point'&&value.points.length<40){remember();value.points.push({x:(value.xmin+value.xmax)/2,y:(value.ymin+value.ymax)/2,label:''});selected=value.points.length-1;draw();}if(t.dataset.pointDelete!==undefined){selected=Number(t.dataset.pointDelete);remove();}if(t.dataset.pointUp!==undefined){const i=Number(t.dataset.pointUp);if(i>0){remember();[value.points[i-1],value.points[i]]=[value.points[i],value.points[i-1]];draw();}}if(t.dataset.objectSelect!==undefined){selected=Number(t.dataset.objectSelect);tool='select';draw();}});
- d.addEventListener('change',e=>{const t=e.target;try{if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}if(t.id==='qw-graph-preset'&&t.value!=='custom'){remember();value=qwGraphDefault();const ps={v:[[0,0],[2,6],[6,6],[9,0]],x:[[0,2],[4,8],[9,8]],a:[[0,4],[5,4],[5,0],[9,0]],p:[[1,9],[2,5],[4,2.5],[9,1]],i:[[0,0],[3,3],[8,8]]};value.points=ps[t.value].map(([x,y])=>({x,y,label:''}));value.xlabel={v:'t, с',x:'t, с',a:'t, с',p:'V, л',i:'U, В'}[t.value];value.ylabel={v:'v, м/с',x:'x, м',a:'a, м/с²',p:'p, кПа',i:'I, А'}[t.value];value.smooth=t.value==='p';selected=-1;draw();}}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
+ d.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.tool){tool=t.dataset.tool;for(const b of d.querySelectorAll('[data-tool]'))b.setAttribute('aria-pressed',String(b===t));if(matchMedia('(max-width:1000px)').matches)showPanel('');}
+  if(t.dataset.construction){
+   try{
+    if(value.length>=60)throw Error('Максимум 60 фигур');
+    const index=Number(d.querySelector('#qw-construction-vertex')?.value||0);
+    const result=qwTriangleConstruction(value[selected],t.dataset.construction,index);
+    remember();value.push(result);selected=value.length-1;tool='select';draw();
+    d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool==='select')));
+   }catch(error){hint.textContent=error.message;hint.className='qw-error';}
+   return;
+  }if(t.id==='qw-add-point'&&kind==='graph'&&value.points.length<40){remember();value.points.push({...qwSnapGraphPoint(value,(value.xmin+value.xmax)/2,(value.ymin+value.ymax)/2),label:''});selected=value.points.length-1;draw();}if(t.dataset.pointDelete!==undefined){selected=Number(t.dataset.pointDelete);remove();}if(t.dataset.pointUp!==undefined){const i=Number(t.dataset.pointUp);if(i>0){remember();[value.points[i-1],value.points[i]]=[value.points[i],value.points[i-1]];draw();}}if(t.dataset.objectSelect!==undefined){selected=Number(t.dataset.objectSelect);tool='select';draw();}});
+ d.addEventListener('change',e=>{const t=e.target;try{if(t.id==='qw-snap-geometry'){snapGeometry=t.checked;draw(false);return;}if(t.id==='qw-grid-step-geometry'){geometryStep=Number(t.value);draw(false);return;}
+   if(t.id==='qw-diagram-preset'&&t.value!=='none'){
+    remember();value=qwPhysicsPreset(t.value);selected=-1;tool='select';draw();
+    d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool==='select')));return;
+   }
+   if(t.id==='qw-block-rotation'&&value[selected]?.kind==='block'){
+    const next=structuredClone(value);next[selected].rotation=Number(t.value);
+    const validated=qwValidateDiagram(next);remember();value=validated;draw();return;
+   }if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}
+   if(t.dataset.edgeIndex!==undefined&&value[selected]?.vertices){
+    const next=structuredClone(value),index=Number(t.dataset.edgeIndex);
+    if(!next[selected].edgeLabels)next[selected].edgeLabels=next[selected].vertices.map(()=>'');
+    next[selected].edgeLabels[index]=t.value.slice(0,40);
+    const validated=qwValidateDiagram(next);remember();value=validated;draw();
+   }
+   if(t.dataset.vertexIndex!==undefined&&value[selected]?.vertices){
+    const next=structuredClone(value),vertex=next[selected].vertices[Number(t.dataset.vertexIndex)],
+     key=t.dataset.vertexField;
+    if(!vertex||!['label','x','y'].includes(key))throw Error('Неизвестный параметр вершины');
+    vertex[key]=key==='label'?t.value:Number(t.value);
+    const v=next[selected].vertices;next[selected].x=Math.min(...v.map(p=>p.x));next[selected].y=Math.min(...v.map(p=>p.y));next[selected].x2=Math.max(...v.map(p=>p.x));next[selected].y2=Math.max(...v.map(p=>p.y));
+    const validated=qwValidateDiagram(next);remember();value=validated;draw();
+   }
+   if(t.id==='qw-curve-family'){
+    const next=structuredClone(value);next.curveFamily=t.value;
+    const validated=qwValidateGraph(next);remember();value=validated;draw();
+   }
+   if(t.dataset.curveParam||t.id==='qw-curve-trig'){
+    const next=structuredClone(value);
+    if(t.dataset.curveParam)next.curve[t.dataset.curveParam]=Number(t.value);
+    else next.curve.trig=t.value;
+    const validated=qwValidateGraph(next);remember();value=validated;draw(false);
+   }if(t.id==='qw-graph-preset'&&t.value!=='custom'){
+    remember();value=qwGraphDefault();
+    const ps={v:[[0,0],[2,6],[6,6],[9,0]],x:[[0,2],[4,8],[9,8]],a:[[0,4],[5,4],[5,0],[9,0]],p:[[1,9],[2,5],[4,2.5],[9,1]],i:[[0,0],[3,3],[8,8]]};
+    if(ps[t.value]){
+     value.points=ps[t.value].map(([x,y])=>({x,y,label:''}));
+     value.xlabel={v:'t, с',x:'t, с',a:'t, с',p:'V, л',i:'U, В'}[t.value];
+     value.ylabel={v:'v, м/с',x:'x, м',a:'a, м/с²',p:'p, кПа',i:'I, А'}[t.value];
+     value.smooth=t.value==='p';
+    }else if(t.value==='parabola'){
+     Object.assign(value,{xmin:-5,xmax:5,ymin:-2,ymax:10,xlabel:'x',ylabel:'y',curveFamily:'quadratic'});
+     value.curve={...value.curve,a:0.4,b:0,c:0};
+    }else if(t.value==='sin'||t.value==='cos'){
+     Object.assign(value,{xmin:-6,xmax:6,ymin:-4,ymax:4,xlabel:'x',ylabel:'y',step:1,curveFamily:'trigonometric'});
+     value.curve={...value.curve,trig:t.value,amplitude:3,frequency:1,phase:0,offset:0};
+    }
+    selected=-1;draw();
+   }}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
  d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}catch(e){hint.textContent=e.message;}};draw();
 }
 function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();qwCorrupt='';qwDoc=qwProject();qwSelected='';qwPersist();qwRender();}
 function qwAction(action,button){
  const q=qwCurrent();
- if(action==='new'){qwNew();return;}if(action==='open'){document.getElementById('qw-file')?.click();return;}if(action==='save'){qwSaveFile();return;}if(action==='settings'){qwSettings();return;}if(action==='preview'){qwPreview();return;}if(action==='pdf-student'||action==='pdf-teacher'){qwExportPDF(action==='pdf-teacher');return;}
+ if(action==='new'){qwNew();return;}if(action==='open'){document.getElementById('qw-file')?.click();return;}if(action==='save'){qwSaveFile();return;}if(action==='settings'){qwSettings();return;}if(action==='preview'){qwPreview();return;}if(action==='pdf'||action==='pdf-text'){qwPrintTextPDF();return;}if(action==='pdf-student'||action==='pdf-teacher'){qwExportPDF(action==='pdf-teacher');return;}
  if(action==='left'||action==='right'||action==='close-panels'){qwLeft=action==='left'?!qwLeft:false;qwRight=action==='right'?!qwRight:false;qwRender();return;}
  if(action==='add'||action==='part'){if(qwDoc.tasks.length>=80){status('Максимум 80 заданий',true);return;}const name=action==='part'?prompt('Название части','Часть '+(new Set(qwDoc.tasks.map(q=>q.part)).size+1)):null;if(action==='part'&&name===null)return;qwChange(()=>{const t=qwTask(document.getElementById('qw-add-type')?.value||'short');t.part=name||q?.part||'Часть 1';qwDoc.tasks.push(t);qwSelected=t.id;qwLeft=false;});return;}
  if(action==='select'){qwSelected=button.dataset.id;qwLeft=false;qwRender();return;}
@@ -22147,7 +22975,7 @@ function qwAction(action,button){
  if(action==='delete'){if(!confirm('Удалить задание '+(qwDoc.tasks.indexOf(q)+1)+'?'))return;qwChange(()=>{qwDoc.tasks=qwDoc.tasks.filter(t=>t.id!==q.id);qwSelected='';});return;}
  if(action==='math'){qwFormula();return;}if(action==='symbols'){qwSymbols();return;}if(action==='blank'){qwInsert('[[blank:6]]');return;}
  if(action==='graph'||action==='diagram'){qwVisualEditor(action);return;}if(action==='image'){document.getElementById('qw-image').click();return;}
- if(action==='bank-save'){try{const items=qwBankRead();if(items.length>=100)throw Error('Максимум 100 заданий в банке');items.push({id:qwId(),subject:qwDoc.subject,task:structuredClone(q)});localStorage.setItem(QW_BANK_KEY,JSON.stringify(items));status('Задание сохранено в банке');}catch(e){status('Банк: '+e.message,true);}return;}
+ if(action==='bank-save'){qwBankSave();return;}
 }
 if(typeof document!=='undefined'){
  document.addEventListener('click',e=>{if(!qwActive()||e.target.closest('#qw-dialog'))return;const b=e.target.closest('[data-qw-action],[data-action^="work-"]');if(!b)return;e.preventDefault();e.stopPropagation();qwAction(b.dataset.qwAction||b.dataset.action.slice(5),b);},true);
@@ -22165,7 +22993,7 @@ if(typeof document!=='undefined'){
 
 function qwFooter(active){
  const spans=document.querySelectorAll('.qo-document-workspace>.qo-editor-foot>span');
- spans.forEach((e,i)=>{if(active){if(e.dataset.qwOriginal===undefined)e.dataset.qwOriginal=e.textContent;e.textContent=i===0?'A4 · PDF 180 dpi':i===1?qwDoc.tasks.length+' заданий · '+qwDoc.tasks.reduce((s,q)=>s+q.points,0)+' баллов':'QWORK / PDF';}else if(e.dataset.qwOriginal!==undefined){e.textContent=e.dataset.qwOriginal;delete e.dataset.qwOriginal;}});
+ spans.forEach((e,i)=>{if(active){if(e.dataset.qwOriginal===undefined)e.dataset.qwOriginal=e.textContent;e.textContent=i===0?'A4 · PDF':i===1?qwDoc.tasks.length+' заданий · '+qwDoc.tasks.reduce((s,q)=>s+q.points,0)+' баллов':'QWORK / PDF';}else if(e.dataset.qwOriginal!==undefined){e.textContent=e.dataset.qwOriginal;delete e.dataset.qwOriginal;}});
 }
 
 
