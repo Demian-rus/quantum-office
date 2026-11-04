@@ -290,7 +290,7 @@ function qwVisualEditor(kind){
      value.curve={...value.curve,trig:t.value,amplitude:3,frequency:1,phase:0,offset:0};
     }
     selected=-1;draw();
-   }}}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
+   }}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
  d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}catch(e){hint.textContent=e.message;}};draw();
 }
 function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();qwCorrupt='';qwDoc=qwProject();qwSelected='';qwPersist();qwRender();}
