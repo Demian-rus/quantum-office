@@ -589,3 +589,24 @@ Excel import/export now supports native dropdown lists stored as inline quoted O
 
 - TASK096 completion preserves `status(message, true/false)` and adds explicit `error/warning/success` tones with semantic colors and accessible announcement roles. TASK096 tests 24 real notifications across all eight palettes. Verified-save/import/clipboard controllers choose tones without changing file data.
 - TASK032 CI null `bounding_box()` was reproduced 2/8 times on Chromium1194. Horizontal scroll replaces the frozen-row DOM on animation frames, racing Playwright's temporary handle. The live A1 remained visible with identical bounds in 20 frames. The test now waits for render completion while retaining its geometry, DOM identity and hit-test assertions; 20/20 repeats passed. Grid engine unchanged. See the TASK096 completion section for evidence.
+
+## TASK141 — профессиональная диагностика (04.11.2026)
+
+Продолжение TASK140/#125. Отдельная Draft-ветка
+`feat/task141-professional-diagnostics`; main не меняется. Подробный
+handoff и ограничения: `docs/TASK141.md`.
+
+Ключевые решения: «Создать с нуля» = ноль разделов/вопросов; пустые личные
+шаблоны допустимы. Конструктор открывает библиотечный шаблон для правок,
+сохраняет связь по ID, имеет заметные основные сохранения сверху.
+Проведение работает с независимым снимком `diagnostic.run.document`,
+а `qdWorkingDoc()` возвращает авторский черновик. `qdDoc()` возвращает
+активный снимок только в режиме проведения. Не подменять снимок при
+переходе в конструктор. QDIAG/QDIAGX/QDOC экспортируют весь проект.
+
+Точные баллы, текстовые ответы, комментарии и критерии сохраняются и
+попадают в отчёт. Поиск и массовые инструменты свёрнуты в дополнительную
+панель, банк и компактный список доступны сверху. Иллюстрации продолжают
+использовать существующий IndexedDB; таблицы/символы — очистку HTML Writer.
+Старые форматы читаются, новые поля необязательные. Создание/смена шаблона
+не очищает ранее сохранённых учеников, журнал и незавершённое проведение.

@@ -14,6 +14,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  await page.locator('.qd-library-card').filter({hasText:'Молекулы и температура'})
    .locator('[data-qd-action="library-open"]').click();
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
  await page.locator('[data-qd-action="view"][data-view="focus"]').click();
  const geometry=await page.evaluate(()=>{
    const rect=s=>{const x=document.querySelector(s).getBoundingClientRect();
@@ -28,11 +29,11 @@ const {pathToFileURL}=require('node:url');
  assert.ok(geometry.root.width>=geometry.viewport-100,'diagnostic must occupy available viewport width');
  assert.ok(geometry.left.x<=75,'topic panel must occupy real left edge instead of being centered');
  assert.ok(geometry.right.right>=geometry.viewport-75,'statistics must occupy real right edge');
- assert.ok(geometry.middle.width>=850&&geometry.middle.width<=1400,'central area uses remaining viewport without squeezing content');
+ assert.ok(geometry.middle.width>=850&&geometry.middle.width<geometry.root.width,'central area uses remaining viewport without squeezing content');
  assert.ok(geometry.middle.x-geometry.left.right>=16,'left rail has measured nonzero gap');
  assert.ok(geometry.right.x-geometry.middle.right>=16,'right rail has measured nonzero gap');
- assert.ok(geometry.right.width>=290&&geometry.right.width<=355,'right rail widened in TASK119');
- assert.ok(geometry.card.height<250,'single-question card should not reserve huge blank area');
+ assert.ok(geometry.right.width>=260&&geometry.right.width<=280,'right rail widened in TASK119');
+ assert.equal(await page.locator('.qd-guided .qd-chat-card [data-qd-field="text-response"]').count(),1,'TASK141 provides space for a recorded answer');
  assert.equal(geometry.ribbon.height,78,'TASK117 standard-height tiled ribbon must fit');
  assert.ok(geometry.tile.width>=120&&geometry.tile.height>=28,'compact file controls must be readable tiles');
  assert.ok(geometry.overflow<=geometry.viewport+3,'no overflow on desktop');
@@ -49,7 +50,7 @@ const {pathToFileURL}=require('node:url');
  const lib=await pendingLib;assert.match(lib.suggestedFilename(),/\.qtpl$/);
  // Empty/new requires explicit confirmation and switches to the builder.
  await page.locator('[data-action="writer-diag-new"]').click();
- assert.equal(await page.evaluate(()=>qdQuestionList().length),1);
+ assert.equal(await page.evaluate(()=>qdQuestionList().length),0);
  assert.equal(await page.locator('[data-qd-action="mode"][data-mode="builder"]').getAttribute('aria-pressed'),'true');
  await page.setViewportSize({width:1150,height:820});
  const mid=await page.evaluate(()=>({

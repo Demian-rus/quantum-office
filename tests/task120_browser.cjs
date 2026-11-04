@@ -31,7 +31,7 @@ const {pathToFileURL}=require('node:url');
  assert.match(await page.locator('#qd-builder-save-state').textContent(),/Все изменения сохранены/);
  const question=page.locator('.qd-edit-card').first().locator('[data-qd-field="prompt"]');
  await question.fill('Новая редакция вопроса по тепловым явлениям.');
- assert.match(await page.locator('#qd-builder-save-state').textContent(),/Локальный черновик/);
+ assert.match(await page.locator('#qd-builder-save-state').textContent(),/Черновик/);
  await page.locator('[data-qd-action="builder-quick-save"]').click();
  const versions=await page.evaluate(()=>{
    const id=qdLibraryRead()[0].id;
@@ -40,6 +40,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(versions,1);
  const answer=await page.evaluate(()=>qdLibraryRead()[0].sections[0].questions[0].prompt);
  assert.equal(answer,'Новая редакция вопроса по тепловым явлениям.');
+ await page.locator('.qd-builder-save>summary').click();
  await page.locator('#qd-builder-template-revision').selectOption({index:1});
  await page.locator('[data-qd-action="builder-template-restore"]').click();
  assert.notEqual(await page.evaluate(()=>qdLibraryRead()[0].sections[0].questions[0].prompt),answer);

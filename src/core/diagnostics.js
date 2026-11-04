@@ -8,7 +8,7 @@ function qdHistoryResponses(raw){
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return result;
   for(const [key,v] of Object.entries(raw).slice(0,QD_LIMITS.questions)){
     if(!/^[\w-]{1,60}$/.test(key)||!v||typeof v!=='object')continue;
-    if(typeof v.value==='string')result[key]={value:qdText(v.value,80)};
+    if(typeof v.value==='string')result[key]={value:qdText(v.value,3500)};
     else if(Array.isArray(v.selected)){
       result[key]={selected:[...new Set(v.selected.filter(i=>Number.isInteger(i)&&i>=0&&i<6))].slice(0,6)};
     }
@@ -32,11 +32,60 @@ const qdDefault = () => ({
   students:[],session:{student:'',studentId:'',marks:{},responses:{}},
   display:{mode:'focus',activeId:''},history:[]
 });
-function qdNormalize(raw){
+/* TASK141: optional version-1 extensions. Legacy documents remain readable. */
+function qdRichSafe(value){
+  return typeof value==='string'&&typeof qoSafeRich==='function'?qoSafeRich(value.slice(0,16000)):'';
+}
+function qdComments(raw,ids){
+  const result={};
+  if(raw&&typeof raw==='object'&&!Array.isArray(raw))for(const [id,value] of Object.entries(raw).slice(0,240)){
+    if(/^[\w-]{1,60}$/.test(id)&&(!ids||ids.has(id)))result[id]=qdText(value,2000);
+  }
+  return result;
+}
+function qdExactScores(raw,sections){
+  const result={},questions=sections?.flatMap(s=>s.questions);
+  if(raw&&typeof raw==='object'&&!Array.isArray(raw))for(const [id,value] of Object.entries(raw).slice(0,240)){
+    const q=questions?.find(q=>q.id===id);
+    if(/^[\w-]{1,60}$/.test(id)&&Number.isFinite(value)&&value>=0&&value<=(q?qdPoints(q.points):10)&&(!questions||q))
+      result[id]=qdScoreNumber(value);
+  }
+  return result;
+}
+function qdStartRun(root=qdWorkingDoc(),fresh=true){
+  const document=qdNormalize({...root,run:undefined,author:undefined,
+    students:[],history:[],session:fresh?{}:root.session,display:fresh?{mode:'focus'}:root.display});
+  if(!document.display.activeId)document.display.activeId=qdQuestionList(document)[0]?.id||'';
+  root.run={id:qdNewId(),created:new Date().toISOString(),templateId:root.author?.templateId||'',
+    revision:qdBuilderSignature(root),document};
+  document.students=root.students;document.history=root.history;
+  return document;
+}
+function qdBlank(root=qdWorkingDoc()){
+  root.title='Новая диагностика';root.description='';root.subject='physics';root.grade='';root.purpose='diagnostic';
+  root.sections=[];root.session={student:'',studentId:'',marks:{},responses:{},comments:{},scores:{}};
+  root.display={mode:'focus',activeId:''};
+  qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
+  root.author={templateId:'',savedSignature:''};qdMode='builder';qoWriter.diagnosticMode='builder';
+  qdSelected.clear();qdRevealed.clear();qdSearch='';qdFilterKind='all';
+  return root;
+}
+function qdIsDirty(){
+  const d=qdWorkingDoc();
+  return qdBuilderSavedSignature?qdBuilderSavedSignature!==qdBuilderSignature(d):
+    !!(d.sections.length||d.description||d.title!=='Новая диагностика'&&d.title!=='Диагностика знаний');
+}
+function qdConfirmReplace(){
+  return !qdIsDirty()||confirm('В конструкторе есть изменения, не сохранённые в шаблоне. Заменить черновик? Сначала можно сохранить шаблон или QDIAG.');
+}
+function qdNormalize(raw,allowRun=true){
   const data=qdDefault();
   if(!raw||typeof raw!=='object'||Array.isArray(raw))return data;
   data.title=qdText(raw.title,120)||data.title;
   data.description=qdText(raw.description,600);
+  data.subject=qdText(raw.subject,40);data.grade=qdText(raw.grade,18);
+  data.purpose=qdText(raw.purpose,40)||'diagnostic';
+  data.author={templateId:qdText(raw.author?.templateId,60),savedSignature:qdText(raw.author?.savedSignature,250000)};
   const used=new Set();
   const id = v => {
     if(typeof v==='string'&&/^[\w-]{1,60}$/.test(v)&&!used.has(v)){used.add(v);return v;}
@@ -56,7 +105,8 @@ function qdNormalize(raw){
             prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),
             points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit),
             choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),
-            tolerance:qdTolerance(q.tolerance)});
+            tolerance:qdTolerance(q.tolerance),criteria:qdText(q.criteria,2000),
+            promptRich:qdRichSafe(q.promptRich),answerRich:qdRichSafe(q.answerRich)});
           count++;
         }
       }
@@ -83,6 +133,8 @@ function qdNormalize(raw){
       if(Object.hasOwn(session.responses,q.id))data.session.responses[q.id]=qdNormalizeResponse(q,session.responses[q.id]);
     }
   }
+  data.session.comments=qdComments(session.comments,questionIds);
+  data.session.scores=qdExactScores(session.scores,data.sections);
   if(Array.isArray(raw.history)){
     data.history=raw.history.slice(-QD_LIMITS.history).filter(h=>h&&typeof h==='object').map(h=>{
       const marks={},responses=qdHistoryResponses(h.responses);
@@ -100,22 +152,40 @@ function qdNormalize(raw){
       return {id:qdText(h.id,60)||qdNewId(),date:qdText(h.date,30),
         student:qdText(h.student,100),studentId:studentIds.has(h.studentId)?h.studentId:'',
         title:qdText(h.title,120),marks,responses,summary,
+        comments:qdComments(h.comments),scores:qdExactScores(h.scores),
+        questions:Array.isArray(h.questions)?h.questions.slice(0,240).filter(q=>q&&/^[\w-]{1,60}$/.test(q.id)).map(q=>({id:q.id,prompt:qdText(q.prompt,1600),section:qdText(q.section,120)})):[],
+        templateId:qdText(h.templateId,60),revision:qdText(h.revision,80),
         topics:Array.isArray(h.topics)?h.topics.slice(0,QD_LIMITS.sections).filter(t=>t&&typeof t==='object')
           .map(t=>({name:qdText(t.name,120),rated:Number.isInteger(t.rated)&&t.rated>=0&&t.rated<=240?t.rated:0,
             total:Number.isInteger(t.total)&&t.total>=0&&t.total<=240?t.total:0,
             percent:Number.isInteger(t.percent)&&t.percent>=0&&t.percent<=100?t.percent:0})):null};
     });
   }
+  if(allowRun&&raw.run?.document&&typeof raw.run.document==='object'&&Array.isArray(raw.run.document.sections)){
+    data.run={id:qdText(raw.run.id,60)||qdNewId(),created:qdText(raw.run.created,40),
+      templateId:qdText(raw.run.templateId,60),revision:qdText(raw.run.revision,80),
+      document:qdNormalize({...raw.run.document,run:undefined},false)};
+  }
   return data;
 }
-function qdDoc(){
+function qdWorkingDoc(){
   if(!qdVerified.has(qoWriter)){
     qoWriter.diagnostic=qdNormalize(qoWriter.diagnostic);
     qdMode=qoWriter.diagnosticMode==='run'?'run':'builder';
     qdVerified.add(qoWriter);
     qdRevealed.clear();qdStudentFilter='';
+    qdBuilderLinkedTemplateId=qoWriter.diagnostic.author?.templateId||'';
+    qdBuilderSavedSignature=qoWriter.diagnostic.author?.savedSignature||'';
   }
   return qoWriter.diagnostic;
+}
+function qdDoc(){
+  const d=qdWorkingDoc();
+  if(qdMode!=='run')return d;
+  if(!d.run)qdStartRun(d,false);
+  d.run.document.students=d.students;
+  d.run.document.history=d.history;
+  return d.run.document;
 }
 function qdQuestionList(d=qdDoc()){
   return d.sections.flatMap(s=>s.questions.map(q=>({...q,section:s.title})));
@@ -139,7 +209,7 @@ function qdParseNumber(value){
   const n=Number(s);return Number.isFinite(n)&&Math.abs(n)<=1e12?n:null;
 }
 function qdNormalizeResponse(q,response){
-  if(q.type==='numeric')return {value:qdText(response?.value,80)};
+  if(!qdAuto(q.type)||q.type==='numeric')return {value:qdText(response?.value,q.type==='numeric'?80:3500)};
   const selected=Array.isArray(response?.selected)?response.selected:[];
   const indices=[...new Set(selected.filter(n=>Number.isInteger(n)&&n>=0&&n<q.choices.length))];
   return {selected:q.type==='single'?indices.slice(0,1):indices.slice(0,6)};
@@ -164,7 +234,7 @@ function qdCheckAnswer(q,response){
 function qdPoints(value){return Number.isInteger(value)&&value>=1&&value<=10?value:2;}
 function qdPartialCredit(value){return Number.isInteger(value)&&value>=0&&value<=100?value:50;}
 function qdScoreNumber(n){return Math.round(n*100)/100;}
-function qdScores(questions,marks){
+function qdScores(questions,marks,scores){
   let yes=0,partial=0,no=0,earned=0,possible=0,maxPoints=0;
   for(const q of questions){
     const points=qdPoints(q.points),state=marks?.[q.id];
@@ -172,6 +242,10 @@ function qdScores(questions,marks){
     if(state==='yes'){yes++;earned+=points;possible+=points;}
     if(state==='partial'){partial++;earned+=points*qdPartialCredit(q.partialCredit)/100;possible+=points;}
     if(state==='no'){no++;possible+=points;}
+    if(QD_STATES.includes(state)&&Number.isFinite(scores?.[q.id])){
+      const defaultScore=state==='yes'?points:state==='partial'?points*qdPartialCredit(q.partialCredit)/100:0;
+      earned+=Math.max(0,Math.min(points,scores[q.id]))-defaultScore;
+    }
   }
   const rated=yes+partial+no;
   return {yes,partial,no,rated,total:questions.length,
@@ -192,7 +266,7 @@ function qdMoveQuestion(d,qid,destSid,targetQid='',after=false){
 }
 
 /* TASK109 — rapid in-section authoring and safe independent section cloning. */
-let qdCollapsedSections=new Set();
+let qdCollapsedSections=new Set(),qdAuthorToolsOpen=false;
 let qdQuickLastType='question';
 function qdCopyCard(q,independentId=true){
   return {...q,id:independentId?qdNewId():q.id,
@@ -285,7 +359,12 @@ function qdStudentResults(d,studentId){
   return d.history.filter(h=>h.studentId===studentId||
     (!h.studentId&&h.student.trim().toLocaleLowerCase('ru-RU')===student.name.toLocaleLowerCase('ru-RU')));
 }
-function qdStore(){qoPersistWriter();}
+function qdStore(){
+  const root=qdWorkingDoc();
+  if(qdMode==='run'&&root.run){root.students=root.run.document.students;root.history=root.run.document.history;}
+  root.author={templateId:qdBuilderLinkedTemplateId,savedSignature:qdBuilderSavedSignature};
+  qoPersistWriter();
+}
 function qdToolbar(){
   const d=qdDoc();
   return `<div class="qd-top">
@@ -667,7 +746,7 @@ function qdVariantPreviewRefresh(){
 function qdBuilderUtilities(d){
   const issues=qdAudit(d);
   return '<div class="qd-panel qd-builder-utilities">'+
-    '<div class="qd-utility-actions"><strong>Инструменты конструктора</strong><button data-qd-action="compact-mode" type="button">'+(qdCompact?'Развернуть все':'Компактный список')+'</button></div>'+
+    '<div class="qd-utility-actions"><strong>Инструменты конструктора</strong></div>'+
     '<details data-qd-pane="audit" class="qd-utility-details" '+(qdAuditOpen?'open':'')+'><summary>Проверка заданий <span>'+issues.length+' замечаний</span></summary>'+
     '<div id="qd-audit-body" class="qd-utility-content">'+qdAuditMarkup(d)+'</div></details>'+
     '<details data-qd-pane="bulk" class="qd-utility-details" '+(qdBulkOpen?'open':'')+'><summary>Массовое добавление вопросов <span>Из текста</span></summary>'+
@@ -725,61 +804,42 @@ function qdApplyFilterUI(){
 /* TASK119 — save and update the *question template* right from the builder.
    A template deliberately excludes pupils, sessions, marks and result history. */
 function qdBuilderTemplateDefaults(d){
-  const my=qdLibraryRead(),existing=my.find(x=>qdPromptKey(x.title)===qdPromptKey(d.title));
+  const my=qdLibraryRead(),existing=my.find(x=>x.id===qdBuilderLinkedTemplateId);
   const preset=QD_PRESETS.find(p=>qdPromptKey(qdTemplate(p.id)?.title)===qdPromptKey(d.title));
-  const subject=existing?.subject||preset?.subject||
+  const subject=d.subject||existing?.subject||preset?.subject||
     Object.entries(QD_SUBJECTS).find(([,label])=>d.title.startsWith(label))?.[0]||'other';
-  const grade=existing?.grade||preset?.grade||d.title.match(/(?:^|\D)([5-9])\s*класс/i)?.[1]||'8';
-  return {my,existing,subject,grade,purpose:existing?.purpose||preset?.purpose||'diagnostic'};
+  const grade=d.grade??existing?.grade??preset?.grade??d.title.match(/(?:^|\D)([5-9])\s*класс/i)?.[1]??'8';
+  return {my,existing,subject,grade,purpose:d.purpose||existing?.purpose||preset?.purpose||'diagnostic'};
 }
 let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
 function qdBuilderSignature(d){
-  return JSON.stringify({title:d.title,description:d.description,
+  const content=JSON.stringify({title:d.title,description:d.description,subject:qdText(d.subject,40),grade:qdText(d.grade,18),purpose:d.purpose||'diagnostic',
     sections:d.sections.map(s=>({title:s.title,questions:s.questions.map(q=>({
-      prompt:q.prompt,answer:q.answer,type:q.type,points:q.points,
-      partialCredit:q.partialCredit,choices:q.choices,numericAnswer:q.numericAnswer,tolerance:q.tolerance
+      prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),type:qdType(q.type),points:qdPoints(q.points),criteria:qdText(q.criteria,2000),
+      promptRich:qdRichSafe(q.promptRich),answerRich:qdRichSafe(q.answerRich),promptMedia:q.promptMedia||null,answerMedia:q.answerMedia||null,
+      partialCredit:qdPartialCredit(q.partialCredit),choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),tolerance:qdTolerance(q.tolerance)
     }))}))});
+  return content.length+':'+qdVariantHash(content);
 }
 function qdBuilderSaveStatus(){
   const label=document.getElementById('qd-builder-save-state');
   if(label)label.textContent=qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(qdDoc())?
-    'Все изменения сохранены в шаблоне':'Локальный черновик · шаблон не обновлён';
+    'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик';
 }
 function qdBuilderTemplateMarkup(d){
   const meta=qdBuilderTemplateDefaults(d);
-  const options=(values,selected)=>values.map(([key,label])=>'<option value="'+qdEsc(key)+
-    '" '+(key===selected?'selected':'')+'>'+qdEsc(label)+'</option>').join('');
-  return '<section class="qd-panel qd-builder-save" aria-label="Сохранение шаблона диагностики">'+
-    '<div class="qd-builder-save-head"><div><h2>Сохранить изменения в шаблон</h2>'+
-    '<p>Исправленные вопросы и ответы можно сохранить как свой шаблон или обновить ранее созданный.</p></div>'+
-    '<span>'+qdQuestionList(d).length+' заданий</span></div>'+
-    '<div class="qd-builder-save-fields">'+
-      '<label>Предмет<select id="qd-builder-template-subject">'+
-        options(Object.entries(QD_SUBJECTS),meta.subject)+'</select></label>'+
-      '<label>Класс<input id="qd-builder-template-grade" maxlength="18" value="'+qdEsc(meta.grade)+'"></label>'+
-      '<label>Цель<select id="qd-builder-template-purpose">'+
-        options(Object.entries(QD_PURPOSES),meta.purpose)+'</select></label>'+
-      '<label>Мой шаблон для обновления<select id="qd-builder-template-target">'+
-        '<option value="">Выберите сохранённый шаблон</option>'+
-        meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+
-          '>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
-    '</div>'+
-    '<div class="qd-builder-revisions"><label>Предыдущие версии выбранного шаблона'+
-      '<select id="qd-builder-template-revision">'+
-        qdTemplateVersionOptions(meta.existing?.id||'')+'</select></label>'+
-      '<button type="button" data-qd-action="builder-template-restore" '+(!meta.existing?'disabled':'')+
-        '>Восстановить версию в библиотеке</button></div>'+
-    '<div class="qd-builder-save-actions">'+
-      '<button type="button" class="qd-primary" data-qd-action="builder-template-save">Сохранить как новый шаблон</button>'+
-      '<button type="button" data-qd-action="builder-template-update" '+(!meta.my.length?'disabled':'')+
-        '>Обновить мой шаблон</button>'+
-      '<button type="button" data-qd-action="builder-template-export" '+(!meta.my.length?'disabled':'')+
-        '>Скачать библиотеку .qtpl</button></div>'+
-    '<p class="qd-hint">Встроенные шаблоны не перезаписываются: исправленную версию сохраните как собственную. '+
-      'Шаблон содержит только задания, без учеников и результатов. Для переноса на другое устройство скачайте .qtpl.</p>'+
-    '</section>';
+  return '<details class="qd-panel qd-builder-save"><summary>Версии шаблона и перенос библиотеки</summary>'+
+    '<p class="qd-hint">Основные кнопки «Сохранить изменения» и «Сохранить как новый шаблон» закреплены вверху. Здесь можно выбрать другой личный шаблон для обновления.</p>'+
+    '<label>Мой шаблон для обновления<select id="qd-builder-template-target"><option value="">Выберите шаблон</option>'+
+      meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+'>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
+    '<div class="qd-builder-revisions"><label>Предыдущие версии выбранного шаблона<select id="qd-builder-template-revision">'+
+      qdTemplateVersionOptions(meta.existing?.id||'')+'</select></label>'+
+      '<button type="button" data-qd-action="builder-template-restore" '+(!meta.existing?'disabled':'')+'>Восстановить версию в библиотеке</button></div>'+
+    '<div class="qd-builder-save-actions"><button type="button" data-qd-action="builder-template-update" '+(!meta.my.length?'disabled':'')+'>Обновить мой шаблон</button>'+
+      '<button type="button" data-qd-action="builder-template-export">Скачать библиотеку .qtpl</button></div></details>';
 }
 function qdBuilderSaveTemplate(d,mode,target,fields){
+  d.subject=fields.subject;d.grade=fields.grade;d.purpose=fields.purpose;
   if(mode==='new')return qdLibrarySaveCurrent(d,fields.subject,fields.grade,fields.purpose);
   if(mode!=='update'||!target)return {ok:false,message:'Выберите свой шаблон для обновления'};
   return qdLibraryUpdate(target,{
@@ -791,32 +851,39 @@ function qdBuilderSaveTemplate(d,mode,target,fields){
 function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
-    <div class="qd-builder-actionbar">
-      <strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?
-        'Все изменения сохранены в шаблоне':'Локальный черновик · шаблон не обновлён'}</span>
-      <button data-qd-action="builder-quick-save" class="qd-primary" type="button">Сохранить шаблон</button>
-      <button data-qd-action="bank-open" type="button">Банк вопросов</button>
+    <div class="qd-builder-actionbar" role="toolbar" aria-label="Инструменты конструктора">
+      <div class="qd-command-row"><strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
+        <button data-qd-action="builder-quick-save" class="qd-primary" type="button">${qdBuilderLinkedTemplateId?'Сохранить изменения':'Сохранить шаблон'}</button>
+        <button data-qd-action="save-copy" type="button">Сохранить как новый шаблон</button></div>
+      <div class="qd-command-row"><button data-qd-action="blank" type="button">Создать с нуля</button>
+        <button data-qd-action="preview" type="button">Предпросмотр</button><button data-qd-action="bank-open" type="button">Банк вопросов</button><button data-qd-action="compact-mode" type="button">${qdCompact?'Развернуть карточки':'Компактный список'}</button>
+        <button data-qd-action="add-section" type="button">+ Раздел</button></div>
     </div>
     <div class="qd-panel qd-meta">
       <label>Название диагностики<input data-qd-field="title" maxlength="120" value="${qdEsc(d.title)}"></label>
+      <div class="qd-author-metadata"><label>Предмет<select data-qd-field="subject" id="qd-builder-template-subject">${Object.entries(QD_SUBJECTS).map(([k,v])=>`<option value="${k}" ${qdBuilderTemplateDefaults(d).subject===k?'selected':''}>${v}</option>`).join('')}</select></label>
+      <label>Класс<input data-qd-field="grade" id="qd-builder-template-grade" maxlength="18" value="${qdEsc(qdBuilderTemplateDefaults(d).grade)}" placeholder="Класс"></label>
+      <label>Тип диагностики<select data-qd-field="purpose" id="qd-builder-template-purpose">${Object.entries(QD_PURPOSES).map(([k,v])=>`<option value="${k}" ${qdBuilderTemplateDefaults(d).purpose===k?'selected':''}>${v}</option>`).join('')}</select></label></div>
       <label>Описание<textarea data-qd-field="description" maxlength="600" rows="2">${qdEsc(d.description)}</textarea></label>
       <div class="qd-row qd-wrap qd-builder-tools">
         <span class="qd-count-pill">${count} / ${QD_LIMITS.questions} заданий · ${d.sections.length} разделов</span>
-        <button data-qd-action="sample" type="button">Пример: физика, 8 класс</button>
+
         <label class="qd-template-selector">Готовые диагностики
           <select id="qd-template-pick" aria-label="Выбрать готовую диагностику">
             ${QD_PRESETS.map(p=>'<option value="'+qdEsc(p.id)+'">'+qdEsc(QD_SUBJECTS[p.subject]||'Другое')+
               ' · '+qdEsc(p.grade)+' класс · '+qdEsc(p.label)+'</option>').join('')}
           </select></label>
         <button data-qd-action="use-template" type="button">Создать из шаблона</button>
+        <button data-qd-action="sample" type="button">Пример: физика</button>
         <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
-        <button data-qd-action="add-section" type="button">+ Раздел</button>
       </div>
       <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
     </div>
+    ${!d.sections.length?'<section class="qd-panel qd-blank-state"><h2>Пустой шаблон</h2><p>Добавьте первый раздел и свои вопросы. Готовые задания появятся только по вашему выбору.</p><button type="button" data-qd-action="add-section" class="qd-primary">Добавить первый раздел</button></section>':''}
+    <details class="qd-author-advanced" data-qd-pane="author-tools" ${qdAuthorToolsOpen?'open':''}><summary>Дополнительные инструменты · проверка, поиск, массовый ввод, варианты</summary>
     ${qdBuilderUtilities(d)}
     ${typeof qdBankMarkup==='function'?qdBankMarkup():''}
-    ${qdBatchToolbar(d)}
+    ${qdBatchToolbar(d)}</details>
     <p id="qd-no-matches" class="qd-empty-filter" hidden>По вашему запросу ничего не найдено.</p>
     ${d.sections.map((s,si)=>`<section class="qd-section qd-editor-section ${qdCollapsedSections.has(s.id)?'qd-section-collapsed':''}" data-section="${qdEsc(s.id)}">
       <div class="qd-section-head">
@@ -854,6 +921,10 @@ function qdBuilder(){
         </div>
         <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
         <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        <div class="qd-rich-actions"><button type="button" data-qd-action="rich-edit" data-kind="prompt" data-qid="${qdEsc(q.id)}">Оформить условие · таблица / формула</button>
+          <button type="button" data-qd-action="rich-edit" data-kind="answer" data-qid="${qdEsc(q.id)}">Оформить решение</button></div>
+        ${q.promptRich?'<details class="qd-rich-preview"><summary>Форматирование условия</summary>'+qdRichSafe(q.promptRich)+'</details>':''}
+        <label>Критерии оценивания<textarea data-qd-field="criteria" data-qid="${qdEsc(q.id)}" maxlength="2000" rows="2" placeholder="За что начисляются баллы">${qdEsc(q.criteria||'')}</textarea></label>
         ${['single','multiple'].includes(q.type)?`<div class="qd-choices-editor">
           <strong>Варианты ответов · отметьте правильные</strong>
           ${qdChoices(q.choices).map((choice,i)=>`<div class="qd-choice-edit">
@@ -916,7 +987,7 @@ function qdTypeTitle(type){
     multiple:'Несколько ответов',numeric:'Числовой ответ'})[type]||'Вопрос';
 }
 function qdAutoInput(q,response){
-  if(!qdAuto(q.type))return '';
+  if(!qdAuto(q.type))return '<label class="qd-written-answer">Ответ ученика<textarea data-qd-field="text-response" data-qid="'+qdEsc(q.id)+'" maxlength="3500" rows="4" placeholder="Запишите ответ или ход решения">'+qdEsc(response?.value||'')+'</textarea></label>';
   const v=qdNormalizeResponse(q,response);
   if(q.type==='numeric')return `<div class="qd-auto-input">
     <label>Ваш числовой ответ<input data-qd-field="numeric-response" data-qid="${qdEsc(q.id)}"
@@ -969,18 +1040,20 @@ function qdRunQuestion(q,number,d){
   return '<article class="qd-card qd-run-card qd-chat-card '+(mark?'qd-mark-'+mark:'')+'" data-qid="'+qdEsc(q.id)+'">'+
     '<div class="qd-chat-head"><div class="qd-question"><span class="qd-counter">'+(number+1)+'.</span><div>'+
       '<span class="qd-type">'+qdEsc(qdTypeTitle(q.type))+' · '+points+' '+(points===1?'балл':points<5?'балла':'баллов')+'</span>'+
-      '<p>'+qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')+'</p></div></div>'+
+      '<p '+(q.promptRich?'hidden':'')+'>'+qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')+'</p>'+(q.promptRich?'<div class="qd-rich-content">'+qdRichSafe(q.promptRich)+'</div>':'')+'</div></div>'+
       '<div class="qd-rating qd-chat-rating" role="group" aria-label="Оценка ответа">'+
         markButton('yes','✓ Знает')+markButton('no','× Не знает')+
         markButton('partial','◐ Частично')+'</div></div>'+
     qdAutoInput(q,d.session.responses[q.id])+
+    '<div class="qd-assessment-fields"><label>Баллы (0–'+points+')<input type="number" min="0" max="'+points+'" step="0.25" data-qd-field="score" data-qid="'+qdEsc(q.id)+'" value="'+(Number.isFinite(d.session.scores?.[q.id])?d.session.scores[q.id]:'')+'" placeholder="Авто по оценке"></label>'+
+    '<label>Комментарий преподавателя<textarea rows="2" maxlength="2000" data-qd-field="comment" data-qid="'+qdEsc(q.id)+'">'+qdEsc(d.session.comments?.[q.id]||'')+'</textarea></label></div>'+
     '<div class="qd-card-actions qd-chat-actions">'+
       '<button type="button" class="qd-answer-toggle" data-qd-action="reveal" data-qid="'+qdEsc(q.id)+
         '" aria-expanded="'+visible+'">'+(visible?'◉ Скрыть ответ':'◎ Показать ответ')+'</button>'+
       (qdAuto(q.type)?'<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="'+qdEsc(q.id)+
         '">Проверить автоматически</button>':'')+
     '</div>'+
-    (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p></div>':'')+
+    (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p>'+(q.answerRich?'<div class="qd-rich-content">'+qdRichSafe(q.answerRich)+'</div>':'')+(q.criteria?'<p><b>Критерии:</b> '+qdEsc(q.criteria)+'</p>':'')+'</div>':'')+
     (!hasPrompt?'<p class="qd-card-unfilled">Сначала заполните вопрос в конструкторе — пустую карточку нельзя оценить.</p>':'')+
     (mark?'<p class="qd-card-assessed" role="status">'+(mark==='yes'?'Знает':mark==='partial'?'Частично':'Не знает')+'</p>':'')+
   '</article>';
@@ -998,6 +1071,7 @@ function qdGuidedQuestions(d,all,s){
     <p>Добавьте задания в конструкторе и вернитесь к проведению.</p>
     <button type="button" data-qd-action="mode" data-mode="builder" class="qd-primary">Открыть конструктор</button></section>`;
   const index=qdCurrentIndex(d,all),q=all[index],progress=s.total?Math.round(s.rated/s.total*100):0;
+  qdDisplay(d).activeId=q.id;
   return `<section class="qd-guided" aria-label="Пошаговая диагностика">
     <div class="qd-guided-status">
       <div class="qd-guided-topline"><span class="qd-guided-section">${qdEsc(q.section)}</span>
@@ -1039,12 +1113,12 @@ function qdGuidedQuestions(d,all,s){
   </section>`;
 }
 function qdRun(){
-  const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks);
+  const d=qdDoc(),all=qdQuestionList(d),s=qdScores(all,d.session.marks,d.session.scores);
   const history=qdStudentFilter?qdStudentResults(d,qdStudentFilter):d.history;
   const profile=d.students.find(x=>x.id===qdStudentFilter);
   const scores=history.map(h=>h.summary||qdScores(all,h.marks)).filter(x=>x.rated);
   const average=scores.length?Math.round(scores.reduce((n,x)=>n+x.percent,0)/scores.length):null;
-  return `<div class="qd-session">
+  return `<div class="qd-session">${qdRunSetup(d)}
     ${qdDisplay(d).mode==='focus'?`<details class="qd-session-drawer">
       <summary>Ученик: ${qdEsc(d.session.student||'не выбран')} <span>Настройки занятия</span></summary>`:''}
     <div class="qd-panel qd-session-panel">
@@ -1083,7 +1157,7 @@ function qdRun(){
       </div>
       <p class="qd-percent">${s.rated?`Результат: <strong>${s.percent}%</strong> · ${s.earned} из ${s.possible} доступных баллов за проверенные вопросы.`:'Начните отмечать ответы, чтобы увидеть результат.'}</p>
       <div class="qd-topic-results">${d.sections.map(section=>{
-        const st=qdScores(section.questions,d.session.marks);
+        const st=qdScores(section.questions,d.session.marks,d.session.scores);
         return `<div><span>${qdEsc(section.title)}</span><span>${st.rated}/${st.total} проверено · ${st.rated?st.percent+'%':'—'} · ${st.earned}/${st.possible} б.</span></div>`;
       }).join('')}</div>
 
@@ -1373,14 +1447,14 @@ function qdGroupJournalCSV(d){
 
 function qdTopicSnapshot(doc,marks){
   return doc.sections.map(section=>{
-    const s=qdScores(section.questions,marks);
+    const s=qdScores(section.questions,marks,doc.session?.scores);
     return {name:section.title,rated:s.rated,total:s.total,percent:s.percent};
   });
 }
 function qdReportHTML(entry){
   const doc=qdDoc(),all=qdQuestionList(doc),current=entry===undefined;
   const marks=current?doc.session.marks:entry.marks;
-  const s=current?qdScores(all,marks):entry.summary||qdScores(all,marks);
+  const s=current?qdScores(all,marks,doc.session.scores):entry.summary||qdScores(all,marks);
   const topics=current?qdTopicSnapshot(doc,marks):entry.topics||qdTopicSnapshot(doc,marks);
   const pupil=qdEsc(current?doc.session.student:(entry.student||''))||'Не указан';
   const stamp=qdEsc(current?new Date().toLocaleString('ru-RU'):qdDateLabel(entry.date));
@@ -1397,6 +1471,7 @@ function qdReportHTML(entry){
    '<p>Знает: '+s.yes+' · Частично: '+s.partial+' · Не знает: '+s.no+'</p>'+
    (Number.isFinite(s.earned)&&Number.isFinite(s.possible)?'<p><b>Баллы:</b> '+s.earned+' из '+s.possible+'</p>':'')+
    '<h2>Результаты по разделам</h2><table><thead><tr><th>Раздел</th><th>Проверено</th><th>Результат</th></tr></thead><tbody>'+rows+'</tbody></table>'+
+   qdAnswerReport(current?{questions:all,responses:doc.session.responses,comments:doc.session.comments,scores:doc.session.scores}:entry)+
    '<p class="muted">Процент рассчитан только по проверенным заданиям. Для сохранения PDF откройте этот файл и выберите «Печать → Сохранить как PDF».</p>'+
    '</body></html>';
 }
@@ -1406,7 +1481,7 @@ function qdExportReport(entry){
 }
 
 function qdExport(){
-  const d=qdDoc();
+  const d=qdWorkingDoc();
   download((typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'.qdiag',
     JSON.stringify(d,null,2),'application/json;charset=utf-8');
 }
@@ -1449,7 +1524,7 @@ function qdLibrarySafe(value){
   if(!title||!Array.isArray(value.sections))return null;
   const model=qdNormalize({title,description:qdText(value.description,600),sections:value.sections,
     students:[],history:[],session:{},display:{mode:'list',activeId:''}});
-  if(!model.sections.length||!qdQuestionList(model).length)return null;
+  if(!qdValidTemplateSections(value.sections))return null;
   return {id:qdText(value.id,60),title:model.title,description:model.description,
     subject,grade:qdText(value.grade,18)||'—',purpose,sections:model.sections};
 }
@@ -1460,7 +1535,7 @@ function qdLibraryRead(){
   }catch(_){return [];}
 }
 function qdLibraryWrite(items){
-  try{localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
+  try{const previous=localStorage.getItem(QD_LIBRARY_KEY);if(previous&&!Array.isArray(JSON.parse(previous)))return false;localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
   catch(_){return false;}
 }
 
@@ -1509,7 +1584,7 @@ function qdTemplateRevisionRestore(templateId,revisionId){
   if(!qdLibraryWrite(items))return {ok:false,message:'Не удалось восстановить шаблон из-за ограничения памяти'};
   return {ok:true,questions:qdQuestionList(previous).length};
 }
-let qdLibraryEditingId='';
+let qdLibraryEditingId='',qdLibrarySource='all';
 function qdLibraryNameUsed(items,title,ignoreId=''){
   const normalized=qdPromptKey(title);
   return items.some(t=>t.id!==ignoreId&&qdPromptKey(t.title)===normalized);
@@ -1522,8 +1597,7 @@ function qdLibraryUpdate(id,fields,d=qdDoc(),replaceQuestions=false){
   if(!title)return {ok:false,message:'Введите название шаблона'};
   if(qdLibraryNameUsed(items,title,id))return {ok:false,message:'Шаблон с таким названием уже существует'};
   const sections=replaceQuestions?d.sections:original.sections;
-  if(replaceQuestions&&!qdQuestionList(d).some(q=>q.prompt.trim()))
-    return {ok:false,message:'Нельзя перезаписать шаблон пустыми вопросами'};
+
   const draft=qdLibrarySafe({
     id:original.id,title,description,
     subject:fields.subject,grade:qdText(fields.grade,18).trim(),purpose:fields.purpose,
@@ -1580,7 +1654,7 @@ function qdLibrarySaveCurrent(d,subject,grade,purpose){
   const current=qdLibraryRead();
   if(current.length>=QD_LIMITS.templates)return {ok:false,message:'Достигнут лимит сохранённых шаблонов'};
   if(qdLibraryNameUsed(current,d.title))return {ok:false,message:'Шаблон с таким названием уже существует — откройте «Изменить» для обновления'};
-  if(!qdQuestionList(d).some(q=>q.prompt.trim()))return {ok:false,message:'Заполните хотя бы один вопрос'};
+
   const data=qdLibrarySafe({
     id:qdNewId(),title:d.title,description:d.description,sections:d.sections,subject,grade,purpose
   });
@@ -1601,6 +1675,7 @@ function qdLibraryItems(){
     label:x.title,description:x.description,count:x.sections.reduce((sum,s)=>sum+s.questions.length,0)}));
   const needle=qdLibraryQuery.trim().toLocaleLowerCase('ru-RU');
   return [...custom,...builtins].filter(x=>
+    (qdLibrarySource==='all'||x.source===qdLibrarySource)&&
     (qdLibrarySubject==='all'||x.subject===qdLibrarySubject)&&
     (qdLibraryGrade==='all'||x.grade===qdLibraryGrade)&&
     (qdLibraryPurpose==='all'||x.purpose===qdLibraryPurpose)&&
@@ -1611,19 +1686,21 @@ function qdLibraryLoad(d,id,source){
   let payload=null;
   if(source==='custom'){
     const x=qdLibraryRead().find(x=>x.id===id);
-    if(x)payload={title:x.title,description:x.description,sections:x.sections};
+    if(x)payload={...x};
   }else if(source==='built-in')payload=qdTemplate(id);
   if(!payload)return false;
   // Re-normalizing generates safe, fresh IDs so an old session cannot inherit marks.
-  const model=qdNormalize({title:payload.title,description:payload.description,sections:payload.sections,
+  const model=qdNormalize({...payload,
     students:[],history:[],session:{},display:{mode:'list'}});
   for(const s of model.sections){
     s.id=qdNewId();
     for(const q of s.questions)q.id=qdNewId();
   }
   d.title=model.title;d.description=model.description;d.sections=model.sections;
-  d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
-  d.display={mode:'list',activeId:''};
+  d.subject=payload.subject||QD_PRESETS.find(p=>p.id===id)?.subject||'';
+  d.grade=payload.grade||QD_PRESETS.find(p=>p.id===id)?.grade||'';d.purpose=payload.purpose||'diagnostic';
+  d.session={student:'',studentId:'',marks:{},responses:{},comments:{},scores:{}};
+  d.display={mode:'focus',activeId:''};
   qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
   qdStore();return true;
 }
@@ -1635,11 +1712,11 @@ function qdLibraryResolve(source,id){
   if(source==='built-in')raw=qdTemplate(id);
   if(source==='custom'){
     const custom=qdLibraryRead().find(x=>x.id===id);
-    if(custom)raw={title:custom.title,description:custom.description,sections:custom.sections};
+    if(custom)raw={...custom};
   }
   if(!raw)return null;
-  const model=qdNormalize({title:raw.title,description:raw.description,sections:raw.sections});
-  return qdQuestionList(model).length?model:null;
+  const model=qdNormalize({...raw});
+  return model;
 }
 function qdLibraryPreviewPick(source,id){
   const model=qdLibraryResolve(source,id);
@@ -1774,9 +1851,11 @@ function qdLibraryView(){
     '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
       '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
       '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
+    '<div class="qd-library-commandbar"><button type="button" data-qd-action="blank" class="qd-primary">Создать с нуля</button><button type="button" data-qd-action="library-import">Импорт QTPL / QTPLX</button><button type="button" data-qd-action="library-export">Экспорт библиотеки</button>'+
+    '<label>Библиотека<select id="qd-library-source">'+options([['all','Все шаблоны'],['built-in','Готовые'],['custom','Мои шаблоны']],qdLibrarySource)+'</select></label></div>'+
     '<section class="qd-panel qd-library-filter"><label>Название или тема<input id="qd-library-search" type="search" maxlength="120" value="'+qdEsc(qdLibraryQuery)+'" placeholder="Найти диагностику"></label>'+
       '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
-      '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...['5–6','7','8','9'].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
+      '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...[...new Set(['5–6','7','8','9',...qdLibraryRead().map(t=>t.grade)])].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
       '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
       '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
@@ -1794,11 +1873,14 @@ function qdLibraryCards(items){
     '<div class="qd-library-tags"><span>'+qdEsc(QD_SUBJECTS[x.subject]||'Другое')+'</span><span>'+qdEsc(x.grade)+' класс</span>'+
     '<span>'+qdEsc(QD_PURPOSES[x.purpose]||'Диагностика')+'</span></div>'+
     '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
+    '<div class="qd-library-structure">'+(x.source==='custom'?qdLibraryRead().find(t=>t.id===x.id)?.sections:qdTemplate(x.id)?.sections)?.map(s=>'<span>'+qdEsc(s.title)+' · '+s.questions.length+'</span>').join('')+'</div>'+
     '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
     (x.source==='custom'?
-    '<button type="button" data-qd-action="library-edit" data-template="'+qdEsc(x.id)+'">Изменить</button>'+
+    '<button type="button" data-qd-action="library-edit-content" data-template="'+qdEsc(x.id)+'">Редактировать</button>'+
+    '<button type="button" data-qd-action="library-edit" data-template="'+qdEsc(x.id)+'">Переименовать / свойства</button>'+
     '<button type="button" data-qd-action="library-clone" data-template="'+qdEsc(x.id)+'">Копировать</button>'+
     '<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
+    '<button type="button" data-qd-action="library-from" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">На основе</button>'+
     '<button type="button" data-qd-action="library-preview" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">Просмотреть</button>'+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
       '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
     '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
@@ -1972,8 +2054,8 @@ function qdTemplate(key){
 function qdApplyTemplate(d,key){
   const template=qdTemplate(key);if(!template)return false;
   d.title=template.title;d.description=template.description;d.sections=template.sections;
-  d.students=[];d.history=[];d.session={student:'',studentId:'',marks:{},responses:{}};
-  d.display={mode:'list',activeId:''};qdStudentFilter='';qdRevealed.clear();
+  d.session={student:'',studentId:'',marks:{},responses:{},comments:{},scores:{}};
+  d.display={mode:'focus',activeId:''};qdStudentFilter='';qdRevealed.clear();
   qdStore();return true;
 }
 function qdReviewItems(d,marks=d.session.marks){
@@ -2001,11 +2083,11 @@ function qdSample(){
       ['Смешали по 1 кг воды температурой 80 °C и 20 °C. Какая будет температура без потерь?','50 °C, поскольку массы и удельные теплоёмкости равны.']
     ],'practice')
   ];
-  d.students=[];d.session={student:'',studentId:'',marks:{},responses:{}};d.history=[];qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
+  d.session={student:'',studentId:'',marks:{},responses:{},comments:{},scores:{}};qdStudentFilter='';d.display={mode:'focus',activeId:''};qdRevealed.clear();qdStore();
 }
 
 function qdRibbonAction(action){
-  const d=qdDoc();
+  const d=qdWorkingDoc();
   if(action==='writer-diag-library')qdMode='library';
   else if(action==='writer-diag-builder')qdMode='builder';
   else if(action==='writer-diag-list'){qdMode='run';qdDisplay(d).mode='list';}
@@ -2018,14 +2100,8 @@ function qdRibbonAction(action){
   }
   else if(action==='writer-diag-csv'){qdCSV();return;}
   else if(action==='writer-diag-new'){
-    if(!confirm('Создать новую пустую диагностику? Вопросы, ученики и история текущей диагностики будут заменены. Сначала сохраните .qdiag.'))return;
-    const blank=qdDefault();
-    d.title=blank.title;d.description=blank.description;d.sections=blank.sections;
-    d.students=blank.students;d.history=blank.history;d.session=blank.session;
-    d.display={mode:'list',activeId:''};
-    qdMode='builder';qoWriter.diagnosticMode='builder';
-    qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
-    qdRevealed.clear();qdSelected.clear();qdSearch='';qdFilterKind='all';
+    if(!qdConfirmReplace())return;
+    qdBlank(d);
     qdStore();qdRefresh();return;
   }
   else return;
@@ -2045,7 +2121,7 @@ function qdSidebarTopics(d,mode){
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
     '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
     '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
-      const graded=qdScores(section.questions,d.session.marks);
+      const graded=qdScores(section.questions,d.session.marks,d.session.scores);
       const share=graded.total?Math.round(graded.rated/graded.total*100):0;
       return '<button type="button" class="qd-side-topic" data-qd-action="sidebar-topic" data-sid="'+qdEsc(section.id)+'">'+
         '<span class="qd-side-topic-title"><b>'+(i+1)+'.</b>'+qdEsc(section.title||'Без названия')+'</span>'+
@@ -2076,7 +2152,7 @@ function qdSideQuestionItems(items,empty,kind){
     '</button>').join('')+'</div>';
 }
 function qdSidebarInsights(d,mode){
-  const all=qdQuestionList(d),s=qdScores(all,d.session.marks);
+  const all=qdQuestionList(d),s=qdScores(all,d.session.marks,d.session.scores);
   if(mode==='builder'){
     const issues=qdAudit(d),types=[
       ['Вопрос',all.filter(q=>q.type==='question').length],
@@ -2127,7 +2203,7 @@ function qdScrollToTopic(sid){
   const target=[...root?.querySelectorAll('[data-section]')||[]].find(el=>el.dataset.section===sid);
   const scroll=document.getElementById('qo-diag-workspace');
   if(!target||!scroll)return false;
-  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(qdMode==='builder'?(document.querySelector('.qd-builder-actionbar')?.offsetHeight||0):0)-12;
   return true;
 }
 
@@ -2154,6 +2230,8 @@ function qoDiagnosticVisibility(){
   if(active)qdRefresh();
 }
 function qoDiagnosticMount(){
+  const initial=qdWorkingDoc();
+  if(initial.title==='Диагностика знаний'&&!initial.history.length&&!initial.students.length&&initial.sections.length===1&&initial.sections[0].questions.length===1&&!initial.sections[0].questions[0].prompt&&!initial.sections[0].questions[0].answer)qdBlank(initial);
   const root=document.getElementById('qo-diag-root');if(!root)return;
   root.addEventListener('click',qdOnClick);
   root.addEventListener('keydown',qdQuickKeydown);
@@ -2167,10 +2245,11 @@ function qoDiagnosticMount(){
     window.addEventListener('pointercancel',qdPointerCancel,true);
     qdPointerBound=true;
   }
-  if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);qdKeyboardBound=true;}
+  if(!qdKeyboardBound){window.addEventListener('keydown',qdGuidedKeydown);window.addEventListener('beforeunload',e=>{if(qdIsDirty()){e.preventDefault();e.returnValue='';}});qdKeyboardBound=true;}
   qoDiagnosticVisibility();
 }
 function qdOnBuilderToggle(event){
+  if(event.target.dataset?.qdPane==='author-tools')qdAuthorToolsOpen=event.target.open;
   if(event.target.dataset?.qdPane==='audit')qdAuditOpen=event.target.open;
   if(event.target.dataset?.qdPane==='bulk')qdBulkOpen=event.target.open;
   if(event.target.dataset?.qdPane==='variants'){
@@ -2182,7 +2261,7 @@ function qdJumpToEdit(qid,field='prompt'){
   const card=[...root?.querySelectorAll('.qd-edit-card')||[]].find(el=>el.dataset.qid===qid);
   if(!card)return;
   const scroll=document.getElementById('qo-diag-workspace');
-  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-20;
+  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(document.querySelector('.qd-builder-actionbar')?.offsetHeight||8)-12;
   const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
   (input||card.querySelector('textarea'))?.focus({preventScroll:true});
 }
@@ -2205,6 +2284,7 @@ function qdRefreshAudit(){
 function qdOnClick(event){
   const button=event.target.closest('[data-qd-action]');if(!button)return;
   const action=button.dataset.qdAction,d=qdDoc();
+  if(qdProfessionalAction(action,button,d))return;
   if(action==='mode'){
     qdMode=['run','builder','library'].includes(button.dataset.mode)?button.dataset.mode:'builder';
     if(qdMode!=='library'){qoWriter.diagnosticMode=qdMode;qdStore();}
@@ -2212,7 +2292,7 @@ function qdOnClick(event){
   }
 
   if(action==='bank-open'){
-    qdBankOpen=true;qdRefresh();
+    qdAuthorToolsOpen=true;qdBankOpen=true;qdRefresh();
     document.getElementById('qd-builder-bank')?.scrollIntoView({block:'start',behavior:'instant'});
     return;
   }
@@ -2247,8 +2327,8 @@ function qdOnClick(event){
   if(action==='bank-import'){document.getElementById('qd-bank-file')?.click();return;}
   if(action==='builder-quick-save'){
     const meta=qdBuilderTemplateDefaults(d);
-    const linked=qdLibraryRead().find(x=>x.id===qdBuilderLinkedTemplateId&&qdPromptKey(x.title)===qdPromptKey(d.title));
-    const fields={subject:meta.subject,grade:meta.grade,purpose:meta.purpose};
+    const linked=qdLibraryRead().find(x=>x.id===qdBuilderLinkedTemplateId);
+    const fields={subject:d.subject||meta.subject,grade:d.grade??meta.grade,purpose:d.purpose||meta.purpose};
     const result=qdBuilderSaveTemplate(d,linked?'update':'new',linked?.id||'',fields);
     if(!result.ok){
       status(result.message+' · Используйте форму сохранения внизу конструктора.',true);
@@ -2304,11 +2384,12 @@ function qdOnClick(event){
   }
   if(action==='library-open'){
     const id=button.dataset.template,source=button.dataset.source;
-    if(!confirm('Открыть шаблон вместо текущих вопросов? Текущая диагностика и журнал будут заменены. Для сохранности сначала скачайте .qdiag.'))return;
-    if(!qdLibraryLoad(d,id,source)){status('Шаблон не найден',true);return;}
+    if(!qdConfirmReplace())return;
+    const working=qdWorkingDoc();
+    if(!qdLibraryLoad(working,id,source)){status('Шаблон не найден',true);return;}
     qdBuilderLinkedTemplateId=source==='custom'?id:'';
-    qdBuilderSavedSignature=source==='custom'?qdBuilderSignature(d):'';
-    qdMode='run';qoWriter.diagnosticMode='run';qdStore();qdRefresh();status('Шаблон открыт');return;
+    qdBuilderSavedSignature=source==='custom'?qdBuilderSignature(working):'';
+    qdMode='builder';qoWriter.diagnosticMode='builder';qdStore();qdRefresh();status('Шаблон открыт');return;
   }
   if(action==='library-edit'){
     qdLibraryEditingId=button.dataset.template;
@@ -2343,9 +2424,9 @@ function qdOnClick(event){
   }
   if(action==='builder-template-save'||action==='builder-template-update'){
     const fields={
-      subject:document.getElementById('qd-builder-template-subject')?.value||'other',
-      grade:document.getElementById('qd-builder-template-grade')?.value||'',
-      purpose:document.getElementById('qd-builder-template-purpose')?.value||'diagnostic'
+      subject:document.getElementById('qd-builder-template-subject')?.value||d.subject||'other',
+      grade:document.getElementById('qd-builder-template-grade')?.value??d.grade??'',
+      purpose:document.getElementById('qd-builder-template-purpose')?.value||d.purpose||'diagnostic'
     };
     const mode=action==='builder-template-save'?'new':'update';
     const target=document.getElementById('qd-builder-template-target')?.value||'';
@@ -2508,10 +2589,11 @@ function qdOnClick(event){
   if(action==='use-template'){
     const key=document.getElementById('qd-template-pick')?.value;
     if(!qdTemplate(key))return;
-    if(!confirm('Заменить текущую диагностику шаблоном? Вопросы, ученики и история этого документа будут заменены. При необходимости сначала скачайте .qdiag.'))return;
+    if(!qdConfirmReplace())return;
     qdApplyTemplate(d,key);
+    const preset=QD_PRESETS.find(p=>p.id===key);if(preset){d.subject=preset.subject;d.grade=preset.grade;d.purpose=preset.purpose;}
     qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
-    qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
+    qdSelected.clear();qdSearch='';qdFilterKind='all';qdStore();qdRefresh();return;
   }
   if(action==='sample-auto'){
     if(qdQuestionList(d).length+2>QD_LIMITS.questions||d.sections.length>=QD_LIMITS.sections){
@@ -2530,9 +2612,9 @@ function qdOnClick(event){
     qdStore();qdRefresh();return;
   }
   if(action==='sample'){
-    if(!confirm('Заменить текущую диагностику примером? Вопросы и история текущего документа будут заменены.'))return;
+    if(!qdConfirmReplace())return;
     qdSample();qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
-    qdSelected.clear();qdSearch='';qdFilterKind='all';qdRefresh();return;
+    qdSelected.clear();qdSearch='';qdFilterKind='all';qdStore();qdRefresh();return;
   }
 
   if(action==='section-collapse'){
@@ -2607,6 +2689,7 @@ function qdOnClick(event){
     if(!q||!qdAuto(q.type))return;
     const grade=qdCheckAnswer(q,d.session.responses[q.id]);
     if(grade===null){status('Выберите ответ или проверьте настройку правильного ответа',true);return;}
+    if(d.session.scores)delete d.session.scores[q.id];
     d.session.marks[q.id]=grade;qdStore();qdRefresh();return;
   }
   if(action==='add-section'){
@@ -2637,6 +2720,7 @@ function qdOnClick(event){
     if(!qdText(question.prompt,1600).trim()){
       status('Сначала заполните формулировку вопроса в конструкторе',true);return;
     }
+    if(d.session.scores)delete d.session.scores[qid];
     const isNewGrade=d.session.marks[qid]!==mark;
     if(!isNewGrade)delete d.session.marks[qid];else d.session.marks[qid]=mark;
     if(isNewGrade&&qdDisplay(d).mode==='focus'&&qdQuestionList(d)[qdCurrentIndex(d)]?.id===qid){
@@ -2703,9 +2787,11 @@ function qdOnClick(event){
     return;
   }
   if(action==='save-result'){
-    const stats=qdScores(qdQuestionList(d),d.session.marks);
+    const stats=qdScores(qdQuestionList(d),d.session.marks,d.session.scores);
     if(!stats.rated)return;
     d.history.push({id:qdNewId(),date:new Date().toISOString(),student:d.session.student,
+      questions:qdQuestionList(d).map(q=>({id:q.id,prompt:q.prompt,section:q.section})),
+      comments:{...d.session.comments},scores:{...d.session.scores},templateId:qdWorkingDoc().run?.templateId||'',revision:qdWorkingDoc().run?.revision||'',
       title:d.title,studentId:d.session.studentId||'',marks:{...d.session.marks},responses:structuredClone(d.session.responses),summary:stats,
       topics:qdTopicSnapshot(d,d.session.marks)});
     d.history=d.history.slice(-QD_LIMITS.history);
@@ -2795,6 +2881,12 @@ function qdOnInput(event){
   }
   const field=event.target.dataset.qdField;if(!field)return;
   const d=qdDoc(),value=event.target.value;
+  if(['text-response','comment'].includes(field)){
+    const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);if(!q)return;
+    if(field==='comment'){d.session.comments||={};d.session.comments[q.id]=qdText(value,2000);}
+    else {d.session.responses[q.id]={value:qdText(value,3500)};delete d.session.marks[q.id];if(d.session.scores)delete d.session.scores[q.id];}
+    qdStore();return;
+  }
   if(field==='title')d.title=qdText(value,120);
   else if(field==='description')d.description=qdText(value,600);
   else if(field==='student'){
@@ -2803,9 +2895,11 @@ function qdOnInput(event){
   }
   else if(field==='section'){
     const s=d.sections.find(x=>x.id===event.target.dataset.sid);if(s)s.title=qdText(value,120);
-  }else if(['prompt','answer'].includes(field)){
+  }else if(['subject','grade','purpose'].includes(field))d[field]=qdText(value,field==='grade'?18:40);
+  else if(field==='criteria'){const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);if(q)q.criteria=qdText(value,2000);}
+  else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
-    if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig)orig[field]=qdText(value,field==='answer'?3500:1600);}
+    if(q){const orig=d.sections.flatMap(s=>s.questions).find(x=>x.id===q.id);if(orig){orig[field]=qdText(value,field==='answer'?3500:1600);delete orig[field+'Rich'];}}
   }else if(field==='choice-text'){
     const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
     const i=Number(event.target.dataset.index);
@@ -2818,12 +2912,13 @@ function qdOnInput(event){
   }else if(field==='numeric-response'){
     const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);
     if(!q||q.type!=='numeric')return;
-    d.session.responses[q.id]={value:qdText(value,80)};delete d.session.marks[q.id];
+    d.session.responses[q.id]={value:qdText(value,80)};delete d.session.marks[q.id];if(d.session.scores)delete d.session.scores[q.id];
   }else if(field==='student-name')return;
   else return;
   qdStore();
   if(['title','description','section','prompt','answer','choice-text','numericAnswer'].includes(field))
     qdBuilderSaveStatus();
+  if(['subject','grade','purpose','criteria'].includes(field))qdBuilderSaveStatus();
   if(field==='prompt'){
     const card=event.target.closest('.qd-edit-card');
     const preview=card?.querySelector('.qd-card-preview');
@@ -2834,6 +2929,15 @@ function qdOnInput(event){
   }
 }
 function qdOnChange(event){
+  if(['subject','grade','purpose'].includes(event.target.dataset.qdField)){qdOnInput(event);return;}
+  if(event.target.id==='qd-library-source'){qdLibrarySource=event.target.value;qdLibraryRefreshCards();return;}
+  if(event.target.dataset.qdField==='score'){
+    const d=qdDoc(),q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);if(!q)return;
+    if(event.target.value===''){if(d.session.scores)delete d.session.scores[q.id];}
+    else {const value=Number(event.target.value);if(!Number.isFinite(value)||value<0||value>qdPoints(q.points)){status('Баллы должны быть от 0 до '+qdPoints(q.points),true);event.target.value='';return;}
+      d.session.scores||={};d.session.scores[q.id]=qdScoreNumber(value);d.session.marks[q.id]=value===0?'no':value===qdPoints(q.points)?'yes':'partial';}
+    qdStore();qdRefresh();return;
+  }
   if(['qd-var-count','qd-var-per-section','qd-var-choices'].includes(event.target.id)){
     if(event.target.id==='qd-var-count')qdVariantOptions.count=Number(event.target.value);
     if(event.target.id==='qd-var-per-section')qdVariantOptions.perSection=Number(event.target.value);
@@ -2915,7 +3019,7 @@ function qdOnChange(event){
     if(q.type==='single')selected=[i];
     else if(event.target.checked)selected=[...new Set([...selected,i])];
     else selected=selected.filter(x=>x!==i);
-    d.session.responses[q.id]={selected};delete d.session.marks[q.id];
+    d.session.responses[q.id]={selected};delete d.session.marks[q.id];if(d.session.scores)delete d.session.scores[q.id];
     qdStore();return;
   }
   if(event.target.id==='qd-builder-template-target'){
@@ -2947,6 +3051,7 @@ function qdOnChange(event){
     qdHistoryProgressRefresh();return;
   }
   if(event.target.dataset.qdField==='student-select'){
+    const current=qdDoc();if(event.target.value!==current.session.studentId&&Object.keys(current.session.marks).length&&!confirm('Ответы относятся к текущему ученику. Изменить привязку этого занятия?')){event.target.value=current.session.studentId;return;}
     const student=qdDoc().students.find(s=>s.id===event.target.value);
     qdDoc().session.studentId=student?.id||'';
     qdDoc().session.student=student?.name||'';
@@ -3013,11 +3118,160 @@ function qdOnChange(event){
   if(file.size>2_000_000){status('Файл диагностики слишком большой (максимум 2 МБ)',true);return;}
   file.text().then(raw=>{
     const parsed=JSON.parse(raw);
-    if(!parsed||parsed.format!=='quantum-diagnostic'||parsed.version!==1||!Array.isArray(parsed.sections))
+    if(!parsed||parsed.format!=='quantum-diagnostic'||parsed.version!==1||!qdValidTemplateSections(parsed.sections)||parsed.run?.document&&!qdValidTemplateSections(parsed.run.document.sections))
       throw Error('Неверный формат');
     if(!confirm('Заменить текущую диагностику содержимым файла?'))return;
     qoWriter.diagnostic=qdNormalize(parsed);qdVerified.add(qoWriter);
     qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
     qdMode='run';qoWriter.diagnosticMode='run';qdStudentFilter='';qdRevealed.clear();qdStore();qdRefresh();
   }).catch(()=>status('Не удалось открыть .qdiag: повреждённый или неподдерживаемый файл',true));
+}
+
+/* TASK141 authoring and session commands use the existing library, scoring,
+   rich-text sanitizer and media storage instead of a second document format. */
+function qdValidTemplateSections(sections){
+  if(!Array.isArray(sections)||sections.length>QD_LIMITS.sections)return false;
+  let count=0;
+  return sections.every(s=>s&&typeof s==='object'&&!Array.isArray(s)&&Array.isArray(s.questions)&&
+    s.questions.every(q=>q&&typeof q==='object'&&!Array.isArray(q)&&typeof q.prompt==='string'&&++count<=QD_LIMITS.questions));
+}
+function qdRunSetup(d){
+  const run=qdWorkingDoc().run;
+  const options=[...qdLibraryRead().map(x=>({...x,source:'custom',label:x.title})),
+    ...QD_PRESETS.map(x=>({...x,source:'built-in',label:qdTemplate(x.id)?.title||x.label}))];
+  return '<section class="qd-panel qd-run-setup" aria-label="Диагностика для проведения">'+
+    '<div><strong>'+qdEsc(d.title)+'</strong><p>Независимый снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+
+    '. Изменения конструктора не затрагивают это занятие.</p></div>'+
+    '<div class="qd-run-start-row"><label>Выбрать диагностику<select id="qd-run-template"><option value="">Текущий черновик конструктора</option>'+
+    options.map(x=>'<option value="'+x.source+':'+qdEsc(x.id)+'">'+(x.source==='custom'?'Мой · ':'Готовый · ')+qdEsc(x.label)+'</option>').join('')+
+    '</select></label><button type="button" data-qd-action="run-start">Начать новое проведение</button>'+
+    '<button type="button" data-qd-action="run-checkpoint" class="qd-primary">Сохранить незавершённое</button></div>'+
+    '<p class="qd-hint">Ответы сохраняются в браузере. Для переноса или резервной копии скачайте QDIAG / QDIAGX в верхней ленте.</p></section>';
+}
+function qdProfessionalAction(action,button,d){
+  if(action==='blank'){
+    if(!qdConfirmReplace())return true;
+    qdBlank();qdStore();qdRefresh();return true;
+  }
+  if(action==='save-copy'){
+    const root=qdWorkingDoc(),title=prompt('Название нового шаблона',root.title+' — копия');
+    if(title===null)return true;
+    const copy={...root,title:qdText(title,120).trim()},meta=qdBuilderTemplateDefaults(root);
+    const result=qdLibrarySaveCurrent(copy,root.subject||meta.subject,root.grade??meta.grade,root.purpose||meta.purpose);
+    if(!result.ok){status(result.message,true);return true;}
+    root.title=copy.title;qdBuilderLinkedTemplateId=result.id;qdBuilderSavedSignature=qdBuilderSignature(root);
+    qdStore();qdRefresh();status('Новый шаблон сохранён');return true;
+  }
+  if(action==='preview'||action==='preview-chat'){qdPreview();return true;}
+  if(action==='library-edit-content'){
+    if(!qdConfirmReplace())return true;
+    const root=qdWorkingDoc();
+    if(!qdLibraryLoad(root,button.dataset.template,'custom')){status('Шаблон не найден',true);return true;}
+    qdBuilderLinkedTemplateId=button.dataset.template;qdBuilderSavedSignature=qdBuilderSignature(root);
+    qdMode='builder';qoWriter.diagnosticMode='builder';qdStore();qdRefresh();return true;
+  }
+  if(action==='library-from'){
+    if(!qdConfirmReplace())return true;
+    const root=qdWorkingDoc();
+    if(!qdLibraryLoad(root,button.dataset.template,button.dataset.source)){status('Шаблон не найден',true);return true;}
+    root.title=qdText(root.title+' — мой вариант',120);qdBuilderLinkedTemplateId='';qdBuilderSavedSignature='';
+    qdMode='builder';qoWriter.diagnosticMode='builder';qdStore();qdRefresh();return true;
+  }
+  if(action==='run-start'){
+    if((Object.keys(d.session.marks).length||Object.keys(d.session.responses).length||Object.keys(d.session.comments||{}).length)&&
+      !confirm('Заменить незавершённое проведение? Для сохранения ответов сначала скачайте QDIAG / QDIAGX.'))return true;
+    const value=document.getElementById('qd-run-template')?.value||'',root=qdWorkingDoc();
+    let source=root,templateId=root.author?.templateId||'';
+    if(value){
+      const split=value.indexOf(':'),kind=value.slice(0,split),id=value.slice(split+1);
+      const item=kind==='custom'?qdLibraryRead().find(x=>x.id===id):qdTemplate(id);
+      if(!item){status('Диагностика не найдена',true);return true;}
+      source={...item,students:root.students,history:root.history,author:{templateId:id}};templateId=id;
+    }
+    const runDoc=qdStartRun(source,true);
+    root.run=source.run;root.run.templateId=templateId;
+    runDoc.students=root.students;runDoc.history=root.history;
+    qdRevealed.clear();qdStore();qdRefresh();return true;
+  }
+  if(action==='run-checkpoint'){
+    qdStore();
+    if(typeof qoWriterSavedLocal!=='undefined'&&!qoWriterSavedLocal)status('Браузер не сохранил занятие. Скачайте QDIAG / QDIAGX.',true);
+    else status('Незавершённое проведение записано в браузере. Скачайте QDIAG для резервной копии.');
+    return true;
+  }
+  if(action==='rich-edit'){qdRichEdit(button.dataset.qid,button.dataset.kind);return true;}
+  return false;
+}
+function qdPreview(){
+  const d=qdWorkingDoc(),dialog=document.createElement('dialog');dialog.className='qd-professional-dialog';
+  dialog.innerHTML='<header><strong>Предпросмотр диагностики</strong><button type="button" data-close>Закрыть</button></header>'+
+    '<article><h1>'+qdEsc(d.title)+'</h1><p>'+qdEsc(d.description)+'</p>'+
+    d.sections.map(s=>'<section><h2>'+qdEsc(s.title)+'</h2>'+s.questions.map((q,i)=>
+      '<div class="qd-preview-question"><strong>'+(i+1)+'. '+qdEsc(qdTypeTitle(q.type))+' · '+qdPoints(q.points)+' б.</strong>'+
+      (q.promptRich?'<div class="qd-rich-content">'+qdRichSafe(q.promptRich)+'</div>':'<p>'+qdEsc(q.prompt).replace(/\n/g,'<br>')+'</p>')+
+      (typeof qdMediaRunHTML==='function'?qdMediaRunHTML(q.promptMedia,'prompt'):'')+
+      (['single','multiple'].includes(q.type)?'<ul>'+qdChoices(q.choices).map(x=>'<li>'+qdEsc(x.text)+'</li>').join('')+'</ul>':'<div class="qd-preview-answer">Место для ответа ученика</div>')+
+      '<details><summary>Ответ и критерии преподавателя</summary><p>'+qdEsc(qdReference(q))+'</p>'+
+      (q.answerRich?qdRichSafe(q.answerRich):'')+'<p>'+qdEsc(q.criteria||'Критерии не указаны')+'</p></details></div>').join('')+'</section>').join('')+
+    (!d.sections.length?'<p>Пустой шаблон. Добавьте разделы и вопросы.</p>':'')+'</article>';
+  dialog.querySelector('[data-close]').onclick=()=>dialog.close();
+  dialog.addEventListener('close',()=>dialog.remove());
+  dialog.addEventListener('click',e=>{if(typeof qdMediaAction==='function')qdMediaAction(e);});
+  document.body.append(dialog);dialog.showModal();
+  if(typeof qdMediaDecorate==='function')qdMediaDecorate(dialog);
+}
+function qdRichEdit(qid,kind){
+  const q=qdWorkingDoc().sections.flatMap(s=>s.questions).find(q=>q.id===qid);if(!q)return;
+  kind=kind==='answer'?'answer':'prompt';
+  const dialog=document.createElement('dialog');dialog.className='qd-professional-dialog qd-rich-dialog';
+  dialog.innerHTML='<header><strong>'+(kind==='prompt'?'Условие':'Решение')+' · оформление</strong><button type="button" data-close>Отмена</button></header>'+
+    '<div class="qd-rich-toolbar" role="toolbar" aria-label="Оформление текста">'+
+    [['bold','Жирный'],['italic','Курсив'],['subscript','Нижний индекс'],['superscript','Верхний индекс'],['insertUnorderedList','Список']].map(([cmd,label])=>
+      '<button type="button" data-rich-command="'+cmd+'">'+label+'</button>').join('')+
+    '<button type="button" data-rich-table>Таблица</button><button type="button" data-rich-math>Формула / символы</button></div>'+
+    '<div class="qd-rich-editor qo-paper" contenteditable="true" role="textbox" aria-label="Форматированный текст" aria-multiline="true">'+
+      (qdRichSafe(q[kind+'Rich'])||'<p>'+qdEsc(q[kind]).replace(/\n/g,'<br>')+'</p>')+'</div>'+
+    '<div class="qd-rich-inserts" hidden><label>Математическое выражение<input data-rich-expression maxlength="600" placeholder="Например: Q = cm(t₂ − t₁)"></label>'+
+    '<div>'+['α','β','γ','Δ','π','ρ','λ','μ','Ω','Σ','√','∫','∞','≈','≠','≤','≥','×','÷','²','³','₀','₁','₂'].map(x=>'<button type="button" data-rich-symbol="'+x+'">'+x+'</button>').join('')+'</div><button type="button" data-rich-insert>Вставить выражение</button></div>'+
+    '<div class="qd-rich-table-settings" hidden><label>Строки<input data-rich-rows type="number" min="1" max="12" value="3"></label><label>Столбцы<input data-rich-cols type="number" min="1" max="8" value="3"></label><button type="button" data-rich-table-insert>Вставить таблицу</button></div>'+
+    '<footer><span>Текст, таблицы, индексы и символы работают без интернета.</span><button type="button" data-rich-save class="qd-primary">Применить к вопросу</button></footer>';
+  const editor=dialog.querySelector('.qd-rich-editor');let range=null;
+  function remember(){const selection=window.getSelection();if(selection.rangeCount&&editor.contains(selection.anchorNode))range=selection.getRangeAt(0).cloneRange();}
+  function restore(){editor.focus();if(range){const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);}}
+  editor.addEventListener('keyup',remember);editor.addEventListener('mouseup',remember);editor.addEventListener('input',remember);
+  editor.addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertHTML',false,qdRichSafe(e.clipboardData.getData('text/html'))||qdEsc(e.clipboardData.getData('text/plain')));remember();});
+  editor.addEventListener('drop',e=>e.preventDefault());
+  dialog.addEventListener('mousedown',e=>{if(e.target.closest('[data-rich-command]'))e.preventDefault();});
+  dialog.addEventListener('click',e=>{
+    if(e.target.closest('[data-close]')){dialog.close();return;}
+    const cmd=e.target.closest('[data-rich-command]');
+    if(cmd){restore();document.execCommand(cmd.dataset.richCommand,false,null);remember();return;}
+    if(e.target.closest('[data-rich-table]')){remember();dialog.querySelector('.qd-rich-table-settings').hidden=false;return;}
+    if(e.target.closest('[data-rich-table-insert]')){
+      const rows=Number(dialog.querySelector('[data-rich-rows]').value),cols=Number(dialog.querySelector('[data-rich-cols]').value);
+      if(!Number.isInteger(rows)||rows<1||rows>12||!Number.isInteger(cols)||cols<1||cols>8)return;
+      restore();document.execCommand('insertHTML',false,'<table><tbody>'+Array.from({length:rows},()=>'<tr>'+Array.from({length:cols},()=>'<td>…</td>').join('')+'</tr>').join('')+'</tbody></table><p><br></p>');remember();return;
+    }
+    if(e.target.closest('[data-rich-math]')){remember();dialog.querySelector('.qd-rich-inserts').hidden=false;return;}
+    const symbol=e.target.closest('[data-rich-symbol]');
+    if(symbol){dialog.querySelector('[data-rich-expression]').value+=symbol.dataset.richSymbol;return;}
+    if(e.target.closest('[data-rich-insert]')){restore();document.execCommand('insertText',false,dialog.querySelector('[data-rich-expression]').value);remember();return;}
+    if(e.target.closest('[data-rich-save]')){
+      const text=editor.innerText.slice(0,kind==='answer'?3500:1600);
+      if(editor.innerHTML.length>16000||editor.innerText.length>(kind==='answer'?3500:1600)){status('Текст превышает допустимый размер вопроса',true);return;}
+      q[kind]=text;q[kind+'Rich']=qdRichSafe(editor.innerHTML);
+      qdStore();dialog.close();qdRefresh();
+    }
+  });
+  dialog.addEventListener('close',()=>dialog.remove());document.body.append(dialog);dialog.showModal();editor.focus();remember();
+}
+function qdAnswerReport(entry){
+  const questions=entry?.questions||[];
+  if(!questions.length)return '';
+  return '<h2>Ответы и комментарии</h2>'+questions.map(q=>{
+    const r=entry.responses?.[q.id],answer=typeof r?.value==='string'?r.value:Array.isArray(r?.selected)?r.selected.map(i=>i+1).join(', '):'';
+    return '<div style="break-inside:avoid;border-top:1px solid #cbd9d1;padding:10px 0"><b>'+qdEsc(q.section||'')+'</b><p>'+qdEsc(q.prompt)+'</p><p><b>Ответ ученика:</b> '+qdEsc(answer||'Не записан')+'</p>'+
+      (Number.isFinite(entry.scores?.[q.id])?'<p><b>Баллы:</b> '+entry.scores[q.id]+'</p>':'')+
+      (entry.comments?.[q.id]?'<p><b>Комментарий:</b> '+qdEsc(entry.comments[q.id])+'</p>':'')+'</div>';
+  }).join('');
 }

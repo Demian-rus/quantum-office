@@ -43,15 +43,15 @@ test('TASK106 template saves only content, without pupils, scoring, or history',
  assert.equal(api.qdLibraryItems().filter(x=>x.source==='custom').length,1);
  assert.equal(writer.html,'<p>Original text is independent</p>');
 });
-test('TASK106 opening preset gives unmarked list view with fresh identities',()=>{
+test('TASK106 opening preset gives unmarked focus view and preserves pupil history',()=>{
  const {api}=harness(),d=api.qdDoc();
  d.students=[{id:'p',name:'Pupil'}];d.history=[{id:'h',student:'Pupil'}];
  const id=d.sections[0].questions[0].id;
  assert.equal(api.qdLibraryLoad(d,'physics8','built-in'),true);
  assert.equal(d.sections.length,3);
- assert.equal(d.display.mode,'list');
+ assert.equal(d.display.mode,'focus');
  assert.notEqual(d.sections[0].questions[0].id,id);
- assert.equal(d.students.length,0);assert.equal(d.history.length,0);
+ assert.equal(d.students.length,1);assert.equal(d.history.length,1);
  assert.equal(Object.keys(d.session.marks).length,0);
  assert.match(api.qdRun(),/qd-chat-card/);
  assert.match(api.qdRun(),/Показать ответ/);

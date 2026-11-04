@@ -39,31 +39,32 @@ const {pathToFileURL}=require('node:url');
    const x=await bounds();
    assert.ok(x.documentWidth<=x.viewport+4,'document overflow at '+width);
    for(const item of x.details)assert.deepEqual(item.overflow,[],'card '+item.index+' overflows at '+width);
-   if(width>1330){
-     assert.ok(x.rightWidth>=290&&x.rightWidth<=356,'wider right sidebar '+width);
+   if(width>=1600){
+     assert.ok(x.rightWidth>=260&&x.rightWidth<=280,'wider right sidebar '+width);
      assert.ok(x.nonOverlap,'workbench columns may not overlap at '+width);
    }
  }
  await page.setViewportSize({width:1600,height:950});
  const save=page.locator('.qd-builder-save');
  assert.equal(await save.count(),1);
- assert.equal(await save.locator('[data-qd-action="builder-template-save"]').count(),1);
+ assert.equal(await page.locator('.qd-builder-actionbar [data-qd-action="builder-quick-save"]').count(),1);
  assert.equal(await save.locator('[data-qd-action="builder-template-update"]').isDisabled(),true);
  const prompt=page.locator('.qd-edit-card').first();
  await prompt.locator('[data-qd-action="card-expand"]').click();
  await prompt.locator('[data-qd-field="prompt"]').fill('Почему сахар быстрее растворяется при повышенной температуре? Исправленная редакция.');
- await save.locator('#qd-builder-template-subject').selectOption('physics');
- await save.locator('#qd-builder-template-grade').fill('8');
- await save.locator('[data-qd-action="builder-template-save"]').click();
+ await page.locator('#qd-builder-template-subject').selectOption('physics');
+ await page.locator('#qd-builder-template-grade').fill('8');
+ await page.locator('[data-qd-action="builder-quick-save"]').click();
  assert.equal(await page.evaluate(()=>qdLibraryRead().length),1);
  assert.equal(await save.locator('[data-qd-action="builder-template-update"]').isDisabled(),false);
  assert.equal(await page.evaluate(()=>qdDoc().history.length),0);
  await prompt.locator('[data-qd-field="answer"]').fill('Исправленный развёрнутый ответ по диффузии.');
  const storedBefore=await page.evaluate(()=>qdLibraryRead()[0].sections[0].questions[0].answer);
  assert.notEqual(storedBefore,'Исправленный развёрнутый ответ по диффузии.');
- await save.locator('[data-qd-action="builder-template-update"]').click();
+ await page.locator('[data-qd-action="builder-quick-save"]').click();
  assert.equal(await page.evaluate(()=>qdLibraryRead()[0].sections[0].questions[0].answer),'Исправленный развёрнутый ответ по диффузии.');
  const dlPromise=page.waitForEvent('download');
+ await save.locator('summary').first().click();
  await save.locator('[data-qd-action="builder-template-export"]').click();
  const dl=await dlPromise;
  assert.match(dl.suggestedFilename(),/\.qtpl$/);

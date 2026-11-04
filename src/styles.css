@@ -132,3 +132,5 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qo-bulk-replace-actions [data-qbr-apply]{background:var(--qo-accent,#278b70);color:white;border-color:transparent}
 .qo-bulk-replace-actions button:disabled{opacity:.4;cursor:default}
 @media(max-width:560px){.qo-bulk-replace-row{grid-template-columns:18px minmax(0,1fr);gap:5px 9px}.qo-bulk-replace-values{grid-column:2}.qo-bulk-replace-panel>footer>span{display:none}}
+
+@import "./styles/diagnostics141.css";
