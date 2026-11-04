@@ -77,7 +77,7 @@ function qwGeometryVertices(object){
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  return raw.map(o=>{
-  if(!o||!['line','arrow','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].includes(o.kind))throw Error('Неизвестная фигура');
+  if(!o||!['line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
   if(['triangle','rightTriangle','quadrilateral'].includes(o.kind)){
@@ -87,6 +87,8 @@ function qwValidateDiagram(raw){
     if(!p||!Number.isFinite(Number(p.x))||!Number.isFinite(Number(p.y)))throw Error('Неверные координаты вершины');
     return {x:qwNum(p.x,0,520,0),y:qwNum(p.y,0,320,0),label:qwText(p.label,20)};
    });
+   if(o.edgeLabels!==undefined&&(!Array.isArray(o.edgeLabels)||o.edgeLabels.length!==vertices.length))throw Error('Некорректные подписи сторон');
+   value.edgeLabels=vertices.map((_,i)=>qwText(o.edgeLabels?.[i],40));
   }
   return value;
  });
