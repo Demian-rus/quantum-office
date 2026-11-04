@@ -105,9 +105,10 @@ function qwDiagramSVG(objects,interactive=false){
    maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
    w=maxX-minX,h=maxY-minY;
   let shape='',captions='';
-  if(o.kind==='line'||o.kind==='arrow'){
+  if(o.kind==='line'||o.kind==='arrow'||o.kind==='dashed'){
    shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
-    (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+'/>';
+    (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+
+    (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
   }
   if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
   if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
@@ -131,6 +132,14 @@ function qwDiagramSVG(objects,interactive=false){
       ly=Math.max(20,Math.min(310,p.y+dy/scale*19+5));
      captions+=label(p.label,lx,ly,20);
     }
+   });
+   vertices.forEach((p,i)=>{
+    const sideText=o.edgeLabels?.[i];if(!sideText)return;
+    const other=vertices[(i+1)%vertices.length],mx=(p.x+other.x)/2,my=(p.y+other.y)/2,
+     dx=mx-cx,dy=my-cy,mag=Math.max(1,Math.hypot(dx,dy));
+    const tx=Math.max(22,Math.min(498,mx+dx/mag*20)),
+     ty=Math.max(20,Math.min(302,my+dy/mag*20+6));
+    captions+=label(sideText,tx,ty,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
     const [p0,p1,p2]=vertices,
