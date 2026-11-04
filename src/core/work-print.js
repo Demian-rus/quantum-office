@@ -28,7 +28,7 @@ async function qwRenderPages(project,teacher=false,options={answers:true,criteri
   }if(row.length)flush();
  }
  function area(height,style){let remaining=height;while(remaining>0){ensure(28);const h=Math.min(remaining,bottom-y);ctx.strokeStyle='#ccc';ctx.lineWidth=.4;if(style==='blank')ctx.strokeRect(M,y,W-2*M,h);else{for(let yy=y+12;yy<=y+h;yy+=style==='grid'?12:18){ctx.beginPath();ctx.moveTo(M,yy);ctx.lineTo(W-M,yy);ctx.stroke();}if(style==='grid')for(let xx=M;xx<=W-M;xx+=12){ctx.beginPath();ctx.moveTo(xx,y);ctx.lineTo(xx,y+h);ctx.stroke();}}ctx.strokeStyle='#222';y+=h;remaining-=h;if(remaining>0)newPage();}}
- newPage();if(d.topic){flow(d.topic,null,11,true);y+=6;}if(d.identity){text('ФИО: ____________________________________    Дата: ______________',M,y+10,10);y+=28;}if(d.instructions){flow(d.instructions,null,10);y+=12;}
+ newPage();if(d.topic){flow(d.topic,null,11,true);y+=6;}/* Online-first work: no mandatory personal-data fields in published PDF. */if(d.instructions){flow(d.instructions,null,10);y+=12;}
  let part='';for(let i=0;i<d.tasks.length;i++){
   activeTask=0;const q=d.tasks[i];if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));const image=q.figure!=='none'?await qwFigureImage(q):null;let imageW=Math.min(q.figureWidth,W-2*M),imageH=image?imageW*image.height/image.width:0;if(imageH>300){imageW*=300/imageH;imageH=300;}if(q.pageBreak&&i>0)newPage();ensure(70+imageH);if(q.part&&q.part!==part){flow(q.part,null,12,true);y+=7;part=q.part;}
   text('Задание '+(i+1)+' · '+QW_TYPES[q.type],M,y+11,10,true);text(q.points+' б.',W-M-34,y+11,10);y+=27;activeTask=i+1;
