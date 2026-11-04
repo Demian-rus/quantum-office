@@ -426,9 +426,9 @@ document.addEventListener('input',e=>{
 const qoHubOriginalQDClick=qdOnClick;
 qdOnClick=function(e){
  const action=e.target.closest?.('[data-qd-action]')?.dataset.qdAction;
- const d=qdDoc(),before=d.history.length,student=d.session.student;
+ const d=qdDoc(),before=d.history.at(-1)?.id,student=d.session.student;
  const result=qoHubOriginalQDClick(e);
- if(action==='save-result'&&d.history.length>before){
+ if(action==='save-result'&&d.history.at(-1)?.id!==before){
   const latest=d.history.at(-1),linked=qoHubSaveOne(latest);
   if(linked.ok&&!linked.duplicate)status('Результат сохранён и привязан к таблице учеников');
   else if(!linked.ok&&qoHubSourceSheet()&&student)

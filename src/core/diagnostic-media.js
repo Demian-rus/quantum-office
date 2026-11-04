@@ -114,7 +114,7 @@ function qdMediaDecorate(root){
     for(const card of root.querySelectorAll('.qd-run-card')){
       const q=qdMediaRefQuestion(card.dataset.qid);
       if(!q)continue;
-      const prompt=card.querySelector('.qd-question p'),answer=card.querySelector('.qd-chat-answer p');
+      const prompt=card.querySelector('.qd-question .qd-rich-content')||card.querySelector('.qd-question p'),answer=card.querySelector('.qd-chat-answer p');
       if(prompt&&qdMediaSafe(q.promptMedia))prompt.insertAdjacentHTML('afterend',qdMediaRunHTML(q.promptMedia,'prompt'));
       if(answer&&qdRevealed.has(q.id)&&qdMediaSafe(q.answerMedia))
         answer.insertAdjacentHTML('afterend',qdMediaRunHTML(q.answerMedia,'answer'));
@@ -132,7 +132,7 @@ function qdMediaDecorate(root){
   }
   const builder=root.querySelector('.qd-builder-actionbar');
   if(builder&&!builder.querySelector('[data-qd-media-action="help"]')){
-    builder.insertAdjacentHTML('beforeend','<button type="button" data-qd-media-action="help" '+
+    (builder.querySelector('.qd-command-row:last-child')||builder).insertAdjacentHTML('beforeend','<button type="button" data-qd-media-action="help" '+
       'title="Изображения к вопросам и ответам">Иллюстрации</button>');
   }
   for(const input of root.querySelectorAll('#qo-diag-file'))input.accept+='.qdiagx,';
@@ -140,8 +140,8 @@ function qdMediaDecorate(root){
   for(const input of root.querySelectorAll('#qd-bank-file'))input.accept+='.qbankx,';
 }
 const qdMediaOrigNormalize=qdNormalize;
-qdNormalize=function(raw){
-  const doc=qdMediaOrigNormalize(raw);
+qdNormalize=function(raw,allowRun=true){
+  const doc=qdMediaOrigNormalize(raw,allowRun);
   if(!raw||!Array.isArray(raw.sections))return doc;
   for(let i=0;i<doc.sections.length;i++){
     const inQuestions=raw.sections[i]?.questions;
@@ -388,6 +388,7 @@ function qdMediaReferenced(data){
   function scan(q){for(const kind of ['prompt','answer']){
     const ref=qdMediaSafe(q?.[qdMediaKey(kind)]);if(ref)ids.add(ref.id);
   }}
+  if(Array.isArray(data?.run?.document?.sections))for(const section of data.run.document.sections)for(const q of section.questions||[])scan(q);
   if(Array.isArray(data?.sections))for(const s of data.sections)for(const q of s.questions||[])scan(q);
   if(Array.isArray(data?.templates))for(const t of data.templates)for(const s of t.sections||[])for(const q of s.questions||[])scan(q);
   if(Array.isArray(data?.questions))for(const entry of data.questions)scan(entry.question);
@@ -443,9 +444,10 @@ async function qdMediaImportArchive(file,type){
     }}
     const data=manifest.data;
     if(type==='diagnostic'){
-      if(!Array.isArray(data.sections))throw Error('Неверная диагностика');
+      if(!qdValidTemplateSections(data.sections)||data.run?.document&&!qdValidTemplateSections(data.run.document.sections))throw Error('Неверная диагностика');
       if(!confirm('Открыть диагностику вместе с изображениями? Текущий документ будет заменён.'))return;
       for(const s of data.sections)for(const q of s.questions||[])remap(q);
+      if(data.run?.document)for(const s of data.run.document.sections||[])for(const q of s.questions||[])remap(q);
     }else if(type==='templates'){
       if(data.format!=='quantum-templates'||!Array.isArray(data.templates))throw Error('Неверная библиотека');
       for(const t of data.templates)for(const s of t.sections||[])for(const q of s.questions||[])remap(q);
@@ -468,7 +470,7 @@ async function qdMediaImportArchive(file,type){
 }
 const qdMediaOrigExport=qdExport;
 qdExport=function(){
-  const d=qdDoc();
+  const d=qdWorkingDoc();
   if(!qdMediaReferenced(d).length)return qdMediaOrigExport();
   qdMediaExportArchive('diagnostic',d,(typeof safeFile==='function'?safeFile(d.title):'diagnostic')+'.qdiagx')
     .catch(e=>status('Не удалось сохранить изображения: '+e.message,true));

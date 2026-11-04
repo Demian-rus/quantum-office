@@ -19,6 +19,8 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('.qd-library-card').count(),14);
  await page.locator('.qd-library-card').filter({hasText:'Молекулы и температура'})
     .locator('[data-qd-action="library-open"]').click();
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+ await page.locator('[data-qd-action="view"][data-view="list"]').click();
  assert.ok((await page.locator('.qd-chat-card').count())>=20,'expanded physics8');
  await page.locator('.qd-chat-card [data-mark="partial"]').first().click();
  assert.equal(await page.evaluate(()=>Object.keys(qdDoc().session.marks).length),1);
@@ -46,7 +48,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика — копия'}).count(),1);
  await page.locator('.qd-library-card').filter({hasText:'Алгебра: уравнения и функции'})
    .locator('[data-qd-action="library-open"]').click();
- assert.ok((await page.locator('.qd-chat-card').count())>=18,'expanded math7');
+ assert.ok((await page.locator('.qd-edit-card').count())>=18,'math7 opens for authoring in TASK141');
  await library();
  card=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'})
    .filter({has:page.locator('[data-qd-action="library-edit"]')}).last();

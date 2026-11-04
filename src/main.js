@@ -1510,7 +1510,7 @@ function qoWriterExport(format){
   clone.querySelectorAll('[data-qo-break]').forEach(el=>el.replaceWith(document.createTextNode('\\n\\n--- Разрыв страницы ---\\n\\n')));
   download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
  }else if(format==='qdoc'){
-  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
+  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdWorkingDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
  }else download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
 }
 function qoWriterPrint(){
@@ -2955,6 +2955,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
    qdRibbonAction(action);return;
  }
  if(action==='writer-new'){
+  if(!qdConfirmReplace())return;
   if(!confirm('Создать новый текстовый документ? Текущий документ можно скачать в HTML.'))return;
   qoWriter=qoNewWriter();render();qoPersistWriter();return;
  }

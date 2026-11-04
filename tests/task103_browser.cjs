@@ -59,7 +59,7 @@ const {pathToFileURL}=require('node:url');
   const dl=await pending,local=path.join(root,'task103-test.qdiag');await dl.saveAs(local);
   const diag=JSON.parse(fs.readFileSync(local,'utf8'));
   assert.ok(diag.sections.length>=5,'TASK118 enriched sections persist in QDIAG');
-  assert.equal(diag.session.marks[diag.sections[0].questions[0].id],'no');
+  assert.equal(diag.run.document.session.marks[diag.run.document.sections[0].questions[0].id],'no');
   fs.rmSync(local,{force:true});
   assert.deepEqual(errors,[]);
   console.log('PASS TASK103: Sheets-scale Writer ribbon, editable size, font, template, review, reload and export');

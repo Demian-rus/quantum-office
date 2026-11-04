@@ -24,6 +24,8 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('.qd-library-card').count(),2);
  assert.match(await page.locator('.qd-library-card[data-template-id="physics8"] h3').textContent(),/Молекулы и температура/);
  await page.locator('.qd-library-card[data-template-id="physics8"] [data-qd-action="library-open"]').click();
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+ await page.locator('[data-qd-action="view"][data-view="list"]').click();
  assert.ok((await page.locator('.qd-chat-card').count())>=20,'expanded physics8');
  assert.equal(await page.locator('[data-qd-action="view"][data-view="list"]').getAttribute('aria-pressed'),'true');
  const positions=await page.locator('.qd-chat-card').first().evaluate(el=>{

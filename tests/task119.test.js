@@ -59,7 +59,7 @@ test('TASK119 builder shows own save/update/export and metadata selectors even w
  assert.match(html,/Сохранить как новый шаблон/);
  assert.match(html,/Обновить мой шаблон/);
  assert.match(html,/Скачать библиотеку \.qtpl/);
- assert.match(html,/data-qd-action="builder-template-save"/);
+ assert.match(html,/закреплены вверху/); // TASK141 moved the primary save actions to the command bar.
  assert.match(html,/disabled/);
  assert.match(html,/Мой шаблон для обновления/);
 });

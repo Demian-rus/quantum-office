@@ -70,7 +70,8 @@ test('TASK108 duplicate titles, empty content and invalid IDs reject without mut
  assert.equal(h.qdLibraryUpdate('missing',{title:'X'},d,false).ok,false);
  assert.equal(h.qdLibraryUpdate(prior.id,{title:' '},d,false).ok,false);
  const empty={...d,sections:[{id:'s',title:'Empty',questions:[]}]};
- assert.equal(h.qdLibraryUpdate(prior.id,{title:prior.title,subject:'math',grade:'7',purpose:'exam'},empty,true).ok,false);
+ const corrupt={...empty,sections:[{title:'Broken',questions:[null]}]};
+ assert.equal(h.qdLibraryUpdate(prior.id,{title:prior.title,subject:'math',grade:'7',purpose:'exam'},corrupt,true).ok,false); // Empty templates are supported in TASK141; malformed ones still reject.
  assert.equal(JSON.stringify(h.qdLibraryRead()),old);
  assert.equal(h.qdLibrarySaveCurrent({...d,title:prior.title},'physics','8','diagnostic').ok,false);
 });

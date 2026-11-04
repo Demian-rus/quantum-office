@@ -12,6 +12,7 @@ const {pathToFileURL}=require('node:url');
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await page.evaluate(()=>route('writer'));
  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ if(await page.locator('[data-qd-pane="author-tools"]').count())await page.locator('[data-qd-pane="author-tools"]>summary').click();
  await page.locator('[data-qd-action="sample"]').click();
  const sizes=await page.evaluate(()=>{
    const el=s=>document.querySelector(s).getBoundingClientRect();
@@ -23,8 +24,8 @@ const {pathToFileURL}=require('node:url');
  console.log('TASK110 actual proportions',JSON.stringify(sizes));
  assert.ok(sizes.main>=600&&sizes.main<=1150,'center stays readable while filling available width');
  assert.ok(sizes.left>=170&&sizes.left<=280,'topic rail should not fill the screen');
- assert.ok(sizes.right>=290&&sizes.right<=355,'TASK119 right rail is wider but bounded');
- assert.ok(sizes.gap>=20,'side rails must breathe rather than crowd the center');
+ assert.ok(sizes.right>=260&&sizes.right<=280,'TASK141 reserves a compact right rail');
+ assert.ok(sizes.gap>=16,'side rails must breathe rather than crowd the center');
  assert.ok(sizes.screen<=sizes.viewport+4,'no horizontal overflow at desktop');
  assert.equal(await page.locator('.qd-side-topic').count(),3);
  assert.equal(await page.locator('.qd-side-insights').getByText('Всего баллов').count(),1);
@@ -59,7 +60,8 @@ const {pathToFileURL}=require('node:url');
    sections:qdDoc().sections.length,
    history:qdDoc().history.length
  })),source);
- await page.locator('[data-qd-action="preview-chat"]').click();
+ await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+ await page.locator('[data-qd-action="view"][data-view="list"]').click();
  assert.equal(await page.locator('.qd-side-insights').getByText('Очередь занятия').count(),1);
  assert.equal(await page.locator('.qd-chat-card').count(),8);
  await page.locator('.qd-side-topic').nth(2).click();

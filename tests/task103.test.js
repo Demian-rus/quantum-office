@@ -34,9 +34,9 @@ test('TASK103 template replacement resets only diagnostics and retains Writer HT
  d.history.push({student:'One',marks:{},summary:null});
  d.students.push({id:'student',name:'One'});
  assert.equal(h.api.qdApplyTemplate(d,'math56'),true);
- assert.equal(d.students.length,0);assert.equal(d.history.length,0);
+ assert.equal(d.students.length,1);assert.equal(d.history.length,1); // TASK141 preserves existing pupil records.
  assert.equal(Object.keys(d.session.marks).length,0);
- assert.equal(d.display.mode,'list'); // TASK106 templates start in the chat-style all-questions view.
+ assert.equal(d.display.mode,'focus'); // TASK141 defaults to sequential conduct.
  assert.ok(h.saves>0);
  assert.equal(h.doc.html,'<p>Существующий документ</p>');
  const normalized=h.api.qdNormalize(JSON.parse(JSON.stringify(d)));
