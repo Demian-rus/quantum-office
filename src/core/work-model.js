@@ -46,7 +46,9 @@ function qwSnapGraphPoint(g,x,y){
   const value=clamp(Number(v),lo,hi);
   if(!g.snapToGrid)return Number(value.toFixed(6));
   // Grid lines are anchored at multiples of the visible tick spacing.
-  const snapped=Math.round(value/step)*step;
+  const first=Math.ceil((lo-1e-9)/step),last=Math.floor((hi+1e-9)/step);
+  if(first>last)return Number(value.toFixed(6));
+  const snapped=Math.min(last,Math.max(first,Math.round(value/step)))*step;
   return Number(clamp(snapped,lo,hi).toFixed(6));
  };
  return {x:snap(x,'x'),y:snap(y,'y')};
