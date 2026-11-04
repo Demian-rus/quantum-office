@@ -1,3 +1,4 @@
+const {openDiagnosticMenu}=require('./diagnostic-menu.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
@@ -30,6 +31,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('[data-qd-action="library-save"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),15);
  let card=page.locator('.qd-library-card').filter({has:page.locator('[data-qd-action="library-edit"]')}).first();
+ await openDiagnosticMenu(card.locator('[data-qd-action="library-edit"]'));
  await card.locator('[data-qd-action="library-edit"]').click();
  assert.equal(await page.locator('.qd-library-editor').count(),1);
  assert.equal(await page.locator('#qd-library-edit-replace').isChecked(),false);
@@ -43,6 +45,7 @@ const {pathToFileURL}=require('node:url');
  assert.equal(await page.locator('.qd-library-card').count(),15);
  card=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'});
  assert.match(await card.textContent(),/9 класс/);
+ await openDiagnosticMenu(card.locator('[data-qd-action="library-clone"]'));
  await card.locator('[data-qd-action="library-clone"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),16);
  assert.equal(await page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика — копия'}).count(),1);
@@ -52,6 +55,7 @@ const {pathToFileURL}=require('node:url');
  await library();
  card=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'})
    .filter({has:page.locator('[data-qd-action="library-edit"]')}).last();
+ await openDiagnosticMenu(card.locator('[data-qd-action="library-edit"]'));
  await card.locator('[data-qd-action="library-edit"]').click();
  assert.equal(await page.locator('#qd-library-edit-title').inputValue(),'Молекулы: авторская диагностика');
  await page.locator('#qd-library-edit-replace').check();
@@ -77,9 +81,8 @@ const {pathToFileURL}=require('node:url');
  await page.reload();await library();
  assert.equal(await page.locator('.qd-library-card').count(),16);
  await page.setViewportSize({width:390,height:830});
- await page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'})
-   .filter({has:page.locator('[data-qd-action="library-edit"]')}).last()
-   .locator('[data-qd-action="library-edit"]').click();
+ const phoneCard=page.locator('.qd-library-card').filter({hasText:'Молекулы: авторская диагностика'}).filter({has:page.locator('[data-qd-action="library-edit"]')}).last();
+ await openDiagnosticMenu(phoneCard.locator('[data-qd-action="library-edit"]'));await phoneCard.locator('[data-qd-action="library-edit"]').click();
  const width=await page.locator('.qd-library-editor').evaluate(el=>({
    viewport:document.documentElement.clientWidth,
    content:document.documentElement.scrollWidth,

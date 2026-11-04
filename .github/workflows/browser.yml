@@ -17,6 +17,7 @@ jobs:
       - run: npm ci
       - run: python -m pip install playwright==1.56.0 openpyxl
       - run: python -m playwright install --with-deps chromium
+      - run: node tests/task142_browser.cjs
       - run: node tests/task141_browser.cjs
       - run: node tests/task100_browser.cjs
       - run: node tests/task101_browser.cjs
@@ -163,4 +164,13 @@ jobs:
         with:
           name: task141-diagnostic-evidence
           path: evidence/task141
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task142-diagnostics-evidence
+          path: |
+            evidence/task142/*.png
+            evidence/task142/result.json
           if-no-files-found: ignore

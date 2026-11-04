@@ -1,3 +1,4 @@
+const {openDiagnosticMenu}=require('./diagnostic-menu.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
@@ -65,6 +66,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('#qd-library-subject').selectOption('physics');
  await page.locator('#qd-library-grade').selectOption('8');
  assert.equal(await page.locator('.qd-library-card').count(),3,'custom template should persist across reload of same HTML');
+ await openDiagnosticMenu(page.locator('[data-qd-action="library-delete"]'));
  await page.locator('[data-qd-action="library-delete"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),2);
  await page.locator('[data-action="writer-diag-templates-import"]').click();

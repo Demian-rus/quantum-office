@@ -9,7 +9,7 @@ const url=pathToFileURL(path.join(root,'Quantum-Office.html')).href;
  const check=(name,data={})=>{results.push({name,pass:true,...data});console.log('PASS',name);};
  async function action(name){await p.locator(`[data-action="${name}"]:visible`).first().click();}
  async function undoRedo(get,before,after){await action('photo-undo');assert.deepEqual(await p.evaluate(get),before);await action('photo-redo');assert.deepEqual(await p.evaluate(get),after);await p.evaluate(()=>{if(qoPhotoStrokes.length){qoPhotoSetSelection([qoPhotoStrokes[0].id]);qoPhotoRefresh();}});}
- async function download(actionName){const pending=p.waitForEvent('download');await action(actionName);const d=await pending,where=path.join(out,d.suggestedFilename());await d.saveAs(where);return where;}
+ async function download(actionName){return require('./studio-download.cjs')(p,out,actionName);}
  async function mousePoint(point){const c=await p.locator('#qo-photo-canvas').boundingBox(),dims=await p.evaluate(()=>[qoPhotoCanvasW,qoPhotoCanvasH]);return {x:c.x+point[0]*c.width/dims[0],y:c.y+point[1]*c.height/dims[1]};}
  async function drag(from,to,mods=[]){for(const mod of mods)await p.keyboard.down(mod);await p.mouse.move(from.x,from.y);await p.mouse.down();await p.mouse.move(to.x,to.y,{steps:7});await p.mouse.up();for(const mod of mods.reverse())await p.keyboard.up(mod);}
  await p.goto(url);await p.evaluate(()=>route('photo'));await p.evaluate(()=>{qoPhotoStrokes=[];qoPhotoHistory=[];qoPhotoRedo=[];qoPhotoAdd('rect');});

@@ -59,7 +59,7 @@ const {pathToFileURL}=require('node:url');
    main:document.querySelector('.qd-workbench-main').getBoundingClientRect(),
    overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth
  }));
- assert.ok(mid.sidebar,'middle widths still show statistical panel');
+ assert.equal(mid.sidebar,false,'TASK142 keeps auxiliary inspector closed at middle widths to preserve editing space');
  assert.ok(mid.main.x>=mid.left.right,'central authoring column not overlapping nav');
  assert.ok(mid.overflow<=4);
  await page.setViewportSize({width:390,height:840});

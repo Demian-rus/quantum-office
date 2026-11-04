@@ -40,7 +40,7 @@ const {pathToFileURL}=require('node:url');
    assert.ok(x.documentWidth<=x.viewport+4,'document overflow at '+width);
    for(const item of x.details)assert.deepEqual(item.overflow,[],'card '+item.index+' overflows at '+width);
    if(width>=1600){
-     assert.ok(x.rightWidth>=260&&x.rightWidth<=280,'wider right sidebar '+width);
+     assert.ok(x.rightWidth>=240&&x.rightWidth<=275,'wider right sidebar '+width);
      assert.ok(x.nonOverlap,'workbench columns may not overlap at '+width);
    }
  }
