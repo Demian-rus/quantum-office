@@ -215,7 +215,8 @@ function qwExample(subject='physics'){
 }
 function qwVisualEditor(kind){
  const q=qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,tool=kind==='graph'?'point':'line',drag=null,history=[],snapGeometry=true;
- const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы','<div class="qw-visual-tools">'+(kind==='graph'?'<label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label>':(['select','line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].map((k,i)=>'<button type="button" data-tool="'+k+'" aria-pressed="'+(k===tool)+'">'+['Выбрать / двигать','Линия','Стрелка','Пунктир','Прямоугольник','Окружность','Точка','Подпись','Угол','Треугольник','Прямоугольный треугольник','Четырёхугольник'][i]+'</button>').join('')))+(kind==='diagram'?'<label class="qw-check"><input id="qw-snap-geometry" type="checkbox" checked>Сетка и привязка 20 px</label>':'')+'<button type="button" id="qw-visual-undo">Отменить</button><button type="button" id="qw-visual-delete">Удалить выбранное</button></div><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div><div id="qw-visual-properties"></div>','<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
+ const d=qwDialog(kind==='graph'?'Редактор графика':'Редактор схемы','<div class="qw-visual-tools">'+(kind==='graph'?'<label>Шаблон<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label>':(['select','line','arrow','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral'].map((k,i)=>'<button type="button" data-tool="'+k+'" aria-pressed="'+(k===tool)+'">'+['Выбрать / двигать','Линия','Стрелка','Пунктир','Прямоугольник','Окружность','Точка','Подпись','Угол','Треугольник','Прямоугольный треугольник','Четырёхугольник'][i]+'</button>').join('')))+'<button type="button" id="qw-visual-undo">Отменить</button><button type="button" id="qw-visual-delete">Удалить выбранное</button></div><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div>'+(kind==='diagram'?'<div class="qw-visual-canvas-footer"><label class="qw-check"><input id="qw-snap-geometry" type="checkbox" checked>Сетка и привязка 20 px</label></div>':'')+'<div id="qw-visual-properties" aria-label="Свойства выбранного объекта" tabindex="0"></div>','<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
+ d.classList.add('qw-visual-dialog');d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect(),x=qwNum((e.clientX-b.left)/b.width*520,0,520,0),y=qwNum((e.clientY-b.top)/b.height*320,0,320,0);return kind==='diagram'&&snapGeometry?{x:Math.round(x/20)*20,y:Math.round(y/20)*20}:{x,y};};
   const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
@@ -235,7 +236,7 @@ function qwVisualEditor(kind){
   if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const snapped=gridPoint(p);value.points.push({...snapped,label:''});selected=value.points.length-1;}
  }else if(tool==='select'){if(!existing){history.pop();selected=-1;draw();return;}selected=Number(existing.dataset.qwObject);}else{if(value.length>=60){history.pop();return;}let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label){history.pop();return;}}value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selected=value.length-1;}
  const vertexHandle=kind==='diagram'&&tool==='select'?e.target.closest('[data-qw-vertex]'):null;
-  drag={start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),
+  drag={creating:kind==='diagram'&&tool!=='select',start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),
    moving:kind==='diagram'&&tool==='select'&&!vertexHandle,vertexIndex:vertexHandle?Number(vertexHandle.dataset.qwVertex):-1};stage.setPointerCapture(e.pointerId);draw(false);
  };
  stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];
@@ -252,7 +253,7 @@ function qwVisualEditor(kind){
    }else{o.x2=p.x;o.y2=p.y;}}draw(false);};
  stage.onpointerup=()=>{
    if(drag){
-    if(kind==='diagram'&&!drag.moving&&['triangle','rightTriangle','quadrilateral'].includes(value[selected]?.kind)){
+    if(kind==='diagram'&&drag.creating&&['triangle','rightTriangle','quadrilateral'].includes(value[selected]?.kind)){
      const o=value[selected];if(Math.abs(o.x2-o.x)<12)o.x2=Math.min(520,o.x+90);
      if(Math.abs(o.y2-o.y)<12)o.y2=Math.min(320,o.y+90);
      o.vertices=qwGeometryVertices(o);
