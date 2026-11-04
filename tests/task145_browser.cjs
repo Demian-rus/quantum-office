@@ -58,11 +58,13 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.evaluate(()=>document.querySelector('#qw-curve-family').value),'trigonometric');
   assert.equal(await page.evaluate(()=>document.querySelector('#qw-curve-trig').value),'sin');
   await page.locator('#qw-graph-preset').selectOption('v');
+  // TASK149 starts in safe Select mode. Explicitly choose legacy point insertion first.
+  await page.locator('#qw-add-point').click();
   const b=await page.locator('#qw-visual-stage svg').boundingBox();
   await page.mouse.click(b.x+b.width*.57,b.y+b.height*.56);
-  const end=await page.evaluate(()=>{const g=document.querySelector('#qw-visual-stage [data-qw-point="4"]');return g!==null;});
+  const end=await page.evaluate(()=>document.querySelector('#qw-visual-stage [data-qw-point="5"]')!==null);
   assert.equal(end,true);
-  const snapped=await page.evaluate(()=>{const row=document.querySelector('[data-point-row="4"]');return [+row.querySelector('[data-point-field="x"]').value,+row.querySelector('[data-point-field="y"]').value]});
+  const snapped=await page.evaluate(()=>{const row=document.querySelector('[data-point-row="5"]');return [+row.querySelector('[data-point-field="x"]').value,+row.querySelector('[data-point-field="y"]').value]});
   assert.ok(snapped.every(Number.isInteger),'Graph pointer should snap to integer grid intersections');
   await page.screenshot({path:path.join(out,'function_graph.png')});
   await action('visual-apply').click();
