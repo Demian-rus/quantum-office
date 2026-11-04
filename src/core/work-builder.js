@@ -234,9 +234,16 @@ function qwVisualEditor(kind){
  stage.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const p=point(e),existing=e.target.closest('[data-qw-point],[data-qw-object]');remember();if(kind==='graph'){
   if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const snapped=gridPoint(p);value.points.push({...snapped,label:''});selected=value.points.length-1;}
  }else if(tool==='select'){if(!existing){history.pop();selected=-1;draw();return;}selected=Number(existing.dataset.qwObject);}else{if(value.length>=60){history.pop();return;}let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label){history.pop();return;}}value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selected=value.length-1;}
- drag={start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),moving:kind==='diagram'&&tool==='select'};stage.setPointerCapture(e.pointerId);draw(false);
+ const vertexHandle=kind==='diagram'&&tool==='select'?e.target.closest('[data-qw-vertex]'):null;
+  drag={start:p,original:structuredClone(kind==='graph'?value.points[selected]:value[selected]),
+   moving:kind==='diagram'&&tool==='select'&&!vertexHandle,vertexIndex:vertexHandle?Number(vertexHandle.dataset.qwVertex):-1};stage.setPointerCapture(e.pointerId);draw(false);
  };
- stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];if(drag.moving){
+ stage.onpointermove=e=>{if(!drag)return;const p=point(e);if(kind==='graph'){Object.assign(value.points[selected],gridPoint(p));}else{const o=value[selected];
+   if(drag.vertexIndex>=0&&o.vertices?.[drag.vertexIndex]){
+    o.vertices[drag.vertexIndex].x=p.x;o.vertices[drag.vertexIndex].y=p.y;
+    const v=o.vertices;o.x=Math.min(...v.map(q=>q.x));o.y=Math.min(...v.map(q=>q.y));
+    o.x2=Math.max(...v.map(q=>q.x));o.y2=Math.max(...v.map(q=>q.y));
+   }else if(drag.moving){
     const a=drag.original,coords=a.vertices?.length?a.vertices:[{x:a.x,y:a.y},{x:a.x2,y:a.y2}],
      dx=qwNum(p.x-drag.start.x,-Math.min(...coords.map(v=>v.x)),520-Math.max(...coords.map(v=>v.x)),0),
      dy=qwNum(p.y-drag.start.y,-Math.min(...coords.map(v=>v.y)),320-Math.max(...coords.map(v=>v.y)),0);
@@ -269,6 +276,7 @@ function qwVisualEditor(kind){
      key=t.dataset.vertexField;
     if(!vertex||!['label','x','y'].includes(key))throw Error('Неизвестный параметр вершины');
     vertex[key]=key==='label'?t.value:Number(t.value);
+    const v=next[selected].vertices;next[selected].x=Math.min(...v.map(p=>p.x));next[selected].y=Math.min(...v.map(p=>p.y));next[selected].x2=Math.max(...v.map(p=>p.x));next[selected].y2=Math.max(...v.map(p=>p.y));
     const validated=qwValidateDiagram(next);remember();value=validated;draw();
    }
    if(t.id==='qw-curve-family'){
