@@ -8,12 +8,12 @@ function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t
 function qwTask(type='short'){
  return {id:qwId(),type:Object.hasOwn(QW_TYPES,type)?type:'short',part:'Часть 1',prompt:'',answer:'',criteria:'',comment:'',grade:'',exam:'general',topic:'',subtopic:'',origin:'original',points:2,answerVisible:true,answerStyle:'line',boxes:6,solutionVisible:['extended','combined'].includes(type),solutionHeight:110,solutionStyle:'lines',figure:['graph','diagram','combined'].includes(type)?type==='diagram'?'diagram':'graph':'none',position:'right',figureWidth:220,pageBreak:false,graph:qwGraphDefault(),diagram:[],image:''};
 }
-function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:false,layout:'worksheet',tasks:[]};}
+function qwProject(){return {format:'quantum-work',version:1,id:qwId(),title:'Новая работа',subject:'physics',grade:'8',topic:'',variant:'1',instructions:'',identity:false,layout:'worksheet',exam:'ege',tasks:[]};}
 function qwValidate(raw){
  if(!raw||raw.format!=='quantum-work'||raw.version!==1||!Array.isArray(raw.tasks)||raw.tasks.length>QW_LIMITS.tasks)throw Error('Неподдерживаемый проект QWORK');
  const d=qwProject(),ids=new Set();
  for(const key of ['title','grade','topic','variant','instructions'])d[key]=qwText(raw[key],key==='instructions'?4000:key==='title'||key==='topic'?160:24);
- d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity===true;d.layout=raw.layout==='exam'?'exam':'worksheet';
+ d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=raw.subject==='math'?'math':'physics';d.identity=raw.identity===true;d.layout=raw.layout==='exam'?'exam':'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
  d.tasks=raw.tasks.map(raw=>{
   if(!raw||typeof raw!=='object'||!Object.hasOwn(QW_TYPES,raw.type)||typeof raw.prompt!=='string'||raw.prompt.length>QW_LIMITS.text)throw Error('Повреждено задание');
   const q=qwTask(raw.type);q.id=qwText(raw.id,80)||qwId();if(ids.has(q.id))throw Error('Повторяющийся ID задания');ids.add(q.id);
