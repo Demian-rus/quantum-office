@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {qwTask,qwValidateDiagram} from '../src/core/work-model.js';
+import {qwTask,qwValidateDiagram,qwTriangleConstruction} from '../src/core/work-model.js';
 import {qwGraphSVG,qwDiagramSVG} from '../src/core/work-content.js';
 
 function yAxisLabels(svg){
@@ -50,4 +50,26 @@ test('TASK146 visual dialog has stable sizing and an independent inspector',()=>
  assert.match(js,/id="qw-grid-step-geometry"/);
  assert.match(js,/drag\.creating&&\['triangle'/);
  assert.match(js,/!e\.shiftKey/);
+});
+
+test('TASK146 exact median/altitude geometry is preserved in printable drawing',()=>{
+ const [triangle]=qwValidateDiagram([{kind:'triangle',x:100,y:50,x2:340,y2:250,label:''}]);
+ const median=qwTriangleConstruction(triangle,'median',0);
+ assert.equal(median.kind,'dashed');
+ assert.equal(median.x,100);assert.equal(median.y,250);
+ assert.equal(median.x2,280);assert.equal(median.y2,150);
+ const altitude=qwTriangleConstruction(triangle,'altitude',2);
+ assert.equal(altitude.x,220);assert.equal(altitude.y,50);
+ assert.equal(altitude.x2,220);assert.equal(altitude.y2,250);
+ const svg=qwDiagramSVG([triangle,median,altitude],false);
+ assert.equal((svg.match(/stroke-dasharray="6 4"/g)||[]).length,2);
+ assert.doesNotMatch(svg,/qw-geometry-guide/);
+});
+test('TASK146 malformed constructions reject degenerate sides',()=>{
+ const [triangle]=qwValidateDiagram([{kind:'triangle',x:100,y:50,x2:340,y2:250,label:''}]);
+ assert.throws(()=>qwTriangleConstruction(triangle,'invalid',0),/Неизвестное/);
+ assert.throws(()=>qwTriangleConstruction(triangle,'median',9),/Неизвестное/);
+ triangle.vertices[1].x=triangle.vertices[2].x;
+ triangle.vertices[1].y=triangle.vertices[2].y;
+ assert.throws(()=>qwTriangleConstruction(triangle,'altitude',0),/ненулевую/);
 });
