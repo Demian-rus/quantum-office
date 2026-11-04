@@ -54,7 +54,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149');
   await page.locator('[data-qw-action="visual-apply"]').click();
   await page.locator('[data-qw-action="diagram"]').click();
   const grid=await page.locator('.qw-visual-tools .qw-tool-group:first-of-type>div').evaluate(e=>getComputedStyle(e).gridTemplateColumns);
-  assert.equal(grid.trim().split(/\\s+/).length,2,'diagram tools use two columns');
+  assert.equal(grid.trim().split(/\s+/).length,2,'diagram tools use two columns');
   await page.screenshot({path:path.join(out,'diagram-two-columns.png')});
   assert.deepEqual(errors,[]);
   console.log('PASS TASK149: desktop layout, mathematical tick typography, persisted mode and Ctrl+Z');
