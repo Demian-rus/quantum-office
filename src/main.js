@@ -374,11 +374,16 @@ function moveSelection(dr,dc,extend=false){const p=parseCell(extend?rangeEnd:act
   }
  }
  const target=cellName(r,c);setSelection(extend?activeCell:target,target);ensureVisible(r,c);}
+function qoFrozenHeight(s=sheet()){
+ if(!s)return 0;
+ const {y}=gridGeometry(s);
+ return Math.max(0,y[s.freeze?.rows||0]-headerH);
+}
 function ensureVisible(r,c){const view=document.querySelector('#grid-scroll');if(!view||!sheet())return;const {x,y}=gridGeometry(sheet()),left=x[c],top=y[r]-headerH,width=x[c+1]-left,height=y[r+1]-y[r];
  if(c>=(sheet().freeze?.cols||0)&&left<view.scrollLeft+x[sheet().freeze?.cols||0])view.scrollLeft=Math.max(0,left-x[sheet().freeze?.cols||0]);
  else if(left+width>view.scrollLeft+view.clientWidth)view.scrollLeft=left+width-view.clientWidth;
- if(r>=(sheet().freeze?.rows||0)&&top<view.scrollTop+y[sheet().freeze?.rows||0]-headerH)view.scrollTop=Math.max(0,top-(y[sheet().freeze?.rows||0]-headerH));
- else if(top+height>view.scrollTop+view.clientHeight)view.scrollTop=top+height-view.clientHeight;}
+ if(r>=(sheet().freeze?.rows||0)&&top<view.scrollTop)view.scrollTop=Math.max(qoFrozenHeight(),top);
+ else if(top+height>view.scrollTop+view.clientHeight)view.scrollTop=Math.max(qoFrozenHeight(),top+height-view.clientHeight);}
 function commitSelectedEntry(){
  if(!editing||!sheet())return;
  const {node}=editing,value=node.value;
@@ -2609,7 +2614,9 @@ function render(){
  const canvas=view.querySelector('#grid-canvas'),geometry=gridGeometry(sheet());
  canvas.style.width=geometry.x[geometry.x.length-1]+'px';
  canvas.style.height=(geometry.y[geometry.y.length-1]-headerH)+'px';
- view.scrollLeft=scrollLeft;view.scrollTop=scrollTop;
+ const freezeHeight=qoFrozenHeight(sheet());
+ view.style.top=(headerH+freezeHeight)+'px';
+ view.scrollLeft=scrollLeft;view.scrollTop=Math.max(scrollTop,freezeHeight);scrollTop=view.scrollTop;
  view.addEventListener('scroll',()=>{
   // Detached views can still dispatch queued scroll events after switching books.
   if(!view.isConnected||view.dataset.sheetId!==sheet()?.id)return;
@@ -2633,7 +2640,7 @@ function refreshFillHandle(){
  const end=cellName(r.r2,r.c2),cell=Array.from(frame.querySelectorAll('.grid-cell')).find(el=>el.dataset.ref===end);
  if(!cell){handle.hidden=true;return;}
  const box=cell.getBoundingClientRect(),parent=frame.getBoundingClientRect(),
-  visible=box.bottom>=parent.top+headerH&&box.bottom<=parent.bottom&&
+  visible=box.bottom>=parent.top+headerH+qoFrozenHeight()&&box.bottom<=parent.bottom&&
    box.right>=parent.left+rowW&&box.right<=parent.right;
  if(!visible){handle.hidden=true;return;}
  handle.style.left=Math.round(box.right-parent.left-5)+'px';
@@ -2801,6 +2808,10 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  // Use the live viewport offsets, not values left by another disposed view.
  scrollLeft=view.scrollLeft;scrollTop=view.scrollTop;
  const {x,y}=gridGeometry(s),freezeR=s.freeze?.rows||0,freezeC=s.freeze?.cols||0;
+ const freezeHeight=Math.max(0,y[freezeR]-headerH);
+ const desiredTop=(headerH+freezeHeight)+'px';
+ if(view.style.top!==desiredTop)view.style.top=desiredTop;
+ if(view.scrollTop<freezeHeight){view.scrollTop=freezeHeight;scrollTop=freezeHeight;}
  canvas.style.width=`${x.at(-1)}px`;canvas.style.height=`${y.at(-1)-headerH}px`;
  const firstR=Math.max(0,firstVisibleIndex(y,view.scrollTop+headerH)-16),lastR=Math.min(LIMITS.rows-1,firstVisibleIndex(y,view.scrollTop+view.clientHeight+headerH)+16);
  const firstC=Math.max(0,firstVisibleIndex(x,view.scrollLeft)-3),lastC=Math.min(LIMITS.columns-1,firstVisibleIndex(x,view.scrollLeft+view.clientWidth)+3);
@@ -2816,13 +2827,13 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
   const item=getCell(s,ref),selected=allSelection.some(a=>r>=a.r1&&r<=a.r2&&c>=a.c1&&c<=a.c2),active=ref===activeCell,style={...getEffectiveStyle(s,ref)};
   if(s.conditionalRules?.length){const fill=conditionalFill(s,ref,resultOf(s,ref,raw,ctx),scaleStats);if(fill)style.bg=fill;}
   const boundary={
-   top:bounds?[...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1,bounds.c1+j)),'top')).find(Boolean):resolveBorderSide(style,'top'),
-   bottom:bounds?[...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r2,bounds.c1+j)),'bottom')).find(Boolean):resolveBorderSide(style,'bottom'),
-   left:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c1)),'left')).find(Boolean):resolveBorderSide(style,'left'),
-   right:bounds?[...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)),'right')).find(Boolean):resolveBorderSide(style,'right')
+   top:bounds?([...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1,bounds.c1+j)),'top')).find(Boolean)||resolveBorderSide(style,'top')):resolveBorderSide(style,'top'),
+   bottom:bounds?([...Array(bounds.c2-bounds.c1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r2,bounds.c1+j)),'bottom')).find(Boolean)||resolveBorderSide(style,'bottom')):resolveBorderSide(style,'bottom'),
+   left:bounds?([...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c1)),'left')).find(Boolean)||resolveBorderSide(style,'left')):resolveBorderSide(style,'left'),
+   right:bounds?([...Array(bounds.r2-bounds.r1+1)].map((_,j)=>resolveBorderSide(getEffectiveStyle(s,cellName(bounds.r1+j,bounds.c2)),'right')).find(Boolean)||resolveBorderSide(style,'right')):resolveBorderSide(style,'right')
   };
   const val=displayedValue(s,ref,raw,ctx),align=style.align||s.defaultAlign||(/^[-+]?\d+(\.\d+)?$/.test(val)?'right':'left');
-  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.underline||style.strike?`text-decoration-line:${style.underline&&style.strike?'underline line-through':style.underline?'underline':'line-through'};text-decoration-thickness:1px;text-underline-offset:2px;`:''}${style.verticalAlign?`align-items:${style.verticalAlign==='top'?'flex-start':style.verticalAlign==='bottom'?'flex-end':'center'};`:''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.fontFamily&&FONT_FAMILIES.includes(style.fontFamily)?`font-family:'${style.fontFamily}',sans-serif;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}text-align:${align};`;
+  const appearance=`justify-content:${align==='center'?'center':align==='right'?'flex-end':'flex-start'};${style.bg?`background:${style.bg};border-right-color:color-mix(in srgb,${style.bg} 86%,#193b2e);border-bottom-color:color-mix(in srgb,${style.bg} 86%,#193b2e);`:''}${style.color?`color:${style.color};`:''}${style.bold?'font-weight:750;':''}${style.italic?'font-style:italic;':''}${style.underline||style.strike?`text-decoration-line:${style.underline&&style.strike?'underline line-through':style.underline?'underline':'line-through'};text-decoration-thickness:1px;text-underline-offset:2px;`:''}${style.verticalAlign?`align-items:${style.verticalAlign==='top'?'flex-start':style.verticalAlign==='bottom'?'flex-end':'center'};`:''}${style.fontSize?`font-size:${Math.round(style.fontSize*4/3*100)/100}px;`:''}${style.fontFamily&&FONT_FAMILIES.includes(style.fontFamily)?`font-family:'${style.fontFamily}',sans-serif;`:''}${style.border==='thin'?`box-shadow:inset 0 0 0 1px ${style.borderColor||'#526d5c'};`:''}${['left','right','top','bottom'].map(side=>borderCSS(side,boundary[side])).join('')}${merged&&!boundary.right?`border-right:1px solid ${style.bg?`color-mix(in srgb,${style.bg} 72%,#193b2e)`:'#9baea5'};`:''}text-align:${align};`;
   const pinnedR=r<freezeR,pinnedC=c<freezeC;
   const action=(filter&&r===filter.r1&&c>=filter.c1&&c<=filter.c2)?`<button class="filter-head ${Object.hasOwn(s.autoFilter?.rules||{},c)?'has-rule':''}" data-action="filter-menu" data-col="${c}" title="Фильтр столбца ${esc(cellName(0,c).replace(/\d+$/,''))}">▾</button>`:'';
   const destination=pinnedR?'row':pinnedC?'col':'main';
@@ -2835,7 +2846,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  const rowOverlay=document.getElementById('grid-row-overlay'),colOverlay=document.getElementById('grid-col-overlay');
  let rowHtml='',colHtml='';
  for(const r of rows){if(!rowVisible(s,r))continue;const pinned=r<freezeR;
-  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${allSelection.some(a=>a.r1<=r&&r<=a.r2)?'header-selected':''} ${parseCell(activeCell)?.row===r?'header-active':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
+  rowHtml+=`<div class="rowhead ${pinned?'frozen-row':''} ${allSelection.some(a=>a.r1<=r&&r<=a.r2)?'header-selected':''} ${parseCell(activeCell)?.row===r?'header-active':''}" data-action="select-row" data-index="${r}" title="Выделить строку ${r+1}" style="top:${y[r]-headerH-(pinned?0:view.scrollTop)+(pinned?0:freezeHeight)}px;left:0;width:${rowW}px;height:${y[r+1]-y[r]}px">${r+1}<span class="grid-resizer row-resizer" data-resize="row" data-index="${r}" title="Изменить высоту строки ${r+1}"></span></div>`;
  }
  for(const c of cols){if(!columnVisible(s,c))continue;const pinned=c<freezeC;
   colHtml+=`<div class="colhead ${pinned?'frozen-col':''} ${allSelection.some(a=>a.c1<=c&&c<=a.c2)?'header-selected':''} ${parseCell(activeCell)?.col===c?'header-active':''}" data-action="select-col" data-index="${c}" title="Выделить столбец ${cellName(0,c).replace(/\d+$/,'')}" style="top:0;left:${x[c]-rowW-(pinned?0:view.scrollLeft)}px;width:${x[c+1]-x[c]}px;height:${headerH}px">${esc(cellName(0,c).replace(/\d+$/,''))}<span class="grid-resizer col-resizer" data-resize="col" data-index="${c}" title="Потянуть для изменения ширины; двойной щелчок — автоподбор"></span></div>`;
@@ -2845,7 +2856,7 @@ function drawGrid(fromScroll=false){if(page!=='sheet'||!sheet())return;const vie
  const top=document.getElementById('grid-frozen-rows'),left=document.getElementById('grid-frozen-cols');
  if(top){top.style.height=`${y[freezeR]-headerH}px`;top.style.display=freezeR?'block':'none';
   if(!fromScroll||frozenRowScrollX!==view.scrollLeft||top.dataset.sheetId!==s.id){top.innerHTML=pinnedRowsHtml;frozenRowScrollX=view.scrollLeft;top.dataset.sheetId=s.id;}}
- if(left){left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
+ if(left){left.style.top=(headerH+freezeHeight)+'px';left.style.width=`${x[freezeC]-rowW}px`;left.style.display=freezeC?'block':'none';left.innerHTML=pinnedColsHtml;}
  if(fillDrag)showFillDragPreview();
  refreshFillHandle();
  qoSyncRibbonState();
