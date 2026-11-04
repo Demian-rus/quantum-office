@@ -105,7 +105,7 @@ function qdNormalize(raw,allowRun=true){
             prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),
             points:qdPoints(q.points),partialCredit:qdPartialCredit(q.partialCredit),
             choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),
-            tolerance:qdTolerance(q.tolerance),criteria:qdText(q.criteria,2000),
+            tolerance:qdTolerance(q.tolerance),criteria:qdText(q.criteria,2000),hint:qdText(q.hint,1200),
             promptRich:qdRichSafe(q.promptRich),answerRich:qdRichSafe(q.answerRich)});
           count++;
         }
@@ -176,6 +176,9 @@ function qdWorkingDoc(){
     qdRevealed.clear();qdStudentFilter='';
     qdBuilderLinkedTemplateId=qoWriter.diagnostic.author?.templateId||'';
     qdBuilderSavedSignature=qoWriter.diagnostic.author?.savedSignature||'';
+    if(qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(qoWriter.diagnostic,true)&&!qdQuestionList(qoWriter.diagnostic).some(q=>q.hint)){
+      qdBuilderSavedSignature=qdBuilderSignature(qoWriter.diagnostic);qoWriter.diagnostic.author.savedSignature=qdBuilderSavedSignature;
+    }
   }
   return qoWriter.diagnostic;
 }
@@ -812,14 +815,15 @@ function qdBuilderTemplateDefaults(d){
   return {my,existing,subject,grade,purpose:d.purpose||existing?.purpose||preset?.purpose||'diagnostic'};
 }
 let qdBuilderLinkedTemplateId='',qdBuilderSavedSignature='';
-function qdBuilderSignature(d){
+function qdBuilderSignature(d,legacy=false){
   const content=JSON.stringify({title:d.title,description:d.description,subject:qdText(d.subject,40),grade:qdText(d.grade,18),purpose:d.purpose||'diagnostic',
     sections:d.sections.map(s=>({title:s.title,questions:s.questions.map(q=>({
-      prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),type:qdType(q.type),points:qdPoints(q.points),criteria:qdText(q.criteria,2000),
+      prompt:qdText(q.prompt,1600),answer:qdText(q.answer,3500),type:qdType(q.type),points:qdPoints(q.points),criteria:qdText(q.criteria,2000),hint:qdText(q.hint,1200),
       promptRich:qdRichSafe(q.promptRich),answerRich:qdRichSafe(q.answerRich),promptMedia:q.promptMedia||null,answerMedia:q.answerMedia||null,
       partialCredit:qdPartialCredit(q.partialCredit),choices:qdChoices(q.choices),numericAnswer:qdText(q.numericAnswer,60),tolerance:qdTolerance(q.tolerance)
     }))}))});
-  return content.length+':'+qdVariantHash(content);
+  const value=legacy?content.replace(/,"hint":"(?:[^"\\]|\\.)*"/g,''):content;
+  return value.length+':'+qdVariantHash(value);
 }
 function qdBuilderSaveStatus(){
   const label=document.getElementById('qd-builder-save-state');
@@ -855,7 +859,7 @@ function qdBuilder(){
       <div class="qd-command-row"><strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
         <button data-qd-action="builder-quick-save" class="qd-primary" type="button">${qdBuilderLinkedTemplateId?'Сохранить изменения':'Сохранить шаблон'}</button>
         <button data-qd-action="save-copy" type="button">Сохранить как новый шаблон</button></div>
-      <div class="qd-command-row"><button data-qd-action="blank" type="button">Создать с нуля</button>
+      <div class="qd-command-row">${typeof qdDeskTools==='function'?qdDeskTools():''}<button data-qd-action="blank" type="button">Создать с нуля</button>
         <button data-qd-action="preview" type="button">Предпросмотр</button><button data-qd-action="bank-open" type="button">Банк вопросов</button><button data-qd-action="compact-mode" type="button">${qdCompact?'Развернуть карточки':'Компактный список'}</button>
         <button data-qd-action="add-section" type="button">+ Раздел</button></div>
     </div>
@@ -904,7 +908,7 @@ function qdBuilder(){
           <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
           <input type="checkbox" class="qd-select-card" data-qd-select data-qid="${qdEsc(q.id)}"
               aria-label="Выбрать вопрос ${qi+1}" ${qdSelected.has(q.id)?'checked':''}>
-          <span class="qd-counter">Вопрос ${qi+1}</span>
+          <button type="button" class="qd-counter qd-select-question" data-qd-action="editor-select" data-qid="${qdEsc(q.id)}" title="Параметры этого вопроса">Вопрос ${qi+1}</button>
            <span class="qd-card-preview" title="${qdEsc(q.prompt)}">${qdEsc(q.prompt||'Новый вопрос')}</span>
            ${qdCompact?`<button type="button" data-qd-action="card-expand" data-qid="${qdEsc(q.id)}">${qdCardExpanded.has(q.id)?'Свернуть':'Редактировать'}</button>`:''}
           <select data-qd-field="type" data-qid="${qdEsc(q.id)}" aria-label="Тип задания">
@@ -924,6 +928,7 @@ function qdBuilder(){
         <div class="qd-rich-actions"><button type="button" data-qd-action="rich-edit" data-kind="prompt" data-qid="${qdEsc(q.id)}">Оформить условие · таблица / формула</button>
           <button type="button" data-qd-action="rich-edit" data-kind="answer" data-qid="${qdEsc(q.id)}">Оформить решение</button></div>
         ${q.promptRich?'<details class="qd-rich-preview"><summary>Форматирование условия</summary>'+qdRichSafe(q.promptRich)+'</details>':''}
+        <label>Подсказка ученику<textarea data-qd-field="hint" data-qid="${qdEsc(q.id)}" maxlength="1200" rows="2" placeholder="Показывается только по запросу">${qdEsc(q.hint||'')}</textarea></label>
         <label>Критерии оценивания<textarea data-qd-field="criteria" data-qid="${qdEsc(q.id)}" maxlength="2000" rows="2" placeholder="За что начисляются баллы">${qdEsc(q.criteria||'')}</textarea></label>
         ${['single','multiple'].includes(q.type)?`<div class="qd-choices-editor">
           <strong>Варианты ответов · отметьте правильные</strong>
@@ -1044,6 +1049,7 @@ function qdRunQuestion(q,number,d){
       '<div class="qd-rating qd-chat-rating" role="group" aria-label="Оценка ответа">'+
         markButton('yes','✓ Знает')+markButton('no','× Не знает')+
         markButton('partial','◐ Частично')+'</div></div>'+
+    (q.hint&&typeof qdDeskHintHTML==='function'?qdDeskHintHTML(q):'')+
     qdAutoInput(q,d.session.responses[q.id])+
     '<div class="qd-assessment-fields"><label>Баллы (0–'+points+')<input type="number" min="0" max="'+points+'" step="0.25" data-qd-field="score" data-qid="'+qdEsc(q.id)+'" value="'+(Number.isFinite(d.session.scores?.[q.id])?d.session.scores[q.id]:'')+'" placeholder="Авто по оценке"></label>'+
     '<label>Комментарий преподавателя<textarea rows="2" maxlength="2000" data-qd-field="comment" data-qid="'+qdEsc(q.id)+'">'+qdEsc(d.session.comments?.[q.id]||'')+'</textarea></label></div>'+
@@ -1535,7 +1541,7 @@ function qdLibraryRead(){
   }catch(_){return [];}
 }
 function qdLibraryWrite(items){
-  try{const previous=localStorage.getItem(QD_LIBRARY_KEY);if(previous&&!Array.isArray(JSON.parse(previous)))return false;localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
+  try{const previous=localStorage.getItem(QD_LIBRARY_KEY);if(previous){const parsed=JSON.parse(previous);if(!Array.isArray(parsed)||parsed.some(item=>!qdLibrarySafe(item)))return false;}localStorage.setItem(QD_LIBRARY_KEY,JSON.stringify(items.slice(0,QD_LIMITS.templates)));return true;}
   catch(_){return false;}
 }
 
@@ -1679,7 +1685,7 @@ function qdLibraryItems(){
     (qdLibrarySubject==='all'||x.subject===qdLibrarySubject)&&
     (qdLibraryGrade==='all'||x.grade===qdLibraryGrade)&&
     (qdLibraryPurpose==='all'||x.purpose===qdLibraryPurpose)&&
-    (!needle||(x.label+' '+x.description+' '+QD_SUBJECTS[x.subject]).toLocaleLowerCase('ru-RU').includes(needle))
+    (!needle||(x.label+' '+x.description+' '+QD_SUBJECTS[x.subject]+' '+(x.source==='custom'?qdLibraryRead().find(t=>t.id===x.id)?.sections:qdTemplate(x.id)?.sections)?.map(s=>s.title+' '+s.questions.map(q=>q.prompt+' '+q.answer).join(' ')).join(' ')).toLocaleLowerCase('ru-RU').includes(needle))
   );
 }
 function qdLibraryLoad(d,id,source){
@@ -1847,7 +1853,7 @@ function qdLibraryImport(text){
 function qdLibraryView(){
   const items=qdLibraryItems(),total=QD_PRESETS.length+qdLibraryRead().length;
   const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
-  return '<div class="qd-template-library">'+
+  return '<div class="qd-template-library">'+(typeof qdDeskLibraryWarning==='function'?qdDeskLibraryWarning():'')+
     '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
       '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
       '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
@@ -1857,7 +1863,7 @@ function qdLibraryView(){
       '<label>Предмет<select id="qd-library-subject">'+options([['all','Все предметы'],...Object.entries(QD_SUBJECTS)],qdLibrarySubject)+'</select></label>'+
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...[...new Set(['5–6','7','8','9',...qdLibraryRead().map(t=>t.grade)])].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
-      '</section><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
+      '</section><p class="qd-library-found" id="qd-library-found" role="status">Найдено: '+items.length+'</p><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
       '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
       '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
@@ -1869,25 +1875,20 @@ function qdLibraryView(){
   '</div>';
 }
 function qdLibraryCards(items){
-  return items.length?items.map(x=>'<article class="qd-library-card" data-template-id="'+qdEsc(x.id)+'">'+
-    '<div class="qd-library-tags"><span>'+qdEsc(QD_SUBJECTS[x.subject]||'Другое')+'</span><span>'+qdEsc(x.grade)+' класс</span>'+
-    '<span>'+qdEsc(QD_PURPOSES[x.purpose]||'Диагностика')+'</span></div>'+
-    '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p>'+
-    '<div class="qd-library-structure">'+(x.source==='custom'?qdLibraryRead().find(t=>t.id===x.id)?.sections:qdTemplate(x.id)?.sections)?.map(s=>'<span>'+qdEsc(s.title)+' · '+s.questions.length+'</span>').join('')+'</div>'+
-    '<div class="qd-library-card-footer"><span>'+x.count+' вопросов</span><div>'+
-    (x.source==='custom'?
-    '<button type="button" data-qd-action="library-edit-content" data-template="'+qdEsc(x.id)+'">Редактировать</button>'+
-    '<button type="button" data-qd-action="library-edit" data-template="'+qdEsc(x.id)+'">Переименовать / свойства</button>'+
-    '<button type="button" data-qd-action="library-clone" data-template="'+qdEsc(x.id)+'">Копировать</button>'+
-    '<button type="button" data-qd-action="library-delete" data-source="custom" data-template="'+qdEsc(x.id)+'">Удалить</button>':'')+
-    '<button type="button" data-qd-action="library-from" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">На основе</button>'+
-    '<button type="button" data-qd-action="library-preview" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">Просмотреть</button>'+    '<button type="button" class="qd-primary" data-qd-action="library-open" data-source="'+x.source+
-      '" data-template="'+qdEsc(x.id)+'">Открыть</button></div></div></article>').join(''):
-    '<div class="qd-library-empty">Ничего не найдено. Попробуйте другой предмет, класс или запрос.</div>';
+  if(!items.length)return '<div class="qd-library-empty"><strong>Шаблоны не найдены</strong><p>Измените фильтры или создайте пустую диагностику кнопкой «Создать с нуля».</p><button type="button" data-qd-action="library-clear-filters">Сбросить фильтры</button></div>';
+  const control=(action,label,x,primary='')=>'<button type="button" class="'+primary+'" data-qd-action="'+action+'" data-source="'+x.source+'" data-template="'+qdEsc(x.id)+'">'+label+'</button>';
+  return items.map(x=>{
+    const sections=x.source==='custom'?qdLibraryRead().find(t=>t.id===x.id)?.sections:qdTemplate(x.id)?.sections;
+    return '<article class="qd-library-card" data-template-id="'+qdEsc(x.id)+'"><div class="qd-library-tags"><span>'+qdEsc(x.source==='custom'?'Мой шаблон':'Готовый')+'</span><span>'+qdEsc(QD_SUBJECTS[x.subject]||'Другое')+' · '+qdEsc(x.grade)+' класс</span><span>'+qdEsc(QD_PURPOSES[x.purpose])+'</span></div>'+
+    '<h3>'+qdEsc(x.label)+'</h3><p>'+qdEsc(x.description||'Собственный шаблон диагностики')+'</p><details class="qd-library-structure"><summary>'+x.count+' вопросов · '+sections.length+' разделов</summary>'+sections.map(s=>'<span>'+qdEsc(s.title)+' · '+s.questions.length+'</span>').join('')+'</details>'+
+    '<div class="qd-library-card-footer"><div>'+control('library-open',x.source==='custom'?'Редактировать':'Открыть',x,'qd-primary')+control('library-preview','Просмотреть',x)+'<details class="qd-library-menu"><summary aria-label="Другие действия с шаблоном" title="Другие действия">⋯</summary><div>'+control('library-from','Создать на основе',x)+
+    (x.source==='custom'?control('library-edit','Переименовать / свойства',x)+control('library-clone','Дублировать',x)+control('library-delete','Удалить',x):'')+'</div></details></div></div></article>';
+  }).join('');
 }
 function qdLibraryRefreshCards(){
   const grid=document.getElementById('qd-library-items');
-  if(grid)grid.innerHTML=qdLibraryCards(qdLibraryItems());
+  const items=qdLibraryItems();if(grid)grid.innerHTML=qdLibraryCards(items);
+  const count=document.getElementById('qd-library-found');if(count)count.textContent='Найдено: '+items.length;
 }
 
 function qdTemplate(key){
@@ -2118,6 +2119,7 @@ function qdRibbonSync(){
 }
 
 function qdSidebarTopics(d,mode){
+  if(mode==='builder'&&typeof qdDeskOutline==='function')return qdDeskOutline(d);
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
     '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
     '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
@@ -2196,7 +2198,7 @@ function qdWorkbench(d,mode,content){
   return '<div class="qd-workbench">'+
     qdSidebarTopics(d,mode)+
     '<main class="qd-workbench-main">'+content+'</main>'+
-    qdSidebarInsights(d,mode)+'</div>';
+    (mode==='builder'&&typeof qdDeskInspector==='function'?qdDeskInspector(d):qdSidebarInsights(d,mode))+'</div>';
 }
 function qdScrollToTopic(sid){
   const root=document.getElementById('qo-diag-root');
@@ -2222,6 +2224,7 @@ function qdRefresh(){
   if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
   qdRibbonSync();
+  if(typeof qdDeskDecorate==='function')qdDeskDecorate();
 }
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
@@ -2267,6 +2270,7 @@ function qdJumpToEdit(qid,field='prompt'){
 }
 function qdRefreshSideInsights(){
   if(qdMode!=='builder')return;
+  if(typeof qdDeskRefreshInspector==='function'){qdDeskRefreshInspector();return;}
   const sidebar=document.querySelector('#qo-diag-root .qd-side-insights');
   if(!sidebar)return;
   const wrapper=document.createElement('div');
@@ -2708,6 +2712,8 @@ function qdOnClick(event){
     section.questions.push({id:qdNewId(),type:'question',prompt:'',answer:'',points:2,partialCredit:50});qdStore();qdRefresh();return;
   }
   if(action==='delete-question'){
+    const question=qdQuestionList(d).find(q=>q.id===button.dataset.qid);
+    if(question?.prompt.trim()&&!confirm('Удалить этот вопрос из черновика? Сохранённый шаблон изменится только после сохранения.'))return;
     const section=d.sections.find(x=>x.id===button.dataset.sid);if(!section)return;
     section.questions=section.questions.filter(q=>q.id!==button.dataset.qid);
     delete d.session.marks[button.dataset.qid];delete d.session.responses[button.dataset.qid];qdRevealed.delete(button.dataset.qid);
@@ -2896,6 +2902,7 @@ function qdOnInput(event){
   else if(field==='section'){
     const s=d.sections.find(x=>x.id===event.target.dataset.sid);if(s)s.title=qdText(value,120);
   }else if(['subject','grade','purpose'].includes(field))d[field]=qdText(value,field==='grade'?18:40);
+  else if(field==='hint'){const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);if(q)q.hint=qdText(value,1200);}
   else if(field==='criteria'){const q=d.sections.flatMap(s=>s.questions).find(q=>q.id===event.target.dataset.qid);if(q)q.criteria=qdText(value,2000);}
   else if(['prompt','answer'].includes(field)){
     const q=qdQuestionList(d).find(x=>x.id===event.target.dataset.qid);
@@ -2918,7 +2925,7 @@ function qdOnInput(event){
   qdStore();
   if(['title','description','section','prompt','answer','choice-text','numericAnswer'].includes(field))
     qdBuilderSaveStatus();
-  if(['subject','grade','purpose','criteria'].includes(field))qdBuilderSaveStatus();
+  if(['subject','grade','purpose','criteria','hint'].includes(field))qdBuilderSaveStatus();
   if(field==='prompt'){
     const card=event.target.closest('.qd-edit-card');
     const preview=card?.querySelector('.qd-card-preview');
@@ -2936,7 +2943,7 @@ function qdOnChange(event){
     if(event.target.value===''){if(d.session.scores)delete d.session.scores[q.id];}
     else {const value=Number(event.target.value);if(!Number.isFinite(value)||value<0||value>qdPoints(q.points)){status('Баллы должны быть от 0 до '+qdPoints(q.points),true);event.target.value='';return;}
       d.session.scores||={};d.session.scores[q.id]=qdScoreNumber(value);d.session.marks[q.id]=value===0?'no':value===qdPoints(q.points)?'yes':'partial';}
-    qdStore();qdRefresh();return;
+    qdStore();if(typeof qdDeskRefreshScores==='function')qdDeskRefreshScores();else qdRefresh();return;
   }
   if(['qd-var-count','qd-var-per-section','qd-var-choices'].includes(event.target.id)){
     if(event.target.id==='qd-var-count')qdVariantOptions.count=Number(event.target.value);
@@ -3139,16 +3146,18 @@ function qdRunSetup(d){
   const run=qdWorkingDoc().run;
   const options=[...qdLibraryRead().map(x=>({...x,source:'custom',label:x.title})),
     ...QD_PRESETS.map(x=>({...x,source:'built-in',label:qdTemplate(x.id)?.title||x.label}))];
-  return '<section class="qd-panel qd-run-setup" aria-label="Диагностика для проведения">'+
+  const untouched=!Object.keys(d.session.responses).length&&!Object.keys(d.session.marks).length;
+  return '<details class="qd-panel qd-run-setup" '+(untouched?'open':'')+' aria-label="Диагностика для проведения"><summary>Диагностика: '+qdEsc(d.title)+' <span>Выбор и сохранение занятия</span></summary><div class="qd-run-setup-body">'+
     '<div><strong>'+qdEsc(d.title)+'</strong><p>Независимый снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+
     '. Изменения конструктора не затрагивают это занятие.</p></div>'+
     '<div class="qd-run-start-row"><label>Выбрать диагностику<select id="qd-run-template"><option value="">Текущий черновик конструктора</option>'+
     options.map(x=>'<option value="'+x.source+':'+qdEsc(x.id)+'">'+(x.source==='custom'?'Мой · ':'Готовый · ')+qdEsc(x.label)+'</option>').join('')+
     '</select></label><button type="button" data-qd-action="run-start">Начать новое проведение</button>'+
     '<button type="button" data-qd-action="run-checkpoint" class="qd-primary">Сохранить незавершённое</button></div>'+
-    '<p class="qd-hint">Ответы сохраняются в браузере. Для переноса или резервной копии скачайте QDIAG / QDIAGX в верхней ленте.</p></section>';
+    '<p class="qd-hint">Ответы сохраняются в браузере. Для переноса или резервной копии скачайте QDIAG / QDIAGX в верхней ленте.</p></div></details>';
 }
 function qdProfessionalAction(action,button,d){
+  if(typeof qdDeskAction==='function'&&qdDeskAction(action,button,d))return true;
   if(action==='blank'){
     if(!qdConfirmReplace())return true;
     qdBlank();qdStore();qdRefresh();return true;

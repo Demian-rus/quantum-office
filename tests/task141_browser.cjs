@@ -8,7 +8,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
  const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  let promptAnswer='Тепловые явления — копия';page.on('dialog',d=>d.accept(d.type()==='prompt'?promptAnswer:undefined));
- const action=name=>page.locator('[data-qd-action="'+name+'"]');
+ const action=name=>page.locator('[data-qd-action="'+(name==='library-edit-content'?'library-open':name)+'"]');
  const mode=name=>page.locator('[data-qd-action="mode"][data-mode="'+name+'"]').first();
  async function open(){await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();}
  async function download(actionFn,name){const event=page.waitForEvent('download');await actionFn();const file=await event;const target=path.join(out,name||file.suggestedFilename());await file.saveAs(target);assert.ok(fs.statSync(target).size>20);return target;}
@@ -99,6 +99,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
   if(view==='library'){await page.locator('#qd-library-source').selectOption('custom');await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library_mobile.png')});await layout(1440);await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_library.png')});}
   if(view==='run'){await page.evaluate(()=>qdScrollToQuestion());await page.screenshot({path:path.join(out,'QuantumOffice_TASK141_mobile.png')});}
  }
+ if(!(await page.locator('.qd-run-setup').evaluate(el=>el.open)))await page.locator('.qd-run-setup>summary').click();
  await page.locator('#qd-run-template').selectOption('built-in:math7');await action('run-start').click();
  assert.match(await page.evaluate(()=>qdDoc().title),/Математика/);assert.match(await page.evaluate(()=>qdWorkingDoc().title),/Тепловые/);
  assert.equal(await page.evaluate(()=>Object.keys(qdDoc().session.responses).length),0);

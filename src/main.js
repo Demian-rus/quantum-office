@@ -3252,8 +3252,9 @@ app.addEventListener('change',async e=>{const t=e.target;
   }
  }
  if(t.id==='qo-writer-file'){
-  const file=t.files?.[0];if(!file)return;
-  const kind=file.name.toLowerCase(),docx=kind.endsWith('.docx');
+  const file=t.files?.[0];if(!file)return;t.value='';
+  const kind=file.name.toLowerCase(),docx=kind.endsWith('.docx')||file.type==='application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  if(!docx&&!/\.(qdoc|txt|html?)$/.test(kind)){t.value='';status('Поддерживаются DOCX, QDOC, HTML и TXT. Исходный документ сохранён.',true);return;}
   if(file.size>(docx?12_000_000:3_000_000)){status('Файл превышает допустимый размер',true);return;}
   try{
    if(docx){
@@ -3262,10 +3263,11 @@ app.addEventListener('change',async e=>{const t=e.target;
 
    }else{
     const raw=await file.text();
+    if(raw.startsWith('PK')||raw.includes('\u0000'))throw Error('Двоичный файл нельзя открыть как текст');
     if(kind.endsWith('.qdoc')){
      const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
      qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode,updated:Date.now()};
-    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:kind.endsWith('.html')?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
+    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:/\.html?$/.test(kind)?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
    }
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
    if(docx)status('DOCX импортирован. Базовое форматирование сохранено; сложная вёрстка Word может отличаться.');

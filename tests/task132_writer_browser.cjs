@@ -1,11 +1,12 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict');
-const path=require('node:path');
+const path=require('node:path'),fs=require('node:fs'),os=require('node:os');
 const {pathToFileURL}=require('node:url');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const page=await browser.newPage({viewport:{width:1360,height:900},acceptDownloads:true});
- const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'qo-docx-roundtrip-'));
  try{
   await page.goto(pathToFileURL(path.resolve(__dirname,'../Quantum-Office.html')).href);
   await page.evaluate(()=>{
@@ -37,10 +38,16 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-action="writer-export-docx"]').click();
   const download=await wait;
   assert.match(download.suggestedFilename(),/\.docx$/i);
-  const filepath=await download.path();
+  // Playwright's download.path() is a GUID without .docx. Preserve the actual
+  // downloaded filename, as a teacher's Downloads folder does.
+  const filepath=path.join(temp,download.suggestedFilename());await download.saveAs(filepath);
+  await page.locator('[data-action="writer-new"]').click();
+  assert.equal(await page.locator('#qo-writer-page h1').count(),0,'import must restore content into a new document');
   await page.locator('#qo-writer-file').setInputFiles(filepath);
-  await page.waitForTimeout(450);
+  await page.waitForFunction(()=>document.querySelector('#qo-writer-page h1')?.textContent==='Проверка QX');
   assert.equal(await page.locator('#qo-writer-page h1').innerText(),'Проверка QX');
+  assert.equal(await page.locator('#qo-writer-page b').innerText(),'жирный');
+  assert.equal(await page.locator('#qo-writer-page i').innerText(),'курсив');
   assert.equal(await page.locator('#qo-writer-page ul li').count(),2);
   assert.equal(await page.locator('#qo-writer-page table tr').count(),1);
   assert.equal(await page.locator('#qo-writer-page a[href="https://example.org/"]').count(),1);
@@ -52,5 +59,5 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.locator('[data-action="writer-export-docx"]').isVisible(),true);
   assert.deepEqual(errors,[]);
   console.log('PASS TASK132: DOCX archive, styles, lists, tables, hyperlink, layout, roundtrip, mobile');
- }finally{await browser.close();}
+ }finally{await browser.close();fs.rmSync(temp,{recursive:true,force:true});}
 })().catch(e=>{console.error(e.stack);process.exit(1);});

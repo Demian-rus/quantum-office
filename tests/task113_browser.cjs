@@ -51,6 +51,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('[data-qd-action="add-section"]').first().click();
  await page.locator('[data-qd-action="add-question"]').click();
  await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
+ if(!await page.locator('.qd-run-setup').evaluate(el=>el.open))await page.locator('.qd-run-setup>summary').click();
  await page.locator('[data-qd-action="run-start"]').click();
  await page.locator('[data-qd-action="view"][data-view="focus"]').click();
  assert.equal(await page.locator('.qd-guided [data-qd-action="mark"]:disabled').count(),3);

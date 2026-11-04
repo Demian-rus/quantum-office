@@ -55,6 +55,10 @@ function qdMediaLabel(kind){return kind==='answer'?'Иллюстрация от�
 function qdMediaKey(kind){return kind==='answer'?'answerMedia':'promptMedia';}
 function qdMediaEsc(x){return qdEsc(String(x??''));}
 function qdMediaSlotHTML(q,kind){
+  const ref=qdMediaSafe(q[qdMediaKey(kind)]);
+  return '<details class="qd-media-fold" '+(ref?'open':'')+'><summary>'+qdMediaLabel(kind)+(ref?' · прикреплена':' · добавить файл, скриншот или рисунок')+'</summary>'+qdMediaSlotContent(q,kind)+'</details>';
+}
+function qdMediaSlotContent(q,kind){
   const ref=qdMediaSafe(q[qdMediaKey(kind)]),key=qdMediaKind(kind),qid=qdMediaEsc(q.id);
   return '<section class="qd-media-slot'+(ref?' is-filled':'')+'" tabindex="0" data-qd-media-slot="'+key+
     '" data-qid="'+qid+'" aria-label="'+qdMediaLabel(kind)+'">'+
@@ -131,7 +135,7 @@ function qdMediaDecorate(root){
     }).catch(()=>{if(img.isConnected){img.alt='Не удалось прочитать иллюстрацию';img.classList.add('qd-media-missing');}});
   }
   const builder=root.querySelector('.qd-builder-actionbar');
-  if(builder&&!builder.querySelector('[data-qd-media-action="help"]')){
+  if(builder&&typeof qdDeskTools!=='function'&&!builder.querySelector('[data-qd-media-action="help"]')){
     (builder.querySelector('.qd-command-row:last-child')||builder).insertAdjacentHTML('beforeend','<button type="button" data-qd-media-action="help" '+
       'title="Изображения к вопросам и ответам">Иллюстрации</button>');
   }
