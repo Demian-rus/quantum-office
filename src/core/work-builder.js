@@ -234,7 +234,7 @@ function qwVisualEditor(kind){
     '<div class="qw-constructions"><label>Из вершины<select id="qw-construction-vertex">'+qwOptions(value[selected].vertices.map((p,i)=>[String(i),p.label||'Вершина '+(i+1)]),'0')+'</select></label>'+
     '<button type="button" data-construction="median">Провести медиану</button>'+
     '<button type="button" data-construction="altitude">Провести высоту</button></div>':'')+
-   '<div class="qw-object-list">+value.map((o,i)=>'<button type="button" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
+   '<div class="qw-object-list">'+value.map((o,i)=>'<button type="button" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
  }
  stage.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const p=point(e),existing=e.target.closest('[data-qw-point],[data-qw-object]');remember();if(kind==='graph'){
   if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const snapped=gridPoint(p);value.points.push({...snapped,label:''});selected=value.points.length-1;}
