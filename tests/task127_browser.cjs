@@ -1,0 +1,52 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const assert=require('node:assert/strict');
+const path=require('node:path');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage({viewport:{width:1440,height:900}});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(pathToFileURL(path.resolve(__dirname,'../Quantum-Office.html')).href);
+  await page.evaluate(()=>{
+   createBook();
+   const b=book();
+   b.sheets[0].name='Контент';
+   b.sheets.push(newSheet('Саморазвитие'),newSheet('Сценарии'));
+   setCell(b.sheets[0],'A2','QX-001');
+   render();
+  });
+  assert.deepEqual(await page.locator('.sheet-tab').allTextContents(),['Контент','Саморазвитие','Сценарии']);
+  await page.locator('[data-action="sheet-navigator"]').click();
+  assert.equal(await page.locator('.qo-sheet-navigator-result').count(),3);
+  await page.locator('#qo-sheet-navigator input').fill('само');
+  assert.equal(await page.locator('.qo-sheet-navigator-result').count(),1);
+  await page.locator('.qo-sheet-navigator-result').click();
+  assert.equal(await page.evaluate(()=>sheet().name),'Саморазвитие');
+  await page.evaluate(()=>{document.body.setAttribute('tabindex','-1');document.body.focus();});
+  await page.keyboard.press('Control+PageDown');
+  assert.equal(await page.evaluate(()=>sheet().name),'Сценарии');
+  await page.keyboard.press('Control+PageUp');
+  assert.equal(await page.evaluate(()=>sheet().name),'Саморазвитие');
+  await page.locator('[data-action="sheet-navigator"]').click();
+  await page.locator('#qo-sheet-navigator input').fill('unknown');
+  assert.equal(await page.locator('.qo-nav-empty').count(),1);
+  await page.locator('#qo-sheet-navigator input').fill('Контент');
+  await page.keyboard.press('Enter');
+  assert.equal(await page.evaluate(()=>sheet().name),'Контент');
+  const tabs=page.locator('.sheet-tab');
+  const src=await tabs.nth(0).boundingBox(),dst=await tabs.nth(2).boundingBox();
+  await page.mouse.move(src.x+src.width/2,src.y+src.height/2);await page.mouse.down();
+  await page.mouse.move(dst.x+dst.width/2,dst.y+dst.height/2,{steps:12});await page.mouse.up();
+  assert.deepEqual(await tabs.allTextContents(),['Саморазвитие','Сценарии','Контент']);
+  await page.evaluate(()=>undo());
+  assert.deepEqual(await tabs.allTextContents(),['Контент','Саморазвитие','Сценарии']);
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-action="sheet-navigator"]').click();
+  assert.equal(await page.locator('#qo-sheet-navigator input').isVisible(),true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('#qo-sheet-navigator').count(),0);
+  assert.deepEqual(errors,[]);
+  console.log('PASS TASK127: navigator, search, shortcuts, drag, Undo and mobile');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exit(1);});

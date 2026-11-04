@@ -40,7 +40,7 @@ with sync_playwright() as p:
  page.get_by_role('button',name='Обзор').click()
  page.get_by_role('button',name='Шаблоны текстов').click()
  assert page.get_by_role('heading',name='Шаблоны текстов').is_visible()
- assert all(c.is_disabled() for c in page.locator('.template-card').all())
+ assert all(c.is_enabled() for c in page.locator('.template-card').all())
  page.get_by_role('button',name='На главную').click()
  page.get_by_role('button',name='Шаблоны презентаций').click()
  assert page.get_by_role('heading',name='Шаблоны презентаций').is_visible()

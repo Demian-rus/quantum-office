@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "name": "Без названия",
+  "width": 1100,
+  "height": 650,
+  "bg": "#ffffff",
+  "transparent": false,
+  "strokes": [
+    {
+      "id": "ps-1",
+      "tool": "text",
+      "color": "#137f5d",
+      "size": 42,
+      "fill": false,
+      "points": [
+        [
+          370,
+          325
+        ]
+      ],
+      "text": "Совместимость TASK 094",
+      "bold": false,
+      "rotation": 18,
+      "groupId": "g-ps-3"
+    },
+    {
+      "id": "ps-2",
+      "tool": "rect",
+      "color": "#137f5d",
+      "size": 7,
+      "fill": false,
+      "points": [
+        [
+          450,
+          255
+        ],
+        [
+          650,
+          395
+        ]
+      ],
+      "opacity": 0.65,
+      "groupId": "g-ps-3"
+    }
+  ],
+  "adjust": {
+    "brightness": 100,
+    "contrast": 100,
+    "saturation": 100
+  },
+  "imageSrc": ""
+}

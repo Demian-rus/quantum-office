@@ -20,13 +20,13 @@ with sync_playwright() as p:
  write('B2','Репетитор');select('B2')
  assert bg('B2')=='',bg('B2')
  page.get_by_role('button',name='Заливка ячеек').click()
- page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
- assert bg('B2')=='rgb(250, 204, 21)',bg('B2')
+ page.locator('[data-action=palette-pick][data-value="#FFFF00"]').click()
+ assert bg('B2')=='rgb(255, 255, 0)',bg('B2')
  # Ctrl+Z must work with the name field focused (previously treated as text-edit).
  page.locator('#name-box').focus();page.keyboard.press('Control+z')
  assert bg('B2')=='',bg('B2')
  page.locator('#name-box').focus();page.keyboard.press('Control+y')
- assert bg('B2')=='rgb(250, 204, 21)',bg('B2')
+ assert bg('B2')=='rgb(255, 255, 0)',bg('B2')
  select('B2')
  offsets=[]
  for label,expected in [('По левому краю','flex-start'),('По центру','center'),('По правому краю','flex-end')]:

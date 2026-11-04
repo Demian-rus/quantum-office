@@ -27,14 +27,14 @@ with sync_playwright() as p:
  write('A1','Исходное значение')
  assert cell('A1')['value']=='Исходное значение'
  page.get_by_role('button',name='Заливка ячеек').click()
- page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
- assert cell('A1')['style']['bg']=='#facc15'
+ page.locator('[data-action=palette-pick][data-value="#FFFF00"]').click()
+ assert cell('A1')['style']['bg']=='#FFFF00'
  shortcut('я','KeyZ')
  assert cell('A1')['style']=={},cell('A1')
  assert cell('A1')['value']=='Исходное значение'
  assert 'отменено' in page.locator('#toast').inner_text().lower()
  shortcut('н','KeyY')
- assert cell('A1')['style']['bg']=='#facc15'
+ assert cell('A1')['style']['bg']=='#FFFF00'
  # Physical keyboard and clipboard editing must share the same workbook history.
  select('A1');page.locator('#grid-scroll').focus();page.keyboard.press('Delete')
  assert cell('A1')['value']==''
@@ -83,7 +83,8 @@ with sync_playwright() as p:
  }""")
  assert status['spans']==2,status
  assert 'Quantum Sheets' not in status['text'] and 'строк ×' not in status['text'],status
- assert status['color']=='rgb(32, 43, 56)' and status['px']>=11,status
+ # TASK096: status follows the semantic text role, rather than a historical RGB.
+ assert status['color']==page.evaluate("()=>{const e=document.createElement('i');e.style.color='var(--qo-text)';document.body.append(e);const c=getComputedStyle(e).color;e.remove();return c}") and status['px']>=11,status
  assert not errors,errors
  print('PASS TASK035: Russian/Latin Ctrl+Z/Y, fill/delete, dirty formula guard, slider below headings, status contrast')
  browser.close()

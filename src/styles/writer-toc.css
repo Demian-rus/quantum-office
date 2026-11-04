@@ -1,0 +1,13 @@
+/* TASK138: editable document with an auto-generated, noneditable table of contents. */
+.qo-document-workspace #qo-writer-page [data-qo-toc="true"]{
+ display:block;box-sizing:border-box;margin:15px 0 19px;padding:12px 16px;
+ border:1px solid #cbd9ce;border-left:3px solid #3c9876;border-radius:6px;
+ background:rgba(88,150,111,.06);color:inherit;
+}
+.qo-document-workspace #qo-writer-page [data-qo-toc="true"] p{margin:5px 0;line-height:1.42}
+.qo-document-workspace #qo-writer-page [data-qo-toc="true"] p:first-child{margin-bottom:10px;font-size:17px}
+.qo-document-workspace #qo-writer-page [data-qo-toc="true"] a{color:#187257;text-decoration:underline;cursor:pointer}
+.qo-document-workspace #qo-writer-page [data-qo-toc="true"] a:hover{text-decoration:none}
+@media print{
+ .qo-document-workspace #qo-writer-page [data-qo-toc="true"]{background:transparent;border:0;padding:0}
+}

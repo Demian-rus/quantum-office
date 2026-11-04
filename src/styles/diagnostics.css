@@ -1,0 +1,99 @@
+
+.qo-document-workspace #qo-writer-edit-scroll[hidden],.qo-document-workspace #qo-diag-workspace[hidden]{display:none!important}
+.qo-document-workspace .qo-diag-scroll{background:var(--qo-bg);overflow:auto;display:block;padding:24px 16px 48px;color:var(--qo-text)}
+#qo-diag-root{width:min(900px,100%);margin:0 auto;font:14px/1.55 "Segoe UI",Arial,sans-serif}
+#qo-diag-root *{box-sizing:border-box}
+#qo-diag-root h1,#qo-diag-root h2,#qo-diag-root p{margin:0}
+#qo-diag-root h1{font-size:25px;line-height:1.25;letter-spacing:-.03em;margin:7px 0}
+#qo-diag-root h2{font-size:17px;font-weight:750}
+#qo-diag-root button,#qo-diag-root input,#qo-diag-root select,#qo-diag-root textarea{font:inherit}
+#qo-diag-root button{appearance:none;border:1px solid var(--qo-border);border-radius:8px;min-height:34px;padding:7px 12px;background:var(--qo-surface);color:var(--qo-text);font-weight:600;transition:background var(--qo-motion),border-color var(--qo-motion);cursor:pointer}
+#qo-diag-root button:not(:disabled):hover{background:var(--qo-hover);border-color:var(--qo-border-strong)}
+#qo-diag-root button:focus-visible,#qo-diag-root input:focus-visible,#qo-diag-root textarea:focus-visible,#qo-diag-root select:focus-visible{outline:2px solid var(--qo-focus);outline-offset:2px}
+#qo-diag-root button:disabled{opacity:.45;cursor:default}
+#qo-diag-root button.qd-primary{background:var(--qo-accent-fill);border-color:var(--qo-accent-fill);color:var(--qo-on-accent)}
+#qo-diag-root button.qd-primary:hover:not(:disabled){background:var(--qo-accent-fill-hover)}
+#qo-diag-root label{display:grid;gap:5px;color:var(--qo-muted);font-size:12px;font-weight:650}
+#qo-diag-root input,#qo-diag-root select,#qo-diag-root textarea{width:100%;background:var(--qo-surface);border:1px solid var(--qo-border-strong);border-radius:7px;padding:9px 10px;color:var(--qo-text)}
+#qo-diag-root textarea{resize:vertical;min-height:54px;line-height:1.45}
+#qo-diag-root .qd-top{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:18px}
+#qo-diag-root .qd-top p{color:var(--qo-muted);max-width:570px}
+#qo-diag-root .qd-eyebrow{color:var(--qo-muted);font-size:10px;font-weight:750;letter-spacing:.13em}
+#qo-diag-root .qd-actions{display:flex;background:var(--qo-surface-alt);padding:4px;border:1px solid var(--qo-border);border-radius:10px;flex-shrink:0;gap:4px}
+#qo-diag-root .qd-actions button{border-color:transparent;background:transparent}
+#qo-diag-root .qd-actions button.active{background:var(--qo-surface);border-color:var(--qo-border);box-shadow:0 1px 5px #0001;color:var(--qo-accent)}
+#qo-diag-root .qd-panel,#qo-diag-root .qd-card{background:var(--qo-surface);border:1px solid var(--qo-border);border-radius:11px;padding:17px;margin-bottom:11px}
+#qo-diag-root .qd-section{margin:20px 0 25px}
+#qo-diag-root .qd-section-title,#qo-diag-root .qd-section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:13px}
+#qo-diag-root .qd-section-title>span{color:var(--qo-muted);font-size:12px}
+#qo-diag-root .qd-card{padding:15px 17px}
+#qo-diag-root .qd-question{display:flex;align-items:flex-start;gap:11px}
+#qo-diag-root .qd-counter,#qo-diag-root .qd-index{color:var(--qo-muted);font-size:12px;font-weight:700}
+#qo-diag-root .qd-index{min-width:20px}
+#qo-diag-root .qd-question>div{min-width:0;flex:1}
+#qo-diag-root .qd-question p{font-size:15px;font-weight:600;overflow-wrap:anywhere;margin-top:3px}
+#qo-diag-root .qd-type{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--qo-muted)}
+#qo-diag-root .qd-card-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:13px;flex-wrap:wrap}
+#qo-diag-root button.qd-answer-toggle{font-size:12px;padding:6px 10px}
+#qo-diag-root .qd-rating{display:flex;align-items:center;gap:5px;flex-wrap:wrap}
+#qo-diag-root .qd-rating button{font-size:12px;white-space:nowrap;min-height:30px;padding:5px 9px}
+#qo-diag-root .qd-rating [data-mark="yes"].selected{background:var(--qo-success-soft);color:var(--qo-success);border-color:var(--qo-success)}
+#qo-diag-root .qd-rating [data-mark="partial"].selected{background:var(--qo-warning-soft);color:var(--qo-warning);border-color:var(--qo-warning)}
+#qo-diag-root .qd-rating [data-mark="no"].selected{background:var(--qo-danger-soft);color:var(--qo-danger);border-color:var(--qo-danger)}
+#qo-diag-root .qd-answer{background:var(--qo-surface-alt);border-radius:8px;padding:12px 14px;margin-top:12px;overflow-wrap:anywhere}
+#qo-diag-root .qd-answer strong{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-answer p{margin-top:4px}
+#qo-diag-root .qd-meta{display:grid;gap:13px}
+#qo-diag-root .qd-row{display:flex;align-items:center;justify-content:space-between;gap:9px}
+#qo-diag-root .qd-wrap{flex-wrap:wrap}
+#qo-diag-root .qd-editor-section{background:var(--qo-surface-alt);padding:16px;border:1px solid var(--qo-border);border-radius:11px}
+#qo-diag-root .qd-section-head label{flex:1}
+#qo-diag-root .qd-section-head button{font-size:12px}
+#qo-diag-root .qd-edit-card{display:grid;gap:11px}
+#qo-diag-root .qd-card-head{display:flex;align-items:center;gap:9px}
+#qo-diag-root .qd-card-head select{margin-left:auto;max-width:144px;font-size:12px;min-height:32px}
+#qo-diag-root .qd-card-head button{font-size:12px;min-height:32px}
+#qo-diag-root .qd-bottom-actions{display:flex;justify-content:space-between;flex-wrap:wrap}
+#qo-diag-root .qd-session-panel{display:flex;align-items:flex-end;justify-content:space-between;gap:15px}
+#qo-diag-root .qd-session-panel label{min-width:200px;max-width:310px;flex:1}
+#qo-diag-root .qd-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:15px}
+#qo-diag-root .qd-metrics>div{display:grid;gap:1px;text-align:center}
+#qo-diag-root .qd-metrics strong{font-size:27px;font-weight:750;font-variant-numeric:tabular-nums}
+#qo-diag-root .qd-metrics span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-good{color:var(--qo-success)}
+#qo-diag-root .qd-partial{color:var(--qo-warning)}
+#qo-diag-root .qd-bad{color:var(--qo-danger)}
+#qo-diag-root .qd-progress{background:var(--qo-surface-raised);height:9px;border-radius:999px;overflow:hidden;display:flex;margin:14px 0 10px}
+#qo-diag-root .qd-progress-good{background:#3eaa75}
+#qo-diag-root .qd-progress-partial{background:#d9a24a}
+#qo-diag-root .qd-progress-bad{background:#d15b65}
+#qo-diag-root .qd-percent{color:var(--qo-muted);font-size:12px}
+#qo-diag-root .qd-topic-results{margin-top:13px;border-top:1px solid var(--qo-border)}
+#qo-diag-root .qd-topic-results>div{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--qo-border);font-size:12px}
+#qo-diag-root .qd-topic-results>div>span:last-child{color:var(--qo-muted);white-space:nowrap}
+#qo-diag-root .qd-history .qd-row{margin-bottom:12px}
+#qo-diag-root .qd-history>p{color:var(--qo-muted);font-size:12px}
+#qo-diag-root .qd-history-list>div{display:flex;align-items:center;gap:14px;padding:9px 0;border-top:1px solid var(--qo-border)}
+#qo-diag-root .qd-history-list>div span:first-child{flex:1}
+#qo-diag-root .qd-history-list small{display:block;color:var(--qo-muted)}
+#qo-diag-root .qd-history-list strong{font-size:16px}
+#qo-diag-root .qd-history-list>div span:last-child{font-size:12px;color:var(--qo-muted)}
+#qo-diag-root .qd-filebar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:13px 0 26px;border-top:1px solid var(--qo-border)}
+#qo-diag-root .qd-filebar span{font-size:11px;color:var(--qo-muted);margin-left:auto}
+@media(max-width:720px){
+.qo-document-workspace .qo-diag-scroll{padding:14px 10px 30px}
+#qo-diag-root .qd-top{display:block}
+#qo-diag-root .qd-top h1{font-size:20px}
+#qo-diag-root .qd-actions{display:inline-flex;margin-top:12px}
+#qo-diag-root .qd-session-panel{align-items:stretch;flex-direction:column}
+#qo-diag-root .qd-session-panel label{max-width:none}
+#qo-diag-root .qd-card-actions{align-items:flex-start}
+#qo-diag-root .qd-rating{width:100%}
+#qo-diag-root .qd-rating button{flex:1;padding:5px}
+#qo-diag-root .qd-section-head{flex-wrap:wrap}
+#qo-diag-root .qd-section-head label{flex-basis:65%}
+}
+@media print{
+.qo-document-workspace .qo-office-toolbar,.qo-document-workspace .qo-editor-foot,#qo-diag-root button,#qo-diag-root .qd-filebar,#qo-diag-root .qd-session-panel{display:none!important}
+#qo-diag-root .qd-card{break-inside:avoid}
+}

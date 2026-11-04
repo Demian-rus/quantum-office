@@ -1,0 +1,98 @@
+/* TASK117 — consistent toolbars; Sheets is the 78px reference. */
+.ribbon .ribbon-controls,
+.ribbon:has(.ribbon-group[aria-label="Условия"]) .ribbon-controls{
+ box-sizing:border-box;height:78px;min-height:78px;max-height:78px;
+}
+.ribbon:has(.ribbon-group[aria-label="Условия"]) .ribbon-group{height:73px}
+.ribbon:has(.ribbon-group[aria-label="Условия"]) .ribbon-group-content{
+ height:54px;min-height:54px;grid-template-rows:repeat(2,26px);
+ row-gap:2px;align-content:center;
+}
+.ribbon:has(.ribbon-group[aria-label="Условия"]) .ribbon-group .tool-btn.is-formula-fn{
+ height:26px;min-height:26px;
+}
+.qo-document-workspace .qo-work-ribbon,
+.qo-slides-workspace .qo-work-ribbon{
+ box-sizing:border-box;height:78px;min-height:78px;max-height:78px;
+}
+.qo-document-workspace .qo-work-panel,
+.qo-slides-workspace .qo-work-panel{
+ box-sizing:border-box;height:78px;min-height:78px;max-height:78px;
+ padding-top:2px;padding-bottom:1px;
+}
+.qo-document-workspace .qo-work-group{
+ height:74px;padding-top:1px;padding-bottom:0;
+}
+/* Preserve two-row tile groups, scaled to a standard 78px ribbon. */
+.qo-document-workspace:has([data-panel-tab="diagnostic"].active) .qo-work-ribbon{
+ height:78px;min-height:78px;max-height:78px;
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"]{
+ height:78px;min-height:78px;max-height:78px;padding:2px 10px 1px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group{
+ height:74px;padding:0 10px;gap:0;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-group-body{
+ height:59px;min-height:59px;max-height:59px;
+ grid-template-columns:repeat(2,minmax(126px,145px));
+ grid-template-rows:repeat(2,28px);gap:3px 5px;align-content:center;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn{
+ height:28px;min-height:28px;max-height:28px;padding:3px 8px;font-size:11px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn span{
+ font-size:11px;line-height:1.15;white-space:nowrap;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-icon{
+ width:16px;height:16px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group{
+ height:74px;padding:0 12px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group .qo-work-group-body{
+ min-height:57px;height:57px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-ribbon-guide{
+ padding:2px 3px;gap:3px;font-size:11px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-work-group-caption{
+ height:12px;line-height:12px;
+}
+/* Constructor buttons share one bottom baseline with the template select. */
+#qo-diag-root .qd-builder-tools{
+ align-items:flex-end;row-gap:8px;
+}
+#qo-diag-root .qd-workbench-main .qd-builder-tools{align-items:flex-end}
+#qo-diag-root .qd-builder-tools>button,
+#qo-diag-root .qd-builder-tools>.qd-template-selector select{
+ box-sizing:border-box;height:35px;min-height:35px;max-height:35px;
+}
+#qo-diag-root .qd-builder-tools>.qd-template-selector{
+ align-self:flex-end;margin:0;
+}
+#qo-diag-root .qd-builder-tools>.qd-count-pill{align-self:flex-end}
+/* Session actions: reset aligns with input, select and add-profile button. */
+#qo-diag-root .qd-session-panel{
+ align-items:flex-end;gap:12px;
+}
+#qo-diag-root .qd-session-panel>.qd-row{
+ align-self:flex-end;align-items:flex-end;justify-content:flex-end;
+ max-width:none;margin:0;
+}
+#qo-diag-root .qd-student-chooser{align-items:end}
+#qo-diag-root .qd-student-chooser>button,
+#qo-diag-root .qd-session-panel>.qd-row>button{
+ box-sizing:border-box;min-height:35px;height:35px;
+}
+/* Space between session setup, view choice and actual lesson. */
+#qo-diag-root.qd-focused-root .qd-session-drawer{margin-bottom:12px}
+#qo-diag-root .qd-session .qd-view-switch{margin-bottom:12px}
+#qo-diag-root .qd-session .qd-guided{margin-top:0}
+@media(max-width:720px){
+ #qo-diag-root .qd-session-panel{align-items:stretch}
+ #qo-diag-root .qd-session-panel>.qd-row{
+   align-self:stretch;justify-content:flex-start;
+ }
+ #qo-diag-root .qd-builder-tools{align-items:flex-end}
+}

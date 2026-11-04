@@ -1,17 +1,74 @@
+export {cellName,parseCell};
 import { cellName,parseCell,colLabel,evaluateCell,createCalculationSession,csvEncode,csvDecode } from './formulas.js';
 import {formatTemporal,parseTemporalInput} from './dates.js';
 import {validateCharts} from './charts.js';
 import {validateConditionalRules} from './conditional.js';
 import {validateDataRules,checkValidatedInput} from './validation.js';
 import {validatePrintSettings} from './printing.js';
+
+
+
+
+
+
 export const uid=()=>globalThis.crypto?.randomUUID?.()??`q-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 export const stamp=()=>new Date().toISOString();
 // 100k virtual rows; populated cell count stays capped independently.
 export const LIMITS={rows:100000,columns:100,cells:50000,sheets:25};
-export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,merges:[],defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
+export function newSheet(name='Лист 1') {return {id:uid(),name,cells:{},charts:[],conditionalRules:[],validations:[],printSettings:{paper:'A4',orientation:'portrait',scale:100,fitWidth:true,area:null},columnWidths:{},rowHeights:{},hiddenRows:{},hiddenColumns:{},freeze:{rows:0,cols:0},autoFilter:null,smartTable:null,merges:[],hyperlinks:{},defaultAlign:null,defaultStyle:{},columnStyles:{},rowStyles:{},rectangleStyles:[]};}
 export function newWorkbook(name='Новая таблица') {const sheet=newSheet();return {id:uid(),type:'sheet',name,created:stamp(),updated:stamp(),sheets:[sheet],activeSheetId:sheet.id};}
 export function currentSheet(book){return book.sheets.find(s=>s.id===book.activeSheetId)||book.sheets[0];}
-export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:520,minRow:22,maxRow:160};
+
+/** TASK126: duplicate the entire worksheet, including styling, layouts, charts and rules. */
+export function duplicateWorksheet(book,sheetId){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ if(book.sheets.length>=LIMITS.sheets)throw Error('Лимит: 25 листов');
+ const index=book.sheets.findIndex(s=>s.id===sheetId);
+ if(index<0)throw Error('Лист не найден');
+ const source=book.sheets[index];
+ const taken=new Set(book.sheets.map(s=>s.name.toLocaleLowerCase('ru-RU')));
+ let name=null;
+ for(let n=1;n<=1000;n++){
+  const suffix=n===1?' — копия':' — копия ('+n+')';
+  const candidate=source.name.slice(0,Math.max(1,31-suffix.length)).trimEnd()+suffix;
+  if(!taken.has(candidate.toLocaleLowerCase('ru-RU'))){name=candidate;break;}
+ }
+ if(!name)throw Error('Не удалось подобрать название копии');
+ const clone=structuredClone(source);
+ clone.id=uid();
+ clone.name=name;
+ if(Array.isArray(clone.charts))for(const item of clone.charts)item.id=uid();
+ if(Array.isArray(clone.conditionalRules))for(const item of clone.conditionalRules)item.id=uid();
+ if(Array.isArray(clone.validations))for(const item of clone.validations)item.id=uid();
+ book.sheets.splice(index+1,0,clone);
+ book.activeSheetId=clone.id;
+ return clone;
+}
+/** TASK127: reorder a worksheet directly to another tab; data, references and active ID remain unchanged. */
+export function reorderWorksheet(book,sourceId,targetId){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const from=book.sheets.findIndex(s=>s.id===sourceId),
+  to=book.sheets.findIndex(s=>s.id===targetId);
+ if(from<0||to<0)throw Error('Лист не найден');
+ if(from===to)return false;
+ const [moving]=book.sheets.splice(from,1);
+ book.sheets.splice(to,0,moving);
+ return true;
+}
+/** TASK126: move left/right without altering any names, formulas or active sheet ID. */
+export function moveWorksheet(book,sheetId,shift){
+ if(!book||!Array.isArray(book.sheets)||![1,-1].includes(shift))
+  throw Error('Неверные параметры перемещения листа');
+ const index=book.sheets.findIndex(s=>s.id===sheetId);
+ if(index<0)throw Error('Лист не найден');
+ const target=index+shift;
+ if(target<0||target>=book.sheets.length)return false;
+ const [moving]=book.sheets.splice(index,1);
+ book.sheets.splice(target,0,moving);
+ return true;
+}
+
+export const DIMENSIONS={defaultColumn:116,defaultRow:29,minColumn:48,maxColumn:3000,minRow:22,maxRow:2000,maxDefaultRow:300};
 const geometryCache=new WeakMap();
 export function invalidateGridGeometry(sheet){if(sheet&&typeof sheet==='object')geometryCache.delete(sheet);}
 export function columnWidth(sheet,index){return sheet.columnWidths?.[index]??sheet.defaultColumnWidth??DIMENSIONS.defaultColumn;}
@@ -46,17 +103,111 @@ export function showAllHidden(sheet,axis){
 }
 /** Filters never move or delete source cells. Only row visibility is changed. */
 export function filterRange(sheet){const value=sheet.autoFilter;return value?rectangle(value.from,value.to):null;}
+const QO_FILTER_OPS=new Set(['contains','notContains','startsWith','endsWith','equals','notEquals','empty','notEmpty','gt','gte','lt','lte','numEq','numNe']);
+const QO_FILTER_NUMERIC=new Set(['gt','gte','lt','lte','numEq','numNe']);
+export function validFilterRule(rule){
+ if(typeof rule==='string')return rule.length<=50000;
+ if(Array.isArray(rule))return rule.length>0&&rule.length<=200&&rule.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(rule).size===rule.length;
+ return !!rule&&typeof rule==='object'&&!Array.isArray(rule)&&rule.kind==='condition'&&
+  Object.keys(rule).every(k=>['kind','op','value'].includes(k))&&QO_FILTER_OPS.has(rule.op)&&
+  typeof rule.value==='string'&&rule.value.length<=200&&
+  (['empty','notEmpty'].includes(rule.op)||rule.value.trim().length>0)&&
+  (!QO_FILTER_NUMERIC.has(rule.op)||Number.isFinite(Number(rule.value)));
+}
+export function filterConditionMatches(raw,rule){
+ const value=String(raw??''),test=rule.value.toLocaleLowerCase('ru-RU'),text=value.toLocaleLowerCase('ru-RU');
+ switch(rule.op){
+  case 'empty':return value==='';case 'notEmpty':return value!=='';
+  case 'contains':return text.includes(test);case 'notContains':return !text.includes(test);
+  case 'startsWith':return text.startsWith(test);case 'endsWith':return text.endsWith(test);
+  case 'equals':return text===test;case 'notEquals':return text!==test;
+  default:{if(!/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(value.trim()))return false;
+   const a=Number(value),b=Number(rule.value);if(!Number.isFinite(a)||!Number.isFinite(b))return false;
+   return rule.op==='gt'?a>b:rule.op==='gte'?a>=b:rule.op==='lt'?a<b:rule.op==='lte'?a<=b:rule.op==='numEq'?a===b:a!==b;
+  }
+ }
+}
 export function filterRowVisible(sheet,row){
  const rect=filterRange(sheet),rules=sheet.autoFilter?.rules||{};
  if(!rect||row<=rect.r1||row>rect.r2)return true;
  return Object.entries(rules).every(([col,needles])=>{
-   const value=getCell(sheet,cellName(row,Number(col))).value;
-   return Array.isArray(needles)?needles.includes(value):value===needles;
-  });
+  const value=getCell(sheet,cellName(row,Number(col))).value;
+  return Array.isArray(needles)?needles.includes(value):typeof needles==='string'?value===needles:filterConditionMatches(value,needles);
+ });
 }
 export function setFreeze(sheet,rows,cols){
  if(!Number.isInteger(rows)||!Number.isInteger(cols)||rows<0||rows>10||cols<0||cols>10)throw Error('Закрепить можно не более 10 строк и столбцов');
  sheet.freeze={rows,cols};
+}
+export function smartTableRange(sheet){return sheet?.smartTable?rectangle(sheet.smartTable.from,sheet.smartTable.to):null;}
+export function createSmartTable(sheet,from,to){
+ const r=rectangle(from,to);
+ if(!r||!validRef(from)||!validRef(to)||r.r2<=r.r1||r.r2-r.r1+1>5000)
+  throw Error('Диапазон должен содержать заголовок и минимум одну строку данных (до 5000 строк)');
+ const old=smartTableRange(sheet),same=old&&old.r1===r.r1&&old.r2===r.r2&&old.c1===r.c1&&old.c2===r.c2;
+ if(same)return 'existing';
+ if(old){
+  const encloses=old.r1>=r.r1&&old.r2<=r.r2&&old.c1>=r.c1&&old.c2<=r.c2;
+  const subset=old.r1<=r.r1&&old.r2>=r.r2&&old.c1<=r.c1&&old.c2>=r.c2;
+  if(subset)throw Error('Выделение входит в существующую умную таблицу. Отдельная таблица внутри неё не создаётся');
+  if(!encloses)throw Error('На листе поддерживается одна умная таблица. Для отдельного списка используется другой лист');
+  if(sheet.autoFilter&&(
+    sheet.autoFilter.from!==cellName(old.r1,old.c1)||sheet.autoFilter.to!==cellName(old.r2,old.c2)))
+   throw Error('Выключите автофильтр другого диапазона перед расширением умной таблицы');
+ }else if(sheet.autoFilter&&(
+  sheet.autoFilter.from!==cellName(r.r1,r.c1)||sheet.autoFilter.to!==cellName(r.r2,r.c2)))
+  throw Error('Автофильтр установлен для другого диапазона. Сначала отключите его');
+ const conflictingMerges=(sheet.merges||[]).filter(m=>{const q=rectangle(m.from,m.to);return q&&q.r1<=r.r2&&q.r2>=r.r1&&q.c1<=r.c2&&q.c2>=r.c1;});
+ if(conflictingMerges.length)
+  throw Error('Объединённые ячейки не поддерживаются: '+conflictingMerges.slice(0,3).map(m=>m.from+':'+m.to).join(', '));
+ for(let c=r.c1;c<=r.c2;c++){
+  if(!getCell(sheet,cellName(r.r1,c)).value.trim())throw Error('Не заполнен заголовок столбца '+colLabel(c));
+ }
+ // Headers may repeat: filters use fixed column indices, not header text.
+ // Expansion is safe when it encloses the prior table and preserves all cells.
+ const oldFilter=sheet.autoFilter;
+ if(old&&oldFilter&&oldFilter.from===sheet.smartTable.from&&oldFilter.to===sheet.smartTable.to){sheet.autoFilter=null;}
+ sheet.smartTable={from:cellName(r.r1,r.c1),to:cellName(r.r2,r.c2)};
+ if(!sheet.autoFilter)setAutoFilter(sheet,sheet.smartTable.from,sheet.smartTable.to);
+ for(let c=r.c1;c<=r.c2;c++){
+  const ref=cellName(r.r1,c),prior=getEffectiveStyle(sheet,ref);
+  const patch={bold:true};
+  if(!prior.bg)patch.bg='#E6F2EB';
+  if(!prior.color)patch.color='#174F3A';
+  setStyle(sheet,ref,patch);
+ }
+ return old?'expanded':'created';
+}
+export function appendSmartTableRow(sheet,editedRef=null){
+ const r=smartTableRange(sheet);
+ if(!r)throw Error('Умная таблица не найдена');
+ if(r.r2+1>=LIMITS.rows||r.r2-r.r1+1>=5000)throw Error('Лимит умной таблицы: 5000 строк');
+ const next=r.r2+1,edited=editedRef?.toUpperCase();
+ for(let col=r.c1;col<=r.c2;col++){
+  const dest=cellName(next,col),src=cellName(r.r2,col),existing=getCell(sheet,dest),previous=getCell(sheet,src);
+  if(mergeAt(sheet,dest))throw Error('Нельзя расширить таблицу на объединённые ячейки');
+  const style=structuredClone(previous.style||{});
+  // Inherit the previous row's explicit cell formatting without replacing user-entered values.
+  if(!Object.keys(existing.style||{}).length&&Object.keys(style).length)setStyle(sheet,dest,style);
+  if(dest!==edited&&!existing.value&&previous.value.startsWith('='))
+   setCell(sheet,dest,translateFormula(previous.value,1,0));
+ }
+ sheet.smartTable={...sheet.smartTable,to:cellName(next,r.c2)};
+ if(sheet.autoFilter?.from===cellName(r.r1,r.c1)&&sheet.autoFilter?.to===cellName(r.r2,r.c2))
+  sheet.autoFilter={...sheet.autoFilter,to:cellName(next,r.c2)};
+ invalidateGridGeometry(sheet);
+ return next;
+}
+export function extendSmartTableAfterEntry(sheet,ref,input){
+ const r=smartTableRange(sheet),p=parseCell(ref);
+ if(r&&p&&p.row===r.r2+1&&p.col>=r.c1&&p.col<=r.c2&&String(input??'').trim())
+  appendSmartTableRow(sheet,ref);
+}
+export function removeSmartTable(sheet){
+ if(!sheet.smartTable)throw Error('На листе нет умной таблицы');
+ if(sheet.autoFilter?.from===sheet.smartTable.from&&sheet.autoFilter?.to===sheet.smartTable.to)
+  sheet.autoFilter=null;
+ sheet.smartTable=null;invalidateGridGeometry(sheet);
 }
 export function setAutoFilter(sheet,from,to){
  const rect=rectangle(from,to);
@@ -67,10 +218,7 @@ export function setAutoFilter(sheet,from,to){
 export function setFilterValue(sheet,col,value){
  const rect=filterRange(sheet);
  if(!rect||!Number.isInteger(col)||col<rect.c1||col>rect.c2)throw Error('Столбец не входит в фильтр');
- if(value!==null){
-   const validString=v=>typeof v==='string'&&v.length<=50000;
-   if(!(validString(value)||(Array.isArray(value)&&value.length>0&&value.length<=200&&value.every(validString)&&new Set(value).size===value.length)))throw Error('Недопустимое значение фильтра');
-  }
+ if(value!==null&&!validFilterRule(value))throw Error('Недопустимое значение фильтра');
  const rules={...(sheet.autoFilter.rules||{})};
  if(value===null)delete rules[col];else rules[col]=value;
  sheet.autoFilter={...sheet.autoFilter,rules};invalidateGridGeometry(sheet);
@@ -130,7 +278,8 @@ export function getEffectiveStyle(sheet,ref,includeCell=true){
  for(const key of Object.keys(style))if(style[key]===null)delete style[key];
  return style;
 }
-const bulkStyleProps=new Set(['bg','color','bold','italic','wrap','format','align','fontSize']);
+export const FONT_FAMILIES=['Aptos','Calibri','Arial','Segoe UI','Verdana','Tahoma','Trebuchet MS','Georgia','Times New Roman','Cambria','Constantia','Candara','Corbel','Consolas','Courier New','Palatino Linotype','Garamond','Book Antiqua','Century Gothic','Franklin Gothic Medium','Arial Black','Impact','Comic Sans MS','Segoe Print','Gabriola','Lucida Handwriting','Brush Script MT','Copperplate','Old English Text MT','PT Sans','PT Serif','Roboto','Noto Sans','Noto Serif','Open Sans','DejaVu Sans','Liberation Sans','Liberation Serif'];
+const bulkStyleProps=new Set(['bg','color','bold','italic','underline','strike','wrap','format','align','verticalAlign','fontSize','fontFamily']);
 export const MAX_RECTANGLE_STYLES=256;
 const intersects=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
 /** Pure subtraction, splits a rectangle into up to four untouched fragments. */
@@ -210,7 +359,44 @@ export function setBulkColumnStyle(sheet,from,to,patch){
  sheet.defaultStyle=next;sheet.columnStyles=columns;sheet.rectangleStyles=remainingRectangleStyles;
 }
 
-export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');checkValidatedInput(sheet,ref,String(value??'').slice(0,50000));const key=ref.toUpperCase();if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value&&!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];if(sheet.autoFilter)invalidateGridGeometry(sheet);}
+// External hyperlinks are data, not HTML: never accept script, data or file schemes.
+export function safeHyperlink(value){
+ if(typeof value!=='string'||value.length>2048||/[\x00-\x1f\x7f]/.test(value))return null;
+ const input=value.trim();if(input!==value||!input)return null;
+ try{
+  const url=new URL(input);
+  if(!['https:','http:','mailto:'].includes(url.protocol))return null;
+  if(url.protocol==='mailto:'&&!url.pathname)return null;
+  if(['http:','https:'].includes(url.protocol)&&!url.hostname)return null;
+  return input;
+ }catch{return null;}
+}
+export function cellHyperlink(sheet,ref){
+ const stored=sheet.hyperlinks?.[ref];if(stored)return safeHyperlink(stored);
+ const value=getCell(sheet,ref).value;
+ return /^https?:\/\//i.test(value)?safeHyperlink(value):null;
+}
+export function setHyperlink(sheet,ref,url,label){
+ if(!validRef(ref))throw Error('Некорректная ячейка для гиперссылки');
+ const normalized=safeHyperlink(String(url||'').trim());
+ if(!normalized)throw Error('Разрешены только ссылки https://, http:// и mailto:');
+ const caption=String(label||'').trim()||normalized;
+ if(caption.length>50000)throw Error('Слишком длинная подпись гиперссылки');
+ setCell(sheet,ref,caption);
+ (sheet.hyperlinks??={})[ref]=normalized;
+}
+export function removeHyperlink(sheet,ref){
+ if(sheet.hyperlinks)delete sheet.hyperlinks[ref];
+}
+export function exportedHyperlinks(sheet){
+ const entries=new Map();
+ for(const [ref,url] of Object.entries(sheet.hyperlinks||{}))if(safeHyperlink(url)&&getCell(sheet,ref).value)entries.set(ref,url);
+ for(const [ref,cell] of Object.entries(sheet.cells))if(!entries.has(ref)&&/^https?:\/\//i.test(cell.value)){
+  const link=safeHyperlink(cell.value);if(link)entries.set(ref,link);
+ }
+ return [...entries].sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true}));
+}
+export function setCell(sheet,ref,value){if(!validRef(ref))throw Error('Адрес ячейки вне диапазона');checkValidatedInput(sheet,ref,String(value??'').slice(0,50000));const key=ref.toUpperCase();if(sheet.hyperlinks&&sheet.cells[key]?.value!==String(value??'').slice(0,50000))delete sheet.hyperlinks[key];if(!sheet.cells[key])sheet.cells[key]={value:'',style:{}};sheet.cells[key].value=String(value??'').slice(0,50000);if(!sheet.cells[key].value){if(sheet.hyperlinks)delete sheet.hyperlinks[key];if(!Object.keys(sheet.cells[key].style||{}).length)delete sheet.cells[key];}if(sheet.autoFilter)invalidateGridGeometry(sheet);}
 /** Convert explicit calendar/time input to serial values only for direct user entry.
  * All file import, clipboard and formula editing outside the UI preserve their raw values. */
 export function setTypedCell(sheet,ref,input){
@@ -219,6 +405,7 @@ export function setTypedCell(sheet,ref,input){
  if(parsed)setStyle(sheet,ref,{format:parsed.format});
  else if(typeof input==='string'&&/^=\s*(?:DATE|TODAY)\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'date'});
  else if(typeof input==='string'&&/^=\s*TIME\s*\(/i.test(input)&&(!getEffectiveStyle(sheet,ref).format||getEffectiveStyle(sheet,ref).format==='general'))setStyle(sheet,ref,{format:'time'});
+ extendSmartTableAfterEntry(sheet,ref,input);
 }
 /** Full-sheet alignment is one property, not 200,000 styled cells.
  * Existing per-cell alignments are reset so this action truly affects all cells.
@@ -279,6 +466,7 @@ export function clearCellValues(sheet,from,to,inspectOnly=false){
   if(!entry.value)continue;
   count++;
   if(!inspectOnly){
+   if(sheet.hyperlinks)delete sheet.hyperlinks[ref];
    if(Object.keys(entry.style||{}).length)sheet.cells[ref]={...entry,value:''};
    else delete sheet.cells[ref];
   }
@@ -413,7 +601,7 @@ export function fillTypedAreas(sheet,areas,input,origin){
  * Reject overlaps: otherwise the fill source could be modified by another selected area. */
 export function fillAreasDirection(sheet,areas,direction){
  if(!Array.isArray(areas)||areas.length<1||areas.length>25||
-    !['down','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
+    !['up','down','left','right'].includes(direction))throw Error('Недопустимые параметры заполнения');
  const rects=areas.map(a=>{
   if(!validRef(a.from)||!validRef(a.to))throw Error('Недопустимый диапазон');
   return rectangle(a.from,a.to);
@@ -432,30 +620,108 @@ export function fillAreasDirection(sheet,areas,direction){
  const staged=structuredClone(sheet);
  let filled=0;
  for(const a of rects)
-  filled+=fillSelection(staged,cellName(a.r1,a.c1),cellName(a.r2,a.c2),direction);
+  filled+=fillSelectionInto(staged,cellName(a.r1,a.c1),cellName(a.r2,a.c2),direction);
  if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
  sheet.cells=staged.cells;
  if(sheet.autoFilter)invalidateGridGeometry(sheet);
  return filled;
 }
 
+/** Recognise IDs and labels with a changing final number, e.g. QX-001, Lesson 3.
+ * For two or more seeds, only extrapolate a consistent arithmetic progression.
+ * Preserve original prefix/suffix and leading zeros without treating plain numbers as IDs. */
+function labeledFillSequence(source){
+ const parts=source.map(({cell})=>{
+  const value=cell.value;
+  if(typeof value!=='string'||value.startsWith('=')||
+     /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(value.trim()))return null;
+  const match=/^(.*?)(\d+)([^\d]*)$/.exec(value);
+  if(!match||(!match[1]&&!match[3]))return null;
+  const n=Number(match[2]);
+  return Number.isSafeInteger(n)?{prefix:match[1],digits:match[2],suffix:match[3],n}:null;
+ });
+ if(parts.some(p=>!p))return null;
+ const first=parts[0];
+ if(parts.some(p=>p.prefix!==first.prefix||p.suffix!==first.suffix))return null;
+ const step=parts.length>1?parts[1].n-first.n:1;
+ if(!Number.isSafeInteger(step)||
+    parts.some((p,i)=>p.n!==first.n+step*i))return null;
+ const pad=parts.some(p=>p.digits.length>1&&p.digits[0]==='0')?
+  Math.max(...parts.map(p=>p.digits.length)):0;
+ return index=>{
+  const number=first.n+step*index;
+  if(!Number.isSafeInteger(number)||Math.abs(number)>1e15)
+   throw Error('Числовая последовательность выходит за пределы допустимых значений');
+  return first.prefix+(number<0?'-':'')+
+   String(Math.abs(number)).padStart(pad,'0')+first.suffix;
+ };
+}
+/** TASK125: Infer ISO calendar dates, including leap days. */
+function isoDateFillSequence(source){
+ const dates=source.map(({cell})=>{
+  const v=cell.value;
+  if(typeof v!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(v))return null;
+  const d=new Date(v+'T00:00:00Z');
+  return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===v?d.getTime():null;
+ });
+ if(dates.some(d=>d===null))return null;
+ const day=86400000,step=dates.length>1?(dates[1]-dates[0])/day:1;
+ if(!Number.isSafeInteger(step)||dates.some((d,i)=>d!==dates[0]+step*i*day))return null;
+ return index=>{
+  const ms=dates[0]+step*index*day,d=new Date(ms);
+  if(!Number.isFinite(ms)||!Number.isFinite(d.getTime())||d.getUTCFullYear()>9999||d.getUTCFullYear()<1)
+   throw Error('Дата выходит за допустимые пределы календаря');
+  return d.toISOString().slice(0,10);
+ };
+}
+/** TASK125: Russian day/month sequences, preserving input capitalization. */
+function namedFillSequence(source){
+ const groups=[
+  ['пн','вт','ср','чт','пт','сб','вс'],
+  ['понедельник','вторник','среда','четверг','пятница','суббота','воскресенье'],
+  ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'],
+  ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']
+ ];
+ const samples=source.map(e=>e.cell.value);
+ if(samples.some(v=>typeof v!=='string'||!v.trim()))return null;
+ const group=groups.find(g=>samples.every(v=>g.includes(v.toLocaleLowerCase('ru-RU'))));
+ if(!group)return null;
+ const numbers=samples.map(v=>group.indexOf(v.toLocaleLowerCase('ru-RU'))),length=group.length;
+ let step=1;
+ if(numbers.length>1){
+  step=(numbers[1]-numbers[0]+length)%length;
+  if(step>length/2)step-=length;
+  if(numbers.some((n,i)=>n!==((numbers[0]+step*i)%length+length)%length))return null;
+ }
+ const first=samples[0],upper=first===first.toLocaleUpperCase('ru-RU'),
+  capital=first[0]===first[0].toLocaleUpperCase('ru-RU');
+ return index=>{
+  const item=group[((numbers[0]+step*index)%length+length)%length];
+  return upper?item.toLocaleUpperCase('ru-RU'):
+   capital?item[0].toLocaleUpperCase('ru-RU')+item.slice(1):item;
+ };
+}
 /** TASK070: extend one rectangle through its Excel-like drag fill handle.
- * Numeric sequences (2+ evenly spaced entries) continue; formulas translate;
- * all other entries cycle, preserving cell styles. One atomic staged write. */
-export function extendFillHandle(sheet,from,to,direction,targetIndex){
- if(!['down','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
+ * Numeric and prefixed-number sequences continue; formulas translate;
+ * plain text cycles. Ctrl+drag copies source values. One atomic staged write. */
+export function extendFillHandle(sheet,from,to,direction,targetIndex,fillMode='auto'){
+ if(!['auto','copy','values','formats'].includes(fillMode))throw Error('Недопустимый режим автозаполнения');
+ if(!['up','down','left','right'].includes(direction))throw Error('Недопустимое направление автозаполнения');
  if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон для автозаполнения');
- const a=rectangle(from,to),last=direction==='down'?a.r2:a.c2,
-  bound=direction==='down'?LIMITS.rows:LIMITS.columns;
- if(!Number.isInteger(targetIndex)||targetIndex<=last||targetIndex>=bound)
-  throw Error('Перетащите маркер ниже или правее выделения');
- const length=direction==='down'?a.r2-a.r1+1:a.c2-a.c1+1,
-  width=direction==='down'?a.c2-a.c1+1:a.r2-a.r1+1,
-  steps=targetIndex-last;
+ const a=rectangle(from,to),vertical=direction==='up'||direction==='down',
+  reverse=direction==='up'||direction==='left',
+  first=vertical?a.r1:a.c1,last=vertical?a.r2:a.c2,
+  edge=reverse?first:last,bound=vertical?LIMITS.rows:LIMITS.columns;
+ if(!Number.isInteger(targetIndex)||targetIndex<0||targetIndex>=bound||
+    (reverse?targetIndex>=edge:targetIndex<=edge))
+  throw Error(reverse?'Перетащите маркер выше или левее выделения':'Перетащите маркер ниже или правее выделения');
+ const length=last-first+1,
+  width=vertical?a.c2-a.c1+1:a.r2-a.r1+1,
+  steps=Math.abs(targetIndex-edge);
  if((a.r2-a.r1+1)*(a.c2-a.c1+1)>10000||steps*width>10000)
   throw Error('Автозаполнение ограничено 10 000 ячеек');
- const affected={r1:a.r1,c1:a.c1,r2:direction==='down'?targetIndex:a.r2,
-  c2:direction==='right'?targetIndex:a.c2};
+ const affected={r1:direction==='up'?targetIndex:a.r1,c1:direction==='left'?targetIndex:a.c1,
+  r2:direction==='down'?targetIndex:a.r2,c2:direction==='right'?targetIndex:a.c2};
  if((sheet.merges||[]).some(m=>{
   const b=rectangle(m.from,m.to);
   return b.r1<=affected.r2&&b.r2>=affected.r1&&b.c1<=affected.c2&&b.c2>=affected.c1;
@@ -467,67 +733,102 @@ export function extendFillHandle(sheet,from,to,direction,targetIndex){
  const prepared=[];
  const numeric=v=>typeof v==='string'&&v.trim()!==''&&
   /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(v.trim())&&Number.isFinite(Number(v));
+ let hasDateSeries=false;
  for(let cross=0;cross<width;cross++){
   const source=Array.from({length},(_,i)=>{
-   const row=direction==='down'?a.r1+i:a.r1+cross,col=direction==='down'?a.c1+cross:a.c1+i;
-   return {row,col,cell:structuredClone(getCell(sheet,cellName(row,col)))};
+   const row=vertical?a.r1+i:a.r1+cross,col=vertical?a.c1+cross:a.c1+i;
+   const ref=cellName(row,col);
+   return {row,col,cell:structuredClone(getCell(sheet,ref)),format:getEffectiveStyle(sheet,ref).format};
   });
   const nums=source.map(e=>numeric(e.cell.value)?Number(e.cell.value):null),
-   numericSeries=length>=2&&nums.every(v=>v!==null),
-   step=numericSeries?nums[1]-nums[0]:null,
-   arithmetic=numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
-    1e-9*Math.max(1,Math.abs(v)));
+   allNumbers=nums.every(v=>v!==null),
+   dateFormat=source[0].format,
+   dateSeries=allNumbers&&['date','datetime'].includes(dateFormat)&&
+    source.every((e,i)=>e.format===dateFormat&&nums[i]>=1&&nums[i]<=2958465),
+   numericSeries=length>=2&&allNumbers,
+   step=numericSeries?nums[1]-nums[0]:dateSeries?1:null,
+   arithmetic=(numericSeries&&nums.every((v,i)=>Math.abs(v-(nums[0]+step*i))<=
+    1e-9*Math.max(1,Math.abs(v))))||(dateSeries&&length===1);
+  const extrapolate=['auto','values'].includes(fillMode)&&arithmetic,
+   textSeries=['auto','values'].includes(fillMode)?(isoDateFillSequence(source)||namedFillSequence(source)||labeledFillSequence(source)):null;
+  if(dateSeries&&extrapolate)hasDateSeries=true;
   for(let i=0;i<steps;i++){
-   const sourceIndex=i%length,origin=source[sourceIndex],
-    row=direction==='down'?last+1+i:a.r1+cross,
-    col=direction==='right'?last+1+i:a.c1+cross;
-   let value=origin.cell.value;
-   if(arithmetic){
-    const result=nums[0]+step*(length+i);
+   const sequenceIndex=reverse?-1-i:length+i,
+    sourceIndex=((sequenceIndex%length)+length)%length,origin=source[sourceIndex],
+    row=vertical?(reverse?a.r1-1-i:a.r2+1+i):a.r1+cross,
+    col=vertical?a.c1+cross:(reverse?a.c1-1-i:a.c2+1+i);
+   const destRef=cellName(row,col),previous=getCell(sheet,destRef);
+   let value=fillMode==='formats'?previous.value:origin.cell.value;
+   if(extrapolate){
+    const result=nums[0]+step*sequenceIndex;
     if(!Number.isFinite(result)||Math.abs(result)>1e15)
      throw Error('Числовая последовательность выходит за пределы допустимых значений');
+    if(dateSeries&&(result<1||result>2958465))
+     throw Error('Дата выходит за допустимые пределы календаря');
     value=String(Number(result.toPrecision(14)));
-   }else if(value.startsWith('='))
+   }else if(textSeries)value=textSeries(sequenceIndex);
+   else if(fillMode!=='formats'&&value.startsWith('='))
     value=translateFormula(value,row-origin.row,col-origin.col);
-   prepared.push({ref:cellName(row,col),value,style:structuredClone(origin.cell.style||{})});
+   prepared.push({ref:destRef,value,style:structuredClone((fillMode==='values'?previous:origin.cell).style||{})});
   }
  }
+ // Validate the full result on an isolated copy before changing the original sheet.
  const staged=structuredClone(sheet);
  for(const item of prepared){
-  checkValidatedInput(staged,item.ref,item.value);
+  if(fillMode!=='formats')checkValidatedInput(staged,item.ref,item.value);
   if(item.value||Object.keys(item.style).length)staged.cells[item.ref]={value:item.value,style:item.style};
   else delete staged.cells[item.ref];
  }
  if(Object.keys(staged.cells).length>LIMITS.cells)throw Error('Превышен лимит заполненных ячеек (50 000)');
  sheet.cells=staged.cells;
  if(sheet.autoFilter)invalidateGridGeometry(sheet);
- return {count:prepared.length,from:cellName(a.r1,a.c1),
-  to:cellName(affected.r2,affected.c2),mode:prepared.some(x=>x.value.startsWith('='))?'formula':'values'};
+ return {count:prepared.length,from:cellName(affected.r1,affected.c1),
+  to:cellName(affected.r2,affected.c2),
+  mode:prepared.some(x=>x.value.startsWith('='))?'formula':hasDateSeries?'date':'values'};
 }
-
-export function fillSelection(sheet, from, to, direction){
- if(!['down','right'].includes(direction))throw Error('Неподдерживаемое направление');
- const rect=rectangle(from,to);if(!rect)throw Error('Неверный диапазон');
- if(direction==='down'&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
- if(direction==='right'&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
+/** Fill the entire selected rectangle from its leading edge. 
+ * Up/left use the bottom/right edge. This is not the fill-handle series tool:
+ * formulas adjust, but literal values repeat exactly (Excel Ctrl+D/R semantics).
+ * Stage all cells before mutation so validation and capacity failures are atomic. */
+function fillSelectionInto(sheet,from,to,direction){
+ if(!['up','down','left','right'].includes(direction))throw Error('Неподдерживаемое направление');
+ if(!validRef(from)||!validRef(to))throw Error('Неверный диапазон');
+ const rect=rectangle(from,to),vertical=['up','down'].includes(direction);
+ if(vertical&&rect.r1===rect.r2)throw Error('Выделите хотя бы две строки');
+ if(!vertical&&rect.c1===rect.c2)throw Error('Выделите хотя бы два столбца');
  const total=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
  if(total>10000)throw Error('Выделено больше 10 000 ячеек');
- if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Заполнение объединённых ячеек пока не поддерживается');
+ if((sheet.merges||[]).some(m=>{
+  const x=rectangle(m.from,m.to);
+  return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;
+ }))throw Error('Заполнение объединённых ячеек пока не поддерживается');
  const changes=[];
  for(let r=rect.r1;r<=rect.r2;r++)for(let c=rect.c1;c<=rect.c2;c++){
-   if(direction==='down'&&r===rect.r1||direction==='right'&&c===rect.c1)continue;
-   const originR=direction==='down'?rect.r1:r,originC=direction==='right'?rect.c1:c;
-   const original=getCell(sheet,cellName(originR,originC));
-   changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),structuredClone(original.style||{})]);
+  if(direction==='down'&&r===rect.r1||direction==='up'&&r===rect.r2||
+     direction==='right'&&c===rect.c1||direction==='left'&&c===rect.c2)continue;
+  const originR=direction==='down'?rect.r1:direction==='up'?rect.r2:r,
+   originC=direction==='right'?rect.c1:direction==='left'?rect.c2:c;
+  const original=getCell(sheet,cellName(originR,originC));
+  changes.push([cellName(r,c),translateFormula(original.value,r-originR,c-originC),
+   structuredClone(original.style||{})]);
  }
- // Precheck validation for the entire fill to preserve atomicity.
- for(const [ref,value] of changes)checkValidatedInput(sheet,ref,value);
- // Do not corrupt existing data if even one translated reference is out of bounds.
+ const staged=sheet;
  for(const [ref,value,style] of changes){
-   if(value||Object.keys(style).length)sheet.cells[ref]={value,style};
-   else delete sheet.cells[ref];
+  checkValidatedInput(staged,ref,value);
+  if(value||Object.keys(style).length)staged.cells[ref]={value,style};
+  else delete staged.cells[ref];
  }
+ if(Object.keys(staged.cells).length>LIMITS.cells)
+  throw Error('Превышен лимит заполненных ячеек (50 000)');
  return changes.length;
+}
+
+export function fillSelection(sheet,from,to,direction){
+ const staged=structuredClone(sheet);
+ const count=fillSelectionInto(staged,from,to,direction);
+ sheet.cells=staged.cells;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
+ return count;
 }
 
 export function rawMap(sheet){return Object.fromEntries(Object.entries(sheet.cells).map(([k,v])=>[k,v.value]));}
@@ -586,37 +887,60 @@ export function pasteTSV(sheet,start,text){const at=parseCell(start);if(!at||!va
 }
 /** Sorts whole selected rows, keeping each cell style with its value. Formula cells are
  * rejected until reference-rewriting semantics for row moves are implemented. */
-export function sortSelectedRows(sheet,start,end,direction='asc'){
+export function sortSelectedRows(sheet,start,end,direction='asc',options={}){
  const rect=rectangle(start,end);
- if(!rect||rect.r1===rect.r2)throw Error('Выделите минимум две строки');
+ if(!rect||rect.r1===rect.r2)throw Error('Выделите минимум две строки для сортировки');
  const size=(rect.r2-rect.r1+1)*(rect.c2-rect.c1+1);
- if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек');
+ if(size>10000)throw Error('Сортировка ограничена 10 000 ячеек. Выделите меньший диапазон');
  if(!['asc','desc'].includes(direction))throw Error('Неверное направление сортировки');
- if((sheet.rectangleStyles||[]).length)throw Error('Сортировка с крупными диапазонами оформления пока недоступна');
- if((sheet.merges||[]).some(m=>{const x=rectangle(m.from,m.to);return x.r1<=rect.r2&&x.r2>=rect.r1&&x.c1<=rect.c2&&x.c2>=rect.c1;}))throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
+ const keyCol=options.keyColumn??rect.c1,header=!!options.header;
+ if(!Number.isInteger(keyCol)||keyCol<rect.c1||keyCol>rect.c2)
+  throw Error('Столбец сортировки должен быть внутри выделенного диапазона');
+ const first=rect.r1+(header?1:0),last=rect.r2;
+ if(first>=last)throw Error('Для сортировки нужны минимум две строки данных');
+ const touches=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;
+ const moving={...rect,r1:first};
+ if((sheet.rectangleStyles||[]).some(rule=>{
+  const part=rectangle(rule.from,rule.to);return part&&touches(part,moving);
+ }))throw Error('Сортировка пересекает диапазон общего оформления. Используйте обычное оформление ячеек');
+ if((sheet.merges||[]).some(m=>{const part=rectangle(m.from,m.to);return part&&touches(part,moving);}))
+  throw Error('Сортировка диапазона с объединёнными ячейками пока не поддерживается');
+ for(let row=first;row<=last;row++)if(!rowVisible(sheet,row))
+  throw Error('Нельзя сортировать скрытые или отфильтрованные строки');
+ for(let col=rect.c1;col<=rect.c2;col++)if(!columnVisible(sheet,col))
+  throw Error('Нельзя сортировать диапазон со скрытыми столбцами');
  const rows=[];
- for(let r=rect.r1;r<=rect.r2;r++){
+ for(let r=first;r<=last;r++){
   const cells=[];
   for(let c=rect.c1;c<=rect.c2;c++){
-   const cell=getCell(sheet,cellName(r,c));
-   if(cell.value.startsWith('='))throw Error('Сортировка диапазона с формулами пока не поддерживается');
-   cells.push(structuredClone(cell));
+   const ref=cellName(r,c),cell=getCell(sheet,ref);
+   if(cell.value.startsWith('='))throw Error('В выделении есть формулы. Сортировка перемещённых формул пока недоступна');
+   cells.push({cell:structuredClone(cell),hyperlink:sheet.hyperlinks?.[ref]||null});
   }
-  rows.push(cells);
+  rows.push({cells,index:r-first});
  }
- const collator=new Intl.Collator('ru-RU',{numeric:true,sensitivity:'base'});
- const sorted=rows.map((row,index)=>({row,index})).sort((a,b)=>{
-  const av=a.row[0].value.trim(),bv=b.row[0].value.trim();
-  if(!av||!bv)return av? -1:bv? 1:a.index-b.index;
-  const an=Number(av.replace(',','.')),bn=Number(bv.replace(',','.'));
-  const result=Number.isFinite(an)&&Number.isFinite(bn)?Math.sign(an-bn):collator.compare(av,bv);
-  return (direction==='desc'?-result:result)||a.index-b.index;
+ const keyIndex=keyCol-rect.c1,collator=new Intl.Collator('ru-RU',{numeric:true,sensitivity:'base'});
+ const numberValue=value=>{
+  const trimmed=value.replace(/\s/g,'').replace(',', '.');
+  return /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(trimmed)?Number(trimmed):null;
+ };
+ const sorted=rows.sort((a,b)=>{
+  const av=a.cells[keyIndex].cell.value.trim(),bv=b.cells[keyIndex].cell.value.trim();
+  if(!av||!bv)return av? -1:bv? 1:a.index-b.index; // Empty values always last.
+  const an=numberValue(av),bn=numberValue(bv);
+  const order=an!==null&&bn!==null?Math.sign(an-bn):collator.compare(av,bv);
+  return (direction==='desc'?-order:order)||a.index-b.index;
  });
- for(let i=0;i<sorted.length;i++)for(let j=0;j<sorted[i].row.length;j++){
-  const ref=cellName(rect.r1+i,rect.c1+j),cell=sorted[i].row[j];
-  if(cell.value||Object.keys(cell.style).length)sheet.cells[ref]=cell;
+ const nextLinks={...(sheet.hyperlinks||{})};
+ for(let i=0;i<sorted.length;i++)for(let j=0;j<sorted[i].cells.length;j++){
+  const ref=cellName(first+i,rect.c1+j),item=sorted[i].cells[j],cell=item.cell;
+  if(cell.value||Object.keys(cell.style||{}).length)sheet.cells[ref]=cell;
   else delete sheet.cells[ref];
+  if(item.hyperlink)nextLinks[ref]=item.hyperlink;
+  else delete nextLinks[ref];
  }
+ sheet.hyperlinks=nextLinks;
+ if(sheet.autoFilter)invalidateGridGeometry(sheet);
  return sorted.length;
 }
 
@@ -627,6 +951,26 @@ export function findCells(sheet,query){
  return Object.keys(sheet.cells).filter(ref=>validRef(ref)&&
    getCell(sheet,ref).value.toLocaleLowerCase('ru-RU').includes(needle))
   .sort((a,b)=>{const x=parseCell(a),y=parseCell(b);return x.row-y.row||x.col-y.col;});
+}
+
+/** TASK128: search values and formula text across one worksheet or the entire workbook.
+ * Pure read-only operation with an explicit results cap for large workbooks. */
+export function findWorkbookCells(book,query,{sheetId=null,limit=500}={}){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const text=String(query??'').trim();
+ if(!text)return {matches:[],truncated:false};
+ if(text.length>1000)throw Error('Слишком длинный поисковый запрос');
+ if(!Number.isInteger(limit)||limit<1||limit>1000)throw Error('Недопустимый лимит результатов');
+ const sources=sheetId?book.sheets.filter(s=>s.id===sheetId):book.sheets;
+ if(sheetId&&!sources.length)throw Error('Лист не найден');
+ const matches=[];
+ for(const sheet of sources){
+  for(const ref of findCells(sheet,text)){
+   if(matches.length>=limit)return {matches,truncated:true};
+   matches.push({sheetId:sheet.id,sheetName:sheet.name,ref,value:getCell(sheet,ref).value});
+  }
+ }
+ return {matches,truncated:false};
 }
 
 /** Replaces literal text without executing input as a regular expression.
@@ -647,6 +991,64 @@ export function replaceAllText(sheet,search,replacement){
  return matches.length;
 }
 
+/** TASK129: bounded read-only preview for replacement across one sheet or a book.
+ * Formula text is excluded. Each item describes one cell, not each occurrence. */
+export function planWorkbookReplacement(book,search,replacement,{sheetId=null,limit=500}={}){
+ if(!book||!Array.isArray(book.sheets))throw Error('Книга недоступна');
+ const term=String(search??''),nextText=String(replacement??'');
+ if(!term)throw Error('Введите текст для поиска');
+ if(term.length>1000||nextText.length>10000)throw Error('Слишком длинный текст');
+ if(!Number.isInteger(limit)||limit<1||limit>500)throw Error('Недопустимый лимит предпросмотра');
+ const target=sheetId?book.sheets.filter(s=>s.id===sheetId):book.sheets;
+ if(sheetId&&!target.length)throw Error('Лист не найден');
+ const escaped=term.replace(/[.*+?^$()|[\]{}\\]/g,'\\$&');
+ const pattern=new RegExp(escaped,'giu');
+ const items=[];
+ for(const sheet of target){
+  for(const ref of findCells(sheet,term)){
+   const before=getCell(sheet,ref).value;
+   if(before.startsWith('='))continue;
+   const after=before.replace(pattern,()=>nextText);
+   if(after===before)continue;
+   if(after.length>50000)throw Error('Результат превышает лимит ячейки');
+   if(after.startsWith('='))throw Error('Замена не должна превращать текст в формулу');
+   if(items.length>=limit)return {bookId:book.id,search:term,replacement:nextText,
+    items,truncated:true,scopeId:sheetId};
+   items.push({key:sheet.id+':'+ref,sheetId:sheet.id,sheetName:sheet.name,ref,before,after});
+  }
+ }
+ return {bookId:book.id,search:term,replacement:nextText,
+  items,truncated:false,scopeId:sheetId};
+}
+/** TASK129: all selected replacements validate on a clone before any real mutation.
+ * Caller wraps this once in transact() so one Undo reverts all edited sheets. */
+export function applyWorkbookReplacement(book,plan,selectedKeys){
+ if(!book||!plan||plan.bookId!==book.id||!Array.isArray(plan.items))
+  throw Error('Предпросмотр относится к другой книге');
+ if(plan.truncated)throw Error('Слишком много совпадений: уточните поиск перед заменой');
+ if(!Array.isArray(selectedKeys))throw Error('Не выбраны ячейки для замены');
+ const available=new Map(plan.items.map(x=>[x.key,x]));
+ const selected=new Set(selectedKeys);
+ if([...selected].some(key=>!available.has(key)))throw Error('Неизвестная ячейка в списке замены');
+ if(!selected.size)return {count:0,sheets:0};
+ const staged=structuredClone(book);
+ const affected=new Set();
+ for(const key of selected){
+  const item=available.get(key);
+  const sheet=staged.sheets.find(s=>s.id===item.sheetId);
+  if(!sheet||sheet.name!==item.sheetName||!validRef(item.ref)||
+     getCell(sheet,item.ref).value!==item.before)
+   throw Error('Книга изменилась после предпросмотра: повторите проверку');
+  if(typeof item.after!=='string'||item.after.length>50000||
+     item.after.startsWith('='))throw Error('Недопустимое новое значение');
+  setCell(sheet,item.ref,item.after);
+  affected.add(sheet.id);
+ }
+ validateWorkbook(staged);
+ book.sheets=staged.sheets;
+ return {count:selected.size,sheets:affected.size};
+}
+
 export function importCSV(text,name='Импорт CSV'){
  const grid=csvDecode(String(text).replace(/^\uFEFF/,''));const book=newWorkbook(name);const sheet=currentSheet(book);if(grid.length>LIMITS.rows)throw Error('Слишком много строк');
  for(let r=0;r<grid.length;r++){if(grid[r].length>LIMITS.columns)throw Error('Слишком много столбцов');for(let c=0;c<grid[r].length;c++){if(grid[r][c])setCell(sheet,cellName(r,c),grid[r][c]);}}
@@ -660,6 +1062,20 @@ export function validateWorkbook(book){
  if(!book||book.type!=='sheet'||typeof book.id!=='string'||typeof book.name!=='string'||book.name.length>200||!Array.isArray(book.sheets)||!book.sheets.length||book.sheets.length>LIMITS.sheets)throw Error('Неверный формат книги');
  let total=0;const ids=new Set(),names=new Set();for(const sheet of book.sheets){
   validateCharts(sheet);
+  if(sheet.hyperlinks!==undefined){
+   if(!sheet.hyperlinks||typeof sheet.hyperlinks!=='object'||Array.isArray(sheet.hyperlinks)||Object.keys(sheet.hyperlinks).length>5000||
+    Object.entries(sheet.hyperlinks).some(([ref,url])=>!validRef(ref)||!safeHyperlink(url)||!sheet.cells?.[ref]?.value))
+    throw Error('Повреждены гиперссылки книги');
+  }
+  if(sheet.smartTable!==undefined&&sheet.smartTable!==null){
+   const t=sheet.smartTable,r=t?.from&&t?.to?rectangle(t.from,t.to):null;
+   if(!t||typeof t!=='object'||Array.isArray(t)||Object.keys(t).some(k=>!['from','to'].includes(k))||
+      !r||!validRef(t.from)||!validRef(t.to)||r.r2<=r.r1||r.r2>=LIMITS.rows||
+      r.c2>=LIMITS.columns||r.r2-r.r1+1>5000||t.from!==cellName(r.r1,r.c1)||t.to!==cellName(r.r2,r.c2))
+    throw Error('Повреждена умная таблица');
+   if((sheet.merges||[]).some(m=>{const q=rectangle(m.from,m.to);return q&&q.r1<=r.r2&&q.r2>=r.r1&&q.c1<=r.c2&&q.c2>=r.c1;}))
+    throw Error('Объединённые ячейки в умной таблице');
+  }
   validateConditionalRules(sheet);
   validateDataRules(sheet);
   validatePrintSettings(sheet);
@@ -670,8 +1086,10 @@ export function validateWorkbook(book){
    Object.keys(style).every(k=>bulkStyleProps.has(k))&&Object.entries(style).every(([k,v])=>{
     if(v===null)return allowNull;
     if(k==='align')return ['left','center','right'].includes(v);
+    if(k==='verticalAlign')return ['top','center','bottom'].includes(v);
     if(k==='format')return ['general','currency','percent','integer','date','time','datetime','duration'].includes(v);
      if(k==='fontSize')return typeof v==='number'&&Number.isFinite(v)&&v>=6&&v<=72;
+    if(k==='fontFamily')return typeof v==='string'&&FONT_FAMILIES.includes(v);
     if(k==='bg'||k==='color')return typeof v==='string'&&/^#[0-9a-fA-F]{6}$/.test(v);
     return typeof v==='boolean';
    });
@@ -702,7 +1120,7 @@ export function validateWorkbook(book){
       Object.entries(styles).some(([key,style])=>!/^(0|[1-9]\d*)$/.test(key)||Number(key)>=max||!validAxisStyle(style)))
     throw Error(name==='columnStyles'?'Повреждено оформление столбцов':'Повреждено оформление строк');
   }
-  for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
+  for(const [name,min,max] of [['defaultColumnWidth',12,DIMENSIONS.maxColumn],['defaultRowHeight',12,DIMENSIONS.maxDefaultRow]])if(sheet[name]!==undefined&&(!Number.isInteger(sheet[name])||sheet[name]<min||sheet[name]>max))throw Error('Некорректный размер листа XLSX');
    for(const [key,max,sizeMin,sizeMax] of [['columnWidths',LIMITS.columns,12,DIMENSIONS.maxColumn],['rowHeights',LIMITS.rows,12,DIMENSIONS.maxRow]]){
    const map=sheet?.[key];if(map===undefined)continue;
    if(!map||typeof map!=='object'||Array.isArray(map)||Object.keys(map).length>max)throw Error('Повреждённые размеры листа');
@@ -719,7 +1137,7 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
    if(sheet.autoFilter!==undefined&&sheet.autoFilter!==null){
     const f=sheet.autoFilter,rect=rectangle(f?.from,f?.to);
     if(!f||!rect||!validRef(f.from)||!validRef(f.to)||rect.r2<=rect.r1||!f.rules||typeof f.rules!=='object'||Array.isArray(f.rules))throw Error('Повреждён автофильтр');
-    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!(typeof val==='string'&&val.length<=50000||Array.isArray(val)&&val.length>0&&val.length<=200&&val.every(v=>typeof v==='string'&&v.length<=50000)&&new Set(val).size===val.length)))throw Error('Некорректные условия фильтра');
+    if(Object.entries(f.rules).some(([col,val])=>!(/^(0|[1-9]\d*)$/.test(col))||Number(col)<rect.c1||Number(col)>rect.c2||!validFilterRule(val)))throw Error('Некорректные условия фильтра');
    }
  if(sheet.merges!==undefined){
    if(!Array.isArray(sheet.merges)||sheet.merges.length>500)throw Error('Некорректные объединения');
@@ -735,14 +1153,16 @@ for(const [key,max] of [['hiddenRows',LIMITS.rows],['hiddenColumns',LIMITS.colum
   }
  if(!sheet||typeof sheet.id!=='string'||ids.has(sheet.id)||typeof sheet.name!=='string'||sheet.name.length>100||!sheet.cells||typeof sheet.cells!=='object'||Array.isArray(sheet.cells))throw Error('Повреждённый лист');ids.add(sheet.id);const keys=Object.keys(sheet.cells);total+=keys.length;for(const ref of keys){const cell=sheet.cells[ref];if(!validRef(ref)||!cell||typeof cell.value!=='string'||cell.value.length>50000||!cell.style||typeof cell.style!=='object'||Array.isArray(cell.style))throw Error('Повреждённая ячейка');
     const style=cell.style;
-    if(Object.keys(style).some(k=>!['bold','italic','bg','color','align','format','border','borders','borderEdges','borderColor','fontSize','wrap'].includes(k))||
-       ['bold','italic','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
+    if(Object.keys(style).some(k=>!['bold','italic','underline','strike','bg','color','align','verticalAlign','format','border','borders','borderEdges','borderColor','fontSize','fontFamily','wrap'].includes(k))||
+       ['bold','italic','underline','strike','wrap'].some(k=>k in style&&typeof style[k]!=='boolean')||
        ['bg','color','borderColor'].some(k=>k in style&&!/^#[0-9a-fA-F]{6}$/.test(style[k]))||
        ('fontSize' in style&&(!Number.isFinite(style.fontSize)||style.fontSize<6||style.fontSize>72))||
+       ('fontFamily' in style&&!FONT_FAMILIES.includes(style.fontFamily))||
         ('border' in style&&!['thin'].includes(style.border))||
        ('borders' in style&&(!style.borders||typeof style.borders!=='object'||Array.isArray(style.borders)||Object.entries(style.borders).some(([k,v])=>!['left','right','top','bottom'].includes(k)||v!==true)))||
         ('borderEdges' in style&&!validBorderEdges(style.borderEdges))||
        ('align' in style&&!['left','center','right'].includes(style.align))||
+       ('verticalAlign' in style&&!['top','center','bottom'].includes(style.verticalAlign))||
        ('format' in style&&!['general','currency','percent','integer','date','time','datetime','duration'].includes(style.format)))throw Error('Недопустимое оформление ячейки');}}
  if(total>LIMITS.cells)throw Error('Превышен лимит ячеек');if(!ids.has(book.activeSheetId))book.activeSheetId=book.sheets[0].id;return book;
 }
@@ -808,7 +1228,7 @@ export function planAutoSum(sheet,from,to){
  return entries;
 }
 
-export {cellName,parseCell};
+{cellName,parseCell};
 
 /** Reusable polished template helpers. Schema remains compatible with .qbook/XLSX. */
 const tColor={ink:'#20354a',navy:'#25415d',blue:'#315e7c',pale:'#e9f1f8',green:'#28664e',mint:'#e7f4ec',gold:'#a36a1a',cream:'#fff0d4',white:'#ffffff',soft:'#f5f8fb',muted:'#617589'};

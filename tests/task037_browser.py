@@ -20,7 +20,7 @@ with sync_playwright() as p:
  page.locator('#formula-input').press('Enter')
  select('B100:C90000')
  page.get_by_role('button',name='Заливка ячеек').click()
- page.locator('[data-action=palette-pick][data-value="#facc15"]').click()
+ page.locator('[data-action=palette-pick][data-value="#FFFF00"]').click()
  state=page.evaluate("""()=>({
   regions:sheet().rectangleStyles.length,
   cells:Object.keys(sheet().cells).length,
@@ -29,31 +29,31 @@ with sync_playwright() as p:
   outside:getEffectiveStyle(sheet(),'D90000').bg,
   text:getCell(sheet(),'B50000').value
  })""")
- assert state=={'regions':1,'cells':1,'one':'#facc15','far':'#facc15','outside':None,'text':'Содержание'},state
+ assert state=={'regions':1,'cells':1,'one':'#FFFF00','far':'#FFFF00','outside':None,'text':'Содержание'},state
  # The Undo action is atomic even though 180k virtual positions changed.
  page.locator('#grid-scroll').focus()
  page.keyboard.press('Control+z')
  assert effective('C89999').get('bg') is None
  assert page.evaluate("getCell(sheet(),'B50000').value")=='Содержание'
  page.keyboard.press('Control+y')
- assert effective('C89999')['bg']=='#facc15'
+ assert effective('C89999')['bg']=='#FFFF00'
  # Smaller new rectangle overrides a subregion and clearing splits it.
  select('C40000:C60000')
  page.get_by_role('button',name='Цвет текста').click()
- page.locator('[data-action=palette-pick][data-value="#ef4444"]').click()
- assert effective('C50000')['color']=='#ef4444'
+ page.locator('[data-action=palette-pick][data-value="#FF0000"]').click()
+ assert effective('C50000')['color']=='#FF0000'
  assert effective('B50000').get('color') is None
  select('C45000:C55000')
  page.get_by_role('button',name='Сбросить формат').click()
  assert effective('C50000').get('color') is None
  assert effective('C50000').get('bg') is None
- assert effective('C44000')['color']=='#ef4444'
- assert effective('C44000')['bg']=='#facc15'
+ assert effective('C44000')['color']=='#FF0000'
+ assert effective('C44000')['bg']=='#FFFF00'
  page.get_by_role('button',name='Отменить').click()
- assert effective('C50000')['color']=='#ef4444'
- assert effective('C50000')['bg']=='#facc15'
+ assert effective('C50000')['color']=='#FF0000'
+ assert effective('C50000')['bg']=='#FFFF00'
  assert page.evaluate('Object.keys(sheet().cells).length')==1
- assert page.evaluate("""()=>{const restored=decodeBook(encodeBook(book()));return getEffectiveStyle(restored.sheets[0],'C50000').color;}""")=='#ef4444'
+ assert page.evaluate("""()=>{const restored=decodeBook(encodeBook(book()));return getEffectiveStyle(restored.sheets[0],'C50000').color;}""")=='#FF0000'
  # Now exports supported rectangles as real Excel style records and reimports.
  page.set_default_timeout(120000)
  roundtrip=page.evaluate("""async()=>{
@@ -64,8 +64,8 @@ with sync_playwright() as p:
     outside:getEffectiveStyle(s,'D50000'),regions:s.rectangleStyles.length};
  }""")
  assert roundtrip['cells']==1 and roundtrip['text']=='Содержание',roundtrip
- assert roundtrip['middle']['color']=='#ef4444' and roundtrip['middle']['bg']=='#facc15',roundtrip
- assert roundtrip['above']['bg']=='#facc15' and roundtrip['outside'].get('bg') is None,roundtrip
+ assert roundtrip['middle']['color']=='#ff0000' and roundtrip['middle']['bg']=='#ffff00',roundtrip
+ assert roundtrip['above']['bg']=='#ffff00' and roundtrip['outside'].get('bg') is None,roundtrip
  assert 1<=roundtrip['regions']<=256,roundtrip
  assert not errors,errors
  print('PASS TASK037: 180k sparse formatting, overlap, split/reset, undo/redo, native persistence, XLSX roundtrip')

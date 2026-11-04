@@ -1,0 +1,113 @@
+/* TASK114 — historical progress is inside the journal, not another duplicate side panel. */
+#qo-diag-root .qd-progress-history{
+  padding:16px 17px;
+  margin:14px 0 17px;
+  border:1px solid var(--qo-border);
+  border-radius:12px;
+  background:var(--qo-surface-alt);
+  display:grid;
+  gap:13px;
+}
+#qo-diag-root .qd-progress-head{
+  display:flex;justify-content:space-between;align-items:start;gap:12px;
+}
+#qo-diag-root .qd-progress-head h3{
+  margin:0 0 5px;font-size:15px;line-height:1.3;
+}
+#qo-diag-root .qd-progress-head p{
+  margin:0;font-size:11px;color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-head button{
+  min-height:34px;padding:7px 11px;font-size:11px;white-space:nowrap;
+}
+#qo-diag-root .qd-progress-trend{
+  display:grid;grid-template-columns:repeat(8,minmax(0,1fr));
+  gap:7px;align-items:end;min-height:126px;
+  padding:12px 8px;
+  border:1px solid var(--qo-border);
+  border-radius:9px;background:var(--qo-surface);
+}
+#qo-diag-root .qd-progress-trend-item{
+  min-width:0;display:grid;justify-items:center;align-items:end;
+  grid-template-rows:17px 75px auto;gap:5px;
+}
+#qo-diag-root .qd-progress-trend-value{
+  font-size:10px;font-weight:700;color:var(--qo-text);
+}
+#qo-diag-root .qd-progress-trend-bar{
+  display:flex;align-items:end;width:min(100%,44px);height:75px;
+  background:var(--qo-surface-alt);border-radius:5px;overflow:hidden;
+}
+#qo-diag-root .qd-progress-trend-bar span{
+  display:block;width:100%;min-height:2px;
+  background:var(--qo-accent);
+  border-radius:4px 4px 0 0;
+}
+#qo-diag-root .qd-progress-trend-item small{
+  width:100%;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;text-align:center;
+  font-size:10px;color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-selectors{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;
+}
+#qo-diag-root .qd-progress-selectors label{
+  display:grid;gap:6px;min-width:0;
+  font-size:11px;font-weight:700;color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-selectors select{
+  width:100%;min-width:0;box-sizing:border-box;
+  height:38px;padding:7px 10px;border-radius:8px;
+  background:var(--qo-surface);
+  border:1px solid var(--qo-border);
+  color:var(--qo-text);font-size:12px;
+}
+#qo-diag-root .qd-progress-summary{
+  display:flex;flex-wrap:wrap;align-items:baseline;
+  gap:11px;padding:10px 0 4px;
+}
+#qo-diag-root .qd-progress-summary strong{font-size:19px}
+#qo-diag-root .qd-progress-delta{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:4px 8px;border-radius:999px;
+  background:var(--qo-surface);border:1px solid var(--qo-border);
+  color:var(--qo-text);font-size:11px;font-weight:700;white-space:nowrap;
+}
+#qo-diag-root .qd-progress-delta.up{color:var(--qo-success,#147a4e)}
+#qo-diag-root .qd-progress-delta.down{color:var(--qo-danger,#ad3342)}
+#qo-diag-root .qd-progress-history h4{
+  font-size:12px;font-weight:700;margin:5px 0 0;
+}
+#qo-diag-root .qd-progress-topic{
+  display:flex;align-items:baseline;justify-content:space-between;
+  gap:12px;border-bottom:1px solid var(--qo-border);
+  padding:8px 0;
+}
+#qo-diag-root .qd-progress-topic>div{
+  display:grid;gap:4px;min-width:0;
+}
+#qo-diag-root .qd-progress-topic strong{
+  font-size:12px;font-weight:600;overflow-wrap:anywhere;
+}
+#qo-diag-root .qd-progress-topic span:not(.qd-progress-delta){
+  font-size:11px;color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-topic small{
+  font-size:10px;color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-hint,
+#qo-diag-root .qd-progress-caution{
+  margin:0;font-size:11px;line-height:1.55;
+  color:var(--qo-muted);
+}
+#qo-diag-root .qd-progress-caution{
+  padding:9px 12px;border:1px dashed var(--qo-border);
+  border-radius:8px;
+}
+@media(max-width:720px){
+  #qo-diag-root .qd-progress-history{padding:13px 11px;}
+  #qo-diag-root .qd-progress-head{flex-wrap:wrap}
+  #qo-diag-root .qd-progress-trend{gap:2px;padding:9px 4px}
+  #qo-diag-root .qd-progress-selectors{grid-template-columns:1fr}
+  #qo-diag-root .qd-progress-topic{gap:8px}
+}

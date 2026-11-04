@@ -14,8 +14,53 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm run build
-      - run: python -m pip install playwright openpyxl
+      - run: npm ci
+      - run: python -m pip install playwright==1.56.0 openpyxl
       - run: python -m playwright install --with-deps chromium
+      - run: node tests/task144_browser.cjs
+      - run: node tests/task145_browser.cjs
+      - run: node tests/task143_browser.cjs
+      - run: node tests/task142_browser.cjs
+      - run: node tests/task141_browser.cjs
+      - run: node tests/task100_browser.cjs
+      - run: node tests/task101_browser.cjs
+      - run: node tests/task102_browser.cjs
+      - run: node tests/task103_browser.cjs
+      - run: node tests/task104_browser.cjs
+      - run: node tests/task105_browser.cjs
+      - run: node tests/task106_browser.cjs
+      - run: node tests/task107_browser.cjs
+      - run: node tests/task108_browser.cjs
+      - run: node tests/task109_browser.cjs
+      - run: node tests/task110_browser.cjs
+      - run: node tests/task111_browser.cjs
+      - run: node tests/task112_browser.cjs
+      - run: node tests/task113_browser.cjs
+      - run: node tests/task114_browser.cjs
+      - run: node tests/task115_browser.cjs
+      - run: node tests/task116_browser.cjs
+      - run: node tests/task117_browser.cjs
+      - run: node tests/task118_browser.cjs
+      - run: node tests/task119_browser.cjs
+      - run: node tests/task120_browser.cjs
+      - run: node tests/task121_browser.cjs
+      - run: node tests/task122_browser.cjs
+      - run: node tests/task123_browser.cjs
+      - run: node tests/task126_browser.cjs
+      - run: node tests/task127_browser.cjs
+      - run: node tests/task128_browser.cjs
+      - run: node tests/task129_browser.cjs
+      - run: node tests/task130_writer_browser.cjs
+      - run: node tests/task131_writer_browser.cjs
+      - run: node tests/task132_writer_browser.cjs
+      - run: node tests/task133_writer_browser.cjs
+      - run: node tests/task134_browser.cjs
+      - run: node tests/task135_browser.cjs
+      - run: node tests/task136_browser.cjs
+      - run: node tests/task137_browser.cjs
+      - run: node tests/task138_writer_browser.cjs
+      - run: node tests/task139_browser.cjs
+      - run: node tests/task140_browser.cjs
       - run: python tests/ui_smoke.py
       - run: python tests/xlsx_browser.py
       - run: python tests/filter_freeze_browser.py
@@ -77,3 +122,81 @@ jobs:
       - run: python tests/task068_browser.py
       - run: python tests/task069_browser.py
       - run: python tests/task070_browser.py
+      - run: python tests/task071_browser.py
+      - run: python tests/task072_browser.py
+      - run: python tests/task073_browser.py
+      - run: python tests/task074_browser.py
+      - run: python tests/task075_browser.py
+      - run: python tests/task076_browser.py
+
+      - run: node tests/task095_browser.cjs
+      - run: node tests/task096_browser.cjs
+      - run: node tests/task097_browser.cjs
+      - run: node tests/task098_browser.cjs
+      - run: node tests/task099_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task095-studio-evidence
+          path: evidence/task095
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task096-design-system-evidence
+          path: evidence/task096
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task097-photo-tools-evidence
+          path: evidence/task097
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task098-creative-tools-evidence
+          path: evidence/task098
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task141-diagnostic-evidence
+          path: evidence/task141
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task142-diagnostics-evidence
+          path: |
+            evidence/task142/*.png
+            evidence/task142/result.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task143-diagnostics-layout-evidence
+          path: |
+            evidence/task143/*.png
+            evidence/task143/result.json
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task144-work-builder-evidence
+          path: evidence/task144
+          if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task145-math-geometry-evidence
+          path: evidence/task145
+          if-no-files-found: ignore

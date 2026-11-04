@@ -1,9 +1,15 @@
 import '../vendor/jszip.min.js';
-import {newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
+import {safeHyperlink,exportedHyperlinks,newWorkbook,newSheet,setCell,setStyle,setColumnWidth,setRowHeight,columnWidth,rowHeight,setHidden,rowVisible,validateWorkbook,FONT_FAMILIES,LIMITS,setFreeze,setAutoFilter,setFilterValue,filterRange,filterRowVisible,getEffectiveStyle,getColumnBaseStyle,rectangle,cellName,parseCell,mergeCells,applyBorderPreset,uid} from './workbook.js';
 import {validateDataRules} from './validation.js';
 import {validateConditionalRules} from './conditional.js';
 import {writeXLSXCharts,importXLSXCharts} from './xlsx-charts.js';
 import {xlsxPrintSettings,xlsxPrintArea,workbookPrintAreaNodes,importXLSXPrintSettings} from './xlsx-print.js';
+
+
+
+
+
+
 /** Limited OOXML workbook exchange. All parsing is local; no eval or network. */
 
 
@@ -70,7 +76,8 @@ export function stylesFromXML(root,themes=DEFAULT_THEME){if(!root)return [{}];
  const indexed=custom.length>=64?custom:INDEXED_DEFAULT;
  const color=node=>resolveXLSXColor(node,themes,indexed);const fonts=elements(element(root,'fonts'),'font').map(node=>{
  const fontSize=Number(element(node,'sz')?.getAttribute('val'));
- return {bold:!!element(node,'b'),italic:!!element(node,'i'),color:color(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
+ const family=element(node,'name')?.getAttribute('val');
+ return {fontFamily:FONT_FAMILIES.includes(family)?family:undefined,bold:!!element(node,'b'),italic:!!element(node,'i'),underline:!!element(node,'u'),strike:!!element(node,'strike'),color:color(element(node,'color')),fontSize:Number.isFinite(fontSize)&&fontSize>=6&&fontSize<=72?fontSize:undefined};
 });const fills=elements(element(root,'fills'),'fill').map(node=>{const p=element(node,'patternFill');return p?.getAttribute('patternType')==='solid'?color(element(p,'fgColor')):undefined;});const nums=new Map(elements(element(root,'numFmts'),'numFmt').map(n=>[+n.getAttribute('numFmtId'),n.getAttribute('formatCode')||'']));
  const borders=elements(element(root,'borders'),'border').map(node=>{
  const edges=Object.fromEntries(['left','right','top','bottom'].flatMap(side=>{
@@ -83,7 +90,9 @@ export function stylesFromXML(root,themes=DEFAULT_THEME){if(!root)return [{}];
  const colors=Object.values(edges).map(x=>x.color||'#000000');
  return {sides,edges,color:colors.length&&new Set(colors).size===1?colors[0]:undefined};
 });
- return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;style.borderEdges=border.edges;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
+ return elements(element(root,'cellXfs'),'xf').map(xf=>{const font=fonts[+xf.getAttribute('fontId')]||{},bg=fills[+xf.getAttribute('fillId')],align=element(xf,'alignment')?.getAttribute('horizontal');const id=+xf.getAttribute('numFmtId');const fmt=nums.get(id)||'';const style={};if(font.bold)style.bold=true;if(font.italic)style.italic=true;if(font.underline)style.underline=true;if(font.strike)style.strike=true;if(font.color)style.color=font.color;if(font.fontSize)style.fontSize=font.fontSize;if(font.fontFamily)style.fontFamily=font.fontFamily;if(bg)style.bg=bg;const border=borders[Number(xf.getAttribute('borderId')||0)]||{};if(Object.keys(border.sides||{}).length){style.borders=border.sides;style.borderEdges=border.edges;if(border.color)style.borderColor=border.color;}if(element(xf,'alignment')?.getAttribute('wrapText')==='1')style.wrap=true;
+ const vertical=element(xf,'alignment')?.getAttribute('vertical');
+ if(['top','center','bottom'].includes(vertical))style.verticalAlign=vertical;if(['left','right','center'].includes(align))style.align=align;if(id===46||/\[(?:hh?|mm?)\]/i.test(fmt))style.format='duration';
  else if(id===22||(/[yd]/i.test(fmt)&&/[hs]/i.test(fmt)))style.format='datetime';
  else if([14,15,16,17].includes(id)||/[yd]/i.test(fmt))style.format='date';
  else if([18,19,20,21,45,47].includes(id)||/[hs]/i.test(fmt))style.format='time';
@@ -95,7 +104,7 @@ export const pkgNS='http://schemas.openxmlformats.org/package/2006/relationships
 /** OOXML requires styled blank cells for arbitrary rectangles. Expand only up
  * to this hard limit, then refuse before creating any output. */
 export const MAX_XLSX_RECTANGLE_CELLS=200000;
-const styleProps=['bg','color','bold','italic','wrap','format','align','fontSize'];
+const styleProps=['bg','color','bold','italic','underline','strike','wrap','format','align','verticalAlign','fontSize','fontFamily'];
 function rectangleBands(sheet,styles){
  const rects=(sheet.rectangleStyles||[]).map(layer=>rectangle(layer.from,layer.to));
  if(!rects.length)return [];
@@ -156,8 +165,8 @@ export async function importXLSX(data,filename='Таблица',report=null){
    const defaults=element(xml,'sheetFormatPr');
    const defaultCol=Number(defaults?.getAttribute('defaultColWidth')||defaults?.getAttribute('baseColWidth')||0);
    const defaultRow=Number(defaults?.getAttribute('defaultRowHeight')||0);
-   if(defaultCol>0){const px=Math.round(defaultCol*7+5);if(px>=12&&px<=520)sheet.defaultColumnWidth=px;}
-   if(defaultRow>0){const px=Math.round(defaultRow*4/3);if(px>=12&&px<=160)sheet.defaultRowHeight=px;}
+   if(defaultCol>0){const px=Math.round(defaultCol*7+5);if(px>=12&&px<=DIMENSIONS.maxColumn)sheet.defaultColumnWidth=px;}
+   if(defaultRow>0){const px=Math.round(defaultRow*4/3);if(px>=12&&px<=DIMENSIONS.maxDefaultRow)sheet.defaultRowHeight=px;}
    const pane=element(element(xml,'sheetViews')?.getElementsByTagNameNS('*','sheetView')?.[0]||null,'pane');
    if(pane?.getAttribute('state')==='frozen'){
     const rows=Number(pane.getAttribute('ySplit')||0),cols=Number(pane.getAttribute('xSplit')||0);
@@ -165,7 +174,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
    }
    const auto=element(xml,'autoFilter');if(auto){const range=auto.getAttribute('ref')?.split(':');if(range?.length===2){try{setAutoFilter(sheet,range[0],range[1]);const rect=filterRange(sheet);for(const col of elements(auto,'filterColumn')){
     const index=rect.c1+Number(col.getAttribute('colId'));
-    const opts=elements(element(col,'filters'),'filter');if(opts.length>=1&&opts.length<=200)setFilterValue(sheet,index,opts.length===1?(opts[0].getAttribute('val')||''):opts.map(n=>n.getAttribute('val')||''));
+    const rule=filterRuleFromXLSX(col);if(rule!==null&&validFilterRule(rule))setFilterValue(sheet,index,rule);
    }}catch{sheet.autoFilter=null;}}}
   const alignedColumns=new Map();
   for(const col of elements(element(xml,'cols'),'col')){
@@ -180,7 +189,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
     const loaded=Object.fromEntries(Object.entries(fmt[columnStyleIndex]).filter(([k])=>allowed.has(k)));
     for(let c=min-1;c<max;c++)if(Object.keys(loaded).length)sheet.columnStyles[String(c)]=loaded;
    }
-   const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=12&&px<=520)for(let c=min-1;c<max;c++)sheet.columnWidths[String(c)]=px;
+   const px=Math.round(width*7+5);if(Number.isFinite(width)&&width>0&&px>=12&&px<=DIMENSIONS.maxColumn)for(let c=min-1;c<max;c++)sheet.columnWidths[String(c)]=px;
    if(col.getAttribute('hidden')==='1')for(let c=min-1;c<max;c++)setHidden(sheet,'col',c,true);
   }
   if(alignedColumns.size===LIMITS.columns&&new Set(alignedColumns.values()).size===1){
@@ -199,7 +208,7 @@ export async function importXLSX(data,filename='Таблица',report=null){
   const compact=xmlCells>LIMITS.cells||needsMask;
   for(const row of importedRows){
    const index=Number(row.getAttribute('r')),ht=Number(row.getAttribute('ht'));
-   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=12&&px<=160)sheet.rowHeights[String(index-1)]=px;}
+   if(row.hasAttribute('customHeight')&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows&&Number.isFinite(ht)&&ht>0){const px=Math.round(ht*4/3);if(px>=12&&px<=DIMENSIONS.maxRow)sheet.rowHeights[String(index-1)]=px;}
    if(row.hasAttribute('s')&&row.getAttribute('customFormat')!=='0'&&Number.isInteger(index)&&index>=1&&index<=LIMITS.rows){
     const id=Number(row.getAttribute('s')),style=fmt[id];
     if(!Number.isInteger(id)||!style)throw Error('Повреждён стиль строки XLSX');
@@ -267,6 +276,28 @@ export async function importXLSX(data,filename='Таблица',report=null){
   const merges=elements(element(xml,'mergeCells'),'mergeCell');
   if(merges.length>500)throw Error('Слишком много объединённых диапазонов');
   for(const merged of merges){const pieces=String(merged.getAttribute('ref')||'').toUpperCase().split(':');if(pieces.length!==2)throw Error('Повреждённый диапазон объединения');mergeCells(sheet,pieces[0],pieces[1]);}
+  // XLSX hyperlinks are external relationships; XML is parsed, never followed or fetched.
+  const hyperlinkNodes=elements(element(xml,'hyperlinks'),'hyperlink');
+  if(hyperlinkNodes.length>5000)throw Error('Слишком много гиперссылок в XLSX');
+  if(hyperlinkNodes.length){
+   const relationPath=path.replace(/([^/]+)$/,'_rels/$1.rels');
+   const xmlRels=zip.file(relationPath)?await readXML(zip,relationPath):null;
+   const hyperlinkRels=new Map(elements(xmlRels,'Relationship').map(n=>[n.getAttribute('Id'),n]));
+   for(const node of hyperlinkNodes){
+    const ref=String(node.getAttribute('ref')||'').toUpperCase();
+    if(!validRef(ref))continue;
+    const id=node.getAttributeNS(relNS,'id')||node.getAttribute('r:id');
+    const rel=hyperlinkRels.get(id);
+    if(!rel||rel.getAttribute('TargetMode')!=='External'||!rel.getAttribute('Type')?.endsWith('/hyperlink'))continue;
+    const href=safeHyperlink(rel.getAttribute('Target'));
+    if(!href)continue;
+    if(!getCell(sheet,ref).value){
+     const display=node.getAttribute('display');
+     setCell(sheet,ref,display||href);
+    }
+    (sheet.hyperlinks??={})[ref]=href;
+   }
+  }
   importXLSXValidations(sheet,xml,report);
   importXLSXConditionalFormatting(sheet,xml,dxfs,report,theme);
   importXLSXPrintSettings(sheet,xml,printAreaNodes,sheetIndex,report);
@@ -453,7 +484,7 @@ export function styleCatalog(book){
  return {unique,lookup,register,getId:s=>lookup.get(keyOf(s))||0,dxfColors,dxfIds};
 }
 export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[null,null],fontIds=new Map(),fillIds=new Map(),borderDefs=[{}],borderIds=new Map([[JSON.stringify([null,null,null,null]),0]]);const cells=styles.unique.map(s=>{
- const fontKey=JSON.stringify([!!s.bold,!!s.italic,s.color||'',s.fontSize||11]);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
+ const fontKey=JSON.stringify([!!s.bold,!!s.italic,!!s.underline,!!s.strike,s.color||'',s.fontSize||11,s.fontFamily||'Aptos']);let fi=fontIds.get(fontKey);if(fi===undefined){fi=fonts.length;fonts.push(s);fontIds.set(fontKey,fi);}
  let fillId=0;if(s.bg){if(!fillIds.has(s.bg)){fillIds.set(s.bg,fills.length);fills.push(s.bg);}fillId=fillIds.get(s.bg);}
  const sides=s.borders||(s.border==='thin'?{left:true,right:true,top:true,bottom:true}:{});
  const perSide={};
@@ -463,9 +494,42 @@ export function styleXML(styles){const fonts=[{bold:false,italic:false}],fills=[
  }
  const key=JSON.stringify(['left','right','top','bottom'].map(side=>perSide[side]||null));
  if(!borderIds.has(key)){borderIds.set(key,borderDefs.length);borderDefs.push({edges:perSide});}
- return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,wrap:!!s.wrap,border:borderIds.get(key)};});
+ return {fi,fillId,format:s.format==='date'?14:s.format==='time'?20:s.format==='datetime'?22:s.format==='duration'?46:s.format==='percent'?10:s.format==='currency'?44:s.format==='integer'?1:0,align:s.align,verticalAlign:s.verticalAlign,wrap:!!s.wrap,border:borderIds.get(key)};});
  const dxfs=(styles.dxfColors||[]).map(c=>'<dxf><fill><patternFill patternType="solid"><fgColor rgb="FF'+c.slice(1).toUpperCase()+'"/><bgColor indexed="64"/></patternFill></fill></dxf>').join('');
- let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="Aptos"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.wrap?' applyAlignment="1"':''}>${c.align||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${(styles.dxfColors||[]).length}">${dxfs}</dxfs></styleSheet>`;return xml;
+ let xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="${base}"><fonts count="${fonts.length}">${fonts.map(f=>`<font><sz val="${f.fontSize||11}"/><name val="${xmlEscape(f.fontFamily||'Aptos')}"/>${f.bold?'<b/>':''}${f.italic?'<i/>':''}${f.underline?'<u/>':''}${f.strike?'<strike/>':''}${f.color?`<color rgb="FF${f.color.slice(1).toUpperCase()}"/>`:''}</font>`).join('')}</fonts><fills count="${fills.length}"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>${fills.slice(2).map(c=>`<fill><patternFill patternType="solid"><fgColor rgb="FF${c.slice(1).toUpperCase()}"/><bgColor indexed="64"/></patternFill></fill>`).join('')}</fills>${`<borders count="${borderDefs.length}">${borderDefs.map(b=>`<border>${['left','right','top','bottom'].map(edge=>{const part=b.edges?.[edge];return part?(part.color?`<${edge} style="${part.line}"><color rgb="FF${part.color.slice(1).toUpperCase()}"/></${edge}>`:`<${edge} style="${part.line}"/>`):`<${edge}/>`;}).join('')}<diagonal/></border>`).join('')}</borders>`}<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="${cells.length}">${cells.map(c=>`<xf numFmtId="${c.format}" fontId="${c.fi}" fillId="${c.fillId}" borderId="${c.border}" xfId="0"${c.align||c.verticalAlign||c.wrap?' applyAlignment="1"':''}>${c.align||c.verticalAlign||c.wrap?`<alignment${c.align?` horizontal="${c.align}"`: ''}${c.verticalAlign?` vertical="${c.verticalAlign}"`:''}${c.wrap?' wrapText="1"':''}/>`:''}</xf>`).join('')}</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles><dxfs count="${(styles.dxfColors||[]).length}">${dxfs}</dxfs></styleSheet>`;return xml;
+}
+function qoWildcardEscape(value){return String(value).replace(/~/g,'~~').replace(/\*/g,'~*').replace(/\?/g,'~?');}
+function filterRuleToXLSX(rule){
+ if(typeof rule==='string'||Array.isArray(rule))return `<filters>${(Array.isArray(rule)?rule:[rule]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters>`;
+ if(rule.op==='empty')return '<filters blank="1"/>';
+ const map={contains:['equal','*'+qoWildcardEscape(rule.value)+'*'],notContains:['notEqual','*'+qoWildcardEscape(rule.value)+'*'],
+  startsWith:['equal',qoWildcardEscape(rule.value)+'*'],endsWith:['equal','*'+qoWildcardEscape(rule.value)],
+  equals:['equal',qoWildcardEscape(rule.value)],notEquals:['notEqual',qoWildcardEscape(rule.value)],
+  notEmpty:['notEqual',''],gt:['greaterThan',rule.value],gte:['greaterThanOrEqual',rule.value],
+  lt:['lessThan',rule.value],lte:['lessThanOrEqual',rule.value],numEq:['equal',rule.value],numNe:['notEqual',rule.value]};
+ const [operator,value]=map[rule.op];return `<customFilters><customFilter operator="${operator}" val="${xmlEscape(value)}"/></customFilters>`;
+}
+function filterRuleFromXLSX(column){
+ const filters=element(column,'filters');if(filters){
+  if(filters.getAttribute('blank')==='1')return {kind:'condition',op:'empty',value:''};
+  const values=elements(filters,'filter').map(v=>v.getAttribute('val')||'');
+  return values.length?values.length===1?values[0]:values:null;
+ }
+ const cf=elements(element(column,'customFilters'),'customFilter');if(cf.length!==1)return null;
+ const operator=cf[0].getAttribute('operator')||'equal',val=cf[0].getAttribute('val')||'';
+ if(val===''&&operator==='notEqual')return {kind:'condition',op:'notEmpty',value:''};
+ const numeric={'greaterThan':'gt','greaterThanOrEqual':'gte','lessThan':'lt','lessThanOrEqual':'lte'};
+ if(operator in numeric)return {kind:'condition',op:numeric[operator],value:val};
+ if(!['equal','notEqual'].includes(operator))return null;
+ if(/^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?$/.test(val))return {kind:'condition',op:operator==='equal'?'numEq':'numNe',value:val};
+ // Safely invert only our unescaped literal '*' wildcards; other Excel wildcard syntax is left unsupported.
+ if(val.includes('?'))return null;
+ const starStart=val.startsWith('*'),starEnd=val.endsWith('*');
+ let inner=val.slice(starStart?1:0,starEnd?-1:undefined);
+ if(/(?<!~)\*/.test(inner))return null;
+ inner=inner.replace(/~~/g,'~').replace(/~\*/g,'*').replace(/~\?/g,'?');
+ return {kind:'condition',op:operator==='notEqual'?(starStart&&starEnd?'notContains':'notEquals'):
+  starStart&&starEnd?'contains':starStart?'endsWith':starEnd?'startsWith':'equals',value:inner};
 }
 export async function exportXLSX(book){validateWorkbook(book);
  const area=book.sheets.reduce((n,s)=>n+(s.rectangleStyles||[]).reduce((v,l)=>{
@@ -511,12 +575,21 @@ export async function exportXLSX(book){validateWorkbook(book);
   const filter=filterRange(s),freeze=s.freeze||{rows:0,cols:0};
   const view=freeze.rows||freeze.cols?`<sheetViews><sheetView workbookViewId="0"><pane${freeze.cols?` xSplit="${freeze.cols}"`:''}${freeze.rows?` ySplit="${freeze.rows}"`:''} topLeftCell="${cellName(freeze.rows,freeze.cols)}" state="frozen"/></sheetView></sheetViews>`:'';
   const merges=s.merges?.length?`<mergeCells count="${s.merges.length}">${s.merges.map(m=>`<mergeCell ref="${xmlEscape(m.from)}:${xmlEscape(m.to)}"/>`).join('')}</mergeCells>`:'';
-  const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}"><filters>${(Array.isArray(val)?val:[val]).map(v=>`<filter val="${xmlEscape(v)}"/>`).join('')}</filters></filterColumn>`).join('')}</autoFilter>`:'';
+  const auto=filter?`<autoFilter ref="${cellName(filter.r1,filter.c1)}:${cellName(filter.r2,filter.c2)}">${Object.entries(s.autoFilter.rules||{}).map(([col,val])=>`<filterColumn colId="${Number(col)-filter.c1}">${filterRuleToXLSX(val)}</filterColumn>`).join('')}</autoFilter>`:'';
   const chartParts=writeXLSXCharts(zip,book,s,i+1),printParts=xlsxPrintSettings(s);
+  const hyperlinkEntries=exportedHyperlinks(s);
+  const hyperlinkXml=hyperlinkEntries.length?'<hyperlinks>'+hyperlinkEntries.map(([ref],j)=>
+   '<hyperlink ref="'+ref+'" r:id="rIdHyper'+(j+1)+'"/>').join('')+'</hyperlinks>':'';
+  if(hyperlinkEntries.length){
+   const rels=(chartParts.drawing?'<Relationship Id="rIdDrawing" Type="'+relNS+'/drawing" Target="../drawings/drawing'+(i+1)+'.xml"/>':'')+
+    hyperlinkEntries.map(([ref,url],j)=>'<Relationship Id="rIdHyper'+(j+1)+'" Type="'+relNS+'/hyperlink" Target="'+xmlEscape(url)+'" TargetMode="External"/>').join('');
+   zip.file('xl/worksheets/_rels/sheet'+(i+1)+'.xml.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="'+pkgNS+'">'+rels+'</Relationships>');
+  }
   const printArea=xlsxPrintArea(s,i+1,sheetName);if(printArea)printAreas.push(printArea);
   const hiddenRows=new Set([...Object.keys(s.hiddenRows||{}).map(v=>Number(v)+1),...(filter?Array.from({length:filter.r2-filter.r1},(_,i)=>filter.r1+i+2).filter(r=>!filterRowVisible(s,r-1)):[])]);
   const rows=new Set([...byRows.keys(),...Object.keys(s.rowHeights||{}).map(v=>Number(v)+1),...Object.keys(s.rowStyles||{}).map(v=>Number(v)+1),...hiddenRows]);
-  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}">${printParts.sheetPr}${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}${printParts.trailing}${chartParts.drawing}</worksheet>`;
+  const xml=`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="${base}" xmlns:r="${relNS}">${printParts.sheetPr}${view}${s.defaultColumnWidth||s.defaultRowHeight?`<sheetFormatPr${s.defaultColumnWidth?` defaultColWidth="${((s.defaultColumnWidth-5)/7).toFixed(3)}"`:''}${s.defaultRowHeight?` defaultRowHeight="${(s.defaultRowHeight*3/4).toFixed(3)}"`:''}/>`:''}${cols?`<cols>${cols}</cols>`:''}<sheetData>${Array.from(rows).sort((a,b)=>a-b).map(r=>{const cc=byRows.get(r)||[],height=s.rowHeights?.[r-1],rowStyle=s.rowStyles?.[r-1],rowStyleID=rowStyle?styles.getId(rowStyle):null;return `<row r="${r}"${rowStyleID!==null?` s="${rowStyleID}" customFormat="1"`:''}${height?` ht="${(height*3/4).toFixed(2)}" customHeight="1"`:''}${hiddenRows.has(r)?' hidden="1"':''}>${cc.sort((a,b)=>a[0].localeCompare(b[0],undefined,{numeric:true})).map(x=>x[1]).join('')}</row>`;}).join('')}</sheetData>${auto}${merges}${hyperlinkXml}${xlsxConditionalFormatting(s,styles)}${xlsxDataValidations(s)}${printParts.trailing}${chartParts.drawing}</worksheet>`;
   zip.file(`xl/worksheets/sheet${i+1}.xml`,xml);sheetTypes.push(`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`,...chartParts.overrides);
   return `<sheet name="${xmlEscape(sheetName)}" sheetId="${i+1}" r:id="rId${i+1}"/>`;
  });

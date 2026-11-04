@@ -48,7 +48,10 @@ with sync_playwright() as playwright:
     page.get_by_role('tab',name='Правка').click()
     assert page.get_by_role('button',name='Копировать').is_visible()
     page.get_by_role('tab',name='Главная').click()
-    assert page.get_by_role('button',name='Жирный').locator('svg').count()==1
+    assert 'Ж' in page.get_by_role('button',name='Жирный').inner_text()
+    assert 'К' in page.get_by_role('button',name='Курсив').inner_text()
+    assert 'Ч' in page.get_by_role('button',name='Подчёркнутый').inner_text()
+    assert 'З' in page.get_by_role('button',name='Зачёркнутый').inner_text()
     assert not errors,errors
     browser.close()
     print('PASS: native Ctrl+C/Ctrl+V, formula translation, compact icons and nonselectable ribbon')

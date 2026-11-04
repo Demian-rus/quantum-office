@@ -1,6 +1,7 @@
-/** Bounded, non-destructive-before-validation data-cleaning operations. */
 import {LIMITS,cellName,rectangle,getCell,parseCell} from './workbook.js';
 import {checkValidatedInput} from './validation.js';
+/** Bounded, non-destructive-before-validation data-cleaning operations. */
+
 
 const DATA_MAX_ROWS=2000,DATA_MAX_COLUMNS=20,DATA_MAX_CELLS=10000;
 const dataAreasOverlap=(a,b)=>a.r1<=b.r2&&a.r2>=b.r1&&a.c1<=b.c2&&a.c2>=b.c1;

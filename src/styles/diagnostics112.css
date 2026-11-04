@@ -1,0 +1,165 @@
+/* TASK112: full-viewport, balanced office UI. Avoid narrowing everything to a central island. */
+.qo-document-workspace .qo-diag-scroll{
+  padding:20px clamp(18px,1.65vw,34px) 28px;
+  overflow-x:hidden;
+}
+#qo-diag-root{width:100%;max-width:none;margin:0}
+#qo-diag-root .qd-top{
+  width:100%;max-width:none;
+  margin:0 0 18px;
+  align-items:center;
+  gap:24px;
+}
+#qo-diag-root .qd-top>div:first-child{min-width:0}
+#qo-diag-root .qd-top h1{font-size:clamp(20px,1.5vw,26px);line-height:1.26}
+#qo-diag-root .qd-top .qd-actions{flex:none;white-space:nowrap}
+#qo-diag-root .qd-workbench{
+  width:100%;max-width:none;
+  display:grid;
+  grid-template-columns:minmax(198px,260px) minmax(0,980px) minmax(208px,260px);
+  gap:clamp(20px,3vw,76px);
+  align-items:start;
+  justify-content:space-between;
+  margin:0;
+}
+#qo-diag-root .qd-workbench-main{
+  width:100%;min-width:0;max-width:980px;margin:0;
+}
+#qo-diag-root .qd-side-panel{
+  width:100%;min-width:0;
+  padding:17px 16px;
+  border-radius:11px;
+  max-height:calc(100vh - 155px);
+}
+#qo-diag-root .qd-side-panel h2{font-size:14px}
+#qo-diag-root .qd-side-topic{padding:10px 9px}
+#qo-diag-root .qd-side-topic-title{font-size:12px}
+#qo-diag-root .qd-side-stat{padding:9px 0}
+#qo-diag-root .qd-side-stat span{font-size:12px}
+#qo-diag-root .qd-side-stat strong{font-size:14px}
+#qo-diag-root .qd-guided>.qd-card{
+  min-height:188px;
+  padding:20px 22px;
+}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-question p{
+  font-size:clamp(17px,1.18vw,20px);line-height:1.46;
+}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-head{gap:13px}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-rating button{
+  min-height:38px;flex:0 1 auto;padding:8px 14px;font-size:12px;
+}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-rating{gap:8px}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-chat-actions{margin-top:11px}
+#qo-diag-root .qd-guided>.qd-chat-card .qd-answer{margin-top:9px}
+/* The sheet-like diagnostic ribbon: two rows of substantial labeled tools. */
+.qo-document-workspace:has([data-panel-tab="diagnostic"].active) .qo-work-ribbon{
+  min-height:112px;overflow-x:auto;overflow-y:hidden;
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"]{
+  display:flex;
+  width:max-content;min-width:100%;
+  height:112px;min-height:112px;max-height:112px;
+  box-sizing:border-box;
+  gap:0;
+  padding:7px 12px 5px;
+  align-items:stretch;
+}
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"][hidden]{
+  display:none!important;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group{
+  flex:none;
+  gap:5px;
+  padding:0 13px;
+  min-width:0;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-group-body{
+  flex:none;
+  display:grid;
+  grid-template-columns:repeat(2, minmax(122px,145px));
+  grid-template-rows:repeat(2,39px);
+  align-content:center;
+  gap:6px;
+  min-height:78px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn{
+  width:100%;min-width:0;max-width:none;
+  height:39px;min-height:39px;max-height:none;
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap:9px;
+  padding:7px 10px;
+  border-radius:7px;
+  border:1px solid var(--qo-border);
+  background:var(--qo-surface);
+  color:var(--qo-text);
+  font:600 12px/1.2 "Segoe UI",Arial,sans-serif;
+  text-align:left;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn:hover{
+  border-color:var(--qo-accent);background:var(--qo-hover)
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn span{
+  display:inline!important;
+  font-size:12px;
+  line-height:1.25;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-icon{
+  width:20px;height:20px;flex:none
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-work-group-caption{
+  height:13px;line-height:13px;font-size:10px
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group{
+  flex:none;min-width:235px;max-width:380px;padding:0 16px;
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group .qo-work-group-body{
+  align-items:center;justify-content:flex-start;min-height:79px
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-ribbon-guide{
+  display:grid;gap:6px;padding:7px 3px;
+  font-size:12px;color:var(--qo-text);line-height:1.3
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-ribbon-guide strong{
+  font-weight:750;font-size:13px
+}
+.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-ribbon-guide span{
+  color:var(--qo-muted);font-size:11px
+}
+/* No second set of file commands at the bottom of diagnostics. */
+#qo-diag-root .qd-filebar[hidden]{display:none!important}
+#qo-diag-root .qd-library-portable-note{color:var(--qo-muted);font-size:12px;margin:5px 0}
+/* Medium screens: statistics remain useful in the left rail, not hidden. */
+@media(max-width:1330px){
+ #qo-diag-root .qd-workbench{
+   grid-template-columns:minmax(178px,225px) minmax(0,1fr);
+   gap:16px 24px;
+   justify-content:stretch;
+ }
+ #qo-diag-root .qd-workbench>.qd-topic-navigator{grid-column:1;grid-row:1}
+ #qo-diag-root .qd-workbench>.qd-side-insights{
+   display:block;grid-column:1;grid-row:2;position:static;max-height:none
+ }
+ #qo-diag-root .qd-workbench>.qd-workbench-main{
+   grid-column:2;grid-row:1/span 2;max-width:none;margin:0
+ }
+}
+@media(max-width:900px){
+ #qo-diag-root .qd-workbench{display:flex;flex-direction:column;gap:12px}
+ #qo-diag-root .qd-workbench>.qd-topic-navigator{order:0;width:100%;max-width:none;max-height:none}
+ #qo-diag-root .qd-workbench>.qd-workbench-main{order:1;width:100%;max-width:none}
+ #qo-diag-root .qd-workbench>.qd-side-insights{order:2;width:100%;max-width:none}
+ #qo-diag-root .qd-top{flex-wrap:wrap}
+ #qo-diag-root .qd-guided>.qd-chat-card .qd-rating button{flex:1 1 100px}
+}
+@media(max-width:560px){
+ .qo-document-workspace .qo-diag-scroll{padding:12px 10px 26px}
+ #qo-diag-root .qd-top{gap:8px}
+ #qo-diag-root .qd-guided>.qd-card{min-height:0;padding:14px}
+ .qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-group-body{
+   grid-template-columns:repeat(2,minmax(120px,140px))
+ }
+}

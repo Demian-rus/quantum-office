@@ -97,7 +97,7 @@ with sync_playwright() as p:
  cell('B2').click(button='right')
  assert page.locator('[data-action=size-context-mode][data-kind="row"]').count()==1
  page.locator('[data-action=size-context-mode][data-kind="row"]').click()
- page.locator('#size-context-number').fill('300')
+ page.locator('#size-context-number').fill('2001')
  page.locator('[data-action=size-context-apply]').click()
  assert page.evaluate('rowHeight(sheet(),1)')==29
  assert page.locator('#toast').is_visible()

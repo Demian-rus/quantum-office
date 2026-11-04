@@ -1,7 +1,7 @@
+import {decodeBook} from './store.js';
 /** Browser File System Access operations are explicit and per-workbook.
  * The handle is session-only; never store handles in .qbook or localStorage.
  * Verification is best effort and is NOT an OS fsync or crash-durability proof. */
-import {decodeBook} from './store.js';
 
 export const DIRECT_FILE_LIMIT=15_000_000;
 

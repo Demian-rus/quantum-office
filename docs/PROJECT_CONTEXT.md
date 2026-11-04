@@ -549,3 +549,109 @@ Excel import/export now supports native dropdown lists stored as inline quoted O
 - Operation is staged before mutating any original sheet cells, validating data-rule restrictions, bounds, merged cells, hidden or filtered positions and the 10k destination / 50k nonempty limits. Invalid moves leave original data and Undo history unchanged. Normal .qbook and XLSX persistence applies.
 - Current limitation: mouse handle can be dragged downward and rightward within the currently visible grid; left/up drags, dates with calendars, automatic scroll on distant targets, series from only a single number without a second seed, and custom fill modes are not yet implemented.
 - New tests \`tests/task070.test.js\` and \`tests/task070_browser.py\` cover true mouse dragging, arithmetic series, repeated text/numbers, formula translations, preview, Ctrl+Z/Y, data validation, QBOOK and native XLSX. Both full Verify and Chromium suites required before merging.
+
+## TASK 071–074 — four-way fill, owner UI fixes, Ctrl selection restoration (2026-10-31)
+
+- Resume existing Draft PR #80 on `feat/task071-four-way-date-autoscroll`. Do not create another parallel PR or merge before full final-head CI. The base `main` commit at task start was `0419c2de53ce2317587bc4f3e5d51f159dbf5e63`.
+- TASK071 extends the bottom-right fill handle to up/down/left/right, adds viewport-edge pointer-driven autoscroll, arithmetic sequences in reverse directions, and Excel-serial daily date sequences (including leap days and two-date intervals). Formula translations respect anchored refs. Merged, hidden, filtered, out-of-bounds or invalid destinations reject before writes.
+- TASK072 adds interactive checkbox marks `☐` / `☑` in worksheet cells (stored as normal Unicode values with center alignment, click to toggle, Undo works). XLSX round-trip carries text marks, **not Excel interactive controls**. Genuine font-family and size selectors added to the compact Home ribbon, with an allowlisted collection of Cyrillic-capable fonts, serialized in QBOOK and XLSX font records. Right-click entire-sheet corner offers compact global row/column size defaults, alongside existing individual and Ctrl-multi-header size editing.
+- TASK073 fixes original root cause of jumping to top after ribbon actions: newly recreated scroll views must receive full grid-canvas geometry **BEFORE** restoring scroll offsets, otherwise Chromium clamps `scrollTop` to zero. Scroll handler renders on animation frames and overscans nearby rows/columns to reduce white gaps. More polished navy/green ribbon and near-black default grid text. Preserve system font fallbacks when unavailable.
+- TASK074 fixes a real regression in TASK068: Ctrl+drag must continue extending an independent rectangle (mouseover after Ctrl-mousedown), while Ctrl-click on already selected cell removes that cell from selection. Ctrl on a fresh cell begins additive drag; Ctrl on a selected cell toggles off without starting drag. Max 25 rectangular areas.
+- TASK074 additionally provides four ribbon fill directions under `Правка → Заполнение`. `fillSelection` / `fillAreasDirection` support Up/Down/Left/Right: Up copies from the bottom edge; Left copies from the right edge; both shift formula references and copy styles. Unlike the drag handle this is edge copying, not arithmetic-sequence extrapolation. All writes are staged and validated, with one undo transaction.
+- Test files: `tests/task071.test.js`, `tests/task071_browser.py`, `tests/task072.test.js`, `tests/task072_browser.py`, `tests/task073_browser.py`, `tests/task074.test.js`, `tests/task074_browser.py`, plus critical existing `tests/task068_browser.py` to prevent Ctrl-drag regressions. Offline standalone `Quantum-Office.html` must be rebuilt with changes and delivered as direct downloadable HTML and ZIP, not raw GitHub source links.
+- Browser and Node verification from final branch head is mandatory. The product still remains Sheets alpha; Writer/Slides are placeholders and XLSX compatibility is partial. Do not claim new work is merged into main until merge is explicitly done.
+
+## TASK 075 — owner UX, rich cell formats and header-drag selection (2026-10-31)
+
+- On sheet checkbox click, `toggleCellCheckbox` changes value without calling `setSelection`. Original selection remains intact; clicking the cell background or dragging over cells selects normally. State persists and remains Undoable.
+- Home ribbon: text buttons `Ж` (bold), `К` (italic), `Ч` (underline) and `З` (strike) replace icon-only format labels, with text and fill color controls beside them. Alignment group has **two rows**: top/middle/bottom within a cell; horizontal left/center/right beneath. Compact UI has expanded font action group and consistent typography.
+- Workbook style schema and QBOOK persist `underline:boolean`, `strike:boolean` and `verticalAlign:top|center|bottom` as sparse default/cell/column/rectangle formats. Grid renderer displays CSS text decoration and vertical flex alignment. XLSX reader/writer supports `<u/>`, `<strike/>` font records and cell `<alignment vertical="..."/>` with per-style deduplication. Old workbooks stay compatible.
+- Pointer drag over a row-number or column-letter header selects the **full consecutive axis span** from initial header to target; ordinary single-click and Ctrl-additive header operations are maintained. Avoid starting selection from resize handles; retain 25-region limit. Drag state ends on pointer up/cancel, with click-suppression only for completed drags.
+- Test coverage: `tests/task075.test.js`, `tests/task075_browser.py` added to CI. Existing `tests/clipboard_browser.py` updated to expect user-approved Cyrillic format glyphs instead of obsolete SVG bold icon. Browser-local regression confirmed mouse checkbox isolation, 4 formats, 6 alignment controls, header drag, XLSX roundtrip and old TASK032/073/074 scenarios.
+- Direct user test artifact is `Quantum-Office-TASK075.html` and `Quantum-Office-TASK075.zip`, generated from Verify CI artifact at `b9bfaf8b` (same implementation source as later commits). PR #80 remains Draft until *final HEAD* Verify + Chromium workflows pass.
+
+## TASK 095 — authoritative TASK094 recovery, appearance and Studio (2026-10-31)
+
+- The owner now prioritizes Studio. TASK094 standalone (SHA-256 `0938db3062298dc07fe36613541d18f329641ce5e8ce554539fea26f242a9a8f`) was newer than GitHub PR #80. Recovered its modules and verified a byte-identical rebuild before new changes. Never roll back Writer/Slides/Studio to the old GitHub placeholders.
+- Read `docs/TASK095.md` for full scope, actual validation and limitations. Studio now has real corner transforms/rotation, snapping, panning, inline multiline text, per-image non-destructive correction/crop/flip, accessible collapsible inspectors and explicit quota feedback.
+- Global Save uses QDOC / QSTUDIO, with separate flat exports. Appearance is a menu: light/dark/system plus accents, without rebuilding document DOM or recoloring content. QSLIDES restores active slide and selection.
+- `src/core/studio-model.js` owns pure validation/crop/filter/geometry helpers. Legacy QSTUDIO v1 fixtures are exported from actual TASK093 and TASK094 runtimes. New optional image fields must not be discarded on future edits. Existing native document formats stay readable.
+- `npm run dev` serves the current built dist, not the stale root index. Run Node tests and the historical Chromium suite, plus `npm run test:studio` (23 functional checks and 32 captures). Python Playwright is pinned to 1.56.0 and npm Playwright to 1.56.1; both use Chromium revision 1194.
+- Draft PR #80 and main must remain untouched until owner authorization. TASK095 is a separate branch. Future multi-page work requires a deliberate migration; no masks/retouch or complete professional photo-editor claim yet.
+
+## TASK 096 — design system and appearance architecture (2026-10-31)
+
+- Continue TASK095 at `6927b7b6918f3f25365e383604c0ffb092aa6afc`, never the old placeholders. TASK096 branch is `feat/task096-design-system`, dependent on `feat/task095-studio-appearance`; main and PR #80 remain untouched.
+- `src/styles.css` is a local import manifest. Seven modules own foundation, shared components, shell, Sheets, Writer/Slides, Studio, and shared control states. Build recursively bundles them into the offline file. Read `docs/DESIGN_SYSTEM.md` before adding interface styles, and `docs/TASK096.md` for audit and acceptance details.
+- Every light/dark/accent palette is defined in Foundation. No component-specific dark-theme overrides, no new color `!important`, no global recoloring of document content. Disabled-selected is neutral; selected-hover and pressed are distinct. Preserve keyboard focus.
+- Header geometry is shared across all four editors. Studio drawers are mutually exclusive at <=1100px but both may be docked on desktop. Slide preview text scales using its real frame container, without changing stored item sizes. Theme refresh redraws Studio overlay without modifying project content or flat export pixels.
+- `npm run test:design-system` covers 96 layouts (including zoom-equivalent CSS viewports), 481 computed contrast pairs, real interactive states, theme persistence, OS changes, and document/pixel isolation. The production-CSS component catalog is built into `dist/components.html`. Existing TASK095 functional and 66 CI Python groups remain required.
+
+- TASK096 completion preserves `status(message, true/false)` and adds explicit `error/warning/success` tones with semantic colors and accessible announcement roles. TASK096 tests 24 real notifications across all eight palettes. Verified-save/import/clipboard controllers choose tones without changing file data.
+- TASK032 CI null `bounding_box()` was reproduced 2/8 times on Chromium1194. Horizontal scroll replaces the frozen-row DOM on animation frames, racing Playwright's temporary handle. The live A1 remained visible with identical bounds in 20 frames. The test now waits for render completion while retaining its geometry, DOM identity and hit-test assertions; 20/20 repeats passed. Grid engine unchanged. See the TASK096 completion section for evidence.
+
+## TASK141 — профессиональная диагностика (04.11.2026)
+
+Продолжение TASK140/#125. Отдельная Draft-ветка
+`feat/task141-professional-diagnostics`; main не меняется. Подробный
+handoff и ограничения: `docs/TASK141.md`.
+
+Ключевые решения: «Создать с нуля» = ноль разделов/вопросов; пустые личные
+шаблоны допустимы. Конструктор открывает библиотечный шаблон для правок,
+сохраняет связь по ID, имеет заметные основные сохранения сверху.
+Проведение работает с независимым снимком `diagnostic.run.document`,
+а `qdWorkingDoc()` возвращает авторский черновик. `qdDoc()` возвращает
+активный снимок только в режиме проведения. Не подменять снимок при
+переходе в конструктор. QDIAG/QDIAGX/QDOC экспортируют весь проект.
+
+Точные баллы, текстовые ответы, комментарии и критерии сохраняются и
+попадают в отчёт. Поиск и массовые инструменты свёрнуты в дополнительную
+панель, банк и компактный список доступны сверху. Иллюстрации продолжают
+использовать существующий IndexedDB; таблицы/символы — очистку HTML Writer.
+Старые форматы читаются, новые поля необязательные. Создание/смена шаблона
+не очищает ранее сохранённых учеников, журнал и незавершённое проведение.
+
+## TASK142 — DOCX и UX диагностики (04.11.2026)
+
+Продолжение TASK141/#126, ветка `feat/task142-diagnostics-workbench-docx`.
+Main не меняется. Подробности: `docs/TASK142.md`.
+
+TASK132: тест терял расширение DOCX при импорте временного GUID-пути
+Playwright. Теперь используется настоящее имя загрузки, импорт проверяется
+в пустом документе. Импортёр не принимает неизвестный или двоичный файл
+за обычный текст, не перезаписывая открытое содержимое при ошибке.
+
+Диагностика сохраняет архитектуру TASK141. Добавлен отдельный модуль
+`diagnostic-workbench.js`: список вопросов, необязательный инспектор,
+скрытие панелей, контекстное меню и быстрые клавиши. Инспектор перемещает
+контролы из выбранной карточки, не создаёт второй модели или дублирующих
+полей. Медиа-панели свёрнуты, библиотечные действия собраны в меню,
+поиск охватывает содержимое. Новое поле `hint` необязательное.
+
+При точной оценке нельзя заменять DOM кнопок/полей: `change` выполняется
+между pointerdown и click следующего действия. Сохранять идентичность
+полей комментария, кнопок завершения и навигации; обновлять показатели
+без потери следующего клика. Снимок проведения остаётся независимым.
+
+## TASK143 — закреплённые зоны диагностики (04.11.2026)
+
+База TASK142/#127. Ветка `feat/task143-diagnostics-three-zone-layout`,
+подробности `docs/TASK143.md`. Композиция: навигация 208 px слева,
+центр максимум 960 px, параметры/обзор 260 px справа. Три независимые
+прокрутки, режимы и сохранения в центральной закреплённой шапке.
+До 1200 px панели открываются кнопками, на телефоне шапка не закреплена.
+Лишняя рекламная шапка и дублирующие пояснения удалены. Модели/форматы
+и независимый снимок не менялись. Восстанавливать прокрутку только после
+декораторов media/student-hub, иначе вставка блоков сдвигает центр.
+
+## TASK144 — отдельный конструктор работ
+
+База TASK143/#128. Ветка `feat/task144-math-physics-work-builder`.
+Новая вкладка Writer «Конструктор работ», отдельная модель/ключ QWORK v1.
+Не встраивать проекты работ в QDIAG или QDOC: использовать QWORK для переноса.
+Математика: MathML и общий AST для PDF. Графики/схемы сохраняют координаты.
+PDF реально скачивается автономно, растровый A4 180 dpi; исходником остаётся
+QWORK. Ученический вывод не читает ключи преподавателя. Не заявлять полный
+LaTeX, официальный ФИПИ-банк, векторный/доступный PDF или DOCX для работ.
+Банк работ и мост из диагностики отдельные, без данных учеников.
+Подробная архитектура, ограничения, тесты и vendor: `docs/TASK144.md`.

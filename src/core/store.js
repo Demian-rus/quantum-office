@@ -1,4 +1,5 @@
 import { validateWorkbook } from './workbook.js';
+
 export const STORE_KEY='quantum-office.workspace.v3';
 export const PREVIOUS_KEY='quantum-office.workspace.v3.previous';
 const blank=()=>({version:3,books:[],active:null});

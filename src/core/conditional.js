@@ -1,5 +1,5 @@
-/** Conditional cell fills: a bounded rule set rendered without mutating source styles. */
 import {uid,rectangle,cellName,LIMITS,resultOf} from './workbook.js';
+/** Conditional cell fills: a bounded rule set rendered without mutating source styles. */
 
 export const CONDITIONAL_KINDS=['gt','lt','eq','contains','scale'];
 const MAX_RULES=24,MAX_CELLS=1200;

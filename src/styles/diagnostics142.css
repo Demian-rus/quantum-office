@@ -1,0 +1,116 @@
+/* TASK142. Workspace proportions and context panels use shared theme roles. */
+#qo-diag-root.qd-desk-builder .qd-workbench{display:grid;grid-template-columns:190px minmax(0,1fr) 250px;gap:14px;align-items:start}
+#qo-diag-root.qd-desk-builder .qd-workbench>.qd-workbench-main{grid-column:2;grid-row:1;min-width:0}
+#qo-diag-root.qd-desk-builder .qd-workbench>.qd-side-insights{grid-column:3;grid-row:1;position:sticky;top:8px;max-height:calc(100dvh - 180px);overflow-y:auto;min-width:0}
+#qo-diag-root .qd-question-inspector h2{font-size:13px;margin:0 0 8px}
+#qo-diag-root .qd-current-question{font-size:11px;line-height:1.5;overflow-wrap:anywhere;margin:5px 0 10px;color:var(--qo-muted)}
+#qo-diag-root .qd-inspector-toggle{width:100%;font-size:11px;min-height:31px;padding:5px 8px;margin-bottom:10px}
+#qo-diag-root #qd-question-properties{display:grid;gap:12px;border-top:1px solid var(--qo-border);padding-top:12px}
+#qo-diag-root #qd-question-properties[hidden]{display:none}
+#qo-diag-root #qd-question-properties label{display:grid;gap:5px;font-size:11px;min-width:0}
+#qo-diag-root #qd-question-properties .qd-settings,#qo-diag-root #qd-question-properties .qd-numeric-editor{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;margin:0;border:0;padding:0;min-width:0}
+#qo-diag-root #qd-question-properties select,#qo-diag-root #qd-question-properties input{height:32px;min-height:32px;max-width:100%;width:100%;box-sizing:border-box}
+#qo-diag-root #qd-question-properties textarea{width:100%;min-height:80px;resize:vertical;box-sizing:border-box;font-size:12px;line-height:1.5}
+#qo-diag-root .qd-inspector-overview,#qo-diag-root .qd-keyboard-help{border-top:1px solid var(--qo-border);padding-top:10px;margin-top:12px}
+#qo-diag-root .qd-inspector-overview>summary,#qo-diag-root .qd-keyboard-help>summary{font-size:11px;font-weight:600;cursor:pointer;padding:3px 0}
+#qo-diag-root .qd-overview-content{padding:10px 0 0;border:0;box-shadow:none;background:transparent}
+#qo-diag-root .qd-overview-content>h2{display:none}
+#qo-diag-root .qd-keyboard-help p{font-size:11px;line-height:1.8;color:var(--qo-muted)}
+#qo-diag-root .qd-desk-outline{position:sticky;top:8px;max-height:calc(100dvh - 180px);overflow:auto;width:auto;min-width:0;padding:10px}
+#qo-diag-root .qd-desk-outline>summary{font-size:12px;font-weight:700;cursor:pointer;line-height:1.5}
+#qo-diag-root .qd-desk-outline>summary span{font-size:10px;color:var(--qo-muted)}
+#qo-diag-root .qd-outline-actions button{font-size:10px;min-height:27px;width:100%;margin:8px 0}
+#qo-diag-root .qd-outline-section{padding:7px 0;border-top:1px solid var(--qo-border)}
+#qo-diag-root .qd-outline-section .qd-side-topic{padding:6px;font-size:11px;margin:0;min-height:30px;text-align:left;line-height:1.4}
+#qo-diag-root .qd-outline-section .qd-side-topic small{color:var(--qo-muted)}
+#qo-diag-root .qd-outline-question{display:grid;grid-template-columns:20px minmax(0,1fr);gap:4px;align-items:start;width:100%;text-align:left;background:transparent;border:1px solid transparent;border-radius:5px;padding:7px 4px;font-size:11px;line-height:1.4;min-width:0;min-height:34px}
+#qo-diag-root .qd-outline-question>span:last-child{overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#qo-diag-root .qd-outline-question>span:first-child{font-size:10px;color:var(--qo-muted)}
+#qo-diag-root .qd-outline-question:hover{background:var(--qo-hover)}
+#qo-diag-root .qd-outline-question[aria-current=true]{background:var(--qo-accent-soft);border-color:var(--qo-accent-border);color:var(--qo-accent)}
+#qo-diag-root .qd-current-card{border-color:var(--qo-accent-border);box-shadow:0 0 0 1px var(--qo-accent-border)}
+#qo-diag-root .qd-select-question{border:0;background:transparent;font-size:11px;padding:4px 7px;color:var(--qo-accent);font-weight:700;min-height:28px}
+#qo-diag-root.qd-desk-wide.qd-desk-builder .qd-workbench{grid-template-columns:minmax(0,1100px)}
+#qo-diag-root.qd-desk-wide.qd-desk-builder .qd-workbench-main{grid-column:1}
+#qo-diag-root.qd-desk-wide.qd-desk-builder .qd-topic-navigator,#qo-diag-root.qd-desk-wide.qd-desk-builder .qd-question-inspector{display:none}
+#qo-diag-root .qd-media-fold{border:1px solid var(--qo-border);border-radius:6px;overflow:hidden}
+#qo-diag-root .qd-media-fold>summary{padding:8px 10px;font-size:11px;color:var(--qo-muted);cursor:pointer;background:var(--qo-surface-alt);line-height:1.5}
+#qo-diag-root .qd-media-fold .qd-media-slot{border:0;margin:0;border-radius:0;padding:10px}
+#qo-diag-root .qd-media-fold .qd-media-slot-title{display:none}
+#qo-diag-root .qd-meta{padding:12px;gap:8px}
+#qo-diag-root .qd-meta>label>textarea{min-height:38px;height:38px;resize:vertical}
+#qo-diag-root .qd-author-metadata{grid-template-columns:minmax(140px,1fr) 78px minmax(150px,1fr);gap:8px}
+#qo-diag-root .qd-builder-tools .qd-template-selector{max-width:300px;min-width:160px}
+#qo-diag-root .qd-builder-actionbar{box-shadow:0 3px 8px var(--qo-border);gap:4px}
+#qo-diag-root .qd-command-row button,#qo-diag-root .qd-library-commandbar button,#qo-diag-root .qd-library-card-footer button{height:30px;min-height:30px;line-height:1.3;border-radius:5px;padding:5px 9px;font-size:11px}
+#qo-diag-root .qd-command-row span{min-width:100px;flex-basis:140px}
+#qo-diag-root .qd-command-row strong{font-size:11px}
+#qo-diag-root .qd-primary{background:var(--qo-accent-fill);color:var(--qo-on-accent)}
+#qo-diag-root .qd-primary:hover{background:var(--qo-accent-fill-hover)}
+#qo-diag-root .qd-library-grid{grid-template-columns:repeat(auto-fill,minmax(min(330px,100%),1fr));gap:12px}
+#qo-diag-root .qd-library-card{min-height:0;gap:8px;padding:14px;box-shadow:none;overflow:visible}
+#qo-diag-root .qd-library-card h3{font-size:15px;line-height:1.4;overflow-wrap:anywhere}
+#qo-diag-root .qd-library-card p{font-size:11px;line-height:1.5}
+#qo-diag-root .qd-library-card-footer{margin-top:auto;padding-top:5px}
+#qo-diag-root .qd-library-card-footer>div{justify-content:start;width:100%;align-items:start}
+#qo-diag-root .qd-library-structure{font-size:11px;display:block;line-height:1.5}
+#qo-diag-root .qd-library-structure>summary{cursor:pointer;font-weight:600;color:var(--qo-muted)}
+#qo-diag-root .qd-library-structure>span{display:block;padding:3px 0}
+#qo-diag-root .qd-library-menu{position:relative;margin-left:auto}
+#qo-diag-root .qd-library-menu>summary{display:flex;align-items:center;justify-content:center;height:30px;width:32px;border:1px solid var(--qo-border);border-radius:5px;list-style:none;cursor:pointer;font-weight:700;font-size:18px}
+#qo-diag-root .qd-library-menu>summary::-webkit-details-marker{display:none}
+#qo-diag-root .qd-library-menu[open]{z-index:20}
+#qo-diag-root .qd-library-menu>div{position:absolute;right:0;top:34px;display:grid;gap:3px;min-width:200px;border:1px solid var(--qo-border-strong);padding:5px;background:var(--qo-surface-raised);box-shadow:var(--qo-shadow);border-radius:7px}
+#qo-diag-root .qd-library-menu>div>button{height:auto;min-height:32px;width:100%;border:0;text-align:left;white-space:normal;background:transparent;color:var(--qo-text)}
+#qo-diag-root .qd-library-menu>div>button:hover{background:var(--qo-hover)}
+#qo-diag-root .qd-library-found{font-size:11px;color:var(--qo-muted);margin:0}
+#qo-diag-root .qd-library-empty{font-size:13px;line-height:1.6;padding:24px;border:1px dashed var(--qo-border);border-radius:8px;background:var(--qo-surface)}
+#qo-diag-root .qd-library-empty p{font-size:12px;margin:5px 0 12px}
+#qo-diag-root .qd-run-setup{display:block;padding:0;border-radius:7px}
+#qo-diag-root .qd-run-setup>summary{cursor:pointer;padding:12px 14px;font-size:12px;line-height:1.5;font-weight:650;overflow-wrap:anywhere}
+#qo-diag-root .qd-run-setup>summary span{color:var(--qo-muted);font-weight:400;font-size:11px}
+#qo-diag-root .qd-run-setup-body{padding:12px 14px;border-top:1px solid var(--qo-border);display:grid;gap:10px}
+#qo-diag-root .qd-pupil-hint{font-size:12px;margin:10px 0}
+#qo-diag-root .qd-pupil-hint button{font-size:11px;min-height:29px;padding:5px 9px}
+#qo-diag-root .qd-pupil-hint p{padding:10px;border-left:3px solid var(--qo-accent-border);background:var(--qo-surface-alt);line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere}
+#qo-diag-root .qd-chat-head .qd-question p{font-size:17px;line-height:1.6;font-weight:600;overflow-wrap:anywhere}
+#qo-diag-root .qd-chat-rating{gap:5px}
+#qo-diag-root .qd-written-answer textarea{font-weight:400;font-size:14px;line-height:1.6}
+#qo-diag-root .qd-context-menu{position:fixed;width:215px;max-width:calc(100vw - 16px);z-index:100;padding:5px;display:grid;gap:3px;background:var(--qo-surface-raised);color:var(--qo-text);border:1px solid var(--qo-border-strong);border-radius:7px;box-shadow:var(--qo-shadow)}
+#qo-diag-root .qd-context-menu button{font-size:12px;min-height:33px;border:0;text-align:left;padding:7px 9px;background:transparent;color:var(--qo-text)}
+#qo-diag-root .qd-context-menu button:hover,#qo-diag-root .qd-context-menu button:focus-visible{background:var(--qo-hover)}
+@media(min-width:1800px){#qo-diag-root.qd-desk-builder .qd-workbench{grid-template-columns:220px minmax(0,1150px) 270px;justify-content:start}}
+@media(max-width:1199px){
+ #qo-diag-root.qd-desk-builder .qd-workbench{grid-template-columns:180px minmax(0,1fr)}
+ #qo-diag-root.qd-desk-builder .qd-question-inspector{display:none}
+ #qo-diag-root.qd-desk-builder.qd-properties-open:not(.qd-desk-wide) .qd-question-inspector{display:block;position:fixed;top:165px;bottom:14px;right:12px;width:300px;max-width:calc(100vw - 24px);max-height:none;z-index:40;box-shadow:var(--qo-shadow);padding:14px}
+ #qo-diag-root .qd-inspector-toggle{position:sticky;top:0;background:var(--qo-surface);z-index:2}
+}
+@media(max-width:900px){
+ #qo-diag-root.qd-desk-builder .qd-workbench{display:flex;flex-direction:column;gap:10px}
+ #qo-diag-root.qd-desk-builder .qd-desk-outline{position:static;max-height:300px;width:100%;box-sizing:border-box}
+ #qo-diag-root .qd-author-metadata{grid-template-columns:minmax(130px,1fr) 70px minmax(135px,1fr)}
+ #qo-diag-root .qd-builder-actionbar{position:sticky;top:0}
+ #qo-diag-root .qd-select-question{padding:5px}
+ #qo-diag-root .qd-library-commandbar{gap:6px}
+ #qo-diag-root .qd-run-setup>summary span{display:block}
+}
+@media(max-width:570px){
+ #qo-diag-root .qd-author-metadata{grid-template-columns:minmax(0,1fr) 70px}
+ #qo-diag-root .qd-author-metadata>label:last-child{grid-column:1/-1}
+ #qo-diag-root .qd-builder-actionbar{position:static}
+ #qo-diag-root .qd-command-row button,#qo-diag-root .qd-library-commandbar button{height:auto;min-height:34px;white-space:normal}
+ #qo-diag-root .qd-command-row span{order:3;flex-basis:100%}
+ #qo-diag-root .qd-question-inspector{font-size:12px}
+ #qo-diag-root .qd-chat-head .qd-question p{font-size:16px}
+ #qo-diag-root .qd-assessment-fields{gap:10px}
+ #qo-diag-root .qd-library-menu>div{min-width:190px}
+}
+#qo-diag-root .qd-data-warning{padding:12px;border:1px solid var(--qo-warning);border-radius:7px;background:var(--qo-warning-soft);color:var(--qo-text);font-size:12px;line-height:1.6}
+#qo-diag-root .qd-data-warning p{margin:4px 0 8px}
+/* In the two-column conduct layout the left panels share one vertical flow.
+   A sticky first panel would cover the second while the questions scroll. */
+@media(max-width:1599px){#qo-diag-root:not(.qd-desk-builder) .qd-workbench>.qd-topic-navigator{position:static}}
+/* Keep the count on its own row so preset actions share a baseline even with
+   both authoring panels visible at 1280px. */
+#qo-diag-root .qd-builder-tools>.qd-count-pill{flex:0 0 100%;width:auto}

@@ -5,11 +5,18 @@
   "type": "module",
   "description": "Local-first cross-platform office suite, beginning with Sheets",
   "scripts": {
-    "dev": "node scripts/serve.mjs",
+    "dev": "npm run build && node scripts/serve.mjs",
     "build": "node scripts/build.mjs",
     "preview": "node scripts/serve.mjs dist",
-    "test": "node --test tests/*.test.js",
-    "check": "npm test && npm run build"
+    "test": "node --test --test-concurrency=4 tests/*.test.js",
+    "check": "npm test && npm run build",
+    "test:studio": "node tests/task095_browser.cjs",
+    "test:design-system": "node tests/task096_browser.cjs",
+    "test:photo-tools": "node tests/task097_browser.cjs",
+    "test:creative-tools": "node tests/task098_browser.cjs"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "playwright": "1.56.1"
+  }
 }

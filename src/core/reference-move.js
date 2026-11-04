@@ -1,10 +1,10 @@
+import {parseCell,cellName} from './formulas.js';
 /** Rebase references for an *actual cut move*, not a copy.
  * Only individual references and fully-contained rectangular ranges can
  * maintain their original reference semantics without a full formula AST.
  * Reject partially intersected ranges rather than silently changing them.
  * This function preserves sheet qualifiers, case, $ anchors and string literals.
  */
-import {parseCell,cellName} from './formulas.js';
 
 const CUT_REF_RE=/(?<![\p{L}\p{N}_.$])(?:(?:'((?:[^']|'')+)'|([\p{L}_][\p{L}\p{N}_.]*))!)?(\$?[A-Z]{1,3}\$?[1-9]\d*)(?::(\$?[A-Z]{1,3}\$?[1-9]\d*))?(?![\p{L}\p{N}_.])/giu;
 const CUT_TOKEN_RE=new RegExp('"(?:[^"]|"")*"|'+CUT_REF_RE.source,'giu');

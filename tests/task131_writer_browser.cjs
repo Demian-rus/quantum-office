@@ -1,0 +1,53 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const assert=require('node:assert/strict');
+const path=require('node:path');
+const fs=require('node:fs');
+const {pathToFileURL}=require('node:url');
+(async()=>{
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ const page=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
+ const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ try{
+  await page.goto(pathToFileURL(path.resolve(__dirname,'../Quantum-Office.html')).href);
+  await page.evaluate(()=>route('writer'));
+  await page.locator('[data-editor="writer"][data-tab="layout"]').click();
+  await page.locator('#qo-writer-paper').selectOption('A5');
+  await page.locator('#qo-writer-orientation').selectOption('landscape');
+  assert.match(await page.locator('#qo-writer-page').getAttribute('style'),/210mm/);
+  await page.locator('#qo-writer-header').fill('Заметки QX');
+  await page.locator('#qo-writer-footer').fill('Научная работа');
+  assert.equal(await page.locator('#qo-writer-page-header').innerText(),'Заметки QX');
+  assert.equal(await page.locator('#qo-writer-footer-text').innerText(),'Научная работа');
+  await page.locator('#qo-writer-page-number').uncheck();
+  assert.equal(await page.locator('#qo-writer-page-counter').innerText(),'');
+  await page.locator('#qo-writer-page-number').check();
+  assert.equal(await page.locator('#qo-writer-page-counter').innerText(),'Стр. 1');
+  const css=await page.evaluate(()=>qoWriterPageRules(qoWriterLayout()));
+  assert.match(css,/size:210mm 148mm/);
+  assert.match(css,/@top-center/);assert.match(css,/@bottom-left/);assert.match(css,/@bottom-right/);
+  await page.evaluate(()=>{
+   const e=document.getElementById('qo-writer-page');
+   e.innerHTML='<h1>Эксперимент</h1><p>Рациональность и проверка гипотез</p>';
+   qoPersistWriter();qoWriterStats();
+  });
+  assert.match(await page.locator('#qo-writer-stats').innerText(),/Абзацев:.*Чтение:/);
+  await page.locator('[data-editor="writer"][data-tab="file"]').click();
+  const qdocWait=page.waitForEvent('download');
+  await page.locator('[data-action="writer-export-qdoc"]').click();
+  const qdoc=JSON.parse(fs.readFileSync(await (await qdocWait).path(),'utf8'));
+  assert.equal(qdoc.layout.paper,'A5');
+  assert.equal(qdoc.layout.orientation,'landscape');
+  assert.equal(qdoc.layout.header,'Заметки QX');
+  assert.equal(qdoc.layout.footer,'Научная работа');
+  const htmlWait=page.waitForEvent('download');
+  await page.locator('[data-action="writer-export-html"]').click();
+  const html=fs.readFileSync(await (await htmlWait).path(),'utf8');
+  assert.match(html,/size:210mm 148mm/);
+  assert.match(html,/Заметки QX/);
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('[data-editor="writer"][data-tab="layout"]').click();
+  assert.equal(await page.locator('#qo-writer-orientation').isVisible(),true);
+  assert.deepEqual(errors,[]);
+  console.log('PASS TASK131: page sizes, orientation, headers/footers, print CSS, QDOC, HTML, stats, mobile');
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e.stack);process.exit(1);});

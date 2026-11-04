@@ -1,4 +1,5 @@
 import {dateSerial,serialDateParts,timeSerial,serialTimeParts} from './dates.js';
+
 /** Bounded formula interpreter. No eval/Function/network, safe for untrusted sheets. */
 export function colLabel(n) {
   let result = '';
@@ -203,6 +204,133 @@ function evaluateNode(node,cells,visiting,context){
       count++;if(name==='SUMIF'){const v=valueOfRef(targets[i],targetSheet);if(numericLike(v))total+=toNumber(v);}
     }
     return name==='COUNTIF'?count:total;
+  }
+  // TASK081: structured lookup and criteria functions. Every reference is resolved
+  // through valueOfRef so cross-sheet evaluation, errors, cycles and dependencies work.
+  const gridOf=n=>{
+    if(n.kind!=='range'&&n.kind!=='ref')throw Error('#VALUE!');
+    const a=address(n.from||n.ref),b=address(n.to||n.ref);
+    const r1=Math.min(a.row,b.row),r2=Math.max(a.row,b.row),
+      c1=Math.min(a.col,b.col),c2=Math.max(a.col,b.col);
+    if((r2-r1+1)*(c2-c1+1)>FORMULA_LIMITS.range)throw Error('#VALUE!');
+    return {r1,r2,c1,c2,rows:r2-r1+1,cols:c2-c1+1,sheet:n.sheet||null};
+  };
+  const gridValue=(g,r,c)=>valueOfRef(cellName(g.r1+r,g.c1+c),g.sheet);
+  const gridSame=(a,b)=>a.rows===b.rows&&a.cols===b.cols;
+  const linear=(g)=>{
+    if(g.rows!==1&&g.cols!==1)throw Error('#VALUE!');
+    const length=Math.max(g.rows,g.cols);
+    return Array.from({length},(_,i)=>gridValue(g,g.rows===1?0:i,g.rows===1?i:0));
+  };
+  const lookupEqual=(a,b)=>compare(a,b)===0;
+  if(name==='COUNTIFS'||name==='SUMIFS'||name==='AVERAGEIFS'){
+    const offset=name==='COUNTIFS'?0:1;
+    if(args.length<offset+2||(args.length-offset)%2!==0||(args.length-offset)>20)throw Error('#ERROR!');
+    const base=name==='COUNTIFS'?gridOf(args[0]):gridOf(args[1]);
+    const groups=[];
+    for(let i=offset;i<args.length;i+=2){
+      const range=gridOf(args[i]);
+      if(!gridSame(base,range))throw Error('#VALUE!');
+      groups.push([range,ev(args[i+1])]);
+    }
+    const sum=name==='COUNTIFS'?null:gridOf(args[0]);
+    if(sum&&!gridSame(base,sum))throw Error('#VALUE!');
+    let count=0,total=0;
+    for(let r=0;r<base.rows;r++)for(let c=0;c<base.cols;c++){
+      let accepted=true;
+      for(const [range,criterion] of groups){
+        if(!matches(gridValue(range,r,c),criterion)){accepted=false;break;}
+      }
+      if(!accepted)continue;
+      if(name==='COUNTIFS'){count++;continue;}
+      const value=gridValue(sum,r,c);
+      if(value!==''&&numericLike(value)){count++;total+=toNumber(value);}
+    }
+    return name==='COUNTIFS'?count:name==='SUMIFS'?total:count?total/count:'#DIV/0!';
+  }
+  if(name==='VLOOKUP'||name==='HLOOKUP'){
+    requireArgs(3,4);
+    const key=ev(args[0]),table=gridOf(args[1]),index=toNumber(ev(args[2]));
+    const vertical=name==='VLOOKUP',limit=vertical?table.cols:table.rows,
+      length=vertical?table.rows:table.cols;
+    if(!Number.isInteger(index)||index<1)throw Error('#VALUE!');
+    if(index>limit)throw Error('#REF!');
+    const exact=args.length===4?!truth(ev(args[3])):false;
+    let best=-1;
+    for(let k=0;k<length;k++){
+      const value=vertical?gridValue(table,k,0):gridValue(table,0,k);
+      if(lookupEqual(value,key)){best=k;break;}
+      if(!exact&&compare(value,key)<0)best=k;
+    }
+    if(best<0)throw Error('#N/A');
+    return vertical?gridValue(table,best,index-1):gridValue(table,index-1,best);
+  }
+  if(name==='MATCH'){
+    requireArgs(2,3);
+    const key=ev(args[0]),hay=linear(gridOf(args[1])),mode=args[2]?toNumber(ev(args[2])):1;
+    if(![-1,0,1].includes(mode))throw Error('#VALUE!');
+    let best=-1;
+    for(let i=0;i<hay.length;i++){
+      if(mode===0&&typeof key==='string'&&/[?*]/.test(key)){
+        if(wildcardMatch(hay[i],key))return i+1;
+      }else if(lookupEqual(hay[i],key))return i+1;
+      const difference=compare(hay[i],key);
+      if(mode===1&&difference<0&& (best<0||compare(hay[i],hay[best])>0))best=i;
+      if(mode===-1&&difference>0&& (best<0||compare(hay[i],hay[best])<0))best=i;
+    }
+    if(best<0)throw Error('#N/A');return best+1;
+  }
+  if(name==='INDEX'){
+    requireArgs(2,3);
+    const table=gridOf(args[0]);let row=toNumber(ev(args[1])),col=args[2]?toNumber(ev(args[2])):1;
+    if(table.rows===1&&table.cols>1&&args.length===2){col=row;row=1;}
+    if(!Number.isInteger(row)||!Number.isInteger(col)||row<1||col<1)throw Error('#VALUE!');
+    if(row>table.rows||col>table.cols)throw Error('#REF!');
+    return gridValue(table,row-1,col-1);
+  }
+  if(name==='XLOOKUP'){
+    requireArgs(3,6);
+    const key=ev(args[0]),look=linear(gridOf(args[1])),data=linear(gridOf(args[2]));
+    if(look.length!==data.length)throw Error('#VALUE!');
+    const mode=args[4]?toNumber(ev(args[4])):0,search=args[5]?toNumber(ev(args[5])):1;
+    if(![-1,0,1,2].includes(mode)||![1,-1].includes(search))throw Error('#VALUE!');
+    let candidate=-1;
+    const indices=Array.from({length:look.length},(_,i)=>search===1?i:look.length-i-1);
+    for(const i of indices){
+      const value=look[i],equal=mode===2&&typeof key==='string'?
+        wildcardMatch(value,key):lookupEqual(value,key);
+      if(equal)return data[i];
+      if(mode===-1&&compare(value,key)<0&& (candidate<0||compare(value,look[candidate])>0))candidate=i;
+      if(mode===1&&compare(value,key)>0&& (candidate<0||compare(value,look[candidate])<0))candidate=i;
+    }
+    if(candidate>=0)return data[candidate];
+    return args.length>=4?ev(args[3]):'#N/A';
+  }
+  if(name==='LEFT'||name==='RIGHT'){
+    requireArgs(1,2);
+    const chars=Array.from(toText(ev(args[0]))),length=args[1]?toNumber(ev(args[1])):1;
+    if(!Number.isInteger(length)||length<0)throw Error('#VALUE!');
+    return name==='LEFT'?chars.slice(0,length).join(''):length===0?'':chars.slice(-length).join('');
+  }
+  if(name==='MID'){
+    requireArgs(3);
+    const value=Array.from(toText(ev(args[0]))),start=toNumber(ev(args[1])),length=toNumber(ev(args[2]));
+    if(!Number.isInteger(start)||!Number.isInteger(length)||start<1||length<0)throw Error('#VALUE!');
+    return value.slice(start-1,start-1+length).join('');
+  }
+  if(name==='TRIM'||name==='UPPER'||name==='LOWER'){
+    requireArgs(1);const value=toText(ev(args[0]));
+    return name==='TRIM'?value.replace(/ +/g,' ').trim():
+      name==='UPPER'?value.toLocaleUpperCase('ru-RU'):value.toLocaleLowerCase('ru-RU');
+  }
+  if(name==='CONCAT'||name==='TEXTJOIN'){
+    if(!args.length)throw Error('#ERROR!');
+    const first=name==='TEXTJOIN'?2:0;
+    if(args.length<=first)throw Error('#ERROR!');
+    const separator=name==='TEXTJOIN'?toText(ev(args[0])):'',ignoreEmpty=name==='TEXTJOIN'?truth(ev(args[1])):false;
+    const values=flattened(args.slice(first)).map(toText).filter(v=>!ignoreEmpty||v!=='');
+    const joined=values.join(separator);
+    if(joined.length>32767)throw Error('#VALUE!');return joined;
   }
   if(name==='DATE'){
     requireArgs(3);const p=args.map(a=>toNumber(ev(a)));

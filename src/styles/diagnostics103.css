@@ -1,0 +1,44 @@
+/* TASK103 — compact template picker and diagnostic weak-topic recap */
+#qo-diag-root .qd-template-selector{
+  display:flex;flex-direction:column;gap:4px;align-items:flex-start;
+  min-width:185px;font-size:11px;color:var(--qo-muted);font-weight:600
+}
+#qo-diag-root .qd-template-selector select{
+  min-width:185px;max-width:100%;min-height:35px;
+  border:1px solid var(--qo-border);border-radius:8px;
+  background:var(--qo-surface);color:var(--qo-text);padding:5px 10px;
+  font:600 12px "Segoe UI",Arial,sans-serif
+}
+#qo-diag-root .qd-review-plan{
+  display:grid;gap:12px;margin-top:17px;
+  padding:14px 16px;border:1px solid var(--qo-border);border-radius:10px;
+  background:var(--qo-surface-alt)
+}
+#qo-diag-root .qd-review-title{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:8px;flex-wrap:wrap
+}
+#qo-diag-root .qd-review-title strong{font-size:14px;color:var(--qo-text)}
+#qo-diag-root .qd-review-title span{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-review-items{display:grid;gap:7px}
+#qo-diag-root .qd-review-item{
+  display:grid;grid-template-columns:75px minmax(0,1fr) auto;
+  gap:10px;align-items:center;background:var(--qo-surface);
+  border:1px solid var(--qo-border);padding:9px 10px;border-radius:8px
+}
+#qo-diag-root .qd-review-mark{
+  font-size:11px;font-weight:700;color:var(--qo-warning);
+}
+#qo-diag-root .qd-review-item:has(.qd-review-mark:first-child) .qd-review-mark{white-space:nowrap}
+#qo-diag-root .qd-review-item>div{display:grid;gap:4px;min-width:0}
+#qo-diag-root .qd-review-item>div strong{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root .qd-review-item>div span{
+  font-size:12px;color:var(--qo-text);overflow-wrap:anywhere;line-height:1.35
+}
+#qo-diag-root .qd-review-item>button{font-size:11px;min-height:33px;padding:5px 9px;white-space:nowrap}
+@media(max-width:600px){
+ #qo-diag-root .qd-template-selector{width:100%}
+ #qo-diag-root .qd-template-selector select{width:100%}
+ #qo-diag-root .qd-review-item{grid-template-columns:minmax(0,1fr) auto}
+ #qo-diag-root .qd-review-mark{grid-column:1/-1}
+}

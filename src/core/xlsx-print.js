@@ -1,6 +1,7 @@
-/** TASK058 — bounded SpreadsheetML print setup and sheet-scoped print areas. */
 import {rectangle,parseCell,cellName,LIMITS} from './workbook.js';
 import {changePrintSettings,printSettings} from './printing.js';
+/** TASK058 — bounded SpreadsheetML print setup and sheet-scoped print areas. */
+
 
 const XP_PAPERS={A4:'9',Letter:'1'};
 const XP_PAPER_IDS={'9':'A4','1':'Letter'};

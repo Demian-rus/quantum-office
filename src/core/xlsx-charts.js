@@ -1,6 +1,7 @@
-/** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
 import {chartData,chartRect,validateCharts,chartLayout,validateChartLayout,chartOptions,validateChartOptions,CHART_COLORS,linearRegression,quadraticRegression} from './charts.js';
 import {uid,parseCell,cellName,getCell,gridGeometry,firstVisibleIndex} from './workbook.js';
+/** TASK056: bounded Excel 2007+ OOXML drawing-chart interoperability. No external resources. */
+
 
 const DRAW='http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing';
 const A='http://schemas.openxmlformats.org/drawingml/2006/main';
