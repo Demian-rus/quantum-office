@@ -20,6 +20,7 @@ jobs:
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
+      - run: node tests/task146_compact_browser.cjs
       - run: node tests/task143_browser.cjs
       - run: node tests/task142_browser.cjs
       - run: node tests/task141_browser.cjs
