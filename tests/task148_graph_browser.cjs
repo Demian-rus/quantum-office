@@ -35,7 +35,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
   await p.locator('#qw-align-block').click();await drag(265,162,285,150.453);
   await p.screenshot({path:path.join(out,'incline-block.png')});await action('visual-apply').click();
   await newTask('diagram','Подвижный блок: две ветви нити и подвешенный груз');await p.locator('#qw-diagram-preset').selectOption('movable');
-  assert.equal(await stage.locator('[data-qw-object]').count(),5);await p.screenshot({path:path.join(out,'movable-pulley.png')});await action('visual-apply').click();
+  assert.equal(await stage.locator('[data-qw-object]').count(),6);await p.screenshot({path:path.join(out,'movable-pulley.png')});await action('visual-apply').click();
   await newTask('diagram','Разноцветные векторы сил F₁, F₂, F₃');await p.locator('#qw-snap-geometry').uncheck();
   for(const [x,y,label,hex] of [[420,160,'F₁','#dc2626'],[260,50,'F₂','#16a34a'],[100,260,'F₃','#2563eb']]){
    await tool('arrow');await drag(260,160,x,y);await change('#qw-object-label',label);await color(hex);

@@ -281,10 +281,11 @@ function qwPhysicsPreset(kind){
    {kind:'block',x:269,y:211,x2:331,y2:271,label:'m₂'}
   ],
   movable:[
-   {kind:'ground',x:160,y:42,x2:360,y2:42,label:''},
+   {kind:'ground',x:160,y:42,x2:260,y2:42,label:''},
    {kind:'movablePulley',x:224,y:154,x2:296,y2:226,label:''},
    {kind:'rope',x:224,y:42,x2:224,y2:122,label:''},
-   {kind:'rope',x:296,y:42,x2:296,y2:122,label:''},
+   {kind:'rope',x:296,y:60,x2:296,y2:122,label:''},
+   {kind:'arrow',x:296,y:60,x2:296,y2:20,label:'F'},
    {kind:'block',x:226,y:244,x2:294,y2:298,label:'m'}
   ],
   spring:[
