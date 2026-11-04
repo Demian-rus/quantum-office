@@ -64,8 +64,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.locator('#qw-prompt').fill('Определите значение скорости по графику.');
   await action('graph').click();
   const svg=await stage.evaluate(x=>x.outerHTML);
-  const yLabels=[...svg.matchAll(/<text x="66" y="[\d.]+".*?>([^<>]+)<\/text>/g)].map(m=>m[1]);
-  assert.deepEqual(yLabels,['0','2','4','6','8','10']);
+  const yLabels=[...svg.matchAll(/<text class="qw-axis-number" data-axis="y" data-value="([^"]+)"/g)].map(m=>m[1]);
+  assert.deepEqual(yLabels,['1','2','3','4','5','6','7','8','9','10']);
+  assert.equal((svg.match(/data-value="0"/g)||[]).length,1,'axis zero is printed only once');
   await page.screenshot({path:path.join(out,'graph_axis_ticks.png')});
   await action('visual-apply').click();
   await page.setViewportSize({width:390,height:844});
