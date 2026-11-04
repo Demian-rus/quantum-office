@@ -52,10 +52,23 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  await p.locator('[data-editor="writer"][data-tab="diagnostic"]').click();assert.deepEqual(await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())})),untouched);await p.locator('[data-editor="writer"][data-tab="work"]').click();
  // Deliverable fixture created through the real Example action, then actual native exports.
  await action('example').click();const example=await dl(()=>action('save').click(),'QuantumOffice_TASK144_example.qwork');
- const studentPDF=await dl(()=>p.locator('[data-action="work-pdf-student"]').click(),'QuantumOffice_TASK144_student.pdf'),teacherPDF=await dl(()=>p.locator('[data-action="work-pdf-teacher"]').click(),'QuantumOffice_TASK144_teacher.pdf');
- for(const file of [studentPDF,teacherPDF])assert.equal(fs.readFileSync(file).subarray(0,5).toString(),'%PDF-');
+ const pdfHTML=await p.evaluate(()=>({student:qwPrintDocumentHTML(qwDoc,false),teacher:qwPrintDocumentHTML(qwDoc,true)}));
+ assert.match(pdfHTML.student,/qw-print-worksheet/);
+ assert.ok(!pdfHTML.student.includes('PRIVATE_TEACHER_ANSWER'));
+ const pdfPage=await browser.newPage({viewport:{width:900,height:1100}});
+ const files=[];
+ for(const [name,html] of [['student',pdfHTML.student],['teacher',pdfHTML.teacher]]){
+  await pdfPage.setContent(html,{waitUntil:'load'});
+  const bytes=await pdfPage.pdf({format:'A4',printBackground:true,preferCSSPageSize:true});
+  const file=path.join(out,'QuantumOffice_TASK144_'+name+'.pdf');
+  fs.writeFileSync(file,bytes);assert.equal(bytes.subarray(0,5).toString(),'%PDF-');
+  files.push(file);
+ }
+ await pdfPage.close();
+ assert.equal(await p.locator('[data-action="work-pdf"]').count(),1);
+ assert.equal(await p.locator('[data-action="work-pdf-student"],[data-action="work-pdf-teacher"]').count(),0);
  const sizes=await p.evaluate(async()=>{const a=await PDFLib.PDFDocument.load(await qwPDFBytes(qwDoc,false));return {pages:a.getPageCount(),width:a.getPages()[0].getWidth(),height:a.getPages()[0].getHeight()};});assert.ok(sizes.pages>=2);assert.ok(Math.abs(sizes.width-595.28)<.1);
- await p.locator('.qw-nav-task').nth(2).click();await shot('workbench_desktop');await action('preview').click();await p.locator('#qw-pages canvas').first().waitFor();assert.ok(await p.locator('#qw-pages canvas').count()>=2);await shot('page_preview');await p.locator('[data-qw-close]').click();
+ await p.locator('.qw-nav-task').nth(2).click();await shot('workbench_desktop');await action('preview').click();await p.locator('#qw-print-preview-frame').waitFor();await p.frameLocator('#qw-print-preview-frame').locator('.qw-paper-task').first().waitFor();assert.equal(await p.locator('#qw-dialog [data-qw-action="preview-pdf"]').count(),1);await shot('page_preview');await p.locator('[data-qw-close]').click();
  for(const width of [1440,768,390]){
   await p.setViewportSize({width,height:1000});await p.keyboard.press('Escape');
   const tabs=await p.locator('.qo-work-tabs .qo-work-tab').evaluateAll(xs=>xs.every(e=>e.scrollWidth<=e.clientWidth+2));assert.equal(tabs,true,'Writer tab labels must never overlap after adding Work Builder');
