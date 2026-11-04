@@ -27,7 +27,7 @@ function qwGraphSVG(g,interactive=false){
    tickCount=Math.max(1,Math.ceil((max-min)/step)),
    longest=Math.max(String(Number(min.toPrecision(5))).length,String(Number(max.toPrecision(5))).length),
    gap=(axis==='x'?b.right-b.left:b.bottom-b.top)/tickCount,
-   stride=Math.max(1,Math.ceil((axis==='x'?longest*9+9:21)/Math.max(gap,1)));
+   stride=Math.max(1,Math.ceil((axis==='x'?longest*10+12:30)/Math.max(gap,1)));
   for(let v=Math.ceil(min/step)*step,c=0;v<=max+step*.001&&c++<24;v+=step){
    const p=qwPlotXY(g,{x:v,y:v}),label=fmt(v),w=Math.max(11,label.length*9);
    if(axis==='x'){
@@ -41,8 +41,8 @@ function qwGraphSVG(g,interactive=false){
     if(g.grid)parts.push(line(b.left,p.y,b.right,p.y,'stroke="#d9dee4" stroke-width="0.8"'));
     parts.push(line(axisX-3,p.y,axisX+3,p.y,'stroke="#333"'));
     if((c-1)%stride!==0&&Math.abs(v)>step*.00001)continue;
-    const ty=Math.max(b.top+8,Math.min(b.bottom-8,p.y));
-    const rect={x:b.left-17-w,y:ty-10,w,h:20};occupied.push(rect);
+    const ty=p.y;
+    const rect={x:b.left-17-w,y:ty-11,w,h:22};occupied.push(rect);
     parts.push('<text x="'+(b.left-16)+'" y="'+(ty+4)+'" font-size="16" text-anchor="end" fill="#263746">'+label+'</text>');
    }
   }
@@ -99,6 +99,49 @@ function qwGraphSVG(g,interactive=false){
  return qwSVG(parts.join(''),'Координатный график');
 }
 function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
+
+/* Position geometry captions outside edges and away from already placed captions.
+   Uses SVG coordinates, so preview and exported documents have identical placement. */
+function qwGeometrySegmentIntersectsBox(a,b,r){
+ const dx=b.x-a.x,dy=b.y-a.y;
+ let near=0,far=1;
+ for(const [p,q] of [[-dx,a.x-r.x],[dx,r.x+r.w-a.x],[-dy,a.y-r.y],[dy,r.y+r.h-a.y]]){
+  if(Math.abs(p)<1e-9){if(q<0)return false;continue;}
+  const t=q/p;
+  if(p<0){if(t>far)return false;near=Math.max(near,t);}
+  else{if(t<near)return false;far=Math.min(far,t);}
+ }
+ return near<=far;
+}
+function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=20){
+ const width=Math.max(18,[...String(value)].length*size*.65),height=size+4;
+ const norm=Math.hypot(away.x,away.y)||1,theta=Math.atan2(away.y,away.x);
+ const shifts=[0,-.35,.35,-.7,.7,-1.05,1.05,-1.45,1.45,Math.PI];
+ let best={x:base.x,y:base.y,score:Infinity,box:null};
+ for(const distance of [27,35,44,55,70]){
+  for(const shift of shifts){
+   const x=base.x+Math.cos(theta+shift)*distance,
+    y=base.y+Math.sin(theta+shift)*distance,
+    rect={x:x-width/2,y:y-height/2,w:width,h:height};
+   const outside=Math.max(0,12-rect.x)+Math.max(0,rect.x+rect.w-508)+
+    Math.max(0,14-rect.y)+Math.max(0,rect.y+rect.h-306);
+   const cross=segments.reduce((n,[a,b])=>n+(qwGeometrySegmentIntersectsBox(a,b,{
+    x:rect.x-3,y:rect.y-3,w:rect.w+6,h:rect.h+6})?1:0),0);
+   const overlap=placed.reduce((n,r)=>{
+    const x=Math.max(0,Math.min(rect.x+rect.w,r.x+r.w)-Math.max(rect.x,r.x)),
+     y=Math.max(0,Math.min(rect.y+rect.h,r.y+r.h)-Math.max(rect.y,r.y));
+    return n+x*y;
+   },0);
+   const nearPoint=points.reduce((n,p)=>n+(Math.max(0,14-Math.hypot(p.x-x,p.y-y))**2),0);
+   const outward=(x-base.x)*away.x+(y-base.y)*away.y;
+   const score=outside*1000+cross*8000+overlap*55+nearPoint*35+
+    (outward<0?150:0)+distance*.5+Math.abs(shift)*12;
+   if(score<best.score)best={x,y,score,box:rect};
+  }
+ }
+ if(best.box)placed.push(best.box);
+ return {x:best.x,y:best.y};
+}
 function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  const guides=interactive&&showGuides?
   '<defs><pattern id="qw-geometry-guide" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M20 0L0 0 0 20" fill="none" stroke="#dce6ec" stroke-width="1"/></pattern></defs>'+
@@ -134,23 +177,21 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    shape='<polygon points="'+vertices.map(p=>p.x+','+p.y).join(' ')+'"'+a+'/>';
    const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
     cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
+   const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
+   const placedLabels=[];
    vertices.forEach((p,j)=>{
     shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
     if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
-     const dx=p.x-cx,dy=p.y-cy,scale=Math.max(1,Math.hypot(dx,dy)),
-      lx=Math.max(14,Math.min(506,p.x+dx/scale*19)),
-      ly=Math.max(20,Math.min(310,p.y+dy/scale*19+5));
-     captions+=label(p.label,lx,ly,20);
+     const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},polygonEdges,vertices,placedLabels,20);
+     captions+=label(p.label,at.x,at.y+7,20);
     }
    });
    vertices.forEach((p,i)=>{
     const sideText=o.edgeLabels?.[i];if(!sideText)return;
-    const other=vertices[(i+1)%vertices.length],mx=(p.x+other.x)/2,my=(p.y+other.y)/2,
-     dx=mx-cx,dy=my-cy,mag=Math.max(1,Math.hypot(dx,dy));
-    const tx=Math.max(22,Math.min(498,mx+dx/mag*20)),
-     ty=Math.max(20,Math.min(302,my+dy/mag*20+6));
-    captions+=label(sideText,tx,ty,17);
+    const other=vertices[(i+1)%vertices.length],mid={x:(p.x+other.x)/2,y:(p.y+other.y)/2};
+    const at=qwGeometryCaptionLocation(sideText,mid,{x:mid.x-cx,y:mid.y-cy},polygonEdges,vertices,placedLabels,17);
+    captions+=label(sideText,at.x,at.y+6,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
     const a=vertices[0],b=vertices[1],c=vertices[2],
