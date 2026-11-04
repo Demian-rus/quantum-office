@@ -27,7 +27,7 @@ function qwAxisLayout(g){
   const span=max-min,pixels=axis==='x'?b.right-b.left:b.bottom-b.top;
   const longest=Math.max(String(Number(min.toPrecision(6))).length,String(Number(max.toPrecision(6))).length);
   const gap=pixels*step/span;
-  const desired=axis==='x'?Math.max(22,(longest+1)*font*.64+8):font+7;
+  const desired=axis==='x'?Math.max(17,longest*font*.59+5):font+6;
   const stride=Math.max(1,Math.ceil(desired/Math.max(1,gap)));
   let count=0;
   for(let n=Math.ceil((min-1e-8)/step);n*step<=max+step*.00001&&count++<30;n++){
