@@ -204,3 +204,16 @@
 .qw-visual-dialog .qw-diagram-presets label{width:min(100%,260px);max-width:100%}
 .qw-visual-dialog .qw-object-rotation{margin:4px 0 10px}
 .qw-visual-dialog .qw-object-rotation label{width:min(100%,220px)}
+/* TASK148: object controls share the TASK147 inspector, without resizing its canvas. */
+.qw-object-style,.qw-object-rotation{border-top:1px solid var(--qo-border);padding-top:8px;margin-top:8px}
+.qw-paint-row{display:flex;align-items:center;gap:7px;margin:5px 0;min-width:0}
+.qw-paint-row>label{flex:1;min-width:0;margin:0;font-size:11px}
+.qw-visual-dialog input[type=color]{width:36px;min-height:23px;height:23px;padding:1px;cursor:pointer}
+.qw-palette{display:flex;flex-wrap:wrap;gap:3px;max-width:104px}
+.qw-palette button{width:19px;min-width:19px;height:19px;min-height:19px;padding:0;border:1px solid var(--qo-border-strong);border-radius:3px;background:var(--qw-swatch,var(--qo-surface));color:var(--qo-text);line-height:15px}
+.qw-visual-dialog [data-layer]{font-size:11px;white-space:normal}
+.qw-visual-dialog [data-qw-editor-only]{filter:none}
+.qw-visual-dialog [data-rotation-handle]{cursor:grab}
+.qw-graph-objects{display:grid;gap:4px}
+.qw-graph-objects button{text-align:left;white-space:normal;overflow-wrap:anywhere}
+.qw-graph-objects [aria-pressed=true]{border-color:var(--qo-accent);background:var(--qo-accent-soft)}
