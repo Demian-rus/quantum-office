@@ -147,6 +147,18 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  const guides=interactive&&showGuides?
   '<defs><pattern id="qw-geometry-guide" width="'+spacing+'" height="'+spacing+'" patternUnits="userSpaceOnUse"><path d="M'+spacing+' 0L0 0 0 '+spacing+'" fill="none" stroke="#dce6ec" stroke-width="0.7"/></pattern></defs>'+
   '<rect x="0" y="0" width="520" height="320" fill="url(#qw-geometry-guide)" pointer-events="none"/>':'';
+ const allSegments=[],allPoints=[],placedLabels=[];
+ const addPolygon=pts=>{pts.forEach((p,i)=>{allSegments.push([p,pts[(i+1)%pts.length]]);allPoints.push(p);});};
+ for(const item of objects){
+  if(['triangle','rightTriangle','quadrilateral'].includes(item.kind))addPolygon(qwGeometryVertices(item));
+  else if(['line','arrow','dashed','rope','spring','ground'].includes(item.kind)){
+   allSegments.push([{x:item.x,y:item.y},{x:item.x2,y:item.y2}]);
+   allPoints.push({x:item.x,y:item.y},{x:item.x2,y:item.y2});
+  }else if(['rect','block','incline'].includes(item.kind)){
+   const x=Math.min(item.x,item.x2),x2=Math.max(item.x,item.x2),y=Math.min(item.y,item.y2),y2=Math.max(item.y,item.y2);
+   addPolygon(item.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x:x2,y:y2},{x,y:y2}]);
+  }else if(item.kind==='point')allPoints.push({x:item.x,y:item.y});
+ }
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle')=>
   '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
@@ -159,10 +171,34 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
    w=maxX-minX,h=maxY-minY;
   let shape='',captions='';
-  if(o.kind==='line'||o.kind==='arrow'||o.kind==='dashed'){
+  if(['line','arrow','dashed','rope','ground'].includes(o.kind)){
    shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
     (o.kind==='arrow'?' marker-end="url(#qw-arrow)"':'')+
     (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
+   if(o.kind==='ground'){
+    const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
+    for(let i=0;i<=Math.floor(length/14);i++){
+     const t=i*14/length,x=o.x+dx*t,y=o.y+dy*t;
+     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-dy/length*10-dx/length*5)+'" y2="'+numeric(y+dx/length*10-dy/length*5)+'" stroke="#91a0ae" stroke-width="1"/>';
+    }
+   }
+  }
+  if(o.kind==='spring'){
+   const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len;
+   let path='M'+o.x+' '+o.y;
+   for(let j=1;j<=19;j++){
+    const t=j/20,offset=(j===1||j===19)?0:(j%2?8:-8);
+    path+=' L'+numeric(o.x+dx*t-uy*offset)+' '+numeric(o.y+dy*t+ux*offset);
+   }
+   shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
+  }
+  if(o.kind==='block')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='pulley'){
+   const rad=Math.max(8,Math.min(w,h)/2),cx=minX+w/2,cy=minY+h/2;
+   shape='<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="'+numeric(rad)+'" fill="white" stroke="#162735" stroke-width="2"/>'+
+    '<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="3.5" fill="#162735"/>'+
+    '<line x1="'+numeric(cx)+'" y1="'+numeric(cy-rad)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-12)+'" stroke="#162735" stroke-width="2"/>';
   }
   if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
   if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
@@ -179,19 +215,18 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    const cx=vertices.reduce((v,p)=>v+p.x,0)/vertices.length,
     cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
    const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
-   const placedLabels=[];
    vertices.forEach((p,j)=>{
     shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
     if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
-     const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},polygonEdges,vertices,placedLabels,20);
+     const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},allSegments,allPoints,placedLabels,20);
      captions+=label(p.label,at.x,at.y+7,20);
     }
    });
    vertices.forEach((p,i)=>{
     const sideText=o.edgeLabels?.[i];if(!sideText)return;
     const other=vertices[(i+1)%vertices.length],mid={x:(p.x+other.x)/2,y:(p.y+other.y)/2};
-    const at=qwGeometryCaptionLocation(sideText,mid,{x:mid.x-cx,y:mid.y-cy},polygonEdges,vertices,placedLabels,17);
+    const at=qwGeometryCaptionLocation(sideText,mid,{x:mid.x-cx,y:mid.y-cy},allSegments,allPoints,placedLabels,17);
     captions+=label(sideText,at.x,at.y+6,17);
    });
    if(o.kind==='rightTriangle'&&vertices.length===3){
@@ -209,11 +244,15 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    if(o.label)captions+=label(o.label,cx,cy+7,17);
   }else if(o.label){
    if(o.kind==='text')captions+=label(o.label,o.x,o.y,19,'start');
-   else if(o.kind==='point')captions+=label(o.label,Math.min(500,o.x+13),Math.max(19,o.y-9),19,'start');
+   else if(o.kind==='point'){
+    const at=qwGeometryCaptionLocation(o.label,{x:o.x,y:o.y},{x:o.x-260,y:o.y-160},allSegments,allPoints,placedLabels,19);
+    captions+=label(o.label,at.x,at.y+7,19);
+   }
    else{
     const midX=(o.x+o.x2)/2,midY=(o.y+o.y2)/2,
      dx=o.x2-o.x,dy=o.y2-o.y,mag=Math.hypot(dx,dy)||1;
-    captions+=label(o.label,midX-dy/mag*14,midY+dx/mag*14-5,18);
+    const pos=qwGeometryCaptionLocation(o.label,{x:midX,y:midY},{x:-dy/mag,y:dx/mag},allSegments,allPoints,placedLabels,18);
+    captions+=label(o.label,pos.x,pos.y+7,18);
    }
   }
   const hit=interactive?'<rect x="'+(minX-9)+'" y="'+(minY-23)+
