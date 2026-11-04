@@ -56,7 +56,7 @@ function qdMediaKey(kind){return kind==='answer'?'answerMedia':'promptMedia';}
 function qdMediaEsc(x){return qdEsc(String(x??''));}
 function qdMediaSlotHTML(q,kind){
   const ref=qdMediaSafe(q[qdMediaKey(kind)]);
-  return '<details class="qd-media-fold" '+(ref?'open':'')+'><summary>'+qdMediaLabel(kind)+(ref?' · прикреплена':' · добавить файл, скриншот или рисунок')+'</summary>'+qdMediaSlotContent(q,kind)+'</details>';
+  return '<details class="qd-media-fold" '+(ref?'open':'')+'><summary>'+qdMediaLabel(kind)+(ref?' · прикреплена':'')+'</summary>'+qdMediaSlotContent(q,kind)+'</details>';
 }
 function qdMediaSlotContent(q,kind){
   const ref=qdMediaSafe(q[qdMediaKey(kind)]),key=qdMediaKind(kind),qid=qdMediaEsc(q.id);

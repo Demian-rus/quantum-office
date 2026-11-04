@@ -1,4 +1,4 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111b31"><meta name="quantum-office-build" content="TASK142"><title>Quantum Office — Таблицы</title><style>/* Quantum Office design system. Build resolves local imports into the offline HTML. */
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#111b31"><meta name="quantum-office-build" content="TASK143"><title>Quantum Office — Таблицы</title><style>/* Quantum Office design system. Build resolves local imports into the offline HTML. */
 /* Physical palettes live here. Components consume semantic roles. */
 :root {
   font-family: "Segoe UI", Inter, Arial, sans-serif;
@@ -11605,6 +11605,101 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
    both authoring panels visible at 1280px. */
 #qo-diag-root .qd-builder-tools>.qd-count-pill{flex:0 0 100%;width:auto}
 
+
+/* TASK143: pinned rails and an independently scrolling, bounded work surface.
+   Geometry only; colors and interaction states use the common Office roles. */
+.qo-document-workspace #qo-diag-workspace{padding:12px 16px;overflow:hidden;min-height:0}
+#qo-diag-root.qd-layout143{height:100%;width:100%;max-width:none;margin:0;min-height:0}
+#qo-diag-root.qd-layout143 .qd-workbench{display:grid;grid-template-columns:208px minmax(0,1fr) 260px;gap:16px;height:100%;min-height:0;align-items:stretch;justify-content:stretch}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-workbench-main{grid-column:2;grid-row:1;min-width:0;width:100%;max-width:960px;height:100%;justify-self:center;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scroll-padding-top:170px;padding:0 4px 28px}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{grid-row:1;position:static;align-self:stretch;height:100%;max-height:none;min-width:0;width:100%;overflow:auto;overscroll-behavior:contain;margin:0;padding:12px;border-radius:8px;background:var(--qo-surface);border:1px solid var(--qo-border)}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-topic-navigator{grid-column:1}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-insights{grid-column:3;display:block}
+#qo-diag-root.qd-layout143 .qd-top{position:sticky;top:0;z-index:8;display:flex;flex-wrap:wrap;align-items:center;justify-content:start;gap:8px;margin:0 0 12px;padding:0 0 10px;background:var(--qo-bg);border-bottom:1px solid var(--qo-border)}
+#qo-diag-root.qd-layout143 .qd-top h1{flex:1 1 100%;font-size:20px;line-height:1.35;margin:0;letter-spacing:-.02em;overflow-wrap:anywhere}
+#qo-diag-root.qd-layout143 .qd-actions{flex:none;width:auto;padding:3px;gap:3px;border-radius:7px}
+#qo-diag-root.qd-layout143 .qd-actions button{font-size:12px;min-height:31px;padding:5px 12px;border-radius:5px}
+#qo-diag-root.qd-layout143 .qd-builder-actionbar{position:static;width:100%;border:0;padding:0;margin:0;box-shadow:none;background:transparent;gap:6px}
+#qo-diag-root.qd-layout143 .qd-command-row{gap:6px}
+#qo-diag-root.qd-layout143 .qd-command-row span{font-size:10px;line-height:1.4;min-width:90px;flex:1 1 130px}
+#qo-diag-root.qd-layout143 .qd-command-row button{min-height:30px;height:auto;white-space:normal}
+#qo-diag-root.qd-layout143 .qd-outline-add{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:10px 0}
+#qo-diag-root.qd-layout143 .qd-outline-add button{min-height:30px;padding:5px;font-size:11px}
+#qo-diag-root.qd-layout143 .qd-inline-add{display:none}
+#qo-diag-root.qd-layout143 .qd-outline-actions button{margin:0 0 8px}
+#qo-diag-root.qd-layout143 .qd-current-question{font-size:11px;margin:3px 0 8px}
+#qo-diag-root.qd-layout143 .qd-inspector-toggle{font-size:10px;width:auto;min-height:27px;margin-bottom:10px}
+#qo-diag-root.qd-layout143 #qd-question-properties{gap:10px;padding-top:10px}
+#qo-diag-root.qd-layout143 #qd-question-properties textarea{min-height:68px}
+#qo-diag-root.qd-layout143 .qd-media-fold>summary{padding:6px 9px;font-size:11px}
+#qo-diag-root.qd-layout143 .qd-meta{padding:12px;gap:9px}
+#qo-diag-root.qd-layout143 .qd-builder-tools{justify-content:start}
+#qo-diag-root.qd-layout143 .qd-builder-tools>.qd-count-pill{font-size:11px;flex:0 0 100%}
+#qo-diag-root.qd-layout143 .qd-editor-section{margin:14px 0 18px}
+#qo-diag-root.qd-layout143 .qd-section-head{gap:6px;padding:8px;margin:0 0 8px}
+#qo-diag-root.qd-layout143 .qd-section-head>label{flex:1 1 180px}
+#qo-diag-root.qd-layout143 .qd-section-actions{gap:4px}
+#qo-diag-root.qd-layout143 .qd-section-actions button{min-height:28px;padding:4px 7px;font-size:10px}
+#qo-diag-root.qd-layout143 .qd-review-title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+#qo-diag-root.qd-layout143 .qd-side-footnote{font-size:10px}
+#qo-diag-root.qd-layout143 .qd-side-panel h2{font-size:13px}
+#qo-diag-root.qd-layout143 .qd-side-caption{font-size:11px;line-height:1.5}
+#qo-diag-root.qd-layout143 .qd-library-heading{padding:0 0 10px;background:transparent;border:0;margin:0}
+#qo-diag-root.qd-layout143 .qd-library-heading h2{font-size:14px}
+#qo-diag-root.qd-layout143 #qd-library-filters-slot{display:grid;gap:14px;margin-top:10px}
+#qo-diag-root.qd-layout143 .qd-library-filter{display:grid;grid-template-columns:1fr;gap:12px;padding:0;margin:0;border:0}
+#qo-diag-root.qd-layout143 .qd-library-filter label{grid-column:auto}
+#qo-diag-root.qd-layout143 .qd-library-commandbar{margin:0 0 6px;padding:0;gap:6px}
+#qo-diag-root.qd-layout143 .qd-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+#qo-diag-root.qd-layout143 .qd-library-card{padding:12px}
+#qo-diag-root.qd-layout143 .qd-library-card h3{font-size:14px}
+#qo-diag-root.qd-layout143 .qd-library-save{padding:0;border:0;background:transparent}
+#qo-diag-root.qd-layout143 .qd-library-save h3{font-size:13px}
+#qo-diag-root.qd-layout143 .qd-library-save-form{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+#qo-diag-root.qd-layout143 .qd-library-save-form button{font-size:11px;white-space:normal;min-height:32px}
+#qo-diag-root.qd-layout143 .qd-library-save>.qd-hint{font-size:10px;line-height:1.5;margin-top:12px}
+#qo-diag-root.qd-layout143 .qd-drawer-close,#qo-diag-root.qd-layout143 .qd-mobile-panels{display:none}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-workbench{grid-template-columns:minmax(0,1fr)}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-workbench-main{grid-column:1;max-width:1080px}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-topic-navigator,#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-side-insights{display:none}
+#qo-diag-root.qd-layout143.qd-desk-wide .qd-inline-add{display:block}
+@media(max-width:1199px){
+ .qo-document-workspace #qo-diag-workspace{padding:10px}
+ #qo-diag-root.qd-layout143 .qd-workbench{grid-template-columns:minmax(0,1fr);gap:0}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-workbench-main{grid-column:1;max-width:960px;padding:0 2px 24px}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{display:none}
+ #qo-diag-root.qd-layout143 .qd-mobile-panels{display:flex;gap:6px;flex-wrap:wrap}
+ #qo-diag-root.qd-layout143 .qd-mobile-panels button{font-size:11px;min-height:31px;padding:5px 9px}
+ #qo-diag-root.qd-layout143 .qd-drawer-close{display:block;position:sticky;top:0;margin:0 0 10px auto;min-height:30px;font-size:11px;z-index:2}
+ #qo-diag-root.qd-layout143.qd-navigation-open .qd-workbench>.qd-topic-navigator,
+ #qo-diag-root.qd-layout143.qd-inspector-open .qd-workbench>.qd-side-insights,
+ #qo-diag-root.qd-layout143.qd-properties-open:not(.qd-desk-wide) .qd-workbench>.qd-question-inspector{display:block;position:fixed;top:160px;bottom:30px;height:auto;max-height:none;width:300px;max-width:calc(100vw - 24px);z-index:30;box-shadow:var(--qo-shadow);padding:12px}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-topic-navigator{left:12px;right:auto}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-side-insights{right:12px;left:auto}
+ #qo-diag-root.qd-layout143 .qd-inline-add{display:block}
+}
+@media(max-width:570px){
+ .qo-document-workspace #qo-diag-workspace{padding:8px}
+ #qo-diag-root.qd-layout143 .qd-top{position:static;gap:7px;padding-bottom:10px}
+ #qo-diag-root.qd-layout143 .qd-top h1{font-size:18px}
+ #qo-diag-root.qd-layout143 .qd-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ #qo-diag-root.qd-layout143 .qd-actions button{padding:5px 3px;font-size:11px;min-height:34px;white-space:normal}
+ #qo-diag-root.qd-layout143 .qd-command-row button{min-height:33px;font-size:10px;padding:5px 7px}
+ #qo-diag-root.qd-layout143 .qd-command-row span{order:3;flex-basis:100%}
+ #qo-diag-root.qd-layout143 .qd-library-grid{grid-template-columns:1fr}
+ #qo-diag-root.qd-layout143 .qd-author-metadata{grid-template-columns:minmax(0,1fr) 70px}
+ #qo-diag-root.qd-layout143 .qd-top .qd-mobile-panels{width:100%}
+ #qo-diag-root.qd-layout143 .qd-library-commandbar button{font-size:10px;white-space:normal;min-height:33px}
+ #qo-diag-root.qd-layout143 .qd-chat-head .qd-question p{font-size:15px;line-height:1.6}
+}
+/* No flex filler after removing the redundant ribbon guide. */
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group:last-child{flex:0 0 auto;min-width:0;justify-content:space-between}
+#qo-diag-root.qd-layout143 .qd-template-library{gap:10px}
+#qo-diag-root.qd-layout143 .qd-library-save{gap:8px}
+#qo-diag-root.qd-layout143 .qd-library-save-form{margin-top:0}
+#qo-diag-root.qd-layout143 .qd-run-version{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root.qd-layout143 .qd-workbench-main,#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{overflow-anchor:none}
+
 </style></head><body><div id="app"></div><script>/*!
 
 JSZip v3.10.1 - A JavaScript class for generating and reading zip files
@@ -17121,16 +17216,15 @@ function qdStore(){
   qoPersistWriter();
 }
 function qdToolbar(){
-  const d=qdDoc();
+  const d=qdDoc(),desk=typeof qdDesk==='undefined'?{}:qdDesk;
   return `<div class="qd-top">
-    <div><span class="qd-eyebrow">QUANTUM WRITER · ИНТЕРАКТИВНЫЙ ДОКУМЕНТ</span>
-    <h1>${qdEsc(d.title)}</h1><p>${qdEsc(d.description||'Создавайте вопросы, открывайте ответы и отмечайте знания ученика.')}</p></div>
+    <h1>${qdEsc(d.title)}</h1>
     <div class="qd-actions" role="group" aria-label="Режим работы">
       <button type="button" data-qd-action="mode" data-mode="library" class="${qdMode==='library'?'active':''}"
         aria-pressed="${qdMode==='library'}">Шаблоны</button>
       <button type="button" data-qd-action="mode" data-mode="builder" class="${qdMode==='builder'?'active':''}" aria-pressed="${qdMode==='builder'}">Конструктор</button>
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
-    </div></div>`;
+    </div><div class="qd-mobile-panels"><button type="button" data-qd-action="navigation" aria-expanded="${!!desk.navigation}">${qdMode==='library'?'Фильтры':'Разделы'}</button><button type="button" data-qd-action="inspector" aria-expanded="${qdMode==='builder'?!!desk.properties:!!desk.inspector}">${qdMode==='builder'?'Параметры':qdMode==='library'?'Сохранить шаблон':'Обзор занятия'}</button></div></div>`;
 }
 
 const QD_BULK_MAX_CHARS=24000;
@@ -17585,7 +17679,6 @@ function qdBuilderSaveStatus(){
 function qdBuilderTemplateMarkup(d){
   const meta=qdBuilderTemplateDefaults(d);
   return '<details class="qd-panel qd-builder-save"><summary>Версии шаблона и перенос библиотеки</summary>'+
-    '<p class="qd-hint">Основные кнопки «Сохранить изменения» и «Сохранить как новый шаблон» закреплены вверху. Здесь можно выбрать другой личный шаблон для обновления.</p>'+
     '<label>Мой шаблон для обновления<select id="qd-builder-template-target"><option value="">Выберите шаблон</option>'+
       meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+'>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
     '<div class="qd-builder-revisions"><label>Предыдущие версии выбранного шаблона<select id="qd-builder-template-revision">'+
@@ -17608,12 +17701,12 @@ function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
     <div class="qd-builder-actionbar" role="toolbar" aria-label="Инструменты конструктора">
-      <div class="qd-command-row"><strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
+      <div class="qd-command-row"><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
         <button data-qd-action="builder-quick-save" class="qd-primary" type="button">${qdBuilderLinkedTemplateId?'Сохранить изменения':'Сохранить шаблон'}</button>
         <button data-qd-action="save-copy" type="button">Сохранить как новый шаблон</button></div>
       <div class="qd-command-row">${typeof qdDeskTools==='function'?qdDeskTools():''}<button data-qd-action="blank" type="button">Создать с нуля</button>
         <button data-qd-action="preview" type="button">Предпросмотр</button><button data-qd-action="bank-open" type="button">Банк вопросов</button><button data-qd-action="compact-mode" type="button">${qdCompact?'Развернуть карточки':'Компактный список'}</button>
-        <button data-qd-action="add-section" type="button">+ Раздел</button></div>
+        </div>
     </div>
     <div class="qd-panel qd-meta">
       <label>Название диагностики<input data-qd-field="title" maxlength="120" value="${qdEsc(d.title)}"></label>
@@ -17633,10 +17726,10 @@ function qdBuilder(){
         <button data-qd-action="sample" type="button">Пример: физика</button>
         <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
       </div>
-      <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
+
     </div>
-    ${!d.sections.length?'<section class="qd-panel qd-blank-state"><h2>Пустой шаблон</h2><p>Добавьте первый раздел и свои вопросы. Готовые задания появятся только по вашему выбору.</p><button type="button" data-qd-action="add-section" class="qd-primary">Добавить первый раздел</button></section>':''}
-    <details class="qd-author-advanced" data-qd-pane="author-tools" ${qdAuthorToolsOpen?'open':''}><summary>Дополнительные инструменты · проверка, поиск, массовый ввод, варианты</summary>
+    ${!d.sections.length?'<section class="qd-panel qd-blank-state"><h2>Пустой шаблон</h2><button type="button" data-qd-action="add-section" class="qd-primary">Добавить первый раздел</button></section>':''}
+    <details class="qd-author-advanced" data-qd-pane="author-tools" ${qdAuthorToolsOpen?'open':''}><summary>Дополнительные инструменты</summary>
     ${qdBuilderUtilities(d)}
     ${typeof qdBankMarkup==='function'?qdBankMarkup():''}
     ${qdBatchToolbar(d)}</details>
@@ -17675,8 +17768,8 @@ function qdBuilder(){
           <button type="button" data-qd-action="duplicate-question" data-qid="${qdEsc(q.id)}" title="Создать копию">Копия</button>
           <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}" title="Удалить вопрос">×</button>
         </div>
-        <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
-        <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        <label>Условие<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
+        <label>Ответ преподавателя<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
         <div class="qd-rich-actions"><button type="button" data-qd-action="rich-edit" data-kind="prompt" data-qid="${qdEsc(q.id)}">Оформить условие · таблица / формула</button>
           <button type="button" data-qd-action="rich-edit" data-kind="answer" data-qid="${qdEsc(q.id)}">Оформить решение</button></div>
         ${q.promptRich?'<details class="qd-rich-preview"><summary>Форматирование условия</summary>'+qdRichSafe(q.promptRich)+'</details>':''}
@@ -17720,7 +17813,7 @@ function qdBuilder(){
        <button type="button" data-qd-action="add-question" data-sid="${qdEsc(s.id)}">+ Пустая карточка</button></section>`).join('')}
     <section class="qd-panel qd-roster">
       <div class="qd-row qd-wrap"><h2>Ученики</h2><span class="qd-muted">${d.students.length} / ${QD_LIMITS.students}</span></div>
-      <p class="qd-hint">Список хранится внутри этой диагностики. Сохранённые результаты привязаны к ученику и не удаляются при смене имени.</p>
+
       <div class="qd-add-student"><input id="qd-student-new" maxlength="100" placeholder="Имя или код ученика" aria-label="Новый ученик"><button type="button" data-qd-action="add-student">+ Добавить</button></div>
       <div class="qd-student-list">${d.students.map(student=>`<div class="qd-student-row">
         <input data-qd-field="student-name" data-student-id="${qdEsc(student.id)}" value="${qdEsc(student.name)}" maxlength="100" aria-label="Изменить имя ученика">
@@ -18607,7 +18700,7 @@ function qdLibraryView(){
   const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
   return '<div class="qd-template-library">'+(typeof qdDeskLibraryWarning==='function'?qdDeskLibraryWarning():'')+
     '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
-      '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
+      '</div>'+
       '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
     '<div class="qd-library-commandbar"><button type="button" data-qd-action="blank" class="qd-primary">Создать с нуля</button><button type="button" data-qd-action="library-import">Импорт QTPL / QTPLX</button><button type="button" data-qd-action="library-export">Экспорт библиотеки</button>'+
     '<label>Библиотека<select id="qd-library-source">'+options([['all','Все шаблоны'],['built-in','Готовые'],['custom','Мои шаблоны']],qdLibrarySource)+'</select></label></div>'+
@@ -18616,14 +18709,13 @@ function qdLibraryView(){
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...[...new Set(['5–6','7','8','9',...qdLibraryRead().map(t=>t.grade)])].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
       '</section><p class="qd-library-found" id="qd-library-found" role="status">Найдено: '+items.length+'</p><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
-      '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
-      '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
+      '<section class="qd-panel qd-library-save"><div><h3>Сохранить шаблон</h3>'+
+      '</div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
       '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
       '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
       '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
-      '<p class="qd-library-portable-note">Перенос библиотеки: используйте кнопки QTPL в верхней ленте.</p>'+
-      '<p class="qd-hint">Для переносимости между версиями HTML сохраняйте библиотеку в .qtpl. Локальное хранилище зависит от файла и настроек браузера.</p></section>'+
+        '<p class="qd-hint">Хранится на этом устройстве. Резервная копия — QTPL / QTPLX.</p></section>'+
   '</div>';
 }
 function qdLibraryCards(items){
@@ -18873,7 +18965,7 @@ function qdRibbonSync(){
 function qdSidebarTopics(d,mode){
   if(mode==='builder'&&typeof qdDeskOutline==='function')return qdDeskOutline(d);
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
-    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
+    '<button type="button" class="qd-drawer-close" data-qd-action="close-panel" aria-label="Закрыть навигацию">Закрыть</button><h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
     '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
       const graded=qdScores(section.questions,d.session.marks,d.session.scores);
       const share=graded.total?Math.round(graded.rated/graded.total*100):0;
@@ -18884,7 +18976,7 @@ function qdSidebarTopics(d,mode){
         (mode==='run'?'<span class="qd-side-mini-bar"><i style="width:'+share+'%"></i></span>':'')+
       '</button>';
     }).join('')+'</div>'+
-    '<p class="qd-side-footnote">Нажмите тему, чтобы перейти к её вопросам.</p></nav>';
+    '</nav>';
 }
 
 function qdReviewQueues(d){
@@ -18900,7 +18992,7 @@ function qdSideQuestionItems(items,empty,kind){
   if(!items.length)return '<p class="qd-side-empty">'+qdEsc(empty)+'</p>';
   return '<div class="qd-review-list">'+items.slice(0,5).map(q=>
     '<button type="button" class="qd-review-link" data-qd-action="sidebar-question" data-qid="'+qdEsc(q.id)+'">'+
-      '<span class="qd-review-title"><b>'+q.number+'.</b>'+qdEsc(q.prompt||'Вопрос не заполнен')+'</span>'+
+      '<span class="qd-review-title" title="'+qdEsc(q.prompt)+'"><b>'+q.number+'.</b>'+qdEsc(q.prompt||'Вопрос не заполнен')+'</span>'+
       '<span class="qd-review-meta">'+qdEsc(q.section)+
         (kind==='review'?' · '+(q.mark==='no'?'Не знает':'Частично'):'')+'</span>'+
     '</button>').join('')+'</div>';
@@ -18915,7 +19007,7 @@ function qdSidebarInsights(d,mode){
       ['Число',all.filter(q=>q.type==='numeric').length]
     ];
     return '<aside class="qd-side-panel qd-side-insights" aria-label="Контроль качества диагностики">'+
-      '<h2>Проверка заданий</h2><p class="qd-side-caption">Недочёты можно открыть сразу в конструкторе</p>'+
+      '<h2>Проверка заданий</h2>'+
       '<div class="qd-side-stat"><span>Вопросов</span><strong>'+all.length+'</strong></div>'+
       '<div class="qd-side-stat"><span>Всего баллов</span><strong>'+s.maxPoints+'</strong></div>'+
       '<div class="qd-side-stat"><span>Замечаний</span><strong>'+issues.length+'</strong></div>'+
@@ -18935,49 +19027,51 @@ function qdSidebarInsights(d,mode){
   }
   const queues=qdReviewQueues(d);
   return '<aside class="qd-side-panel qd-side-insights qd-review-sidebar" aria-label="Очередь вопросов">'+
-    '<h2>Очередь занятия</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
+    '<button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button><h2>Очередь занятия</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
     '<div class="qd-side-stat"><span>Не проверено</span><strong>'+queues.pending.length+'</strong></div>'+
     '<div class="qd-side-stat"><span>К повторению</span><strong>'+queues.review.length+'</strong></div>'+
     '<h3>Следующие вопросы</h3>'+
     qdSideQuestionItems(queues.pending,'Все вопросы оценены.','pending')+
     '<h3>Вернуться к ответам</h3>'+
-    qdSideQuestionItems(queues.review,'Нет заданий с частичной или отрицательной оценкой.','review')+
-    '<p class="qd-side-footnote">Нажмите на вопрос, чтобы перейти к нему. Очередь обновляется после оценки.</p>'+
+    qdSideQuestionItems(queues.review,'Нет заданий для повторения.','review')+
     '</aside>';
 }
 
 function qdWorkbench(d,mode,content){
-  return '<div class="qd-workbench">'+
-    qdSidebarTopics(d,mode)+
-    '<main class="qd-workbench-main">'+content+'</main>'+
-    (mode==='builder'&&typeof qdDeskInspector==='function'?qdDeskInspector(d):qdSidebarInsights(d,mode))+'</div>';
+  const close='<button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button>';
+  const left=mode==='library'?'<aside class="qd-side-panel qd-topic-navigator qd-library-nav" aria-label="Фильтры библиотеки">'+close+'<h2>Фильтры</h2><div id="qd-library-filters-slot"></div></aside>':qdSidebarTopics(d,mode);
+  const right=mode==='library'?'<aside class="qd-side-panel qd-side-insights qd-library-properties" aria-label="Сохранение шаблона">'+close+'<div id="qd-library-save-slot"></div></aside>':mode==='builder'&&typeof qdDeskInspector==='function'?qdDeskInspector(d):qdSidebarInsights(d,mode);
+  return '<div class="qd-workbench">'+left+'<main class="qd-workbench-main" tabindex="-1" aria-label="Рабочая область диагностики">'+qdToolbar()+content+'</main>'+right+'</div>';
 }
+function qdScrollHost(){return document.querySelector('#qo-diag-root .qd-workbench-main')||document.getElementById('qo-diag-workspace');}
+function qdHeaderHeight(){const header=document.querySelector('#qo-diag-root .qd-top');return header&&getComputedStyle(header).position==='sticky'?header.offsetHeight:0;}
 function qdScrollToTopic(sid){
   const root=document.getElementById('qo-diag-root');
   const target=[...root?.querySelectorAll('[data-section]')||[]].find(el=>el.dataset.section===sid);
-  const scroll=document.getElementById('qo-diag-workspace');
+  const scroll=qdScrollHost();
   if(!target||!scroll)return false;
-  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(qdMode==='builder'?(document.querySelector('.qd-builder-actionbar')?.offsetHeight||0):0)-12;
+  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
   return true;
 }
 
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
-  const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  qdFrameCapture();
+  root.classList.add('qd-layout143');root.dataset.mode=qdMode;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.classList.toggle('qd-library-root',qdMode==='library');
-  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdWorkbench(qdDoc(),qdMode,qdMode==='builder'?qdBuilder():qdRun()))+
+  root.innerHTML=qdWorkbench(qdDoc(),qdMode,qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar" hidden>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden>
        <input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden>
        <input id="qd-bank-file" type="file" accept=".qbank,application/json" hidden>
        </div>`;
-  if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
   qdRibbonSync();
   if(typeof qdDeskDecorate==='function')qdDeskDecorate();
 }
+
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
   document.getElementById('qo-writer-edit-scroll')?.toggleAttribute('hidden',active);
@@ -19015,8 +19109,8 @@ function qdJumpToEdit(qid,field='prompt'){
   const root=document.getElementById('qo-diag-root');
   const card=[...root?.querySelectorAll('.qd-edit-card')||[]].find(el=>el.dataset.qid===qid);
   if(!card)return;
-  const scroll=document.getElementById('qo-diag-workspace');
-  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(document.querySelector('.qd-builder-actionbar')?.offsetHeight||8)-12;
+  const scroll=qdScrollHost();
+  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
   const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
   (input||card.querySelector('textarea'))?.focus({preventScroll:true});
 }
@@ -19270,8 +19364,8 @@ function qdOnClick(event){
     }
     const root=document.getElementById('qo-diag-root');
     const card=[...root?.querySelectorAll('.qd-run-card')||[]].find(el=>el.dataset.qid===id);
-    const scroll=document.getElementById('qo-diag-workspace');
-    if(card&&scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-16;
+    const scroll=qdScrollHost();
+    if(card&&scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
     return;
   }
   if(action==='sidebar-issue'){
@@ -19560,8 +19654,8 @@ function qdOnClick(event){
 
 
 function qdScrollToQuestion(){
-  const scroll=document.getElementById('qo-diag-workspace'),guided=document.querySelector('#qo-diag-root .qd-guided');
-  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+  const scroll=qdScrollHost(),guided=document.querySelector('#qo-diag-root .qd-guided');
+  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
 }
 function qdGuidedKeydown(event){
   if(qdMode!=='run'||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
@@ -19645,7 +19739,7 @@ function qdOnInput(event){
     else {d.session.responses[q.id]={value:qdText(value,3500)};delete d.session.marks[q.id];if(d.session.scores)delete d.session.scores[q.id];}
     qdStore();return;
   }
-  if(field==='title')d.title=qdText(value,120);
+  if(field==='title'){d.title=qdText(value,120);const heading=document.querySelector('#qo-diag-root .qd-top h1');if(heading)heading.textContent=d.title;}
   else if(field==='description')d.description=qdText(value,600);
   else if(field==='student'){
     d.session.student=qdText(value,100);
@@ -19899,14 +19993,13 @@ function qdRunSetup(d){
   const options=[...qdLibraryRead().map(x=>({...x,source:'custom',label:x.title})),
     ...QD_PRESETS.map(x=>({...x,source:'built-in',label:qdTemplate(x.id)?.title||x.label}))];
   const untouched=!Object.keys(d.session.responses).length&&!Object.keys(d.session.marks).length;
-  return '<details class="qd-panel qd-run-setup" '+(untouched?'open':'')+' aria-label="Диагностика для проведения"><summary>Диагностика: '+qdEsc(d.title)+' <span>Выбор и сохранение занятия</span></summary><div class="qd-run-setup-body">'+
-    '<div><strong>'+qdEsc(d.title)+'</strong><p>Независимый снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+
-    '. Изменения конструктора не затрагивают это занятие.</p></div>'+
+  return '<details class="qd-panel qd-run-setup" '+(untouched?'open':'')+' aria-label="Диагностика для проведения"><summary>Диагностика: '+qdEsc(d.title)+' <span>Настройки занятия</span></summary><div class="qd-run-setup-body">'+
+    '<p class="qd-run-version">Снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+'</p>'+
     '<div class="qd-run-start-row"><label>Выбрать диагностику<select id="qd-run-template"><option value="">Текущий черновик конструктора</option>'+
     options.map(x=>'<option value="'+x.source+':'+qdEsc(x.id)+'">'+(x.source==='custom'?'Мой · ':'Готовый · ')+qdEsc(x.label)+'</option>').join('')+
     '</select></label><button type="button" data-qd-action="run-start">Начать новое проведение</button>'+
     '<button type="button" data-qd-action="run-checkpoint" class="qd-primary">Сохранить незавершённое</button></div>'+
-    '<p class="qd-hint">Ответы сохраняются в браузере. Для переноса или резервной копии скачайте QDIAG / QDIAGX в верхней ленте.</p></div></details>';
+    '<p class="qd-hint">Резервная копия занятия — QDIAG / QDIAGX.</p></div></details>';
 }
 function qdProfessionalAction(action,button,d){
   if(typeof qdDeskAction==='function'&&qdDeskAction(action,button,d))return true;
@@ -20096,7 +20189,7 @@ function qdMediaKey(kind){return kind==='answer'?'answerMedia':'promptMedia';}
 function qdMediaEsc(x){return qdEsc(String(x??''));}
 function qdMediaSlotHTML(q,kind){
   const ref=qdMediaSafe(q[qdMediaKey(kind)]);
-  return '<details class="qd-media-fold" '+(ref?'open':'')+'><summary>'+qdMediaLabel(kind)+(ref?' · прикреплена':' · добавить файл, скриншот или рисунок')+'</summary>'+qdMediaSlotContent(q,kind)+'</details>';
+  return '<details class="qd-media-fold" '+(ref?'open':'')+'><summary>'+qdMediaLabel(kind)+(ref?' · прикреплена':'')+'</summary>'+qdMediaSlotContent(q,kind)+'</details>';
 }
 function qdMediaSlotContent(q,kind){
   const ref=qdMediaSafe(q[qdMediaKey(kind)]),key=qdMediaKind(kind),qid=qdMediaEsc(q.id);
@@ -20538,26 +20631,26 @@ qdBankExport=function(){
 /* TASK142: authoring outline, optional properties inspector and fast assessment.
    UI preferences are separate from QDIAG. All mutations use the existing model. */
 const QD_DESK_KEY='quantum-office.diagnostic-workbench.v1';
-let qdDesk={question:'',panels:true,properties:false};
+let qdDesk={question:'',panels:true,properties:false,navigation:false,inspector:false};
 try{const stored=JSON.parse(localStorage.getItem(QD_DESK_KEY)||'{}');qdDesk.question=qdText(stored.question,60);qdDesk.panels=stored.panels!==false;qdDesk.properties=stored.properties===true;}catch(_){/* default layout, document untouched */}
 const qdDeskHintRevealed=new Set(),qdDeskBoundRoots=new WeakSet();
 function qdDeskRemember(){try{localStorage.setItem(QD_DESK_KEY,JSON.stringify(qdDesk));}catch(_){}}
 function qdDeskTools(){
  return '<button type="button" data-qd-action="panels" aria-pressed="'+qdDesk.panels+'" title="Показать или скрыть вспомогательные панели">'+(qdDesk.panels?'Скрыть панели':'Показать панели')+'</button>'+
- '<button type="button" data-qd-action="quick-question" title="Добавить вопрос · Ctrl+Enter">+ Вопрос</button>';
+ '<button class="qd-inline-add" type="button" data-qd-action="quick-question" title="Добавить вопрос · Ctrl+Enter">+ Вопрос</button>';
 }
 function qdDeskOutline(d){
  let num=0;
  return '<details class="qd-side-panel qd-topic-navigator qd-desk-outline" '+(typeof innerWidth==='undefined'||innerWidth>900?'open':'')+'><summary>Разделы и вопросы <span>'+qdQuestionList(d).length+'</span></summary>'+
- '<div class="qd-outline-body"><div class="qd-outline-actions"><button data-qd-action="toggle-all-sections" type="button">'+(qdCollapsedSections.size?'Развернуть все':'Свернуть разделы')+'</button></div>'+d.sections.map(s=>
+ '<div class="qd-outline-body"><button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button><div class="qd-outline-add"><button type="button" data-qd-action="add-section">+ Раздел</button><button type="button" data-qd-action="quick-question">+ Вопрос</button></div><div class="qd-outline-actions"><button data-qd-action="toggle-all-sections" type="button">'+(qdCollapsedSections.size?'Развернуть все':'Свернуть разделы')+'</button></div>'+d.sections.map(s=>
  '<div class="qd-outline-section"><button type="button" class="qd-side-topic" data-qd-action="sidebar-topic" data-sid="'+qdEsc(s.id)+'">'+qdEsc(s.title)+' <small>'+s.questions.length+'</small></button>'+s.questions.map(q=>
  '<button type="button" class="qd-outline-question" data-qd-action="editor-select" data-qid="'+qdEsc(q.id)+'" aria-current="'+(q.id===qdDesk.question)+'" title="'+qdEsc(q.prompt||'Новый вопрос')+'"><span>'+ ++num+'</span><span>'+qdEsc(q.prompt||'Новый вопрос')+'</span></button>').join('')+'</div>').join('')+
- (!d.sections.length?'<p class="qd-hint">Создайте первый раздел и добавьте свои вопросы.</p>':'')+'</div></details>';
+ (!d.sections.length?'<p class="qd-side-empty">Нет разделов</p>':'')+'</div></details>';
 }
 function qdDeskInspector(d){
  const q=qdQuestionList(d).find(q=>q.id===qdDesk.question);
- return '<aside class="qd-side-panel qd-side-insights qd-question-inspector" aria-label="Свойства выбранного вопроса"><h2>Параметры вопроса</h2>'+
- (q?'<p class="qd-current-question">'+qdEsc(q.prompt||'Новый вопрос')+'</p><button type="button" class="qd-inspector-toggle" data-qd-action="properties" aria-expanded="'+qdDesk.properties+'">'+(qdDesk.properties?'Вернуть параметры в карточку':'Открыть параметры здесь')+'</button>':'<p class="qd-hint">Выберите вопрос в списке слева или нажмите его номер в карточке.</p>')+
+ return '<aside class="qd-side-panel qd-side-insights qd-question-inspector" aria-label="Свойства выбранного вопроса"><button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button><h2>Параметры вопроса</h2>'+
+ (q?'<p class="qd-current-question">'+'№ '+(qdQuestionList(d).findIndex(x=>x.id===q.id)+1)+'</p><button type="button" class="qd-inspector-toggle" data-qd-action="properties" aria-expanded="'+qdDesk.properties+'">'+(qdDesk.properties?'Параметры в карточке':'Параметры в панели')+'</button>':'<p class="qd-side-empty">Нет выбранного вопроса</p>')+
  '<div id="qd-question-properties" '+(qdDesk.properties&&q?'':'hidden')+'></div><details class="qd-inspector-overview" '+(!q?'open':'')+'><summary>Обзор и проверка</summary><div class="qd-overview-slot">'+qdSidebarInsights(d,'builder').replace('qd-side-insights','qd-overview-content')+'</div></details>'+
  '<details class="qd-keyboard-help"><summary>Горячие клавиши</summary><p>Ctrl+S — сохранить шаблон<br>Ctrl+Enter — новый вопрос<br>Ctrl+D — копия выбранного<br>Alt+↑ / ↓ — переместить вопрос<br>Shift+F10 — меню вопроса</p></details></aside>';
 }
@@ -20566,7 +20659,7 @@ function qdDeskRefreshInspector(){
  const overview=root.querySelector('.qd-overview-slot');
  if(overview)overview.innerHTML=qdSidebarInsights(qdWorkingDoc(),'builder').replace('qd-side-insights','qd-overview-content');
  const q=qdQuestionList(qdWorkingDoc()).find(q=>q.id===qdDesk.question);
- const label=root.querySelector('.qd-current-question');if(label&&q)label.textContent=q.prompt||'Новый вопрос';
+ const label=root.querySelector('.qd-current-question');if(label&&q)label.textContent='№ '+(qdQuestionList(qdWorkingDoc()).findIndex(x=>x.id===q.id)+1);
  for(const button of root.querySelectorAll('.qd-outline-question')){
   const q=qdQuestionList(qdWorkingDoc()).find(q=>q.id===button.dataset.qid);
   if(q){button.lastElementChild.textContent=q.prompt||'Новый вопрос';button.title=q.prompt||'Новый вопрос';}
@@ -20574,6 +20667,7 @@ function qdDeskRefreshInspector(){
 }
 function qdDeskDecorate(){
  const root=document.getElementById('qo-diag-root');if(!root)return;
+ qdFrameDecorate(root);
  root.classList.toggle('qd-desk-builder',qdMode==='builder');root.classList.toggle('qd-desk-wide',!qdDesk.panels);root.classList.toggle('qd-properties-open',qdDesk.properties&&!!qdDesk.question);
  if(!qdDeskBoundRoots.has(root)){
   root.addEventListener('contextmenu',event=>{if(qdMode!=='builder')return;const card=event.target.closest('.qd-edit-card');const section=event.target.closest('.qd-section-head');if(!card&&!section)return;event.preventDefault();qdDeskMenu(card?.dataset.qid||'',section?.closest('[data-section]')?.dataset.section||'',event.clientX,event.clientY);});
@@ -20592,9 +20686,16 @@ function qdDeskDecorate(){
 }
 function qdDeskSelect(id){
  const d=qdWorkingDoc(),section=d.sections.find(s=>s.questions.some(q=>q.id===id));if(!section)return;
- qdDesk.question=id;qdDesk.properties=true;qdDesk.panels=true;qdCollapsedSections.delete(section.id);qdCardExpanded.add(id);qdDeskRemember();qdRefresh();if(innerWidth<1200){document.querySelector('#qd-question-properties select')?.focus();}else qdJumpToEdit(id);
+ qdDesk.question=id;qdDesk.properties=true;qdDesk.panels=true;qdDesk.navigation=false;qdCollapsedSections.delete(section.id);qdCardExpanded.add(id);qdDeskRemember();qdRefresh();if(innerWidth<1200){document.querySelector('#qd-question-properties select')?.focus();}else qdJumpToEdit(id);
 }
 function qdDeskAction(action,button,d){
+ if(action==='sidebar-topic'||action==='sidebar-question'){qdDesk.navigation=false;qdDesk.inspector=false;}
+ if(action==='navigation'||action==='inspector'||action==='close-panel'){
+  if(action==='navigation'){qdDesk.navigation=!qdDesk.navigation;qdDesk.inspector=false;if(innerWidth<1200)qdDesk.properties=false;}
+  else if(action==='inspector'){qdDesk.navigation=false;qdDesk.panels=true;if(qdMode==='builder'){if(!qdQuestionList(d).some(q=>q.id===qdDesk.question))qdDesk.question=qdQuestionList(d)[0]?.id||'';qdDesk.properties=!qdDesk.properties;}else qdDesk.inspector=!qdDesk.inspector;}
+  else{qdDesk.navigation=false;qdDesk.inspector=false;if(innerWidth<1200)qdDesk.properties=false;}
+  qdDeskRemember();qdRefresh();return true;
+ }
  if(action==='library-recovery'){download('QuantumOffice-templates-recovery.json',localStorage.getItem(QD_LIBRARY_KEY)||'[]','application/json');return true;}
  if(action==='editor-select'){qdDeskSelect(button.dataset.qid);return true;}
  if(action==='properties'||action==='panels'){
@@ -20611,7 +20712,7 @@ function qdDeskAction(action,button,d){
   const id=button.dataset.qid;if(qdDeskHintRevealed.has(id))qdDeskHintRevealed.delete(id);else qdDeskHintRevealed.add(id);
   qdRefresh();return true;
  }
- if(action==='mode'||action==='reset'||action==='run-start')qdDeskHintRevealed.clear();
+ if(action==='mode'||action==='reset'||action==='run-start'){qdDeskHintRevealed.clear();qdDesk.navigation=false;qdDesk.inspector=false;}
  if(action==='library-clear-filters'){
   qdLibraryQuery='';qdLibrarySubject='all';qdLibraryGrade='all';qdLibraryPurpose='all';qdLibrarySource='all';qdRefresh();return true;
  }
@@ -20667,7 +20768,7 @@ if(typeof window!=='undefined'){
  window.addEventListener('keydown',e=>{
   if(e.defaultPrevented||e.isComposing)return;
   if(typeof page==='undefined'||page!=='writer'||qoWorkspaceTab.writer!=='diagnostic'||document.querySelector('dialog[open]'))return;
-  if(e.key==='Escape'){document.getElementById('qd-context-menu')?.remove();for(const menu of document.querySelectorAll('.qd-library-menu[open]'))menu.open=false;if(qdMode==='builder'&&qdDesk.properties&&innerWidth<1200){qdDesk.properties=false;qdDeskRemember();qdRefresh();}return;}
+  if(e.key==='Escape'){document.getElementById('qd-context-menu')?.remove();for(const menu of document.querySelectorAll('.qd-library-menu[open]'))menu.open=false;if(innerWidth<1200&&(qdDesk.navigation||qdDesk.inspector||qdDesk.properties)){qdDesk.navigation=false;qdDesk.inspector=false;qdDesk.properties=false;qdDeskRemember();qdRefresh();document.querySelector('.qd-mobile-panels button')?.focus();}return;}
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&qdMode==='builder'){
    e.preventDefault();document.querySelector('[data-qd-action="builder-quick-save"]')?.click();return;
   }
@@ -20683,6 +20784,28 @@ if(typeof window!=='undefined'){
 function qdDeskLibraryWarning(){
  try{const raw=localStorage.getItem(QD_LIBRARY_KEY);if(!raw)return '';const data=JSON.parse(raw);if(Array.isArray(data)&&data.every(x=>qdLibrarySafe(x)))return '';}catch(_){}
  return '<div class="qd-data-warning" role="alert"><strong>Не удалось прочитать всю личную библиотеку.</strong><p>Исходные данные не перезаписываются. Скачайте их перед восстановлением.</p><button type="button" data-qd-action="library-recovery">Скачать исходные данные</button></div>';
+}
+
+// TASK143: a stable frame. UI scroll positions are not part of the document.
+const qdFrameScrolls=new Map();
+function qdFrameCapture(){
+ const root=document.getElementById('qo-diag-root');if(!root?.dataset.mode)return;
+ qdFrameScrolls.set(root.dataset.mode,['.qd-workbench-main','.qd-topic-navigator','.qd-side-insights'].map(s=>root.querySelector(s)?.scrollTop||0));
+}
+function qdFrameRestore(){
+ const root=document.getElementById('qo-diag-root'),values=qdFrameScrolls.get(qdMode)||[];
+ ['.qd-workbench-main','.qd-topic-navigator','.qd-side-insights'].forEach((s,i)=>{const el=root?.querySelector(s);if(el)el.scrollTop=values[i]||0;});
+}
+function qdFrameDecorate(root){
+ root.classList.toggle('qd-navigation-open',!!qdDesk.navigation);root.classList.toggle('qd-inspector-open',!!qdDesk.inspector);
+ const toolbar=root.querySelector('.qd-builder-actionbar');if(toolbar)root.querySelector('.qd-top').append(toolbar);
+ if(qdMode==='library'){
+  const filters=root.querySelector('#qd-library-filters-slot'),save=root.querySelector('#qd-library-save-slot');
+  const source=root.querySelector('#qd-library-source')?.closest('label');if(source)filters.append(source);
+  const panel=root.querySelector('.qd-library-filter');if(panel)filters.append(panel);
+  const form=root.querySelector('.qd-library-save');if(form)save.append(form);
+ }
+ if(qdDesk.navigation){const nav=root.querySelector('.qd-desk-outline');if(nav)nav.open=true;}
 }
 
 
@@ -23109,10 +23232,6 @@ function qoWriterPage(){
  const diagnosticTemplates=qoWorkGroup('Коллекция',
    diagTile('writer-diag-templates-import','Загрузить QTPL','folder')+
    diagTile('writer-diag-templates-export','Скачать QTPL','copy'),'qo-diag-tile-group');
- const diagnosticGuide=qoWorkGroup('Рабочие подсказки',
-  '<div class="qo-diag-ribbon-guide"><strong>Интерактивная диагностика</strong>'+
-  '<span>Темы слева · вопросы по центру · результаты справа</span>'+
-  '<span>Оценка: 1 / 2 / 3 · ответ: R</span></div>','qo-diag-guide-group');
  const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
  const navigator=qoWriterNavigationTools();
  const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-docx','Word DOCX','file-text')+qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
@@ -23125,7 +23244,7 @@ function qoWriterPage(){
  ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
  ${qoWorkPanel('writer','view',navigator)}
  ${qoWorkPanel('writer','file',files+exporttools)}
- ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates+diagnosticGuide)}
+ ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates)}
  </div></div>
  <div class="qo-writer-body">${qoWriterNavigationHTML()}
  <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'hidden':''}><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
@@ -25558,7 +25677,7 @@ function qoHubRosterPanel(){
    filtered=items.filter(x=>!search||qoHubKey(x.name+' '+x.info).includes(search));
  return '<section class="qd-panel qo-hub-roster"><div class="qo-hub-roster-head"><div><h3>Ученики из таблицы</h3>'+
    '<p>'+(source?'Связана таблица «'+qoHubEsc(source.book.name)+'», лист «'+qoHubEsc(source.sheet.name)+'».':
-     'Сначала откройте таблицу и привяжите лист «Ученики».')+'</p></div>'+
+     'Таблица не подключена.')+'</p></div>'+
    '<button data-hub-action="roster-toggle">'+(qoHubRosterOpen?'Свернуть':'Показать список')+'</button></div>'+
    (qoHubRosterOpen?'<div class="qo-hub-roster-body">'+
     (source?'<div class="qo-hub-roster-controls"><label>Найти ученика<input id="qo-hub-search" type="search" value="'+
@@ -25676,7 +25795,7 @@ qdOnClick=function(e){
  return result;
 };
 const qoHubOriginalQDRefresh=qdRefresh;
-qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='writer')qoHubDiagDecorate();};
+qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='writer')qoHubDiagDecorate();if(typeof qdFrameRestore==='function')qdFrameRestore();};
 const qoHubOriginalDrawGrid=drawGrid;
 drawGrid=function(...args){const ret=qoHubOriginalDrawGrid(...args);qoHubBadges();return ret;};
 const qoHubOriginalRender=render;

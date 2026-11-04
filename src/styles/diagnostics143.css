@@ -1,0 +1,93 @@
+/* TASK143: pinned rails and an independently scrolling, bounded work surface.
+   Geometry only; colors and interaction states use the common Office roles. */
+.qo-document-workspace #qo-diag-workspace{padding:12px 16px;overflow:hidden;min-height:0}
+#qo-diag-root.qd-layout143{height:100%;width:100%;max-width:none;margin:0;min-height:0}
+#qo-diag-root.qd-layout143 .qd-workbench{display:grid;grid-template-columns:208px minmax(0,1fr) 260px;gap:16px;height:100%;min-height:0;align-items:stretch;justify-content:stretch}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-workbench-main{grid-column:2;grid-row:1;min-width:0;width:100%;max-width:960px;height:100%;justify-self:center;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scroll-padding-top:170px;padding:0 4px 28px}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{grid-row:1;position:static;align-self:stretch;height:100%;max-height:none;min-width:0;width:100%;overflow:auto;overscroll-behavior:contain;margin:0;padding:12px;border-radius:8px;background:var(--qo-surface);border:1px solid var(--qo-border)}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-topic-navigator{grid-column:1}
+#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-insights{grid-column:3;display:block}
+#qo-diag-root.qd-layout143 .qd-top{position:sticky;top:0;z-index:8;display:flex;flex-wrap:wrap;align-items:center;justify-content:start;gap:8px;margin:0 0 12px;padding:0 0 10px;background:var(--qo-bg);border-bottom:1px solid var(--qo-border)}
+#qo-diag-root.qd-layout143 .qd-top h1{flex:1 1 100%;font-size:20px;line-height:1.35;margin:0;letter-spacing:-.02em;overflow-wrap:anywhere}
+#qo-diag-root.qd-layout143 .qd-actions{flex:none;width:auto;padding:3px;gap:3px;border-radius:7px}
+#qo-diag-root.qd-layout143 .qd-actions button{font-size:12px;min-height:31px;padding:5px 12px;border-radius:5px}
+#qo-diag-root.qd-layout143 .qd-builder-actionbar{position:static;width:100%;border:0;padding:0;margin:0;box-shadow:none;background:transparent;gap:6px}
+#qo-diag-root.qd-layout143 .qd-command-row{gap:6px}
+#qo-diag-root.qd-layout143 .qd-command-row span{font-size:10px;line-height:1.4;min-width:90px;flex:1 1 130px}
+#qo-diag-root.qd-layout143 .qd-command-row button{min-height:30px;height:auto;white-space:normal}
+#qo-diag-root.qd-layout143 .qd-outline-add{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin:10px 0}
+#qo-diag-root.qd-layout143 .qd-outline-add button{min-height:30px;padding:5px;font-size:11px}
+#qo-diag-root.qd-layout143 .qd-inline-add{display:none}
+#qo-diag-root.qd-layout143 .qd-outline-actions button{margin:0 0 8px}
+#qo-diag-root.qd-layout143 .qd-current-question{font-size:11px;margin:3px 0 8px}
+#qo-diag-root.qd-layout143 .qd-inspector-toggle{font-size:10px;width:auto;min-height:27px;margin-bottom:10px}
+#qo-diag-root.qd-layout143 #qd-question-properties{gap:10px;padding-top:10px}
+#qo-diag-root.qd-layout143 #qd-question-properties textarea{min-height:68px}
+#qo-diag-root.qd-layout143 .qd-media-fold>summary{padding:6px 9px;font-size:11px}
+#qo-diag-root.qd-layout143 .qd-meta{padding:12px;gap:9px}
+#qo-diag-root.qd-layout143 .qd-builder-tools{justify-content:start}
+#qo-diag-root.qd-layout143 .qd-builder-tools>.qd-count-pill{font-size:11px;flex:0 0 100%}
+#qo-diag-root.qd-layout143 .qd-editor-section{margin:14px 0 18px}
+#qo-diag-root.qd-layout143 .qd-section-head{gap:6px;padding:8px;margin:0 0 8px}
+#qo-diag-root.qd-layout143 .qd-section-head>label{flex:1 1 180px}
+#qo-diag-root.qd-layout143 .qd-section-actions{gap:4px}
+#qo-diag-root.qd-layout143 .qd-section-actions button{min-height:28px;padding:4px 7px;font-size:10px}
+#qo-diag-root.qd-layout143 .qd-review-title{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+#qo-diag-root.qd-layout143 .qd-side-footnote{font-size:10px}
+#qo-diag-root.qd-layout143 .qd-side-panel h2{font-size:13px}
+#qo-diag-root.qd-layout143 .qd-side-caption{font-size:11px;line-height:1.5}
+#qo-diag-root.qd-layout143 .qd-library-heading{padding:0 0 10px;background:transparent;border:0;margin:0}
+#qo-diag-root.qd-layout143 .qd-library-heading h2{font-size:14px}
+#qo-diag-root.qd-layout143 #qd-library-filters-slot{display:grid;gap:14px;margin-top:10px}
+#qo-diag-root.qd-layout143 .qd-library-filter{display:grid;grid-template-columns:1fr;gap:12px;padding:0;margin:0;border:0}
+#qo-diag-root.qd-layout143 .qd-library-filter label{grid-column:auto}
+#qo-diag-root.qd-layout143 .qd-library-commandbar{margin:0 0 6px;padding:0;gap:6px}
+#qo-diag-root.qd-layout143 .qd-library-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+#qo-diag-root.qd-layout143 .qd-library-card{padding:12px}
+#qo-diag-root.qd-layout143 .qd-library-card h3{font-size:14px}
+#qo-diag-root.qd-layout143 .qd-library-save{padding:0;border:0;background:transparent}
+#qo-diag-root.qd-layout143 .qd-library-save h3{font-size:13px}
+#qo-diag-root.qd-layout143 .qd-library-save-form{display:grid;grid-template-columns:1fr;gap:12px;margin-top:12px}
+#qo-diag-root.qd-layout143 .qd-library-save-form button{font-size:11px;white-space:normal;min-height:32px}
+#qo-diag-root.qd-layout143 .qd-library-save>.qd-hint{font-size:10px;line-height:1.5;margin-top:12px}
+#qo-diag-root.qd-layout143 .qd-drawer-close,#qo-diag-root.qd-layout143 .qd-mobile-panels{display:none}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-workbench{grid-template-columns:minmax(0,1fr)}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-workbench-main{grid-column:1;max-width:1080px}
+#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-topic-navigator,#qo-diag-root.qd-layout143.qd-desk-wide.qd-desk-builder .qd-side-insights{display:none}
+#qo-diag-root.qd-layout143.qd-desk-wide .qd-inline-add{display:block}
+@media(max-width:1199px){
+ .qo-document-workspace #qo-diag-workspace{padding:10px}
+ #qo-diag-root.qd-layout143 .qd-workbench{grid-template-columns:minmax(0,1fr);gap:0}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-workbench-main{grid-column:1;max-width:960px;padding:0 2px 24px}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{display:none}
+ #qo-diag-root.qd-layout143 .qd-mobile-panels{display:flex;gap:6px;flex-wrap:wrap}
+ #qo-diag-root.qd-layout143 .qd-mobile-panels button{font-size:11px;min-height:31px;padding:5px 9px}
+ #qo-diag-root.qd-layout143 .qd-drawer-close{display:block;position:sticky;top:0;margin:0 0 10px auto;min-height:30px;font-size:11px;z-index:2}
+ #qo-diag-root.qd-layout143.qd-navigation-open .qd-workbench>.qd-topic-navigator,
+ #qo-diag-root.qd-layout143.qd-inspector-open .qd-workbench>.qd-side-insights,
+ #qo-diag-root.qd-layout143.qd-properties-open:not(.qd-desk-wide) .qd-workbench>.qd-question-inspector{display:block;position:fixed;top:160px;bottom:30px;height:auto;max-height:none;width:300px;max-width:calc(100vw - 24px);z-index:30;box-shadow:var(--qo-shadow);padding:12px}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-topic-navigator{left:12px;right:auto}
+ #qo-diag-root.qd-layout143 .qd-workbench>.qd-side-insights{right:12px;left:auto}
+ #qo-diag-root.qd-layout143 .qd-inline-add{display:block}
+}
+@media(max-width:570px){
+ .qo-document-workspace #qo-diag-workspace{padding:8px}
+ #qo-diag-root.qd-layout143 .qd-top{position:static;gap:7px;padding-bottom:10px}
+ #qo-diag-root.qd-layout143 .qd-top h1{font-size:18px}
+ #qo-diag-root.qd-layout143 .qd-actions{width:100%;display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+ #qo-diag-root.qd-layout143 .qd-actions button{padding:5px 3px;font-size:11px;min-height:34px;white-space:normal}
+ #qo-diag-root.qd-layout143 .qd-command-row button{min-height:33px;font-size:10px;padding:5px 7px}
+ #qo-diag-root.qd-layout143 .qd-command-row span{order:3;flex-basis:100%}
+ #qo-diag-root.qd-layout143 .qd-library-grid{grid-template-columns:1fr}
+ #qo-diag-root.qd-layout143 .qd-author-metadata{grid-template-columns:minmax(0,1fr) 70px}
+ #qo-diag-root.qd-layout143 .qd-top .qd-mobile-panels{width:100%}
+ #qo-diag-root.qd-layout143 .qd-library-commandbar button{font-size:10px;white-space:normal;min-height:33px}
+ #qo-diag-root.qd-layout143 .qd-chat-head .qd-question p{font-size:15px;line-height:1.6}
+}
+/* No flex filler after removing the redundant ribbon guide. */
+.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group:last-child{flex:0 0 auto;min-width:0;justify-content:space-between}
+#qo-diag-root.qd-layout143 .qd-template-library{gap:10px}
+#qo-diag-root.qd-layout143 .qd-library-save{gap:8px}
+#qo-diag-root.qd-layout143 .qd-library-save-form{margin-top:0}
+#qo-diag-root.qd-layout143 .qd-run-version{font-size:11px;color:var(--qo-muted)}
+#qo-diag-root.qd-layout143 .qd-workbench-main,#qo-diag-root.qd-layout143 .qd-workbench>.qd-side-panel{overflow-anchor:none}

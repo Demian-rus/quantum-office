@@ -65,7 +65,7 @@ test('TASK113 completed work has empty review queue and user data stays private'
  assert.equal(queue.pending.length,0);assert.equal(queue.review.length,0);
  const html=h.qdSidebarInsights(d,'run');
  assert.match(html,/Все вопросы оценены/);
- assert.match(html,/Нет заданий с частичной/);
+ assert.match(html,/Нет заданий для повторения/);
  assert.equal(d.history.length,0);
  assert.equal(h.writer.html,'<p>Не трогать текстовый документ</p>');
 });

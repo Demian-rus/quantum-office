@@ -319,7 +319,7 @@ function qoHubRosterPanel(){
    filtered=items.filter(x=>!search||qoHubKey(x.name+' '+x.info).includes(search));
  return '<section class="qd-panel qo-hub-roster"><div class="qo-hub-roster-head"><div><h3>Ученики из таблицы</h3>'+
    '<p>'+(source?'Связана таблица «'+qoHubEsc(source.book.name)+'», лист «'+qoHubEsc(source.sheet.name)+'».':
-     'Сначала откройте таблицу и привяжите лист «Ученики».')+'</p></div>'+
+     'Таблица не подключена.')+'</p></div>'+
    '<button data-hub-action="roster-toggle">'+(qoHubRosterOpen?'Свернуть':'Показать список')+'</button></div>'+
    (qoHubRosterOpen?'<div class="qo-hub-roster-body">'+
     (source?'<div class="qo-hub-roster-controls"><label>Найти ученика<input id="qo-hub-search" type="search" value="'+
@@ -437,7 +437,7 @@ qdOnClick=function(e){
  return result;
 };
 const qoHubOriginalQDRefresh=qdRefresh;
-qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='writer')qoHubDiagDecorate();};
+qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='writer')qoHubDiagDecorate();if(typeof qdFrameRestore==='function')qdFrameRestore();};
 const qoHubOriginalDrawGrid=drawGrid;
 drawGrid=function(...args){const ret=qoHubOriginalDrawGrid(...args);qoHubBadges();return ret;};
 const qoHubOriginalRender=render;

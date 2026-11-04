@@ -369,16 +369,15 @@ function qdStore(){
   qoPersistWriter();
 }
 function qdToolbar(){
-  const d=qdDoc();
+  const d=qdDoc(),desk=typeof qdDesk==='undefined'?{}:qdDesk;
   return `<div class="qd-top">
-    <div><span class="qd-eyebrow">QUANTUM WRITER · ИНТЕРАКТИВНЫЙ ДОКУМЕНТ</span>
-    <h1>${qdEsc(d.title)}</h1><p>${qdEsc(d.description||'Создавайте вопросы, открывайте ответы и отмечайте знания ученика.')}</p></div>
+    <h1>${qdEsc(d.title)}</h1>
     <div class="qd-actions" role="group" aria-label="Режим работы">
       <button type="button" data-qd-action="mode" data-mode="library" class="${qdMode==='library'?'active':''}"
         aria-pressed="${qdMode==='library'}">Шаблоны</button>
       <button type="button" data-qd-action="mode" data-mode="builder" class="${qdMode==='builder'?'active':''}" aria-pressed="${qdMode==='builder'}">Конструктор</button>
       <button type="button" data-qd-action="mode" data-mode="run" class="${qdMode==='run'?'active':''}" aria-pressed="${qdMode==='run'}">Проведение</button>
-    </div></div>`;
+    </div><div class="qd-mobile-panels"><button type="button" data-qd-action="navigation" aria-expanded="${!!desk.navigation}">${qdMode==='library'?'Фильтры':'Разделы'}</button><button type="button" data-qd-action="inspector" aria-expanded="${qdMode==='builder'?!!desk.properties:!!desk.inspector}">${qdMode==='builder'?'Параметры':qdMode==='library'?'Сохранить шаблон':'Обзор занятия'}</button></div></div>`;
 }
 
 const QD_BULK_MAX_CHARS=24000;
@@ -833,7 +832,6 @@ function qdBuilderSaveStatus(){
 function qdBuilderTemplateMarkup(d){
   const meta=qdBuilderTemplateDefaults(d);
   return '<details class="qd-panel qd-builder-save"><summary>Версии шаблона и перенос библиотеки</summary>'+
-    '<p class="qd-hint">Основные кнопки «Сохранить изменения» и «Сохранить как новый шаблон» закреплены вверху. Здесь можно выбрать другой личный шаблон для обновления.</p>'+
     '<label>Мой шаблон для обновления<select id="qd-builder-template-target"><option value="">Выберите шаблон</option>'+
       meta.my.map(t=>'<option value="'+qdEsc(t.id)+'" '+(meta.existing?.id===t.id?'selected':'')+'>'+qdEsc(t.title)+'</option>').join('')+'</select></label>'+
     '<div class="qd-builder-revisions"><label>Предыдущие версии выбранного шаблона<select id="qd-builder-template-revision">'+
@@ -856,12 +854,12 @@ function qdBuilder(){
   const d=qdDoc(),count=qdQuestionList(d).length;
   return `<div class="qd-editor">
     <div class="qd-builder-actionbar" role="toolbar" aria-label="Инструменты конструктора">
-      <div class="qd-command-row"><strong>Конструктор</strong><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
+      <div class="qd-command-row"><span id="qd-builder-save-state">${qdBuilderSavedSignature&&qdBuilderSavedSignature===qdBuilderSignature(d)?'Все изменения сохранены в шаблоне':qdIsDirty()?'Черновик · есть несохранённые изменения':'Пустой черновик'}</span>
         <button data-qd-action="builder-quick-save" class="qd-primary" type="button">${qdBuilderLinkedTemplateId?'Сохранить изменения':'Сохранить шаблон'}</button>
         <button data-qd-action="save-copy" type="button">Сохранить как новый шаблон</button></div>
       <div class="qd-command-row">${typeof qdDeskTools==='function'?qdDeskTools():''}<button data-qd-action="blank" type="button">Создать с нуля</button>
         <button data-qd-action="preview" type="button">Предпросмотр</button><button data-qd-action="bank-open" type="button">Банк вопросов</button><button data-qd-action="compact-mode" type="button">${qdCompact?'Развернуть карточки':'Компактный список'}</button>
-        <button data-qd-action="add-section" type="button">+ Раздел</button></div>
+        </div>
     </div>
     <div class="qd-panel qd-meta">
       <label>Название диагностики<input data-qd-field="title" maxlength="120" value="${qdEsc(d.title)}"></label>
@@ -881,10 +879,10 @@ function qdBuilder(){
         <button data-qd-action="sample" type="button">Пример: физика</button>
         <button data-qd-action="sample-auto" type="button">+ Автоматические задания</button>
       </div>
-      <p class="qd-hint">Перетаскивайте карточки за значок захвата или используйте стрелки и меню разделов.</p>
+
     </div>
-    ${!d.sections.length?'<section class="qd-panel qd-blank-state"><h2>Пустой шаблон</h2><p>Добавьте первый раздел и свои вопросы. Готовые задания появятся только по вашему выбору.</p><button type="button" data-qd-action="add-section" class="qd-primary">Добавить первый раздел</button></section>':''}
-    <details class="qd-author-advanced" data-qd-pane="author-tools" ${qdAuthorToolsOpen?'open':''}><summary>Дополнительные инструменты · проверка, поиск, массовый ввод, варианты</summary>
+    ${!d.sections.length?'<section class="qd-panel qd-blank-state"><h2>Пустой шаблон</h2><button type="button" data-qd-action="add-section" class="qd-primary">Добавить первый раздел</button></section>':''}
+    <details class="qd-author-advanced" data-qd-pane="author-tools" ${qdAuthorToolsOpen?'open':''}><summary>Дополнительные инструменты</summary>
     ${qdBuilderUtilities(d)}
     ${typeof qdBankMarkup==='function'?qdBankMarkup():''}
     ${qdBatchToolbar(d)}</details>
@@ -923,8 +921,8 @@ function qdBuilder(){
           <button type="button" data-qd-action="duplicate-question" data-qid="${qdEsc(q.id)}" title="Создать копию">Копия</button>
           <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}" title="Удалить вопрос">×</button>
         </div>
-        <label>Что спросить у ученика<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
-        <label>Ответ преподавателя (скрыт при проведении)<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
+        <label>Условие<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
+        <label>Ответ преподавателя<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
         <div class="qd-rich-actions"><button type="button" data-qd-action="rich-edit" data-kind="prompt" data-qid="${qdEsc(q.id)}">Оформить условие · таблица / формула</button>
           <button type="button" data-qd-action="rich-edit" data-kind="answer" data-qid="${qdEsc(q.id)}">Оформить решение</button></div>
         ${q.promptRich?'<details class="qd-rich-preview"><summary>Форматирование условия</summary>'+qdRichSafe(q.promptRich)+'</details>':''}
@@ -968,7 +966,7 @@ function qdBuilder(){
        <button type="button" data-qd-action="add-question" data-sid="${qdEsc(s.id)}">+ Пустая карточка</button></section>`).join('')}
     <section class="qd-panel qd-roster">
       <div class="qd-row qd-wrap"><h2>Ученики</h2><span class="qd-muted">${d.students.length} / ${QD_LIMITS.students}</span></div>
-      <p class="qd-hint">Список хранится внутри этой диагностики. Сохранённые результаты привязаны к ученику и не удаляются при смене имени.</p>
+
       <div class="qd-add-student"><input id="qd-student-new" maxlength="100" placeholder="Имя или код ученика" aria-label="Новый ученик"><button type="button" data-qd-action="add-student">+ Добавить</button></div>
       <div class="qd-student-list">${d.students.map(student=>`<div class="qd-student-row">
         <input data-qd-field="student-name" data-student-id="${qdEsc(student.id)}" value="${qdEsc(student.name)}" maxlength="100" aria-label="Изменить имя ученика">
@@ -1855,7 +1853,7 @@ function qdLibraryView(){
   const options=(values,selected)=>values.map(([key,title])=>'<option value="'+key+'" '+(selected===key?'selected':'')+'>'+qdEsc(title)+'</option>').join('');
   return '<div class="qd-template-library">'+(typeof qdDeskLibraryWarning==='function'?qdDeskLibraryWarning():'')+
     '<section class="qd-panel qd-library-heading"><div><h2>Библиотека диагностик</h2>'+
-      '<p>Выберите предмет, класс и цель. Откройте готовую подборку или сохраните свою — ученики и результаты в шаблон не попадут.</p></div>'+
+      '</div>'+
       '<span class="qd-library-total">'+total+' шаблонов</span></section>'+
     '<div class="qd-library-commandbar"><button type="button" data-qd-action="blank" class="qd-primary">Создать с нуля</button><button type="button" data-qd-action="library-import">Импорт QTPL / QTPLX</button><button type="button" data-qd-action="library-export">Экспорт библиотеки</button>'+
     '<label>Библиотека<select id="qd-library-source">'+options([['all','Все шаблоны'],['built-in','Готовые'],['custom','Мои шаблоны']],qdLibrarySource)+'</select></label></div>'+
@@ -1864,14 +1862,13 @@ function qdLibraryView(){
       '<label>Класс<select id="qd-library-grade">'+options([['all','Все классы'],...[...new Set(['5–6','7','8','9',...qdLibraryRead().map(t=>t.grade)])].map(x=>[x,x+' класс'])],qdLibraryGrade)+'</select></label>'+
       '<label>Цель<select id="qd-library-purpose">'+options([['all','Любая цель'],...Object.entries(QD_PURPOSES)],qdLibraryPurpose)+'</select></label>'+
       '</section><p class="qd-library-found" id="qd-library-found" role="status">Найдено: '+items.length+'</p><section class="qd-library-grid" id="qd-library-items">'+qdLibraryCards(items)+'</section>'+'<div id="qd-library-editor-slot">'+qdLibraryEditorMarkup()+'</div>'+'<div id="qd-library-preview-slot">'+qdLibraryPreviewMarkup()+'</div>'+
-      '<section class="qd-panel qd-library-save"><div><h3>Сохранить текущую диагностику как шаблон</h3>'+
-      '<p>Шаблон будет доступен в этой программе на данном устройстве даже после создания нового документа. Хранится локально в браузере.</p></div>'+
+      '<section class="qd-panel qd-library-save"><div><h3>Сохранить шаблон</h3>'+
+      '</div>'+
       '<div class="qd-library-save-form"><label>Предмет<select id="qd-library-save-subject">'+options(Object.entries(QD_SUBJECTS),'physics')+'</select></label>'+
       '<label>Класс<input id="qd-library-save-grade" maxlength="18" value="8" placeholder="Например, 8"></label>'+
       '<label>Цель<select id="qd-library-save-purpose">'+options(Object.entries(QD_PURPOSES),'diagnostic')+'</select></label>'+
       '<button type="button" data-qd-action="library-save" class="qd-primary">Сохранить свой шаблон</button></div>'+
-      '<p class="qd-library-portable-note">Перенос библиотеки: используйте кнопки QTPL в верхней ленте.</p>'+
-      '<p class="qd-hint">Для переносимости между версиями HTML сохраняйте библиотеку в .qtpl. Локальное хранилище зависит от файла и настроек браузера.</p></section>'+
+        '<p class="qd-hint">Хранится на этом устройстве. Резервная копия — QTPL / QTPLX.</p></section>'+
   '</div>';
 }
 function qdLibraryCards(items){
@@ -2121,7 +2118,7 @@ function qdRibbonSync(){
 function qdSidebarTopics(d,mode){
   if(mode==='builder'&&typeof qdDeskOutline==='function')return qdDeskOutline(d);
   return '<nav class="qd-side-panel qd-topic-navigator" aria-label="Навигация по разделам">'+
-    '<h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
+    '<button type="button" class="qd-drawer-close" data-qd-action="close-panel" aria-label="Закрыть навигацию">Закрыть</button><h2>Разделы</h2><p class="qd-side-caption">'+d.sections.length+' тем · '+qdQuestionList(d).length+' вопросов</p>'+    (mode==='builder'?'<button type="button" class="qd-side-toggle" data-qd-action="toggle-all-sections">'+      (qdCollapsedSections.size?'Развернуть все':'Свернуть все')+'</button>':'')+
     '<div class="qd-side-topic-list">'+d.sections.map((section,i)=>{
       const graded=qdScores(section.questions,d.session.marks,d.session.scores);
       const share=graded.total?Math.round(graded.rated/graded.total*100):0;
@@ -2132,7 +2129,7 @@ function qdSidebarTopics(d,mode){
         (mode==='run'?'<span class="qd-side-mini-bar"><i style="width:'+share+'%"></i></span>':'')+
       '</button>';
     }).join('')+'</div>'+
-    '<p class="qd-side-footnote">Нажмите тему, чтобы перейти к её вопросам.</p></nav>';
+    '</nav>';
 }
 
 function qdReviewQueues(d){
@@ -2148,7 +2145,7 @@ function qdSideQuestionItems(items,empty,kind){
   if(!items.length)return '<p class="qd-side-empty">'+qdEsc(empty)+'</p>';
   return '<div class="qd-review-list">'+items.slice(0,5).map(q=>
     '<button type="button" class="qd-review-link" data-qd-action="sidebar-question" data-qid="'+qdEsc(q.id)+'">'+
-      '<span class="qd-review-title"><b>'+q.number+'.</b>'+qdEsc(q.prompt||'Вопрос не заполнен')+'</span>'+
+      '<span class="qd-review-title" title="'+qdEsc(q.prompt)+'"><b>'+q.number+'.</b>'+qdEsc(q.prompt||'Вопрос не заполнен')+'</span>'+
       '<span class="qd-review-meta">'+qdEsc(q.section)+
         (kind==='review'?' · '+(q.mark==='no'?'Не знает':'Частично'):'')+'</span>'+
     '</button>').join('')+'</div>';
@@ -2163,7 +2160,7 @@ function qdSidebarInsights(d,mode){
       ['Число',all.filter(q=>q.type==='numeric').length]
     ];
     return '<aside class="qd-side-panel qd-side-insights" aria-label="Контроль качества диагностики">'+
-      '<h2>Проверка заданий</h2><p class="qd-side-caption">Недочёты можно открыть сразу в конструкторе</p>'+
+      '<h2>Проверка заданий</h2>'+
       '<div class="qd-side-stat"><span>Вопросов</span><strong>'+all.length+'</strong></div>'+
       '<div class="qd-side-stat"><span>Всего баллов</span><strong>'+s.maxPoints+'</strong></div>'+
       '<div class="qd-side-stat"><span>Замечаний</span><strong>'+issues.length+'</strong></div>'+
@@ -2183,49 +2180,51 @@ function qdSidebarInsights(d,mode){
   }
   const queues=qdReviewQueues(d);
   return '<aside class="qd-side-panel qd-side-insights qd-review-sidebar" aria-label="Очередь вопросов">'+
-    '<h2>Очередь занятия</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
+    '<button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button><h2>Очередь занятия</h2><p class="qd-side-caption">'+qdEsc(d.session.student||'Ученик не выбран')+'</p>'+
     '<div class="qd-side-stat"><span>Не проверено</span><strong>'+queues.pending.length+'</strong></div>'+
     '<div class="qd-side-stat"><span>К повторению</span><strong>'+queues.review.length+'</strong></div>'+
     '<h3>Следующие вопросы</h3>'+
     qdSideQuestionItems(queues.pending,'Все вопросы оценены.','pending')+
     '<h3>Вернуться к ответам</h3>'+
-    qdSideQuestionItems(queues.review,'Нет заданий с частичной или отрицательной оценкой.','review')+
-    '<p class="qd-side-footnote">Нажмите на вопрос, чтобы перейти к нему. Очередь обновляется после оценки.</p>'+
+    qdSideQuestionItems(queues.review,'Нет заданий для повторения.','review')+
     '</aside>';
 }
 
 function qdWorkbench(d,mode,content){
-  return '<div class="qd-workbench">'+
-    qdSidebarTopics(d,mode)+
-    '<main class="qd-workbench-main">'+content+'</main>'+
-    (mode==='builder'&&typeof qdDeskInspector==='function'?qdDeskInspector(d):qdSidebarInsights(d,mode))+'</div>';
+  const close='<button type="button" class="qd-drawer-close" data-qd-action="close-panel">Закрыть</button>';
+  const left=mode==='library'?'<aside class="qd-side-panel qd-topic-navigator qd-library-nav" aria-label="Фильтры библиотеки">'+close+'<h2>Фильтры</h2><div id="qd-library-filters-slot"></div></aside>':qdSidebarTopics(d,mode);
+  const right=mode==='library'?'<aside class="qd-side-panel qd-side-insights qd-library-properties" aria-label="Сохранение шаблона">'+close+'<div id="qd-library-save-slot"></div></aside>':mode==='builder'&&typeof qdDeskInspector==='function'?qdDeskInspector(d):qdSidebarInsights(d,mode);
+  return '<div class="qd-workbench">'+left+'<main class="qd-workbench-main" tabindex="-1" aria-label="Рабочая область диагностики">'+qdToolbar()+content+'</main>'+right+'</div>';
 }
+function qdScrollHost(){return document.querySelector('#qo-diag-root .qd-workbench-main')||document.getElementById('qo-diag-workspace');}
+function qdHeaderHeight(){const header=document.querySelector('#qo-diag-root .qd-top');return header&&getComputedStyle(header).position==='sticky'?header.offsetHeight:0;}
 function qdScrollToTopic(sid){
   const root=document.getElementById('qo-diag-root');
   const target=[...root?.querySelectorAll('[data-section]')||[]].find(el=>el.dataset.section===sid);
-  const scroll=document.getElementById('qo-diag-workspace');
+  const scroll=qdScrollHost();
   if(!target||!scroll)return false;
-  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(qdMode==='builder'?(document.querySelector('.qd-builder-actionbar')?.offsetHeight||0):0)-12;
+  scroll.scrollTop+=target.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
   return true;
 }
 
 function qdRefresh(){
   const root=document.getElementById('qo-diag-root');if(!root)return;
-  const scroll=document.getElementById('qo-diag-workspace'),top=scroll?.scrollTop||0;
+  qdFrameCapture();
+  root.classList.add('qd-layout143');root.dataset.mode=qdMode;
   qdSelected=new Set([...qdSelected].filter(id=>qdQuestionList(qdDoc()).some(q=>q.id===id)));
   root.classList.toggle('qd-focused-root',qdMode==='run'&&qdDisplay().mode==='focus');
   root.classList.toggle('qd-library-root',qdMode==='library');
-  root.innerHTML=qdToolbar()+(qdMode==='library'?qdLibraryView():qdWorkbench(qdDoc(),qdMode,qdMode==='builder'?qdBuilder():qdRun()))+
+  root.innerHTML=qdWorkbench(qdDoc(),qdMode,qdMode==='library'?qdLibraryView():qdMode==='builder'?qdBuilder():qdRun())+
     `<div class="qd-filebar" hidden>
        <input id="qo-diag-file" type="file" accept=".qdiag,application/json" hidden>
        <input id="qd-library-file" type="file" accept=".qtpl,application/json" hidden>
        <input id="qd-bank-file" type="file" accept=".qbank,application/json" hidden>
        </div>`;
-  if(scroll)scroll.scrollTop=top;
   qdApplyFilterUI();
   qdRibbonSync();
   if(typeof qdDeskDecorate==='function')qdDeskDecorate();
 }
+
 function qoDiagnosticVisibility(){
   const active=qoWorkspaceTab.writer==='diagnostic';
   document.getElementById('qo-writer-edit-scroll')?.toggleAttribute('hidden',active);
@@ -2263,8 +2262,8 @@ function qdJumpToEdit(qid,field='prompt'){
   const root=document.getElementById('qo-diag-root');
   const card=[...root?.querySelectorAll('.qd-edit-card')||[]].find(el=>el.dataset.qid===qid);
   if(!card)return;
-  const scroll=document.getElementById('qo-diag-workspace');
-  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-(document.querySelector('.qd-builder-actionbar')?.offsetHeight||8)-12;
+  const scroll=qdScrollHost();
+  if(scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
   const input=[...card.querySelectorAll('[data-qd-field]')].find(el=>el.dataset.qdField===field);
   (input||card.querySelector('textarea'))?.focus({preventScroll:true});
 }
@@ -2518,8 +2517,8 @@ function qdOnClick(event){
     }
     const root=document.getElementById('qo-diag-root');
     const card=[...root?.querySelectorAll('.qd-run-card')||[]].find(el=>el.dataset.qid===id);
-    const scroll=document.getElementById('qo-diag-workspace');
-    if(card&&scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-16;
+    const scroll=qdScrollHost();
+    if(card&&scroll)scroll.scrollTop+=card.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
     return;
   }
   if(action==='sidebar-issue'){
@@ -2808,8 +2807,8 @@ function qdOnClick(event){
 
 
 function qdScrollToQuestion(){
-  const scroll=document.getElementById('qo-diag-workspace'),guided=document.querySelector('#qo-diag-root .qd-guided');
-  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-12;
+  const scroll=qdScrollHost(),guided=document.querySelector('#qo-diag-root .qd-guided');
+  if(scroll&&guided)scroll.scrollTop+=guided.getBoundingClientRect().top-scroll.getBoundingClientRect().top-qdHeaderHeight()-12;
 }
 function qdGuidedKeydown(event){
   if(qdMode!=='run'||event.ctrlKey||event.metaKey||event.altKey||event.repeat)return;
@@ -2893,7 +2892,7 @@ function qdOnInput(event){
     else {d.session.responses[q.id]={value:qdText(value,3500)};delete d.session.marks[q.id];if(d.session.scores)delete d.session.scores[q.id];}
     qdStore();return;
   }
-  if(field==='title')d.title=qdText(value,120);
+  if(field==='title'){d.title=qdText(value,120);const heading=document.querySelector('#qo-diag-root .qd-top h1');if(heading)heading.textContent=d.title;}
   else if(field==='description')d.description=qdText(value,600);
   else if(field==='student'){
     d.session.student=qdText(value,100);
@@ -3147,14 +3146,13 @@ function qdRunSetup(d){
   const options=[...qdLibraryRead().map(x=>({...x,source:'custom',label:x.title})),
     ...QD_PRESETS.map(x=>({...x,source:'built-in',label:qdTemplate(x.id)?.title||x.label}))];
   const untouched=!Object.keys(d.session.responses).length&&!Object.keys(d.session.marks).length;
-  return '<details class="qd-panel qd-run-setup" '+(untouched?'open':'')+' aria-label="Диагностика для проведения"><summary>Диагностика: '+qdEsc(d.title)+' <span>Выбор и сохранение занятия</span></summary><div class="qd-run-setup-body">'+
-    '<div><strong>'+qdEsc(d.title)+'</strong><p>Независимый снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+
-    '. Изменения конструктора не затрагивают это занятие.</p></div>'+
+  return '<details class="qd-panel qd-run-setup" '+(untouched?'open':'')+' aria-label="Диагностика для проведения"><summary>Диагностика: '+qdEsc(d.title)+' <span>Настройки занятия</span></summary><div class="qd-run-setup-body">'+
+    '<p class="qd-run-version">Снимок'+(run?' · '+qdEsc(qdDateLabel(run.created)):'')+'</p>'+
     '<div class="qd-run-start-row"><label>Выбрать диагностику<select id="qd-run-template"><option value="">Текущий черновик конструктора</option>'+
     options.map(x=>'<option value="'+x.source+':'+qdEsc(x.id)+'">'+(x.source==='custom'?'Мой · ':'Готовый · ')+qdEsc(x.label)+'</option>').join('')+
     '</select></label><button type="button" data-qd-action="run-start">Начать новое проведение</button>'+
     '<button type="button" data-qd-action="run-checkpoint" class="qd-primary">Сохранить незавершённое</button></div>'+
-    '<p class="qd-hint">Ответы сохраняются в браузере. Для переноса или резервной копии скачайте QDIAG / QDIAGX в верхней ленте.</p></div></details>';
+    '<p class="qd-hint">Резервная копия занятия — QDIAG / QDIAGX.</p></div></details>';
 }
 function qdProfessionalAction(action,button,d){
   if(typeof qdDeskAction==='function'&&qdDeskAction(action,button,d))return true;
