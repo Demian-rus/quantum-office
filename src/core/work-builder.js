@@ -253,6 +253,37 @@ function qwVisualIcon(kind){
  };
  return '<svg viewBox="0 0 24 24" width="21" height="21" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+(paths[kind]||paths.line)+'</svg>';
 }
+function qwPhysicsPreset(kind){
+ const list={
+  surface:[
+   {kind:'ground',x:70,y:246,x2:450,y2:246,label:''},
+   {kind:'block',x:220,y:178,x2:320,y2:246,label:'m',rotation:0},
+   {kind:'arrow',x:270,y:178,x2:270,y2:100,label:'N'},
+   {kind:'arrow',x:270,y:212,x2:270,y2:295,label:'mg'}
+  ],
+  incline:[
+   {kind:'incline',x:80,y:90,x2:450,y2:260,label:''},
+   {kind:'block',x:230,y:135,x2:300,y2:175,label:'m',rotation:-25},
+   {kind:'arrow',x:272,y:145,x2:272,y2:235,label:'mg'}
+  ],
+  pulley:[
+   {kind:'ground',x:195,y:42,x2:327,y2:42,label:''},
+   {kind:'pulley',x:220,y:56,x2:300,y2:136,label:''},
+   {kind:'rope',x:220,y:96,x2:220,y2:211,label:''},
+   {kind:'rope',x:300,y:96,x2:300,y2:211,label:''},
+   {kind:'block',x:189,y:211,x2:251,y2:271,label:'m₁'},
+   {kind:'block',x:269,y:211,x2:331,y2:271,label:'m₂'}
+  ],
+  spring:[
+   {kind:'ground',x:68,y:245,x2:450,y2:245,label:''},
+   {kind:'rect',x:68,y:150,x2:84,y2:245,label:''},
+   {kind:'spring',x:84,y:209,x2:287,y2:209,label:'k'},
+   {kind:'block',x:287,y:166,x2:372,y2:245,label:'m'}
+  ]
+ };
+ if(!Object.hasOwn(list,kind))throw Error('Неизвестная готовая схема');
+ return qwValidateDiagram(list[kind]);
+}
 function qwVisualPalette(selected){
  return QW_VISUAL_TOOLS.map(([kind,title])=>
   '<button type="button" class="qw-tool-tile" data-tool="'+kind+'" title="'+qwEsc(title)+'" aria-label="'+qwEsc(title)+'" aria-pressed="'+(selected===kind)+'">'+qwVisualIcon(kind)+'</button>').join('');
@@ -272,13 +303,14 @@ function qwVisualEditor(kind){
    (value.curveFamily==='trigonometric'?'<label>Функция<select id="qw-curve-trig">'+qwOptions([['sin','sin'],['cos','cos']],value.curve.trig)+'</select></label>'+
      ['amplitude','frequency','phase','offset'].map((k,i)=>'<label>'+['Амплитуда','Частота (рад)','Фаза (рад)','Смещение'][i]+'<input data-curve-param="'+k+'" type="number" step="any" value="'+qwEsc(value.curve[k])+'"></label>').join(''):'')+
    '</div><button type="button" id="qw-add-point">Добавить точку</button><div class="qw-point-list">'+value.points.map((p,i)=>'<div data-point-row="'+i+'"><b>'+(i+1)+'</b>'+['x','y','label'].map(k=>'<input aria-label="'+k+' точки '+(i+1)+'" data-point-index="'+i+'" data-point-field="'+k+'" type="'+(k==='label'?'text':'number')+'" '+(k==='label'?'maxlength="30"':'step="any"')+' value="'+qwEsc(p[k])+'">').join('')+'<button type="button" data-point-up="'+i+'" '+(!i?'disabled':'')+' title="Раньше в ломаной">↑</button><button type="button" data-point-delete="'+i+'" aria-label="Удалить точку '+(i+1)+'">×</button></div>').join('')+'</div>';
-  else props.innerHTML='<div class="qw-row"><label>Подпись выбранной фигуры<input id="qw-object-label" maxlength="80" value="'+qwEsc(value[selected]?.label||'')+'" '+(selected<0?'disabled':'')+'></label></div>'+
+  else props.innerHTML='<div class="qw-diagram-presets"><label>Готовые физические схемы<select id="qw-diagram-preset">'+qwOptions([['none','Выбрать схему'],['surface','Брусок на опоре'],['incline','Брусок на наклонной плоскости'],['pulley','Система с блоком'],['spring','Брусок и пружина']],'none')+'</select></label></div><div class="qw-row"><label>Подпись выбранной фигуры<input id="qw-object-label" maxlength="80" value="'+qwEsc(value[selected]?.label||'')+'" '+(selected<0?'disabled':'')+'></label></div>'+
+   (value[selected]?.kind==='block'?'<div class="qw-object-rotation"><label>Поворот бруска, °<input id="qw-block-rotation" type="number" min="-180" max="180" step="1" value="'+(value[selected].rotation||0)+'"></label></div>':'')+
    (value[selected]?.vertices?'<details open><summary>Вершины и обозначения</summary><div class="qw-vertex-list">'+value[selected].vertices.map((p,i)=>'<div><label>Вершина '+(i+1)+'<input data-vertex-index="'+i+'" data-vertex-field="label" maxlength="20" value="'+qwEsc(p.label)+'"></label><label>X<input data-vertex-index="'+i+'" data-vertex-field="x" type="number" min="0" max="520" step="any" value="'+p.x+'"></label><label>Y<input data-vertex-index="'+i+'" data-vertex-field="y" type="number" min="0" max="320" step="any" value="'+p.y+'"></label></div>').join('')+'</div><div class="qw-edge-list">'+value[selected].vertices.map((p,i)=>'<label>Сторона '+qwEsc(p.label||String(i+1))+'–'+qwEsc(value[selected].vertices[(i+1)%value[selected].vertices.length].label||String((i+1)%value[selected].vertices.length+1))+'<input data-edge-index="'+i+'" maxlength="40" placeholder="Длина / обозначение" value="'+qwEsc(value[selected].edgeLabels?.[i]||'')+'"></label>').join('')+'</div></details>':'')+
    (value[selected]&&['triangle','rightTriangle'].includes(value[selected].kind)?
     '<div class="qw-constructions"><label>Из вершины<select id="qw-construction-vertex">'+qwOptions(value[selected].vertices.map((p,i)=>[String(i),p.label||'Вершина '+(i+1)]),'0')+'</select></label>'+
     '<button type="button" data-construction="median">Провести медиану</button>'+
     '<button type="button" data-construction="altitude">Провести высоту</button></div>':'')+
-   '<div class="qw-object-list">'+value.map((o,i)=>'<button type="button" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
+   '<div class="qw-object-list">'+value.map((o,i)=>'<button type="button" data-object-select="'+i+'">'+(i+1)+'. '+qwEsc(Object.fromEntries(QW_VISUAL_TOOLS)[o.kind]||o.kind)+' '+qwEsc(o.label)+'</button>').join('')+'</div>';
  }
  stage.onpointerdown=e=>{if(e.button!==0)return;e.preventDefault();const p=point(e),existing=e.target.closest('[data-qw-point],[data-qw-object]');remember();if(kind==='graph'){
   if(existing)selected=Number(existing.dataset.qwPoint);else {if(value.points.length>=40){history.pop();return;}const snapped=gridPoint(p);value.points.push({...snapped,label:''});selected=value.points.length-1;}
@@ -323,7 +355,15 @@ function qwVisualEditor(kind){
    }catch(error){hint.textContent=error.message;hint.className='qw-error';}
    return;
   }if(t.id==='qw-add-point'&&kind==='graph'&&value.points.length<40){remember();value.points.push({...qwSnapGraphPoint(value,(value.xmin+value.xmax)/2,(value.ymin+value.ymax)/2),label:''});selected=value.points.length-1;draw();}if(t.dataset.pointDelete!==undefined){selected=Number(t.dataset.pointDelete);remove();}if(t.dataset.pointUp!==undefined){const i=Number(t.dataset.pointUp);if(i>0){remember();[value.points[i-1],value.points[i]]=[value.points[i],value.points[i-1]];draw();}}if(t.dataset.objectSelect!==undefined){selected=Number(t.dataset.objectSelect);tool='select';draw();}});
- d.addEventListener('change',e=>{const t=e.target;try{if(t.id==='qw-snap-geometry'){snapGeometry=t.checked;draw(false);return;}if(t.id==='qw-grid-step-geometry'){geometryStep=Number(t.value);draw(false);return;}if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}
+ d.addEventListener('change',e=>{const t=e.target;try{if(t.id==='qw-snap-geometry'){snapGeometry=t.checked;draw(false);return;}if(t.id==='qw-grid-step-geometry'){geometryStep=Number(t.value);draw(false);return;}
+   if(t.id==='qw-diagram-preset'&&t.value!=='none'){
+    remember();value=qwPhysicsPreset(t.value);selected=-1;tool='select';draw();
+    d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool==='select')));return;
+   }
+   if(t.id==='qw-block-rotation'&&value[selected]?.kind==='block'){
+    const next=structuredClone(value);next[selected].rotation=Number(t.value);
+    const validated=qwValidateDiagram(next);remember();value=validated;draw();return;
+   }if(t.dataset.graphField){const next=structuredClone(value),k=t.dataset.graphField;next[k]=t.type==='checkbox'?t.checked:t.type==='number'?Number(t.value):t.value;const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.dataset.pointField){const next=structuredClone(value),k=t.dataset.pointField;next.points[Number(t.dataset.pointIndex)][k]=k==='label'?t.value:Number(t.value);const validated=qwValidateGraph(next);remember();value=validated;draw(false);}if(t.id==='qw-object-label'&&value[selected]){remember();value[selected].label=t.value;draw(false);}
    if(t.dataset.edgeIndex!==undefined&&value[selected]?.vertices){
     const next=structuredClone(value),index=Number(t.dataset.edgeIndex);
     if(!next[selected].edgeLabels)next[selected].edgeLabels=next[selected].vertices.map(()=>'');
