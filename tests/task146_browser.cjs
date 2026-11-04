@@ -35,6 +35,11 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.mouse.move(v.x+v.width/2+36,v.y+v.height/2+11,{steps:4});await page.mouse.up();
   const current=await page.locator('[data-vertex-index="0"][data-vertex-field="x"]').inputValue();
   assert.notEqual(current,previous,'vertex drag must persist rather than reset on pointerup');
+  await page.locator('[data-construction="median"]').click();
+  assert.equal(await stage.locator('[data-qw-object]').count(),2);
+  await page.locator('[data-object-select="0"]').click();
+  await page.locator('[data-construction="altitude"]').click();
+  assert.equal(await stage.locator('[data-qw-object]').count(),3);
   await page.screenshot({path:path.join(out,'geometry_labels.png')});
   await page.locator('[data-tool="line"]').click();
   for(let i=0;i<54;i++){
