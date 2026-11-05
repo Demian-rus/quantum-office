@@ -3,7 +3,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
 const {pathToFileURL}=require('node:url');
 (async()=>{
- const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task145');
+ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task145');
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
@@ -14,8 +14,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-editor="writer"][data-tab="work"]').click();
   const action=k=>page.locator('[data-qw-action="'+k+'"]');
   const add=async(type,prompt)=>{
-   await page.locator('#qw-add-type').selectOption(type);
-   await page.locator('.qw-left [data-qw-action="add"]').click();
+   await page.locator('[data-qw-action="quick-add"][data-type="'+type+'"]').click();
    await page.locator('#qw-prompt').fill(prompt);
   };
   await add('diagram','В треугольнике ABC найдите длину стороны AB и обозначьте высоту.');

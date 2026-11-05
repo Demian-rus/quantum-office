@@ -1,7 +1,7 @@
 /* TASK148: full user workflows, export/import, desktop/scaling matrix and real PDF. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
+const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task148');
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -18,7 +18,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
   const mDrag=async(x,y,x2,y2)=>{const a=math(x,y),b=math(x2,y2);await drag(a.x,a.y,b.x,b.y);};
   const tool=async key=>p.locator('[data-tool="'+key+'"]').click();
   const color=async hex=>p.locator('[data-style-key="stroke"][data-style-color="'+hex+'"]').click();
-  const newTask=async(kind,prompt)=>{await p.locator('#qw-add-type').selectOption(kind);await p.locator('.qw-left [data-qw-action="add"]').click();await p.locator('#qw-prompt').fill(prompt);await action(kind).click();};
+  const newTask=async(kind,prompt)=>{await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();await p.locator('#qw-prompt').fill(prompt);await action(kind).click();};
   await p.addInitScript(()=>{window.print=()=>{window.top.__qwPrintCalled=true;};});
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
@@ -50,14 +50,14 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
   assert.match(await p.locator('[data-object-select="2"]').textContent(),/F₁/);await p.locator('[data-layer="back"]').click();
   await p.screenshot({path:path.join(out,'colored-forces.png')});await action('visual-apply').click();
   await newTask('graph','Отрицательные координаты, независимые отрезки, ломаная и функции');
-  await p.locator('#qw-coordinate-mode').selectOption('positiveX');assert.equal(await p.locator('[data-graph-field="ymin"]').inputValue(),'-10');
-  await p.locator('#qw-coordinate-mode').selectOption('math');assert.equal(await p.locator('[data-graph-field="xmin"]').inputValue(),'-10');
-  const canvasBox=await stage.boundingBox();
+  await p.locator('#qw-coordinate-mode').selectOption('positiveX');assert.equal(await p.locator('[data-graph-field="ymin"]').inputValue(),'-5');
+  await p.locator('#qw-coordinate-mode').selectOption('math');assert.equal(await p.locator('[data-graph-field="xmin"]').inputValue(),'-5');
+  const wideRange=async()=>{for(const [k,v]of Object.entries({xmin:-10,xmax:10,ymin:-10,ymax:10}))await change('[data-graph-field="'+k+'"]',v);};await wideRange();const canvasBox=await stage.boundingBox();
   await tool('line');for(let i=0;i<20;i++)await mClick(-8+i*.3,-8);assert.equal(await stage.locator('[data-qw-element]').count(),0);
   assert.equal(await p.locator('#qw-visual-undo').isDisabled(),false,'coordinate preset is the only prior undo');
   await mDrag(-8,-6,-2,0);await color('#dc2626');await tool('line');await mDrag(2,0,8,6);await color('#16a34a');
   assert.equal(await stage.locator('[data-qw-element]').count(),2);
-  await p.locator('#qw-coordinate-mode').selectOption('first');assert.match(await p.locator('#qw-visual-state').textContent(),/Координаты сохранены/);assert.equal(await stage.locator('[data-qw-element]').count(),2);await p.locator('#qw-coordinate-mode').selectOption('math');
+  await p.locator('#qw-coordinate-mode').selectOption('first');assert.match(await p.locator('#qw-visual-state').textContent(),/Координаты сохранены/);assert.equal(await stage.locator('[data-qw-element]').count(),2);await p.locator('#qw-coordinate-mode').selectOption('math');await wideRange();
   assert.notEqual(await stage.locator('[data-qw-element="0"] path').getAttribute('stroke'),await stage.locator('[data-qw-element="1"] path').getAttribute('stroke'));
   await tool('select');await mDrag(-9,-7,9,7);assert.equal(await stage.locator('.qw-visual-selected').count(),2,'graph marquee');
   const original=await stage.locator('[data-qw-element="0"] path').getAttribute('d');await mDrag(-5,-3,-4,-2);
@@ -88,7 +88,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
   await p.reload();assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected,'reopen persisted QWORK');
   await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
   // Use the actual exported document for both PDF paths, with no test-generated illustration model.
-  const raster=await p.evaluate(async()=>Array.from(await qwPDFBytes(qwDoc,false)));fs.writeFileSync(path.join(out,'task148-raster.pdf'),Buffer.from(raster));
+  const raster=await p.evaluate(async()=>Array.from(await qwPDFBytes({...qwDoc,layout:'worksheet'},false)));fs.writeFileSync(path.join(out,'task148-raster.pdf'),Buffer.from(raster));
   await action('preview').click();await p.frameLocator('#qw-print-preview-frame').locator('.qw-paper-task').first().waitFor();
   const previewFrame=await p.locator('#qw-print-preview-frame').elementHandle();const printed=await (await previewFrame.contentFrame()).content();
   await action('preview-pdf').click();await p.waitForFunction(()=>window.__qwPrintCalled===true);await p.locator('[data-qw-close]').click();assert.doesNotMatch(printed,/data-qw-(?:vertex|object|element|editor|marquee)/);

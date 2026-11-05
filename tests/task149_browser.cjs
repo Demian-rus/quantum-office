@@ -1,7 +1,7 @@
 /* TASK149: desktop toolbar organization, axis label bounds and Ctrl+Z. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149');
+const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task149');
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -11,8 +11,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149');
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
   await page.locator('[data-editor="writer"][data-tab="work"]').click();
-  await page.locator('#qw-add-type').selectOption('graph');
-  await page.locator('.qw-left [data-qw-action="add"]').click();
+  await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
   await page.locator('[data-qw-action="graph"]').click();
   assert.equal(await page.locator('.qw-drawing-group [data-tool]').count(),9);
   assert.equal(await page.locator('.qw-graph-range [data-graph-field]').count(),4);

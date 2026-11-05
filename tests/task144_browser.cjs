@@ -2,18 +2,18 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
 (async()=>{
- const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task144');fs.mkdirSync(out,{recursive:true});
+ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task144');fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
  const p=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true}),errors=[],metrics=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept('A'));
  const action=a=>p.locator('[data-qw-action="'+a+'"]');
  const open=async()=>{await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();};
- const add=async(type,prompt)=>{await p.locator('#qw-add-type').selectOption(type);await p.locator('.qw-left [data-qw-action="add"]').click();await p.locator('#qw-prompt').fill(prompt);};
+ const add=async(type,prompt)=>{await p.locator('[data-qw-action="quick-add"][data-type="'+(['blanks','combined'].includes(type)?'short':type)+'"]').click();if(['blanks','combined'].includes(type))await p.locator('[data-qw-field="type"]').selectOption(type);await p.locator('#qw-prompt').fill(prompt);};
  const dl=async(fn,name)=>{const event=p.waitForEvent('download');await fn();const d=await event,target=path.join(out,name||d.suggestedFilename());await d.saveAs(target);assert.ok(fs.statSync(target).size>50);return target;};
  const shot=async name=>{await p.locator('#toast.active').waitFor({state:'hidden'});await p.screenshot({path:path.join(out,name+'.png')});};
  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await open();
  const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));assert.equal(await p.evaluate(()=>qwDoc.tasks.length),0);
- await action('settings').click();await p.locator('[data-meta="title"]').fill('Физика и математика TASK144');await p.locator('[data-meta="topic"]').fill('Тренировочная работа');await p.locator('[data-qw-action="meta-apply"]').click();
+ await action('settings').click();await p.locator('[data-meta="layout"]').selectOption('worksheet');await p.locator('[data-meta="title"]').fill('Физика и математика TASK144');await p.locator('[data-meta="topic"]').fill('Тренировочная работа');await p.locator('[data-qw-action="meta-apply"]').click();
  await add('short','Вычислите выражение. ');await action('math').click();await p.locator('#qw-formula-source').fill('\\frac{\\alpha x^{2}}{\\sqrt{y_{1}}}');await p.locator('[data-qw-action="formula-insert"]').click();await action('blank').click();await action('symbols').click();await p.locator('[data-symbol="Δ"]').click();
  assert.equal(await p.locator('#qw-task-preview math mfrac').count(),1);assert.equal(await p.locator('#qw-task-preview math msqrt').count(),1);assert.equal(await p.locator('.qw-inline-blank').count(),1);assert.match(await p.locator('#qw-task-preview').innerText(),/Δ/);
  await p.locator('[data-qw-field="points"]').fill('5');await p.locator('[data-qw-field="points"]').dispatchEvent('change');assert.match(await p.locator('.qo-office-footer').innerText(),/5 баллов/);
@@ -46,9 +46,10 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  }
  await p.locator('[data-action="work-new"]').click();assert.equal(await p.evaluate(()=>qwDoc.tasks.length),0);await p.locator('#qw-file').setInputFiles(saved);await p.waitForFunction(()=>qwDoc.tasks.length===7);assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected);
  await p.reload();await open();assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected);
- // Student PDF never reads teacher-only strings; options control each teacher layer.
- const printed=await p.evaluate(async()=>{const captured=[],old=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...rest){captured.push(String(text));return old.call(this,text,...rest);};try{await qwRenderPages(qwDoc,false);const student=captured.join(' ');captured.length=0;await qwRenderPages(qwDoc,true);const teacher=captured.join(' ');captured.length=0;await qwRenderPages(qwDoc,true,{answers:false,criteria:false,comments:false});return {student,teacher,hidden:captured.join(' ')};}finally{CanvasRenderingContext2D.prototype.fillText=old;}});
- for(const value of ['PRIVATE_TEACHER_ANSWER','PRIVATE_CRITERIA','PRIVATE_COMMENT']){assert.ok(!printed.student.includes(value));assert.ok(printed.teacher.includes(value));assert.ok(!printed.hidden.includes(value));}
+ // Student canvases never read key data; answers use a separate vector document.
+ const printed=await p.evaluate(async()=>{const captured=[],old=CanvasRenderingContext2D.prototype.fillText;CanvasRenderingContext2D.prototype.fillText=function(text,...rest){captured.push(String(text));return old.call(this,text,...rest);};try{await qwRenderPages(qwDoc,false);return {student:captured.join(' '),key:qwPrintDocumentHTML(qwDoc,true,{includeCriteria:true,includeComments:true}),hidden:qwPrintDocumentHTML(qwDoc,true)};}finally{CanvasRenderingContext2D.prototype.fillText=old;}});
+ for(const value of ['PRIVATE_TEACHER_ANSWER','PRIVATE_CRITERIA','PRIVATE_COMMENT']){assert.ok(!printed.student.includes(value));assert.ok(printed.key.includes(value));if(value!=='PRIVATE_TEACHER_ANSWER')assert.ok(!printed.hidden.includes(value));}
+ assert.doesNotMatch(printed.key,/<figure/);
  await p.locator('[data-editor="writer"][data-tab="diagnostic"]').click();assert.deepEqual(await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())})),untouched);await p.locator('[data-editor="writer"][data-tab="work"]').click();
  // Deliverable fixture created through the real Example action, then actual native exports.
  await action('example').click();const example=await dl(()=>action('save').click(),'QuantumOffice_TASK144_example.qwork');

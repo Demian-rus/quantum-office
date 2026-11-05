@@ -2,7 +2,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
 (async()=>{
- const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task146');
+ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task146');
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
@@ -11,8 +11,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="work"]').click();
   const action=k=>page.locator('[data-qw-action="'+k+'"]');
-  await page.locator('#qw-add-type').selectOption('diagram');
-  await page.locator('.qw-left [data-qw-action="add"]').click();
+  await page.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await page.locator('#qw-prompt').fill('В треугольнике ABC определите неизвестную сторону и проведите высоту.');
   await action('diagram').click();
   const modal=page.locator('#qw-dialog'),stage=page.locator('#qw-visual-stage svg');
@@ -59,8 +58,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.locator('#qw-visual-properties').evaluate(x=>x.scrollTop=x.scrollHeight);
   await page.screenshot({path:path.join(out,'fixed_dialog_many_objects.png')});
   await action('visual-apply').click();
-  await page.locator('#qw-add-type').selectOption('graph');
-  await page.locator('.qw-left [data-qw-action="add"]').click();
+  await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
   await page.locator('#qw-prompt').fill('Определите значение скорости по графику.');
   await action('graph').click();
   const svg=await stage.evaluate(x=>x.outerHTML);
