@@ -51,6 +51,17 @@ jobs:
       - run: python tests/task149_6_pdf.py
       - run: node tests/task149_7_browser.cjs
       - run: node tests/task149_7_offline.cjs
+      - uses: actions/checkout@v4
+        with:
+          ref: d0f1b3c6ec98b88aa73d784f5f5859be8059a338
+          path: task150-baseline
+      - run: node scripts/build.mjs
+        working-directory: task150-baseline
+      - run: node tests/task150_browser.cjs --before
+        env:
+          QW_TASK150_HTML: ${{ github.workspace }}/task150-baseline/Quantum-Office.html
+      - run: node tests/task150_browser.cjs
+      - run: python tests/task150_pdf.py
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
@@ -330,3 +341,12 @@ jobs:
             evidence/task149.1/*.png
             evidence/task149.1/result.json
           if-no-files-found: ignore
+
+      - name: Package TASK150 review
+        if: always()
+        run: python scripts/package-task150.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task150-pdf-layout-qx
+          path: evidence/task150/
