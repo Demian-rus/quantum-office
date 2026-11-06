@@ -5,7 +5,7 @@ const {readFileSync,writeFileSync,mkdirSync}=require('node:fs');
 const {execFileSync}=require('node:child_process');
 const path=require('node:path'),{pathToFileURL}=require('node:url');
 (async()=>{
- const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task146/compact');
+ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task146/compact');
  mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
@@ -14,8 +14,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
   const action=k=>p.locator('[data-qw-action="'+k+'"]');
-  await p.locator('#qw-add-type').selectOption('diagram');
-  await p.locator('.qw-left [data-qw-action="add"]').click();
+  await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await p.locator('#qw-prompt').fill('Брусок массой m находится на наклонной плоскости. Найдите работу силы тяжести. \\(A=mgh\\).');
   await action('diagram').click();
   const tools=await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>({key:x.dataset.tool,text:x.textContent.trim(),title:x.title,aria:x.getAttribute('aria-label')})));
@@ -39,15 +38,16 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   await p.screenshot({path:path.join(out,'physics_editor.png')});
   await action('visual-apply').click();
   assert.equal(await p.evaluate(()=>qwCurrent().diagram.some(x=>x.kind==='block'&&x.rotation===-20)),true);
+  // Reopen the legacy layout; it is no longer offered as an official exam template.
+  await p.evaluate(()=>qwChange(()=>{qwDoc.layout='exam';qwDoc.exam='ege';}));
   await action('settings').click();
   await p.locator('[data-meta="title"]').fill('Физика — тренировочный вариант');
   await p.locator('[data-meta="layout"]').selectOption('exam');
-  await p.locator('[data-meta="exam"]').selectOption('ege');
   await p.locator('[data-qw-action="meta-apply"]').click();
   const exam=await p.evaluate(()=>qwPrintDocumentHTML(qwDoc,false));
   assert.match(exam,/qw-print-exam/);
   assert.match(exam,/qw-exam-task/);
-  assert.match(exam,/ЕГЭ/);
+  assert.match(exam,/Прежний компактный макет/);
   assert.match(exam,/<svg/);
   assert.match(exam,/<mo lspace="0.28em" rspace="0.28em">=<\/mo>/);
   assert.doesNotMatch(exam,/Задание 1 · Рисунок/);
@@ -67,9 +67,9 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   const circle=await print.locator('.qw-exam-task figure svg').count();
   assert.equal(circle,1);
   try{
-    const txt=execFileSync('pdftotext',['-layout',path.join(out,'ege_vector.pdf'),'-'],{encoding:'utf8'});
+    const txt=execFileSync(process.env.QW_PYTHON||'python',['-c','import pymupdf,sys; sys.stdout.buffer.write(pymupdf.open(sys.argv[1])[0].get_text().encode("utf-8"))',path.join(out,'ege_vector.pdf')],{encoding:'utf8'});
     assert.match(txt,/Брусок массой/);
-    assert.match(txt,/ЕГЭ/);
+    assert.match(txt,/Прежний компактный макет/);
   }catch(err){if(err.code!=='ENOENT')throw err;}
   await print.close();
   await action('settings').click();

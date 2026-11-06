@@ -25,13 +25,13 @@ test('TASK145 custom graph coefficient bounds protect plot generation',()=>{
  assert.equal(qwValidateGraph(g).curve.trig,'sin');
 });
 
-test('TASK145 graph axis captions stay in reserved margins',()=>{
+test('TASK145 graph axis captions identify their axes without changing point coordinates',()=>{
  const g=qwTask('graph').graph;
  g.points=[{x:0,y:0,label:'A'},{x:10,y:10,label:'B'}];
  const svg=qwGraphSVG(g,true);
  assert.deepEqual(qwPlotXY(g,{x:0,y:0}),{x:82,y:262});
- assert.match(svg,/<text x="500" y="309"/);
- assert.match(svg,/<text x="10" y="24"/);
+ assert.match(svg,/<text class="qw-axis-title" data-axis="x"[^>]*>t, с<\/text>/);
+ assert.match(svg,/<text class="qw-axis-title" data-axis="y"[^>]*>v, м\/с<\/text>/);
  assert.match(svg,/paint-order="stroke"/);
  assert.match(svg,/data-qw-point="0"/);
  assert.doesNotMatch(svg,/NaN|Infinity/);

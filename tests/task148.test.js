@@ -49,7 +49,7 @@ import {qwValidateGraph,qwCoordinatePreset,qwPlotXY,qwSnapDiagramPoint} from '..
 import {qwHitGraph,qwTranslateGraphObject} from '../src/core/work-geometry.js';
 import {qwGraphSVG} from '../src/core/work-content.js';
 test('TASK148 D: independent graph primitives preserve math coordinates, colors and old points',()=>{
- const d=qwProject(),q=qwTask('graph');d.tasks=[q];Object.assign(q.graph,qwCoordinatePreset('math'));
+ const d=qwProject(),q=qwTask('graph');d.tasks=[q];Object.assign(q.graph,{xmin:-10,xmax:10,ymin:-10,ymax:10,coordinateMode:'math'});
  q.graph.points=[{x:2,y:-3,label:'P',style:{stroke:'#dc2626'}}];
  q.graph.elements=[{kind:'line',x:-8,y:-5,x2:-2,y2:0,label:'s₁',style:{stroke:'#dc2626',width:3}},{kind:'line',x:2,y:0,x2:8,y2:5,label:'s₂',style:{stroke:'#16a34a'}},{kind:'arrow',x:-5,y:8,x2:-2,y2:3,label:'F',style:{stroke:'#2563eb'}},{kind:'polyline',vertices:[{x:-5,y:-8},{x:0,y:-5},{x:5,y:-8}],label:''},{kind:'text',x:3,y:8,label:'<script>&'},{kind:'function',family:'quadratic',curve:{a:.1,b:0,c:0},style:{stroke:'#9333ea'}}];
  const restored=qwValidate(JSON.parse(JSON.stringify(d))),g=restored.tasks[0].graph;

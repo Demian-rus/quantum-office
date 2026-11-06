@@ -2,7 +2,7 @@
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path');
 const {pathToFileURL}=require('node:url');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task147');
+const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task147');
 const before=process.argv.includes('--before');
 const html=before?process.env.QW_BEFORE_HTML:path.join(root,'Quantum-Office.html');
 const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.ok(Math.abs(a[k]-b[k])<1,message+' '+k);};
@@ -20,7 +20,7 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   await p.locator('[data-editor="writer"][data-tab="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   if(width<1200)await action('left').click();
-  await p.locator('#qw-add-type').selectOption(kind);await p.locator('.qw-left [data-qw-action="add"]').click();
+  if(await p.locator('[data-qw-action="quick-add"]').count()){await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();}else{await p.locator('#qw-add-type').selectOption(kind);await p.locator('.qw-left [data-qw-action="add"]').click();}
   await p.locator('#qw-prompt').fill('TASK147: '+kind+' — редактируемая иллюстрация');
   await action(kind).click();
   const panel=async name=>{if(width<=1000&&await p.locator('#qw-dialog').getAttribute('data-panel')!==name)await p.locator('[data-visual-panel="'+name+'"]').click();};
@@ -39,9 +39,9 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   if(kind==='diagram'){
    if(!before){
     await panel('tools');
-    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Физика']);
-    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','arrow','text','rect','circle','angle','triangle','rightTriangle','quadrilateral','dashed','block','incline','pulley','movablePulley','rope','spring','ground']);
-    assert.equal(await p.locator('[data-tool] span').count(),19);
+    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Построения','Физика']);
+    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','dashed','arrow','text','rect','circle','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','equalMarks','block','incline','pulley','movablePulley','rope','spring','ground']);
+    assert.equal(await p.locator('[data-tool] span').count(),28);
     await p.locator('.qw-tool-group summary').first().click();sameBox(stable,await stage.boundingBox(),'collapse must not resize canvas');
     await p.locator('.qw-tool-group summary').first().click();
     await p.locator('#qw-visual-tools').evaluate(e=>e.scrollTop=e.scrollHeight);sameBox(stable,await stage.boundingBox(),'tools scroll independent');

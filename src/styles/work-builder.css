@@ -1,7 +1,7 @@
 /* TASK144: separate work surface; shared Office colors, no document recoloring. */
 .qo-document-workspace #qo-work-workspace[hidden]{display:none!important}
 #qo-work-workspace{padding:12px 16px;background:var(--qo-bg);color:var(--qo-text);overflow:hidden;min-height:0}
-.qw-frame{display:grid;grid-template-columns:208px minmax(0,1fr) 260px;gap:16px;height:100%;min-height:0;font:12px/1.5 'Segoe UI',Arial,sans-serif}
+.qw-frame{display:grid;grid-template-columns:228px minmax(0,1fr) 260px;gap:16px;height:100%;min-height:0;font:12px/1.5 'Segoe UI',Arial,sans-serif}
 .qw-frame *,.qw-dialog *{box-sizing:border-box}
 .qw-frame h1,.qw-frame h2,.qw-frame h3,.qw-frame p{margin:0}
 .qw-frame h1{font-size:19px;line-height:1.35;overflow-wrap:anywhere}
@@ -38,7 +38,7 @@
 .qw-figure-right figure{float:right}.qw-figure-left figure{float:left;margin:0 14px 10px 0}.qw-figure-below figure{float:none;max-width:100%;margin:14px 0;display:block}
 .qw-figure-below{display:flex;flex-direction:column}.qw-figure-below figure{order:2}
 .qw-inline-blank{display:inline-block;border-bottom:1px solid #222;height:1.25em;vertical-align:baseline;max-width:100%}
-.qw-paper-task math{font-size:1.15em}.qw-formula-error{color:#a32121;text-decoration:underline wavy}
+.qw-paper-task math{font-size:1em}.qw-formula-error{color:#a32121;text-decoration:underline wavy}
 .qw-answer-preview{display:flex;align-items:center;gap:0;margin-top:18px;font-size:12px}
 .qw-answer-preview span{display:block;flex:1;border-bottom:1px solid #333;margin-left:10px;min-height:22px}
 .qw-answer-preview i{width:22px;height:24px;border:1px solid #333;display:block}.qw-answer-preview i:first-of-type{margin-left:10px}.qw-answer-preview .qw-answer-box{width:160px}
@@ -102,7 +102,7 @@
 .qw-visual-dialog>header,.qw-visual-dialog>footer{flex:0 0 auto;position:relative}
 .qw-visual-dialog>.qw-visual-body{flex:1;min-height:0;display:grid;grid-template-columns:184px minmax(0,1fr) 286px;gap:10px;padding:10px;overflow:hidden;position:relative}
 .qw-visual-panel-nav{display:none}
-.qw-visual-dialog .qw-visual-tools{display:block;min-width:0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:4px 6px 8px 0;margin:0;border-right:1px solid var(--qo-border)}
+.qw-visual-dialog .qw-visual-tools{display:block;min-width:0;min-height:0;max-height:none;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:6px 8px 8px 6px;margin:0;border-right:1px solid var(--qo-border)}
 .qw-visual-dialog .qw-tool-group{padding:0 0 10px;margin:0 0 8px;border-bottom:1px solid var(--qo-border)}
 .qw-visual-dialog .qw-tool-group summary{font-size:11px;font-weight:700;cursor:pointer;padding:6px 2px;color:var(--qo-muted)}
 .qw-visual-dialog h2{font-size:12px;line-height:1.4;margin:0 0 8px}
@@ -134,6 +134,14 @@
 .qw-visual-dialog .qw-point-list :is(input,button){padding:4px;min-width:0}
 .qw-visual-dialog .qw-point-list button{display:grid;place-items:center}
 .qw-visual-dialog .qw-object-list{display:grid;gap:4px;align-content:start}
+.qw-visual-dialog .qw-object-list button{width:100%;min-width:0;text-align:left;white-space:normal;overflow-wrap:anywhere}
+.qw-visual-dialog #qw-visual-properties>.qw-selected-settings{display:grid;gap:8px}
+.qw-visual-dialog #qw-visual-properties>.qw-selected-settings>h2{margin-bottom:0}
+.qw-visual-dialog .qw-primitive-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.qw-visual-dialog .qw-primitive-settings label{display:grid;gap:3px}
+.qw-visual-dialog .qw-primitive-settings input{width:100%;min-width:0}
+.qw-visual-dialog .qw-objects-section .qw-object-list{margin:0}
+.qw-visual-dialog #qw-finish-polyline{width:100%;margin-top:8px;font-size:10.5px}
 .qw-object-list button{text-align:left;overflow-wrap:anywhere}
 .qw-visual-dialog .qw-vertex-list>div{grid-template-columns:minmax(0,1.2fr) repeat(2,minmax(0,1fr));gap:5px}
 .qw-visual-dialog .qw-edge-list{grid-template-columns:1fr}
@@ -154,16 +162,38 @@
  .qw-visual-actions button{padding:6px;min-height:32px}
  .qw-visual-actions button span{display:none}
  .qw-visual-dialog .qw-visual-tools,.qw-visual-dialog #qw-visual-properties{display:none;position:absolute;z-index:2;top:44px;bottom:6px;margin:0;padding:10px;border:1px solid var(--qo-border-strong);border-radius:6px;background:var(--qo-surface-raised);box-shadow:var(--qo-shadow);max-width:calc(100% - 12px)}
- .qw-visual-dialog .qw-visual-tools{left:6px;width:218px}
+ .qw-visual-dialog .qw-visual-tools{left:6px;width:270px}
  .qw-visual-dialog #qw-visual-properties{right:6px;width:286px}
  .qw-visual-dialog[data-panel=tools] .qw-visual-tools,.qw-visual-dialog[data-panel=properties] #qw-visual-properties{display:block}
 }
 
 .qw-paper-task math{
-  display:inline-block;vertical-align:-.22em;margin:0 .16em;
-  font:1.08em/1.25 "Cambria Math","STIX Two Math","Times New Roman",serif;
+  vertical-align:baseline;margin:0;
+  font:1em/normal "Cambria Math","STIX Two Math","Times New Roman",serif;
 }
-.qw-paper-task math mfrac{font-size:1.04em}
+.qw-paper-task math mfrac{font-size:1em}
+.qw-paper-task.qw-compact-entry{display:grid;grid-template-columns:24px minmax(0,1fr);gap:6px;border:0;background:white}
+.qw-compact-entry>header{margin:0;font-size:inherit}
+.qw-compact-entry .qw-task-flow{min-width:0;display:flow-root}
+.qw-preview-options [data-practice-controls][hidden],.qw-settings [data-practice-controls][hidden]{display:none!important}
+.qw-preview-options label{display:grid;gap:3px;font-size:12px}
+.qw-preview-options select{max-width:100%;min-width:145px}
+.qw-pdf-controls{flex:0 0 auto}
+.qw-layout-cards{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.qw-layout-cards legend{font-size:12px;font-weight:600;margin-bottom:6px}
+.qw-layout-card{position:relative;display:grid!important;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:9px;padding:9px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;background:white;color:#334155}
+.qw-layout-card:has(input:checked){border-color:#16835e;background:#f0faf5;box-shadow:inset 0 0 0 1px #16835e}
+.qw-layout-card:has(input:focus-visible){outline:2px solid #1582ce;outline-offset:2px}
+.qw-layout-card input{position:absolute;opacity:0;width:1px;height:1px}
+.qw-layout-card svg{width:36px;height:52px}
+.qw-layout-card strong{display:block;font-size:12px;margin-bottom:4px}.qw-layout-card small{display:block;font-size:11px;line-height:1.3;font-weight:400}
+.qw-preview-settings[hidden]{display:none!important}
+.qw-preview-settings input[type=number]{width:76px}
+.qw-exam-unavailable{margin:5px 0;font-size:11px}
+#qw-page-count{font-size:12px;margin-right:auto;max-width:50%}
+#qw-label-warnings{flex:0 0 auto;font-size:12px;margin:3px 0 6px}
+.qw-label-settings{border:1px solid #b6cfde;padding:9px;border-radius:4px}
+@media(max-width:650px){.qw-layout-cards{grid-template-columns:1fr}.qw-layout-card{grid-template-columns:26px minmax(0,1fr);padding:6px}.qw-layout-card svg{width:26px;height:36px}.qw-layout-card strong{margin-bottom:2px}.qw-layout-card small{font-size:10px}.qw-pdf-controls .qw-preview-options{gap:6px}#qw-page-count{max-width:100%}}
 .qw-paper-task.qw-exam-task{padding:12px 14px;border:0;box-shadow:none;font:14px/1.42 "Times New Roman","Liberation Serif",serif}
 .qw-exam-grid{display:grid;grid-template-columns:27px minmax(0,1fr);gap:6px}
 .qw-exam-number{font-weight:700;line-height:1.3}
@@ -206,14 +236,97 @@
 .qw-visual-dialog .qw-object-rotation label{width:min(100%,220px)}
 /* TASK148: object controls share the TASK147 inspector, without resizing its canvas. */
 .qw-object-style,.qw-object-rotation{border-top:1px solid var(--qo-border);padding-top:8px;margin-top:8px}
-.qw-paint-row{display:flex;align-items:center;gap:7px;margin:5px 0;min-width:0}
-.qw-paint-row>label{flex:1;min-width:0;margin:0;font-size:11px}
+.qw-paint-row{display:grid;gap:4px;margin:7px 0;min-width:0}
+.qw-paint-row>label{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0;margin:0;font-size:11px}
 .qw-visual-dialog input[type=color]{width:36px;min-height:23px;height:23px;padding:1px;cursor:pointer}
-.qw-palette{display:flex;flex-wrap:wrap;gap:3px;max-width:104px}
+.qw-palette{display:flex;flex-wrap:wrap;gap:4px}
 .qw-palette button{width:19px;min-width:19px;height:19px;min-height:19px;padding:0;border:1px solid var(--qo-border-strong);border-radius:3px;background:var(--qw-swatch,var(--qo-surface));color:var(--qo-text);line-height:15px}
+.qw-visual-dialog .qw-palette button:is(:hover,:active){background:var(--qw-swatch,var(--qo-surface));border-color:var(--qo-text)}
 .qw-visual-dialog [data-layer]{font-size:11px;white-space:normal}
 .qw-visual-dialog [data-qw-editor-only]{filter:none}
+.qw-visual-dialog [data-qw-object]:not(.qw-visual-selected) [data-qw-vertex]{display:none}
 .qw-visual-dialog [data-rotation-handle]{cursor:grab}
 .qw-graph-objects{display:grid;gap:4px}
 .qw-graph-objects button{text-align:left;white-space:normal;overflow-wrap:anywhere}
 .qw-graph-objects [aria-pressed=true]{border-color:var(--qo-accent);background:var(--qo-accent-soft)}
+
+
+/* TASK149: desktop graph workbench with compact, responsibility-based controls. */
+@media(min-width:1001px){
+ .qw-visual-dialog.qw-visual-diagram>.qw-visual-body{grid-template-columns:254px minmax(0,1fr) 272px}
+ .qw-visual-dialog.qw-visual-graph>.qw-visual-body{grid-template-columns:246px minmax(0,1fr) 278px}
+}
+.qw-visual-diagram .qw-tool-group>div,
+.qw-visual-graph .qw-drawing-group>.qw-tool-grid{
+ display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px
+}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile{
+ display:flex;align-items:center;justify-content:flex-start;
+ min-width:0;min-height:38px;padding:5px;gap:4px;
+ font-size:10.5px;line-height:1.22;overflow-wrap:anywhere
+}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile svg,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile svg{width:15px;height:15px}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile span,
+.qw-visual-graph .qw-drawing-group .qw-tool-tile span{min-width:0}
+.qw-visual-diagram .qw-visual-tools .qw-tool-tile[aria-pressed=true],
+.qw-visual-graph .qw-drawing-group .qw-tool-tile[aria-pressed=true]{font-weight:650}
+.qw-visual-dialog .qw-tool-group{padding-bottom:8px;margin-bottom:6px}
+.qw-visual-graph .qw-tool-group summary,
+.qw-visual-diagram .qw-tool-group summary{padding:7px 3px;font-size:11.5px;color:var(--qo-text)}
+.qw-visual-graph .qw-coordinate-group label,
+.qw-visual-graph .qw-template-group label{display:grid;gap:3px;min-width:0}
+.qw-visual-graph .qw-coordinate-group select,
+.qw-visual-graph .qw-template-group select,
+.qw-visual-graph #qw-graph-mode select{width:100%;min-width:0;max-width:100%;font-size:11.5px;text-overflow:ellipsis;padding:6px 24px 6px 7px}
+.qw-visual-graph .qw-coordinate-group .qw-muted{font-size:10px;line-height:1.45;margin:6px 2px;color:var(--qo-muted)}
+.qw-visual-graph .qw-template-group #qw-graph-mode{margin-top:8px}
+.qw-visual-graph .qw-template-group #qw-add-point{min-height:33px;font-size:11px;margin-top:8px}
+.qw-visual-graph #qw-finish-polyline{width:100%;margin-top:8px;min-height:30px;font-size:10.5px}
+.qw-visual-dialog #qw-visual-properties .qw-inspector-section{
+ display:block;margin:0 0 9px;padding:0 0 10px;
+ border:0;border-bottom:1px solid var(--qo-border);border-radius:0
+}
+.qw-visual-dialog .qw-inspector-section>h2,
+.qw-visual-dialog .qw-inspector-section>summary{
+ display:list-item;margin:0 0 7px;padding:3px 0;
+ color:var(--qo-text);font-size:11.5px;font-weight:700
+}
+.qw-visual-dialog .qw-inspector-section>h2{display:block}
+.qw-visual-dialog .qw-inspector-section>summary{cursor:pointer}
+.qw-visual-dialog .qw-inspector-section :is(input,select){font-size:11.5px}
+.qw-visual-graph .qw-graph-range{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 7px}
+.qw-visual-graph .qw-graph-range label,
+.qw-visual-graph .qw-grid-quick label,
+.qw-visual-graph .qw-axis-titles label{display:grid;gap:3px;min-width:0;font-size:10.5px}
+.qw-visual-graph .qw-graph-range input,
+.qw-visual-graph .qw-grid-quick input,
+.qw-visual-graph .qw-axis-titles input{width:100%;min-height:29px;padding:4px 6px}
+.qw-visual-graph .qw-grid-quick{margin-top:8px}
+.qw-visual-graph .qw-grid-quick label{width:calc(50% - 4px)}
+.qw-visual-graph .qw-graph-flags{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 8px}
+.qw-visual-graph .qw-graph-flags .qw-check{display:flex;align-items:center;gap:5px;min-width:0;font-size:10.5px;line-height:1.2}
+.qw-visual-graph .qw-graph-flags input[type=checkbox]{width:15px;height:15px;flex:none}
+.qw-visual-graph .qw-axis-titles{display:grid;gap:6px}
+.qw-visual-graph .qw-function-settings{margin:0;padding:0;border:0;gap:6px}
+.qw-visual-graph .qw-selected-settings .qw-function-settings{grid-template-columns:repeat(2,minmax(0,1fr));margin:0}
+.qw-visual-graph .qw-point-list{margin-top:5px}
+.qw-visual-graph .qw-template-color label{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.qw-visual-graph .qw-object-style{margin:0 0 10px;padding:9px;border:1px solid var(--qo-border);border-radius:6px;background:var(--qo-surface-alt)}
+.qw-visual-graph .qw-object-style h2{margin-bottom:7px}
+
+/* TASK149.6: one-click presets, accessible drag handles and focus-ring clearance. */
+.qw-quick-add{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px}
+.qw-quick-add button{display:flex;align-items:center;gap:4px;min-width:0;min-height:39px;padding:5px;font-size:10px;text-align:left}
+.qw-quick-add svg{width:14px;height:14px;flex:none}.qw-quick-add span{min-width:0;overflow-wrap:normal;word-break:normal}
+.qw-visual-diagram .qw-tool-tile span{overflow-wrap:normal;word-break:normal}
+.qw-nav-row{display:grid;grid-template-columns:17px minmax(0,1fr);gap:3px;position:relative;margin:4px 0}
+.qw-nav-row .qw-nav-task{margin:0;padding:6px;grid-template-columns:16px minmax(0,1fr);gap:3px}
+.qw-nav-row .qw-task-drag{padding:0;min-width:0;border-color:transparent;background:transparent;cursor:grab;touch-action:none}
+.qw-task-drag svg{width:12px;height:20px}.qw-task-drag:active{cursor:grabbing}
+.qw-drop-before:before,.qw-drop-after:after{content:'';position:absolute;left:0;right:0;height:2px;background:var(--qo-accent);z-index:2;pointer-events:none}
+.qw-drop-before:before{top:-3px}.qw-drop-after:after{bottom:-3px}.qw-left nav h3{position:relative}
+.qw-visual-tools :is(details,label,select,input,button){min-width:0;max-width:100%}
+.qw-visual-tools label{width:100%}.qw-visual-tools select{box-sizing:border-box;width:100%}
+.qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;list-style-type:decimal;line-height:1.4}

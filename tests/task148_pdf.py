@@ -1,9 +1,10 @@
 """Check the exported PDFs themselves, including raster colors and vector geometry."""
+import os
 import json
 from pathlib import Path
 import fitz
 
-out = Path(__file__).resolve().parents[1] / 'evidence/task148'
+out = Path(os.environ['QW_REGRESSION_ROOT']) / 'task148' if os.environ.get('QW_REGRESSION_ROOT') else Path(__file__).resolve().parents[1] / 'evidence/task148'
 targets = {'red': (220, 38, 38), 'green': (22, 163, 74), 'blue': (37, 99, 235)}
 report = {}
 for name in ('vector', 'raster'):

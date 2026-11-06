@@ -2,6 +2,9 @@ name: Chromium smoke
 on:
   push:
   pull_request:
+concurrency:
+  group: chromium-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   browser:
     runs-on: ubuntu-latest
@@ -31,6 +34,23 @@ jobs:
       - run: node tests/task148_browser.cjs
       - run: node tests/task148_graph_browser.cjs
       - run: python tests/task148_pdf.py
+      - run: node tests/task149_browser.cjs
+      - run: node tests/task149_1_browser.cjs
+      - run: node tests/task149_2_browser.cjs
+      - run: node tests/task149_2_sample.cjs
+      - run: python tests/task149_2_pdf.py
+      - run: node tests/task149_3_browser.cjs
+      - run: node tests/task149_3_layout_browser.cjs
+      - run: python tests/task149_3_pdf.py
+      - run: node tests/task149_4_browser.cjs
+      - run: python tests/task149_4_pdf.py
+      - run: node tests/task149_5_browser.cjs
+      - run: python tests/task149_5_pdf.py
+      - run: python tests/task149_7_pdf_regression.py
+      - run: node tests/task149_6_browser.cjs
+      - run: python tests/task149_6_pdf.py
+      - run: node tests/task149_7_browser.cjs
+      - run: node tests/task149_7_offline.cjs
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
@@ -150,12 +170,75 @@ jobs:
       - run: node tests/task097_browser.cjs
       - run: node tests/task098_browser.cjs
       - run: node tests/task099_browser.cjs
+      - run: python tests/task149_7_artifacts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-7-validation
+          path: evidence/task149.7
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: task095-studio-evidence
           path: evidence/task095
           if-no-files-found: ignore
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-2-diagram-and-teaching-pdf
+          path: evidence/task149.2
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-3-compact-print-evidence
+          path: |
+            evidence/task149.3/*.pdf
+            evidence/task149.3/*.qwork
+            evidence/task149.3/*.png
+            evidence/task149.3/*.json
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-4-print-formats
+          path: |
+            evidence/task149.4/*.pdf
+            evidence/task149.4/*.qwork
+            evidence/task149.4/*.png
+            evidence/task149.4/*.json
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-5-labels-and-print-formats
+          path: |
+            evidence/task149.5/*.pdf
+            evidence/task149.5/*.qwork
+            evidence/task149.5/*.png
+            evidence/task149.5/*.svg
+            evidence/task149.5/*.json
+            evidence/task149.5/ui/*.png
+            evidence/task149.5/cases
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-6-builder-constructions-and-print
+          path: |
+            evidence/task149.6/*.pdf
+            evidence/task149.6/*.qwork
+            evidence/task149.6/*.png
+            evidence/task149.6/*.json
+            evidence/task149.6/ui
+          if-no-files-found: error
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -237,3 +320,13 @@ jobs:
           name: task148-visual-editing-evidence
           path: evidence/task148
           if-no-files-found: error
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-desktop-graph-evidence
+          path: |
+            evidence/task149
+            evidence/task149.1/*.png
+            evidence/task149.1/result.json
+          if-no-files-found: ignore

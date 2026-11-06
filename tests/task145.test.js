@@ -61,10 +61,11 @@ test('TASK145 unknown task classification is sanitized',()=>{
 test('TASK145 online PDF is selectable HTML and SVG, without identity prompt',()=>{
  const builder=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
  const printer=readFileSync(new URL('../src/core/work-print.js',import.meta.url),'utf8');
+ const layout=readFileSync(new URL('../src/core/work-layout.js',import.meta.url),'utf8');
  assert.match(builder,/function qwPrintTextPDF/);
- assert.match(builder,/@page\{size:A4/);
+ assert.match(layout,/@page\{size:A4/);
  assert.match(builder,/win\.focus\(\);win\.print\(\)/);
  assert.match(builder,/function qwPrintDocumentHTML/);
- assert.match(builder,/qwTaskPreview\(q,i,d\.layout\)/);
+ assert.match(builder,/qwTaskPreview\(q,i,format,true,d\.printSettings\)/);
  assert.doesNotMatch(printer,/if\(d\.identity\)\{text\('ФИО/);
 });

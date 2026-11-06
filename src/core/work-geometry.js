@@ -28,7 +28,12 @@ function qwSpringPoints(o){
  return [...ps,{x:o.x2,y:o.y2}];
 }
 function qwObjectBounds(o){
- let ps=qwObjectPolygon(o);
+ if(['ray','infiniteLine'].includes(o.kind)){
+  const ps=qwExtendedSegment(o).map(p=>qwRotatePoint(p,qwObjectCenter(o),o.rotation||0));
+  if(!ps.length)return {x:o.x,y:o.y,x2:o.x,y2:o.y};
+  return {x:Math.min(...ps.map(p=>p.x)),y:Math.min(...ps.map(p=>p.y)),x2:Math.max(...ps.map(p=>p.x)),y2:Math.max(...ps.map(p=>p.y))};
+ }
+ let ps=o.kind==='polyline'?o.vertices:o.kind==='arc'?qwArcPoints(o):['dimension','doubleArrow'].includes(o.kind)?qwLinearSegments(o).flat():qwObjectPolygon(o);
  if(o.kind==='text')ps=[{x:o.x,y:o.y-20},{x:o.x+Math.max(10,[...(o.label||'')].length*12),y:o.y+5}];
  const c=qwObjectCenter(o);
  if(['pulley','fixedPulley','movablePulley'].includes(o.kind)){const r=Math.max(8,Math.min(Math.abs(o.x2-o.x),Math.abs(o.y2-o.y))/2);ps=[{x:c.x-r,y:c.y-r-(o.kind==='movablePulley'?32:14)},{x:c.x+r,y:c.y+r+(o.kind==='movablePulley'?18:0)}];}
@@ -41,10 +46,35 @@ function qwTranslateObject(o,dx,dy){
  return moved;
 }
 function qwInclineAngle(o){const ps=qwObjectPolygon(o),a=ps[0],b=ps[2];return Math.atan2(b.y-a.y,b.x-a.x)*180/Math.PI+(o.rotation||0);}
+/* New primitives share the same printable geometry and hit targets. Arc angles
+   are mathematical degrees (positive counterclockwise); rotation stays clockwise. */
+function qwArcPoints(o){
+ const cx=(o.x+o.x2)/2,cy=(o.y+o.y2)/2,r=(o.x2-o.x)/2,delta=o.endAngle-o.startAngle;
+ const count=Math.max(1,Math.ceil(Math.abs(delta)/3));
+ return Array.from({length:count+1},(_,i)=>{const a=(o.startAngle+delta*i/count)*Math.PI/180;return {x:cx+r*Math.cos(a),y:cy-r*Math.sin(a)};});
+}
+function qwLinearSegments(o){
+ const a={x:o.x,y:o.y},b={x:o.x2,y:o.y2},dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
+ const result=[[a,b]],width=o.style?.width||2;
+ if(o.kind==='dimension')for(const p of [a,b])result.push([{x:p.x+nx*7,y:p.y+ny*7},{x:p.x-nx*7,y:p.y-ny*7}]);
+ if(o.kind==='doubleArrow')for(const [p,sign] of [[a,1],[b,-1]])for(const side of [-1,1])result.push([p,{x:p.x+sign*ux*6*width+side*nx*3*width,y:p.y+sign*uy*6*width+side*ny*3*width}]);
+ return result;
+}
+function qwExtendedSegment(o){
+ const dx=o.x2-o.x,dy=o.y2-o.y;let lo=o.kind==='ray'?0:-Infinity,hi=Infinity;
+ for(const [p,d,min,max]of [[o.x,dx,4,516],[o.y,dy,4,316]]){if(Math.abs(d)<1e-10){if(p<min||p>max)return [];continue;}const a=(min-p)/d,b=(max-p)/d;lo=Math.max(lo,Math.min(a,b));hi=Math.min(hi,Math.max(a,b));}
+ if(lo>hi||!Number.isFinite(lo)||!Number.isFinite(hi))return [];return [{x:o.x+lo*dx,y:o.y+lo*dy},{x:o.x+hi*dx,y:o.y+hi*dy}];
+}
 function qwHitObject(o,point,tolerance=6){
  const p=qwRotatePoint(point,qwObjectCenter(o),-(o.rotation||0)),a={x:o.x,y:o.y},b={x:o.x2,y:o.y2},t=tolerance+(o.style?.width||2)/2;
  if(o.kind==='point')return Math.hypot(p.x-o.x,p.y-o.y)<=t+3;
+ if(['ray','infiniteLine'].includes(o.kind)){const ps=qwExtendedSegment(o);return ps.length===2&&qwSegmentDistance(p,ps[0],ps[1])<=t;}
  if(o.kind==='text')return p.x>=o.x-t&&p.x<=o.x+Math.max(10,[...(o.label||'')].length*12)+t&&p.y>=o.y-20-t&&p.y<=o.y+5+t;
+ if(o.kind==='arc'||o.kind==='polyline'){
+  const ps=o.kind==='arc'?qwArcPoints(o):o.vertices;
+  return ps.slice(1).some((b,i)=>qwSegmentDistance(p,ps[i],b)<=t);
+ }
+ if(['dimension','doubleArrow'].includes(o.kind))return qwLinearSegments(o).some(([a,b])=>qwSegmentDistance(p,a,b)<=t);
  if(['circle','pulley','fixedPulley','movablePulley'].includes(o.kind)){
   const c=qwObjectCenter(o),r=Math.max(8,Math.min(Math.abs(o.x2-o.x),Math.abs(o.y2-o.y))/2),rx=o.kind==='circle'?Math.max(1,Math.abs(o.x2-o.x)/2):r,ry=o.kind==='circle'?Math.max(1,Math.abs(o.y2-o.y)/2):rx;
   if(o.kind==='movablePulley'&&[ [{x:c.x-r,y:c.y-r-32},{x:c.x-r,y:c.y}], [{x:c.x+r,y:c.y-r-32},{x:c.x+r,y:c.y}], [{x:c.x,y:c.y},{x:c.x,y:c.y+r+18}] ].some(([a,b])=>qwSegmentDistance(p,a,b)<=t))return true;
@@ -67,7 +97,7 @@ function qwHitDiagram(objects,p,tolerance=6){
 }
 function qwValidDrag(o,pixels){
  if(pixels<4)return false;
- if(['rect','circle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
+ if(['rect','circle','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
  return Math.hypot(o.x2-o.x,o.y2-o.y)>.01;
 }
 function qwGraphObjectPoints(g,o){
@@ -93,4 +123,4 @@ function qwTranslateGraphObject(o,dx,dy){
  else{n.x+=dx;n.y+=dy;if(o.x2!==undefined){n.x2+=dx;n.y2+=dy;}}
  return n;
 }
-export {qwRotatePoint,qwObjectCenter,qwObjectPolygon,qwSegmentDistance,qwInPolygon,qwSpringPoints,qwHitObject,qwHitDiagram,qwValidDrag,qwObjectBounds,qwTranslateObject,qwInclineAngle,qwGraphObjectPoints,qwHitGraph,qwTranslateGraphObject};
+export {qwRotatePoint,qwObjectCenter,qwObjectPolygon,qwSegmentDistance,qwInPolygon,qwSpringPoints,qwHitObject,qwHitDiagram,qwValidDrag,qwObjectBounds,qwTranslateObject,qwInclineAngle,qwGraphObjectPoints,qwHitGraph,qwTranslateGraphObject,qwArcPoints,qwLinearSegments,qwExtendedSegment};

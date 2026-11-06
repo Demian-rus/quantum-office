@@ -1,7 +1,7 @@
 /* TASK148: user input only for editing; read model solely to verify persisted results. */
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
-const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
+const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task148');
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task148');
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
-  await p.locator('#qw-add-type').selectOption('diagram');await p.locator('.qw-left [data-qw-action="add"]').click();
+  await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await p.locator('#qw-prompt').fill('TASK148: физические и математические иллюстрации');
   await p.locator('[data-qw-action="diagram"]').click();
   const stage=p.locator('#qw-visual-stage svg'),count=()=>stage.locator('[data-qw-object]').count();

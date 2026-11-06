@@ -3,7 +3,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
 const assert=require('node:assert/strict'),path=require('node:path'),fs=require('node:fs');
 const {pathToFileURL}=require('node:url');
 (async()=>{
- const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task145');
+ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_ROOT||path.join(root,'evidence'),'task145');
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  try{
@@ -14,8 +14,7 @@ const {pathToFileURL}=require('node:url');
   await page.locator('[data-editor="writer"][data-tab="work"]').click();
   const action=k=>page.locator('[data-qw-action="'+k+'"]');
   const add=async(type,prompt)=>{
-   await page.locator('#qw-add-type').selectOption(type);
-   await page.locator('.qw-left [data-qw-action="add"]').click();
+   await page.locator('[data-qw-action="quick-add"][data-type="'+type+'"]').click();
    await page.locator('#qw-prompt').fill(prompt);
   };
   await add('diagram','В треугольнике ABC найдите длину стороны AB и обозначьте высоту.');
@@ -58,11 +57,13 @@ const {pathToFileURL}=require('node:url');
   assert.equal(await page.evaluate(()=>document.querySelector('#qw-curve-family').value),'trigonometric');
   assert.equal(await page.evaluate(()=>document.querySelector('#qw-curve-trig').value),'sin');
   await page.locator('#qw-graph-preset').selectOption('v');
+  // TASK149 starts in safe Select mode. Explicitly choose legacy point insertion first.
+  await page.locator('#qw-add-point').click();
   const b=await page.locator('#qw-visual-stage svg').boundingBox();
   await page.mouse.click(b.x+b.width*.57,b.y+b.height*.56);
-  const end=await page.evaluate(()=>{const g=document.querySelector('#qw-visual-stage [data-qw-point="4"]');return g!==null;});
+  const end=await page.evaluate(()=>document.querySelector('#qw-visual-stage [data-qw-point="5"]')!==null);
   assert.equal(end,true);
-  const snapped=await page.evaluate(()=>{const row=document.querySelector('[data-point-row="4"]');return [+row.querySelector('[data-point-field="x"]').value,+row.querySelector('[data-point-field="y"]').value]});
+  const snapped=await page.evaluate(()=>{const row=document.querySelector('[data-point-row="5"]');return [+row.querySelector('[data-point-field="x"]').value,+row.querySelector('[data-point-field="y"]').value]});
   assert.ok(snapped.every(Number.isInteger),'Graph pointer should snap to integer grid intersections');
   await page.screenshot({path:path.join(out,'function_graph.png')});
   await action('visual-apply').click();
