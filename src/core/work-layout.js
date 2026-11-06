@@ -1,3 +1,5 @@
+import {QW_PRINT_FONT_CSS} from './work-print-fonts.js';
+import {qwPrintThemeStyles} from './work-print-theme.js';
 /* Print-only layout. Fonts and SVG ink are measured before any pagination.
    QWORK and editor geometry are never mutated by this document. */
 function qwMeasureSVGInk(svg){
@@ -13,9 +15,9 @@ function qwMeasureSVGInk(svg){
   return {x:box.x-pad,y:box.y-pad,width:Math.max(1,box.width+pad*2),height:Math.max(1,box.height+pad*2)};
  }finally{for(const {e,style} of clipped)if(style===null)e.removeAttribute('style');else e.setAttribute('style',style);}
 }
-function qwPrintStyles(){return `
+function qwPrintStyles(){return QW_PRINT_FONT_CSS+`
 @page{size:A4;margin:0}
-:root{--qw-print-family:Arial,"Liberation Sans",sans-serif}
+:root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font:var(--qw-print-size,10.8pt)/1.35 var(--qw-print-family)}
@@ -23,9 +25,11 @@ body{font:var(--qw-print-size,10.8pt)/1.35 var(--qw-print-family)}
 .qw-print-page{position:relative;width:210mm;height:297mm;padding:14mm 15mm 20mm;break-after:page;background:white}
 .qw-print-page:last-child{break-after:auto}
 .qw-page-content{display:flow-root;width:180mm;height:263mm}
-.qw-page-footer{position:absolute;bottom:7mm;left:15mm;right:15mm;text-align:right;font:8pt/1.2 var(--qw-print-family);color:#555}
+.qw-page-footer>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qw-page-footer>span:last-child{flex:none}
+.qw-page-footer{position:absolute;bottom:7mm;left:15mm;right:15mm;display:flex;justify-content:space-between;gap:5mm;font:8pt/1.2 var(--qw-print-family);color:#555}
 .qw-print-header{margin:0 0 4mm}
 .qw-print-title{font-size:15pt;line-height:1.2;margin:0 0 2mm;font-weight:700}
+.qw-print-topic{font-size:11pt;line-height:1.3;margin:0 0 1.5mm;font-weight:400}
 .qw-print-meta{font-size:9pt;line-height:1.3;margin:0 0 3mm;color:#444}
 .qw-print-intro{font-size:10pt;line-height:1.35;margin:0;white-space:pre-wrap}
 .qw-running-header{font-size:8.5pt;line-height:1.3;color:#555;margin:0 0 3mm;border-bottom:.2mm solid #ccc;padding-bottom:1.5mm}
@@ -71,20 +75,20 @@ math mfrac{font-size:1em}
 body[data-qw-format="compact"],body[data-qw-format="practice"],body[data-qw-format="answers"]{font-size:var(--qw-print-size,10pt);line-height:1.3}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-page{padding:12mm}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-page-content{width:186mm;height:273mm}
-body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-title{font-size:14pt;margin:0;line-height:1.2}
+body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-title{font-size:14pt;margin:0 0 1.5mm;line-height:1.2}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-section{margin-bottom:2mm}
 .qw-topic-title{font-size:12pt;line-height:1.25;margin:3mm 0 1.5mm;font-weight:700;color:#b42318;break-after:avoid}
 body[data-qw-format="compact"] .qw-print-section{margin-bottom:.5mm;position:relative}
 body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section{padding-top:.5mm}
 body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section:before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:#e0e4e8;transform:scaleY(.4);transform-origin:top}
-body[data-qw-format="compact"] .qw-topic-title{margin-top:4mm;margin-bottom:2mm}
+body[data-qw-format="compact"] .qw-topic-title{margin-top:2mm;margin-bottom:1mm}
 .qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;line-height:1.3}
 .qw-compact-entry{display:grid;grid-template-columns:6mm minmax(0,1fr);column-gap:1mm}
 .qw-compact-entry>header{margin:0;font:700 1em/1.3 var(--qw-print-family)}
 .qw-print-number{font-family:var(--qw-print-family);font-size:1em;font-weight:700;font-style:normal}
 .qw-compact-entry>header,.qw-answer-item>.qw-print-number,.qw-exam-number{text-align:right}
 .qw-compact-entry .qw-task-flow{display:flow-root!important;min-width:0}
-.qw-compact-entry .qw-task-flow figure{float:right;margin:0 0 1mm 3mm}
+.qw-compact-entry .qw-task-flow figure{float:right;margin:0 0 .8mm 3mm}
 .qw-compact-entry .qw-figure-left figure{float:left;margin:0 3mm 1mm 0}
 .qw-compact-entry .qw-figure-below figure{float:none;margin:1.5mm 0 0}
 .qw-answer-columns{display:grid;grid-template-columns:repeat(var(--qw-answer-columns),minmax(0,1fr));gap:3mm 8mm}
@@ -97,7 +101,7 @@ body[data-qw-format="practice"] .qw-print-section{margin-bottom:4mm}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
-`;}
+`+qwPrintThemeStyles();}
 async function qwPreparePrintDocument(){
  await document.fonts.ready;
  const existing=document.getElementById('qw-print-layout-report');
@@ -109,6 +113,13 @@ async function qwPreparePrintDocument(){
  // Figure geometry is calculated in an A4-width measurement surface.
  source.style.width=modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
+  // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
+  if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
+   const value=e.getAttribute(key);if(!/^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(value||''))continue;
+   const hex=value.length===4?value.slice(1).split('').map(c=>c+c).join(''):value.slice(1),rgb=[0,2,4].map(i=>parseInt(hex.slice(i,i+2),16));
+   const gray=Math.round(rgb[0]*.2126+rgb[1]*.7152+rgb[2]*.0722);e.setAttribute(key,'#'+gray.toString(16).padStart(2,'0').repeat(3));
+  }
+
   const flow=section.querySelector('.qw-task-flow'),figure=flow.querySelector('figure');
   flow.classList.toggle('qw-print-has-figure',!!figure);
   if(figure){
@@ -148,12 +159,13 @@ async function qwPreparePrintDocument(){
   }
   if([...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
- const title=header.querySelector('h1')?.textContent||(modern?'':document.title);
+ const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
+ const footerLabel=[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
-  if(!pages.length)content.append(header);else if(title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title;content.append(running);}
+  if(!pages.length)content.append(header);else if(title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
   host.append(page);pages.push({page,content});return pages.at(-1);
  }
  function used(page){const last=[...page.content.children].reverse().find(e=>getComputedStyle(e).display!=='none');if(!last)return 0;return last.getBoundingClientRect().bottom-page.content.getBoundingClientRect().top+parseFloat(getComputedStyle(last).marginBottom||0);}
@@ -257,7 +269,7 @@ async function qwPreparePrintDocument(){
  }
  source.remove();
  const report={pages:pages.map(({page,content},i)=>{
-  const footer=document.createElement('footer');footer.className='qw-page-footer';footer.textContent=(i+1)+' / '+pages.length;page.append(footer);
+  const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
   const sections=[...content.querySelectorAll(':scope>.qw-print-section')];
   return {page:i+1,capacityMm:content.getBoundingClientRect().height/MM,usedMm:used({content})/MM,freeMm:(content.getBoundingClientRect().height-used({content}))/MM,tasks:sections.map(section=>{
    const box=section.getBoundingClientRect(),figure=section.querySelector('figure'),f=figure?.getBoundingClientRect();

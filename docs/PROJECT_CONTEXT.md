@@ -1,5 +1,22 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## TASK150 — PDF layout and opt-in QX samples (06.11.2026)
+
+База main `d0f1b3c6ec98b88aa73d784f5f5859be8059a338`, ветка
+`design/task150-pdf-layout`, Draft PR в main; merge запрещён. Исходные
+TASK149/149.7 объединены владельцем, PR134/135 closed/merged.
+Compact24: исходное Linux 10+13+1 воспроизведено; более точные интервалы
+разделов/рисунков дают 10+14 без уменьшения шрифта и геометрии. Общие
+заголовки/title/topic/metadata/footers; автономные OFL print-шрифты.
+QWORK v1, geometry и остальные редакторы не менялись. Три QX-концепции
+показаны на тех же24 задачах: по3 страницы+ключ, также BW. Ни одна тема не
+включена по умолчанию. Только export options; применение всей экосистеме
+ждёт выбора владельца. Архитектура/инвентаризация и проект TASK151 — в
+`docs/TASK150-BRANDING-ARCHITECTURE.md`, `docs/TASK151-DRAFT.md`.
+Реальные before/after PDF и PNG всех страниц: `evidence/task150/`, review ZIP.
+Проверки, CI и ограничения: `docs/TASK150.md` и Draft PR. Нативные Windows/
+macOS не проверены, SVG/MathML могут зависеть от системных шрифтов.
+
 ## TASK149.7 — продолжение 06.11.2026
 
 Точная база `712b6acfa2f72b9aa139571bbc2b72ade324cc74`, ветка
