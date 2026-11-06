@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 import pymupdf
+from pdf_graph_geometry import verify_ab
 
 out = Path(os.environ.get('QW_TASK1495_EVIDENCE', Path(__file__).resolve().parents[1] / 'evidence/task149.5'))
 browser = json.loads((out / 'browser-result.json').read_text(encoding='utf-8'))
@@ -69,15 +70,11 @@ page = doc[control['page']-1]
 f = control['boxPt']; region = pymupdf.Rect(f['x']-1,f['y']-1,f['x']+f['w']+1,f['y']+f['h']+1)
 spans = [s for block in page.get_text('dict')['blocks'] if 'lines' in block for line in block['lines'] for s in line['spans'] if s['text'] in ['A','B'] and region.contains(pymupdf.Rect(s['bbox']))]
 assert {s['text'] for s in spans} == {'A','B'}
-points = [pymupdf.Point(p['x'],p['y']) for p in control['points']]
-assert len(points) == 2
+source = json.loads((out / 'Compact-Geometry-Polished.qwork').read_text(encoding='utf-8'))
+graph = source['tasks'][17]['graph']
+assert [(p['x'],p['y'],p['label']) for p in graph['points']] == [(1,1,'A'),(4,5,'B')]
+points, segments, transform = verify_ab(page, region, graph, control['points'])
 a, b = points
-segments = []
-for path in page.get_drawings():
-    for item in path['items']:
-        if item[0] == 'l' and ((abs(item[1]-a)<.3 and abs(item[2]-b)<.3) or (abs(item[2]-a)<.3 and abs(item[1]-b)<.3)):
-            segments.append((item[1],item[2],path['width']))
-assert segments, 'actual AB vector path must agree with measured point positions'
 labels = {}
 for span in spans:
     rect = pymupdf.Rect(span['bbox']); labels[span['text']] = list(rect)
@@ -85,6 +82,6 @@ for span in spans:
         assert not crosses(p0,p1,pymupdf.Rect(rect.x0-width/2,rect.y0-width/2,rect.x1+width/2,rect.y1+width/2)), span
 assert labels['A'][2] < a.x and labels['A'][1] < a.y
 assert labels['B'][0] > b.x and labels['B'][1] > b.y
-result['task18'] = {'status':'PASS','page':control['page'],'points':[list(a),list(b)],'letterBounds':labels,'actualABPath':True,'A':'left and above, clear of line','B':'right and below'}
+result['task18'] = {'status':'PASS','page':control['page'],'points':[list(a),list(b)],'letterBounds':labels,'actualABPath':True,'A':'left and above, clear of line','B':'right and below',**transform}
 (out / 'pdf-result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
 print('PASS TASK149.5 PDF: A avoids actual AB vector/B right-below; all 24 prefixes share one bold font/size; red 12pt themes, vector A4 pages and bounds')

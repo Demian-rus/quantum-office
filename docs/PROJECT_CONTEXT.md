@@ -1,5 +1,21 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## TASK149.7 — продолжение 06.11.2026
+
+Точная база `712b6acfa2f72b9aa139571bbc2b72ade324cc74`, ветка
+`fix/task1497-ci-pdf-validation`, Draft PR в sync, без merge. CI FAIL TASK149.5
+воспроизведён на артефакте run 42106712829: ошибка проверки из-за смешения
+preview/PDF координат при печатном округлении. Проверка теперь сверяет
+QWORK/сетку/маркеры/AB внутри PDF, допуск AB 0,3 pt сохранён; реальные PDF
+с намеренно испорченными командами отвергаются. Исправлены воспроизведённые
+нулевые границы рамочного выбора луча/прямой с сохранением свободы переноса.
+Build нормализует CRLF и фиксирует ZIP-дату; старый ZIP отличался от внешнего
+HTML только CRLF. Адресные TASK144–149.6/PDF, 560 Node, offline 7 QWORK и CRC/
+побайтные/повторные/CRLF/TZ проверки PASS. Полная историческая матрица и
+точный итоговый HEAD — в PR. В Linux исходный CI и новые сборники имеют
+3 страницы вместо 2 из прежних Windows-отчётов; сохранность 24 задач проверена.
+Подробные причины, доказательства и ограничения: `docs/TASK149.7.md`.
+
 Updated: 2026-10-28. Repository: `Demian-rus/quantum-office`, main branch. This document is intentionally written for the next developer, agent or ChatGPT conversation.
 
 ## Owner's non-negotiable product decision

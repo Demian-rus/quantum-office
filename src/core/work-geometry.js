@@ -28,7 +28,11 @@ function qwSpringPoints(o){
  return [...ps,{x:o.x2,y:o.y2}];
 }
 function qwObjectBounds(o){
- if(['ray','infiniteLine'].includes(o.kind))return {x:o.x,y:o.y,x2:o.x,y2:o.y};
+ if(['ray','infiniteLine'].includes(o.kind)){
+  const ps=qwExtendedSegment(o).map(p=>qwRotatePoint(p,qwObjectCenter(o),o.rotation||0));
+  if(!ps.length)return {x:o.x,y:o.y,x2:o.x,y2:o.y};
+  return {x:Math.min(...ps.map(p=>p.x)),y:Math.min(...ps.map(p=>p.y)),x2:Math.max(...ps.map(p=>p.x)),y2:Math.max(...ps.map(p=>p.y))};
+ }
  let ps=o.kind==='polyline'?o.vertices:o.kind==='arc'?qwArcPoints(o):['dimension','doubleArrow'].includes(o.kind)?qwLinearSegments(o).flat():qwObjectPolygon(o);
  if(o.kind==='text')ps=[{x:o.x,y:o.y-20},{x:o.x+Math.max(10,[...(o.label||'')].length*12),y:o.y+5}];
  const c=qwObjectCenter(o);
