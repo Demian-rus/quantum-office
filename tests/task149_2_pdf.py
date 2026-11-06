@@ -5,9 +5,13 @@ import re
 import unicodedata
 from pathlib import Path
 import pymupdf
+from pdf_footer_bounds import verify_page_bounds
 
 out = Path(os.environ['QW_TASK1492_EVIDENCE']) if os.environ.get('QW_TASK1492_EVIDENCE') else Path(__file__).resolve().parents[1] / 'evidence/task149.2'
 report = {}
+project = json.loads((out / 'Quantum-Office-Sample.qwork').read_text(encoding='utf-8'))
+assert project['subject'] == 'physics'
+metadata = f"Физика · {project['grade']} класс · Вариант {project['variant']}"
 for audience in ('Student', 'Answers'):
     file = out / f'Quantum-Office-Sample-{audience}.pdf'
     doc = pymupdf.open(file)
@@ -20,17 +24,14 @@ for audience in ('Student', 'Answers'):
     pages = []
     for i, page in enumerate(doc):
         assert abs(page.rect.width - 595.28) < 1 and abs(page.rect.height - 841.89) < 1
-        spans = [s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
-        for s in spans:
-            x0, y0, x1, y1 = s['bbox']
-            footer = bool(re.fullmatch(r'\d+ / \d+', s['text']))
-            assert x0 >= 30 and y0 >= 25 and x1 <= page.rect.width - 30 and y1 <= page.rect.height - (12 if footer else 30), (audience, i, s)
+        label = metadata + (' · Ключ ответов' if audience == 'Answers' else '')
+        spans, footers = verify_page_bounds(page, label, i + 1, len(doc))
         drawings = page.get_drawings()
         if audience == 'Student': assert len(drawings) > 15, 'illustrations must remain vector paths'
         assert not page.get_images()
         pix = page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False)
         pix.save(out / f'{audience}-verified-{i + 1}.png')
-        pages.append({'page': i + 1, 'textSpans': len(spans), 'vectorPaths': len(drawings), 'sizePt': [page.rect.width, page.rect.height]})
+        pages.append({'page': i + 1, 'textSpans': len(spans), 'vectorPaths': len(drawings), 'sizePt': [page.rect.width, page.rect.height], 'footers': footers})
     if audience == 'Student':
         assert all(f'Задание {i}' in doc[0].get_text() for i in (1, 2))
         assert all(f'Задание {i}' in doc[1].get_text() for i in (3, 4))
@@ -39,7 +40,6 @@ for audience in ('Student', 'Answers'):
         assert 'Брусок массой' not in text
     report[audience] = {'pages': pages, 'selectableText': True, 'answersSeparated': True}
 
-project = json.loads((out / 'Quantum-Office-Sample.qwork').read_text(encoding='utf-8'))
 assert project['version'] == 1 and len(project['tasks']) == 4
 assert {o['kind'] for q in project['tasks'] for o in q['diagram']} >= {'polyline', 'arc', 'dimension', 'doubleArrow'}
 g = project['tasks'][2]['graph']

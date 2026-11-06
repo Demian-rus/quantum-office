@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 import pymupdf
+from pdf_task_numbers import task_numbers
 from pdf_graph_geometry import verify_ab
 
 out = Path(os.environ.get('QW_TASK1495_EVIDENCE', Path(__file__).resolve().parents[1] / 'evidence/task149.5'))
@@ -19,7 +20,7 @@ for name in names:
     for i, page in enumerate(doc):
         assert abs(page.rect.width - 595.28) < 1 and abs(page.rect.height - 841.89) < 1
         text = page.get_text()
-        current = [int(n) for n in re.findall(r'(?m)^(\d+)\.', text)]
+        current = task_numbers(page)
         if name.endswith('Answers-Polished') or name == 'Compact-Geometry-Polished':
             numbers.extend(current)
         counts.append(len(current))
