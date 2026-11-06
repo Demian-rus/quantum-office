@@ -2,6 +2,9 @@ name: Chromium smoke
 on:
   push:
   pull_request:
+concurrency:
+  group: chromium-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   browser:
     runs-on: ubuntu-latest
@@ -43,8 +46,11 @@ jobs:
       - run: python tests/task149_4_pdf.py
       - run: node tests/task149_5_browser.cjs
       - run: python tests/task149_5_pdf.py
+      - run: python tests/task149_7_pdf_regression.py
       - run: node tests/task149_6_browser.cjs
       - run: python tests/task149_6_pdf.py
+      - run: node tests/task149_7_browser.cjs
+      - run: node tests/task149_7_offline.cjs
       - run: node tests/task144_browser.cjs
       - run: node tests/task145_browser.cjs
       - run: node tests/task146_browser.cjs
@@ -164,6 +170,14 @@ jobs:
       - run: node tests/task097_browser.cjs
       - run: node tests/task098_browser.cjs
       - run: node tests/task099_browser.cjs
+      - run: python tests/task149_7_artifacts.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task149-7-validation
+          path: evidence/task149.7
+          if-no-files-found: error
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:

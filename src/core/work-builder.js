@@ -620,7 +620,9 @@ function qwVisualEditor(kind){
     const at=qwRotatePoint(location,qwObjectCenter(o),-(o.rotation||0));o.vertices[drag.vertexIndex].x=qwNum(at.x,0,520,0);o.vertices[drag.vertexIndex].y=qwNum(at.y,0,320,0);
     const v=o.vertices;o.x=Math.min(...v.map(q=>q.x));o.y=Math.min(...v.map(q=>q.y));o.x2=Math.max(...v.map(q=>q.x));o.y2=Math.max(...v.map(q=>q.y));
    }else{
-    const bounds=drag.indices.map(i=>{const o=drag.before[i];return o.kind==='arc'?{x:o.x,y:o.y,x2:o.x2,y2:o.y2}:qwObjectBounds(o);});let dx=p.x-drag.start.x,dy=p.y-drag.start.y;
+    // Extended geometry is clipped to the stage for selection, but movement is
+    // bounded by its stored anchor: clipping endpoints must not pin the line.
+    const bounds=drag.indices.map(i=>{const o=drag.before[i];return ['ray','infiniteLine'].includes(o.kind)?{x:o.x,y:o.y,x2:o.x,y2:o.y}:o.kind==='arc'?{x:o.x,y:o.y,x2:o.x2,y2:o.y2}:qwObjectBounds(o);});let dx=p.x-drag.start.x,dy=p.y-drag.start.y;
     if(snapGeometry&&!e.shiftKey){dx=Math.round(dx/geometryStep)*geometryStep;dy=Math.round(dy/geometryStep)*geometryStep;}
     dx=qwNum(dx,-Math.min(...bounds.map(b=>b.x)),520-Math.max(...bounds.map(b=>b.x2)),0);dy=qwNum(dy,-Math.min(...bounds.map(b=>b.y)),320-Math.max(...bounds.map(b=>b.y2)),0);
     for(const i of drag.indices)value[i]=qwTranslateObject(drag.before[i],dx,dy);
