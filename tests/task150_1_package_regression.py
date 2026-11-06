@@ -81,7 +81,7 @@ if '--archive' in sys.argv:
                 assert {n for n in archive.namelist() if n.startswith(stem + '-page-')} == pngs
                 assert all(archive.read(n).startswith(b'\x89PNG\r\n\x1a\n') for n in pngs)
                 assert stem + '.qwork' in manifest
-                if stem in themes: assert len(pdf) == 8
+                if stem in themes: assert len(pdf) == 6  # two work pages + key, colour and BW
                 page_count += len(pdf)
         for name in formats:
             # Baseline/final fixtures are independently created app documents.
