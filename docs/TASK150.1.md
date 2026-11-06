@@ -55,3 +55,11 @@ Linux local system-font fallback differs from GitHub's browser dependencies;
 baseline compact distribution is 10+12+2 locally (still 3 pages), final is
 10+14. PDF bounds and all semantic/geometry checks pass at unchanged tolerances.
 Native Windows/macOS and physical print were not tested in this CI-only task.
+
+The first full GitHub matrix exposed another obsolete TASK146 compact assertion:
+it required the legacy layout chooser label inside print HTML/PDF. TASK150's
+unified header intentionally prints the document title and subject/grade/variant.
+The test now checks the legacy label in its actual settings option, and exact
+current title/metadata in HTML and native PDF, plus page 1 / 1. It explicitly
+waits for qwPrintReady before printing. UI, selectable text, vector diagram,
+MathML, worksheet and physics checks are retained. No application changes.
