@@ -2,6 +2,7 @@
 import json,os,re
 from pathlib import Path
 import pymupdf as fitz
+from pdf_task_numbers import task_numbers
 root=Path(__file__).resolve().parents[1]
 out=Path(os.environ.get('QW_TASK150_EVIDENCE',root/'evidence/task150/after'))
 report=json.loads((out/'report.json').read_text());results=[]
@@ -13,7 +14,7 @@ for entry in report['reports']:
         assert abs(p.rect.width-595.28)<1 and abs(p.rect.height-841.89)<1
         assert not p.get_images(),(name,'unexpected rasterisation')
         text=p.get_text();assert not re.search('PRIVATE_|INTERNAL_|�',text),(name,'text corruption/leak')
-        nums=[int(n) for n in re.findall(r'(?m)^(\d+)\.',text)];numbers.extend(nums)
+        nums=task_numbers(p);numbers.extend(nums)
         drawings=p.get_drawings();vectors+=len(drawings)
         spans=[s for b in p.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
         for s in spans:

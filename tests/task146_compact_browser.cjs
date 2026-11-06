@@ -41,13 +41,15 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   // Reopen the legacy layout; it is no longer offered as an official exam template.
   await p.evaluate(()=>qwChange(()=>{qwDoc.layout='exam';qwDoc.exam='ege';}));
   await action('settings').click();
+  assert.equal(await p.locator('[data-meta="layout"] option[value="exam"]').textContent(),'Прежний компактный макет (без проверки ФИПИ)');
   await p.locator('[data-meta="title"]').fill('Физика — тренировочный вариант');
   await p.locator('[data-meta="layout"]').selectOption('exam');
   await p.locator('[data-qw-action="meta-apply"]').click();
   const exam=await p.evaluate(()=>qwPrintDocumentHTML(qwDoc,false));
   assert.match(exam,/qw-print-exam/);
   assert.match(exam,/qw-exam-task/);
-  assert.match(exam,/Прежний компактный макет/);
+  assert.match(exam,/<h1 class="qw-print-title">Физика — тренировочный вариант<\/h1>/);
+  assert.match(exam,/<div class="qw-print-meta">Физика · 8 класс · Вариант 1<\/div>/);
   assert.match(exam,/<svg/);
   assert.match(exam,/<mo lspace="0.28em" rspace="0.28em">=<\/mo>/);
   assert.doesNotMatch(exam,/Задание 1 · Рисунок/);
@@ -61,6 +63,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   await p.locator('#qw-dialog [data-qw-close]').click();
   const print=await browser.newPage({viewport:{width:1000,height:1300}});
   await print.setContent(exam,{waitUntil:'load'});
+  await print.evaluate(()=>window.qwPrintReady);
   const pdf=await print.pdf({preferCSSPageSize:true,printBackground:true,format:'A4'});
   assert.equal(pdf.subarray(0,5).toString(),'%PDF-');
   writeFileSync(path.join(out,'ege_vector.pdf'),pdf);
@@ -69,7 +72,9 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   try{
     const txt=execFileSync(process.env.QW_PYTHON||'python',['-c','import pymupdf,sys; sys.stdout.buffer.write(pymupdf.open(sys.argv[1])[0].get_text().encode("utf-8"))',path.join(out,'ege_vector.pdf')],{encoding:'utf8'});
     assert.match(txt,/Брусок массой/);
-    assert.match(txt,/Прежний компактный макет/);
+    assert.match(txt,/Физика — тренировочный вариант/);
+    assert.match(txt,/Физика · 8 класс · Вариант 1/);
+    assert.match(txt,/^1 \/ 1$/m);
   }catch(err){if(err.code!=='ENOENT')throw err;}
   await print.close();
   await action('settings').click();

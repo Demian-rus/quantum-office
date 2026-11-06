@@ -78,10 +78,18 @@ body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-title{font-size:14pt;margin:0 0 1.5mm;line-height:1.2}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-section{margin-bottom:2mm}
 .qw-topic-title{font-size:12pt;line-height:1.25;margin:3mm 0 1.5mm;font-weight:700;color:#b42318;break-after:avoid}
-body[data-qw-format="compact"] .qw-print-section{margin-bottom:.5mm;position:relative}
-body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section{padding-top:.5mm}
+body[data-qw-format="compact"]{line-height:1.25}
+body[data-qw-format="compact"] .qw-print-header{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:4mm;row-gap:.7mm;align-items:baseline;margin-bottom:1.2mm}
+body[data-qw-format="compact"] .qw-print-title{font-size:12pt;line-height:1.2;margin:0;grid-column:1;grid-row:1}
+body[data-qw-format="compact"] .qw-print-topic{font-size:10.5pt;line-height:1.2;font-weight:700;color:#b42318;margin:0;grid-column:1/-1;grid-row:2}
+body[data-qw-format="compact"] .qw-print-meta{font-size:8.5pt;line-height:1.2;margin:0;grid-column:2;grid-row:1}
+body[data-qw-format="compact"] .qw-print-section{margin-bottom:.2mm;position:relative}
+body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section{padding-top:.4mm}
 body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section:before{content:"";position:absolute;top:0;left:0;right:0;height:1px;background:#e0e4e8;transform:scaleY(.4);transform-origin:top}
-body[data-qw-format="compact"] .qw-topic-title{margin-top:2mm;margin-bottom:1mm}
+body[data-qw-format="compact"] .qw-topic-title{font-size:10.5pt;line-height:1.2;margin-top:1.2mm;margin-bottom:.7mm}
+body[data-qw-format="compact"] .qw-print-header+.qw-print-section>.qw-topic-title{margin-top:0}
+body[data-qw-format="compact"] .qw-compact-entry .qw-task-flow figure{margin-bottom:.35mm}
+body[data-qw-format="compact"] math{math-style:normal}
 .qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;line-height:1.3}
 .qw-compact-entry{display:grid;grid-template-columns:6mm minmax(0,1fr);column-gap:1mm}
 .qw-compact-entry>header{margin:0;font:700 1em/1.3 var(--qw-print-family)}
@@ -159,6 +167,7 @@ async function qwPreparePrintDocument(){
   }
   if([...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
+ const brand=header.querySelector('.qw-print-brand');brand?.remove();
  const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
  const footerLabel=[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
@@ -166,6 +175,7 @@ async function qwPreparePrintDocument(){
   const page=document.createElement('section');page.className='qw-print-page';
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
   if(!pages.length)content.append(header);else if(title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
+  if(brand)page.append(brand.cloneNode(true));
   host.append(page);pages.push({page,content});return pages.at(-1);
  }
  function used(page){const last=[...page.content.children].reverse().find(e=>getComputedStyle(e).display!=='none');if(!last)return 0;return last.getBoundingClientRect().bottom-page.content.getBoundingClientRect().top+parseFloat(getComputedStyle(last).marginBottom||0);}

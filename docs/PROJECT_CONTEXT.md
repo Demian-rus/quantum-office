@@ -1,5 +1,25 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## TASK150.2 — визуальная переработка compact (06.11.2026)
+
+Владелец НЕ принял визуальный результат TASK150, несмотря на PASS CI.
+База `152fbafed393315316de739c991df474fcb6017f`, ветка
+`design/task1502-compact-polish`, Draft PR в `design/task150-pdf-layout`;
+merge запрещён. Бренд только в верхнем поле/колонтитуле, без значка и
+английского названия. Компактная шапка, красная тема, full-size дроби MathML.
+Демонстрационные разрывы QX после 8/16 удалены, пользовательские сохранены.
+Схема/модели/геометрия и остальные редакторы не меняются. Метрики, референс,
+до/после и визуальная проверка — `docs/TASK150.2.md` и Draft PR.
+
+## TASK150.1 — CI validation (06.11.2026)
+
+Base `22f2ebea55cb408a8000d88f1b35908af6d7b9f0`, branch
+`fix/task1501-ci-validation`, Draft PR to `design/task150-pdf-layout`; no merge.
+Strict footer/content and numbering validation, independent ordered TASK150
+review CI job, fail-closed complete packaging and negative PDF/input regressions.
+Application/design/models/geometry unchanged. See `docs/TASK150.1.md` and PR
+for evidence, final SHA and CI URLs.
+
 ## TASK150 — PDF layout and opt-in QX samples (06.11.2026)
 
 База main `d0f1b3c6ec98b88aa73d784f5f5859be8059a338`, ветка
