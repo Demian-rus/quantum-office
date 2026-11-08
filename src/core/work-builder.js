@@ -92,16 +92,14 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   const topic=sectionTitle(q),showTopic=format==='compact'&&d.printSettings?.topicHeadings!==false&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
- const styles=qwPrintStyles();
- const theme=d.topic||(/^Новая работа$/.test(d.title)?'':d.title);
- const header=modern?(format==='answers'?'<h1 class="qw-print-title">Ответы'+(theme?' — '+qwEsc(theme):'')+'</h1>':theme?'<h1 class="qw-print-title">'+qwEsc(theme)+'</h1>':''):exam?'<div class="qw-exam-header">'+qwEsc(subject)+' · Прежний компактный макет'+
-  (d.variant?' · Вариант '+qwEsc(d.variant):'')+'</div>':
-  '<h1 class="qw-print-title">'+qwEsc(d.title)+'</h1>'+
-  '<div class="qw-print-meta">'+qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+
-  (d.variant?' · Вариант '+qwEsc(d.variant):'')+'</div>'+
-  (d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
+ const printTheme=qwPrintTheme(options),styles=qwPrintStyles();
+ const meta=qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'');
+ const header=qwPrintBrand(printTheme)+'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(d.title)+'</h1>'+
+  (d.topic&&d.topic!==d.title?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
+  '<div class="qw-print-meta">'+meta+'</div>'+
+  (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
-  '</title><style>'+styles+'</style></head><body '+(d.printSettings?'style="--qw-print-size:'+d.printSettings.fontPt+'pt" ':'')+'data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '</title><style>'+styles+'</style></head><body '+(d.printSettings?'style="--qw-print-size:'+d.printSettings.fontPt+'pt" ':'')+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+'" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){

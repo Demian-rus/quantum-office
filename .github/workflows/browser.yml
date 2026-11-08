@@ -39,6 +39,7 @@ jobs:
       - run: node tests/task149_2_browser.cjs
       - run: node tests/task149_2_sample.cjs
       - run: python tests/task149_2_pdf.py
+      - run: python tests/task150_1_pdf_regression.py
       - run: node tests/task149_3_browser.cjs
       - run: node tests/task149_3_layout_browser.cjs
       - run: python tests/task149_3_pdf.py
@@ -329,4 +330,65 @@ jobs:
             evidence/task149
             evidence/task149.1/*.png
             evidence/task149.1/result.json
+          if-no-files-found: ignore
+
+  task150-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run build
+      - run: python -m pip install pymupdf==1.26.6 pillow
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/checkout@v4
+        with:
+          ref: d0f1b3c6ec98b88aa73d784f5f5859be8059a338
+          path: task150-baseline
+      - run: node scripts/build.mjs
+        working-directory: task150-baseline
+      - run: node tests/task150_browser.cjs --before
+        env:
+          QW_TASK150_HTML: ${{ github.workspace }}/task150-baseline/Quantum-Office.html
+      - run: node tests/task150_browser.cjs
+      - run: python tests/task150_pdf.py
+      - run: python tests/task150_1_numbering_regression.py
+      - uses: actions/checkout@v4
+        with:
+          ref: 152fbafed393315316de739c991df474fcb6017f
+          path: task1502-baseline
+      - run: node scripts/build.mjs
+        working-directory: task1502-baseline
+      - run: node tests/task150_2_browser.cjs --before
+        env:
+          QW_TASK1502_HTML: ${{ github.workspace }}/task1502-baseline/Quantum-Office.html
+      - run: node tests/task150_2_browser.cjs
+      - run: python tests/task150_2_pdf.py
+      - run: python scripts/package-task1502.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: task1502-compact-polish
+          path: evidence/task1502/TASK150.2-Review.zip
+          if-no-files-found: error
+      - name: Check incomplete TASK150 inputs
+        run: python tests/task150_1_package_regression.py --missing-inputs
+      - name: Package TASK150 review
+        run: python scripts/package-task150.py
+      - name: Verify complete TASK150 archive
+        run: python tests/task150_1_package_regression.py --archive
+      - uses: actions/upload-artifact@v4
+        with:
+          name: task150-pdf-layout-qx
+          path: evidence/task150/TASK150-Review.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: task150-diagnostics-incomplete
+          path: evidence/task150/
           if-no-files-found: ignore
