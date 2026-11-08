@@ -257,7 +257,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  const allSegments=[],allPoints=[],placedLabels=[];
  const addPolygon=pts=>{pts.forEach((p,i)=>{allSegments.push([p,pts[(i+1)%pts.length]]);allPoints.push(p);});};
  for(const item of objects){
-  if(['triangle','rightTriangle','quadrilateral'].includes(item.kind))addPolygon(qwGeometryVertices(item));
+  if(['triangle','rightTriangle','quadrilateral','regularPolygon'].includes(item.kind))addPolygon(qwGeometryVertices(item));
   else if(['polyline','arc'].includes(item.kind)){
    const ps=item.kind==='arc'?qwArcPoints(item):item.vertices;
    ps.slice(1).forEach((p,i)=>allSegments.push([ps[i],p]));allPoints.push(...ps);
@@ -278,7 +278,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  return qwPlaceSVGLabels(qwSVG(guides+objects.map((o,i)=>{
   const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#162735',width=paint.width||2,fill=paint.fill||'none';
   const a=' stroke="'+stroke+'" stroke-width="'+width+'" fill="none"',
-   vertices=['triangle','rightTriangle','quadrilateral'].includes(o.kind)?qwGeometryVertices(o):null;
+   vertices=['triangle','rightTriangle','quadrilateral','regularPolygon'].includes(o.kind)?qwGeometryVertices(o):null;
   const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
   const minX=Math.min(...all.map(p=>p.x)),minY=Math.min(...all.map(p=>p.y)),
    maxX=Math.max(...all.map(p=>p.x)),maxY=Math.max(...all.map(p=>p.y)),
@@ -339,7 +339,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
      '<line x1="'+numeric(cx)+'" y1="'+numeric(cy)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-14)+'" stroke="#162735" stroke-width="2"/>');
   }
   if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
-  if(o.kind==='circle')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
+  if(o.kind==='circle'||o.kind==='ellipse')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
   if(o.kind==='point')shape='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';
   if(o.kind==='angle'){
    const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;
@@ -355,7 +355,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
    vertices.forEach((p,j)=>{
     shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
-    if(interactive)shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
+    if(interactive&&o.kind!=='regularPolygon')shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
      const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},allSegments,allPoints,placedLabels,20);
      captions+=qwLabelSVG('d:'+i+':v:'+j,p,p.labelPosition,label(p.label,at.x,at.y+7,20));
@@ -418,7 +418,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f6f8|#eef3f5|white)"/g,'fill="'+fill+'"');
   if(paint.text)captions=captions.replace(/fill="#162735"/g,'fill="'+paint.text+'"');
   const marker=['arrow','doubleArrow'].includes(o.kind)?'<defs><marker id="qw-arrow-'+key+'-'+i+'" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="'+(o.kind==='doubleArrow'?'auto-start-reverse':'auto')+'"><path d="M0 0L6 3L0 6" fill="none" stroke="'+stroke+'" stroke-width="1"/></marker></defs>':'';
-  const center={x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
+  const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
  }).join('')));
 }
