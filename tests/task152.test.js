@@ -49,7 +49,7 @@ test('TASK152 midpoint and perpendicular bisector follow edited and rotated segm
  near(d[1].x,235);near(d[1].y,125);
  near(d[2].x,235);near(d[2].y,125);
  d[0].rotation=90;d=qwResolveDiagram(d);
- const u={x:d[0].x2-d[0].x,y:d[0].y2-d[0].y},v={x:d[2].x2-d[2].x,y:d[2].y2-d[2].y};
+ const u={x:-(d[0].y2-d[0].y),y:d[0].x2-d[0].x},v={x:d[2].x2-d[2].x,y:d[2].y2-d[2].y};
  near(u.x*v.x+u.y*v.y,0);
  near(d[1].x,d[2].x);near(d[1].y,d[2].y);
  assert.deepEqual(qwValidateDiagram(JSON.parse(JSON.stringify(d))),d);
