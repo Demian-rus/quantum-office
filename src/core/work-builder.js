@@ -274,11 +274,11 @@ function qwExample(subject='physics'){
  d.tasks=data.map(([type,prompt,answer],i)=>{const q=qwTask(type);q.prompt=prompt;q.answer=answer;q.criteria='1 балл — правильная зависимость; 1 балл — обоснование.';q.comment='Допустим другой обоснованный способ решения.';q.graph.points=[{x:0,y:0,label:'A'},{x:2,y:6,label:'B'},{x:6,y:6,label:'C'},{x:9,y:0,label:'D'}];if(subject==='math'){q.graph.xlabel='x';q.graph.ylabel='y';}q.diagram=[{kind:'rect',x:180,y:120,x2:330,y2:220,label:'Тело'},{kind:'arrow',x:330,y:170,x2:470,y2:170,label:'F₁'},{kind:'arrow',x:180,y:170,x2:80,y2:170,label:'F₂'}];if(subject==='math'){q.diagram=qwValidateDiagram([{kind:'rightTriangle',x:130,y:70,x2:390,y2:260,label:'',vertices:[{x:130,y:260,label:'A'},{x:390,y:260,label:'B'},{x:130,y:70,label:'C'}],edgeLabels:['6 см','','4 см']}]);if(type==='graph'){Object.assign(q.graph,{xmin:-5,xmax:5,ymin:0,ymax:10,curveFamily:'quadratic',xlabel:'x',ylabel:'y',points:[]});q.graph.curve={...q.graph.curve,a:.375,b:0,c:0};}}if(i>3)q.part='Часть 2';if(type==='combined'){q.position='below';q.figureWidth=360;q.solutionHeight=170;}return q;});return d;
 }
 const QW_VISUAL_TOOLS=[
- ['ray','Луч'],['infiniteLine','Прямая'],['parallel','Параллельная прямая'],['perpendicular','Перпендикуляр'],['equalMarks','Равные отрезки'],
+ ['ray','Луч'],['infiniteLine','Прямая'],['parallel','Параллельная прямая'],['perpendicular','Перпендикуляр'],['midpoint','Середина отрезка'],['angleBisector','Биссектриса угла'],['perpendicularBisector','Серединный перпендикуляр'],['equalMarks','Равные отрезки'],
  ['select','Выбрать и переместить'],['point','Точка'],['line','Отрезок'],
  ['polyline','Ломаная'],['arc','Дуга окружности'],['dimension','Размерная линия'],['doubleArrow','Двусторонняя стрелка'],
  ['arrow','Вектор / стрелка'],['dashed','Пунктир'],['rope','Нить / верёвка'],
- ['rect','Прямоугольник'],['circle','Окружность'],['text','Текстовая подпись'],
+ ['rect','Прямоугольник'],['circle','Окружность'],['ellipse','Эллипс'],['regularPolygon','Правильный многоугольник'],['text','Текстовая подпись'],
  ['angle','Угол'],['triangle','Треугольник'],['rightTriangle','Прямоугольный треугольник'],
  ['quadrilateral','Четырёхугольник'],['block','Брусок'],['incline','Наклонная плоскость'],
  ['pulley','Неподвижный блок'],['movablePulley','Подвижный блок'],['spring','Пружина'],['ground','Опора']
@@ -303,6 +303,11 @@ function qwVisualIcon(kind){
  rope:'<path d="M3 7q5-5 10 2t8 8"/>',
  rect:'<rect x="3" y="6" width="18" height="12" rx="1"/>',
  circle:'<circle cx="12" cy="12" r="9"/>',
+ ellipse:'<ellipse cx="12" cy="12" rx="10" ry="6"/>',
+ regularPolygon:'<path d="M12 2L21.5 9L18 20H6L2.5 9Z"/>',
+ midpoint:'<path d="M2 17L22 7"/><circle cx="12" cy="12" r="2.8" fill="currentColor" stroke="none"/>',
+ angleBisector:'<path d="M3 21L20 21L3 3M3 21l13-8"/>',
+ perpendicularBisector:'<path d="M3 12H21M12 2V22M12 8h4v4"/>',
  text:'<path d="M4 6h16M12 6v14M9 20h6"/>',
  angle:'<path d="M3 20l9-16 9 16"/><path d="M8 20a5 5 0 013.1-4.6"/>',
  triangle:'<path d="M12 3L22 21H2z"/>',
@@ -362,7 +367,7 @@ function qwPhysicsPreset(kind){
 }
 function qwVisualPalette(selected){
  const titles={select:'Выделение',point:'Точка',line:'Отрезок',arrow:'Стрелка',text:'Подпись',rightTriangle:'Прям. треугольник',quadrilateral:'4-угольник',dashed:'Вспом. линия',pulley:'Неподвижный блок',movablePulley:'Подвижный блок',rope:'Нить'};
- return [['Основные',['select','point','line','dashed','arrow','text']],['Геометрия',['rect','circle','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral']],['Построения',['ray','infiniteLine','parallel','perpendicular','equalMarks']],['Физика',['block','incline','pulley','movablePulley','rope','spring','ground']]].map(([title,keys])=>
+ return [['Основные',['select','point','line','dashed','arrow','text']],['Геометрия',['rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral']],['Построения',['ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks']],['Механика',['block','incline','pulley','movablePulley','rope','spring','ground']]].map(([title,keys])=>
   '<details class="qw-tool-group" open><summary>'+title+'</summary><div>'+keys.map(kind=>{
    const title=titles[kind]||Object.fromEntries(QW_VISUAL_TOOLS)[kind];
    return '<button type="button" class="qw-tool-tile" data-tool="'+kind+'" title="'+qwEsc(title)+'" aria-label="'+qwEsc(title)+'" aria-pressed="'+(selected===kind)+'">'+qwVisualIcon(kind)+'<span>'+qwEsc(kind==='rect'?'Прямоуг.':title)+'</span></button>';
@@ -440,7 +445,7 @@ function qwVisualEditor(kind){
   const o=objectAt(selected),paint=o?.style||{};
   const graphElement=kind==='graph'&&selected>=value.points.length;
   const defaultStroke=kind==='graph'?(graphElement?'#186ba3':'#142b42'):'#162735';
-  return '<section class="qw-object-style"><h2>Оформление'+(multi.size>1?' · '+multi.size+' объектов':'')+'</h2>'+[['stroke','Цвет линии / контура',defaultStroke],['fill','Цвет заливки','#ffffff'],['text','Цвет подписи',kind==='graph'?(paint.stroke||defaultStroke):'#162735']].filter(([key])=>key!=='fill'||kind==='diagram'&&selectedIndices().some(i=>['rect','circle','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(objectAt(i)?.kind))).map(([key,title,fallback])=>'<div class="qw-paint-row"><label>'+title+'<input type="color" data-style="'+key+'" value="'+(paint[key]&&paint[key]!=='none'?paint[key]:fallback)+'"></label><div class="qw-palette">'+['#162735','#dc2626','#16a34a','#2563eb','#9333ea','#ea580c'].map(color=>'<button type="button" data-style-key="'+key+'" data-style-color="'+color+'" style="--qw-swatch:'+color+'" aria-label="'+title+' '+color+'" title="'+title+' '+color+'"></button>').join('')+(key==='fill'?'<button type="button" data-style-key="fill" data-style-color="none" aria-label="Без заливки" title="Без заливки">×</button>':'')+'</div></div>').join('')+'<label>Толщина линии<input data-style="width" type="number" min="0.5" max="12" step="0.5" value="'+(paint.width||(graphElement?2.5:2))+'"></label></section>';
+  return '<section class="qw-object-style"><h2>Оформление'+(multi.size>1?' · '+multi.size+' объектов':'')+'</h2>'+[['stroke','Цвет линии / контура',defaultStroke],['fill','Цвет заливки','#ffffff'],['text','Цвет подписи',kind==='graph'?(paint.stroke||defaultStroke):'#162735']].filter(([key])=>key!=='fill'||kind==='diagram'&&selectedIndices().some(i=>['rect','circle','ellipse','regularPolygon','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(objectAt(i)?.kind))).map(([key,title,fallback])=>'<div class="qw-paint-row"><label>'+title+'<input type="color" data-style="'+key+'" value="'+(paint[key]&&paint[key]!=='none'?paint[key]:fallback)+'"></label><div class="qw-palette">'+['#162735','#dc2626','#16a34a','#2563eb','#9333ea','#ea580c'].map(color=>'<button type="button" data-style-key="'+key+'" data-style-color="'+color+'" style="--qw-swatch:'+color+'" aria-label="'+title+' '+color+'" title="'+title+' '+color+'"></button>').join('')+(key==='fill'?'<button type="button" data-style-key="fill" data-style-color="none" aria-label="Без заливки" title="Без заливки">×</button>':'')+'</div></div>').join('')+'<label>Толщина линии<input data-style="width" type="number" min="0.5" max="12" step="0.5" value="'+(paint.width||(graphElement?2.5:2))+'"></label></section>';
  }
  function rotationPanel(){
   const o=value[selected];if(!o||multi.size!==1||['point','ray','infiniteLine'].includes(o.kind))return '';
@@ -450,7 +455,15 @@ function qwVisualEditor(kind){
   const o=multi.size===1?value[selected]:null;
   const presets='<section class="qw-inspector-section qw-diagram-presets"><label>Готовые физические схемы<select id="qw-diagram-preset">'+qwOptions([['none','Выбрать схему'],['surface','Брусок на опоре'],['incline','Брусок на наклонной плоскости'],['pulley','Система с неподвижным блоком'],['movable','Система с подвижным блоком'],['spring','Брусок и пружина']],'none')+'</select></label></section>';
   let parameters='';
-  if(o?.kind==='arc'){
+  if(o?.kind==='regularPolygon'){
+   parameters='<label>Количество сторон<select data-polygon-sides>'+qwOptions(Array.from({length:10},(_,i)=>[String(i+3),String(i+3)]),o.sides)+'</select></label>'+
+    '<div class="qw-primitive-settings">'+['x','y','x2','y2'].map((key,i)=>'<label>'+['Граница X1','Граница Y1','Граница X2','Граница Y2'][i]+'<input data-diagram-field="'+key+'" type="number" min="0" max="'+(key[0]==='x'?520:320)+'" step="any" value="'+o[key]+'"></label>').join('')+'</div>'+
+    '<p class="qw-muted">Все стороны равны. Изменяйте размеры, положение и количество сторон.</p>';
+  }else if(o?.kind==='ellipse'){
+   parameters='<div class="qw-primitive-settings">'+['x','y','x2','y2'].map((key,i)=>'<label>'+['Граница X1','Граница Y1','Граница X2','Граница Y2'][i]+'<input data-diagram-field="'+key+'" type="number" min="0" max="'+(key[0]==='x'?520:320)+'" step="any" value="'+o[key]+'"></label>').join('')+'</div>';
+  }else if(o?.construction&&['midpoint','angleBisector','perpendicularBisector'].includes(o.construction.kind)){
+   parameters='<p class="qw-muted">Зависимое построение: геометрия пересчитывается при изменении исходной фигуры. Настройте подпись и оформление здесь.</p>';
+  }else if(o?.kind==='arc'){
    const values={cx:(o.x+o.x2)/2,cy:(o.y+o.y2)/2,radius:(o.x2-o.x)/2,startAngle:o.startAngle,endAngle:o.endAngle};
    const labels={cx:'Центр X',cy:'Центр Y',radius:'Радиус',startAngle:'Начало, °',endAngle:'Конец, °'};
    parameters='<div class="qw-primitive-settings">'+Object.entries(values).map(([key,n])=>'<label>'+labels[key]+'<input type="number" step="any" data-arc-field="'+key+'" value="'+Number(n.toFixed(3))+'"></label>').join('')+'</div><p class="qw-muted">Углы от оси X, положительные — против часовой стрелки. Протяните от центра, чтобы задать радиус.</p>';
@@ -482,11 +495,11 @@ function qwVisualEditor(kind){
  }
  function applyStyle(key,next,indices=selectedIndices()){
   const style=qwValidateStyle({[key]:next});if(!indices.length)return;
-  remember();for(const i of indices){const o=objectAt(i);if(o&&(key!=='fill'||['rect','circle','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(o.kind)))o.style={...o.style,...style};}draw();
+  remember();for(const i of indices){const o=objectAt(i);if(o&&(key!=='fill'||['rect','circle','ellipse','regularPolygon','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(o.kind)))o.style={...o.style,...style};}draw();
  }
  function rotateSelected(angle){if(selected<0)return;remember();value[selected].rotation=((angle+180)%360+360)%360-180;draw();}
  function remember(){history.push(structuredClone(value));history=history.slice(-30);}
- function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
+ function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';if(['midpoint','perpendicularBisector'].includes(tool))hint.textContent+=' · Нажмите исходный отрезок.';if(tool==='angleBisector')hint.textContent+=' · Нажмите исходный угол.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
   const conflicts=stage.querySelectorAll('[data-label-conflict="true"]').length;if(conflicts){hint.className='qw-error';hint.textContent+=' · Подписей с пересечениями: '+conflicts+'. Выберите подпись и перетащите её.';}
   if(!labelSelected)props.querySelector('.qw-label-settings')?.remove();
   if(!full)return;
@@ -561,6 +574,20 @@ function qwVisualEditor(kind){
    }else{
     if(value.elements.length>=60)return;creating=true;draft={kind:tool,...coordinate,x2:coordinate.x,y2:coordinate.y,label:''};
    }
+  }else if(['midpoint','angleBisector','perpendicularBisector'].includes(tool)){
+   const hit=qwHitDiagram(value,p,5/scale),ref=value[hit];
+   const compatible=tool==='angleBisector'?ref?.kind==='angle':
+    ref&&['line','dashed','arrow','dimension','doubleArrow'].includes(ref.kind);
+   if(!compatible){hint.className='qw-error';hint.textContent=tool==='angleBisector'?'Нажмите существующий угол.':'Нажмите конечный отрезок.';return;}
+   if(value.length>=60){hint.className='qw-error';hint.textContent='Максимум 60 фигур';return;}
+   try{
+    const next=structuredClone(value);next[hit].id??=qwId();const source=next[hit];
+    const nextKind=tool==='midpoint'?'point':tool==='angleBisector'?'ray':'infiniteLine';
+    next.push({kind:nextKind,id:qwId(),x:source.x,y:source.y,x2:source.x+1,y2:source.y+1,label:'',
+     construction:{kind:tool,reference:source.id}});
+    const result=qwValidateDiagram(next);remember();value=result;selectOnly(value.length-1);tool='select';draw();
+   }catch(error){hint.className='qw-error';hint.textContent=error.message;}
+   return;
   }else if(['parallel','perpendicular','equalMarks'].includes(tool)){
    const hit=qwHitDiagram(value,p,5/scale);
    if(tool==='equalMarks'){if(hit>=0&&linear(value[hit])){remember();value[hit].ticks=(value[hit].ticks||0)%3+1;selectOnly(hit);draw();}return;}
@@ -580,7 +607,7 @@ function qwVisualEditor(kind){
   }else{
    if(value.length>=60)return;let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label)return;}
    if(['point','text'].includes(tool)){remember();value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selectOnly(value.length-1);draw();return;}
-   creating=true;draft={kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label:'',...(tool==='arc'?{startAngle:0,endAngle:90}:{})};
+   creating=true;draft={kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label:'',...(tool==='arc'?{startAngle:0,endAngle:90}:tool==='regularPolygon'?{sides:6}:{})};
   }
   let handle=kind==='diagram'&&multi.size===1&&tool==='select'?e.target.closest('[data-qw-vertex]'):null;
   if(handle&&Number(handle.closest('[data-qw-object]').dataset.qwObject)!==selected)handle=null;
@@ -610,6 +637,9 @@ function qwVisualEditor(kind){
    if(legacy.length){dx=qwNum(dx,value.xmin-Math.min(...legacy.map(p=>p.x)),value.xmax-Math.max(...legacy.map(p=>p.x)),0);dy=qwNum(dy,value.ymin-Math.min(...legacy.map(p=>p.y)),value.ymax-Math.max(...legacy.map(p=>p.y)),0);}
    for(const i of drag.indices)setObject(i,qwTranslateGraphObject(objectAt(i,drag.before),dx,dy));
   }else{
+   if(drag.indices.some(i=>['midpoint','angleBisector','perpendicularBisector'].includes(value[i]?.construction?.kind))){
+    hint.textContent='Зависимое построение следует за исходной фигурой';return;
+   }
    const o=value[selected];
    if(drag.vertexIndex>=0&&o.vertices?.[drag.vertexIndex]){
     const initial=drag.before[selected];
@@ -691,9 +721,10 @@ function qwVisualEditor(kind){
     else o.vertices[Number(t.dataset.polylineVertex)][t.dataset.coordinate]=Number(t.value);
     const validated=qwValidateGraph(next);remember();value=validated;t.defaultValue=t.value;draw();return;
    }
-   if(t.dataset.arcField||t.dataset.diagramField){
+   if(t.dataset.arcField!==undefined||t.dataset.diagramField!==undefined||t.dataset.polygonSides!==undefined){
     const next=structuredClone(value),o=next[selected];if(!o)return;
-    if(t.dataset.arcField){
+    if(t.dataset.polygonSides!==undefined)o.sides=Number(t.value);
+    else if(t.dataset.arcField){
      const fields={cx:(o.x+o.x2)/2,cy:(o.y+o.y2)/2,radius:(o.x2-o.x)/2,startAngle:o.startAngle,endAngle:o.endAngle};fields[t.dataset.arcField]=Number(t.value);
      Object.assign(o,{x:fields.cx-fields.radius,y:fields.cy-fields.radius,x2:fields.cx+fields.radius,y2:fields.cy+fields.radius,startAngle:fields.startAngle,endAngle:fields.endAngle});
     }else o[t.dataset.diagramField]=Number(t.value);

@@ -114,7 +114,13 @@ function qwEvaluateCurve(graph,x){
  if(graph.curveFamily==='trigonometric')return p.amplitude*Math[p.trig==='cos'?'cos':'sin'](p.frequency*x+p.phase)+p.offset;
  return NaN;
 }
+function qwRegularPolygonVertices(object){
+ const x=Math.min(object.x,object.x2),x2=Math.max(object.x,object.x2),y=Math.min(object.y,object.y2),y2=Math.max(object.y,object.y2);
+ const n=object.sides||6,cx=(x+x2)/2,cy=(y+y2)/2,r=Math.min(x2-x,y2-y)/2;
+ return Array.from({length:n},(_,i)=>{const a=-Math.PI/2+2*Math.PI*i/n;return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),label:''};});
+}
 function qwGeometryVertices(object){
+ if(object.kind==='regularPolygon')return qwRegularPolygonVertices(object);
  if(Array.isArray(object.vertices)&&object.vertices.length>=3)return object.vertices;
  const x=Math.min(object.x,object.x2),x2=Math.max(object.x,object.x2),
   y=Math.min(object.y,object.y2),y2=Math.max(object.y,object.y2);
@@ -144,17 +150,18 @@ function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
   const x=Math.min(o.x,o.x2),x2=Math.max(o.x,o.x2),
    y=Math.min(o.y,o.y2),y2=Math.max(o.y,o.y2);
   let local=[];
-  if(Array.isArray(o.vertices))local.push(...o.vertices);
+  if(o.kind==='regularPolygon')local.push(...qwGeometryVertices(o),{x:(x+x2)/2,y:(y+y2)/2});
+  else if(Array.isArray(o.vertices))local.push(...o.vertices);
   else if(['block','rect','incline'].includes(o.kind)){
    local.push(...(o.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x,y:y2},{x:x2,y:y2}]),
     {x:(x+x2)/2,y:y2},{x:x2,y:(y+y2)/2});
    if(o.kind==='incline')local.push({x:(x+x2)/2,y:(y+y2)/2});
    else local.push({x:(x+x2)/2,y},{x,y:(y+y2)/2});
-  }else if(['circle','pulley','fixedPulley','movablePulley'].includes(o.kind)){
+  }else if(['circle','ellipse','pulley','fixedPulley','movablePulley'].includes(o.kind)){
    const cx=(x+x2)/2,cy=(y+y2)/2,r=Math.max(8,Math.min(x2-x,y2-y)/2);
-   local.push({x:cx,y:cy},{x:cx,y:o.kind==='circle'?y:cy-r},{x:cx,y:o.kind==='circle'?y2:cy+r},{x:o.kind==='circle'?x:cx-r,y:cy},{x:o.kind==='circle'?x2:cx+r,y:cy});
+   local.push({x:cx,y:cy},{x:cx,y:['circle','ellipse'].includes(o.kind)?y:cy-r},{x:cx,y:['circle','ellipse'].includes(o.kind)?y2:cy+r},{x:['circle','ellipse'].includes(o.kind)?x:cx-r,y:cy},{x:['circle','ellipse'].includes(o.kind)?x2:cx+r,y:cy});
    if(o.kind==='movablePulley')local.push({x:cx-r,y:cy-r-32},{x:cx+r,y:cy-r-32},{x:cx,y:cy+r+18});
-   else if(o.kind!=='circle')local.push({x:cx,y:cy-r-14});
+   else if(!['circle','ellipse'].includes(o.kind))local.push({x:cx,y:cy-r-14});
   }else local.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
   const cx=(x+x2)/2,cy=(y+y2)/2,a=(o.rotation||0)*Math.PI/180;
   anchors.push(...local.map(p=>({x:cx+(p.x-cx)*Math.cos(a)-(p.y-cy)*Math.sin(a),y:cy+(p.x-cx)*Math.sin(a)+(p.y-cy)*Math.cos(a)})));
@@ -181,12 +188,20 @@ function qwValidateStyle(raw){
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  const ids=new Set(),result=raw.map(o=>{
-  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
+  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','ellipse','regularPolygon','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
+  if(o.kind==='regularPolygon'){
+   if(!Number.isInteger(o.sides)||o.sides<3||o.sides>12)throw Error('Правильный многоугольник: 3–12 сторон');
+   value.sides=o.sides;
+  }
   if(o.id!==undefined){if(typeof o.id!=='string'||!o.id||o.id.length>80||ids.has(o.id))throw Error('Некорректный или повторный ID фигуры');value.id=o.id;ids.add(o.id);}
   if(['ray','infiniteLine'].includes(o.kind)){if(Math.abs(o.x2)>1040||Math.abs(o.y2)>1040||Math.hypot(o.x2-o.x,o.y2-o.y)<.01)throw Error('Построение: задайте ненулевое направление');value.x2=o.x2;value.y2=o.y2;}
-  if(o.construction!==undefined){const c=o.construction;if(o.kind!=='infiniteLine'||!c||!['parallel','perpendicular'].includes(c.kind)||typeof c.reference!=='string'||!c.reference)throw Error('Некорректная связь построения');value.construction={kind:c.kind,reference:c.reference};}
+  if(o.construction!==undefined){const c=o.construction;if(!c||!['parallel','perpendicular','midpoint','angleBisector','perpendicularBisector'].includes(c.kind)
+   ||typeof c.reference!=='string'||!c.reference
+   ||(['parallel','perpendicular','perpendicularBisector'].includes(c.kind)&&o.kind!=='infiniteLine')
+   ||(c.kind==='midpoint'&&o.kind!=='point')||(c.kind==='angleBisector'&&o.kind!=='ray'))
+   throw Error('Некорректная связь построения');value.construction={kind:c.kind,reference:c.reference};}
   if(o.ticks!==undefined){if(!['line','arrow','dashed','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind)||![0,1,2,3].includes(o.ticks))throw Error('Засечки: от 0 до 3 на линейном объекте');value.ticks=o.ticks;}
   if(o.kind==='block'||o.rotation!==undefined){if(o.rotation!==undefined&&!Number.isFinite(o.rotation))throw Error('Некорректный угол');value.rotation=qwNum(o.rotation,-180,180,0);}
   if(o.style!==undefined)value.style=qwValidateStyle(o.style);
@@ -233,9 +248,38 @@ function qwValidateDiagram(raw){
 function qwResolveDiagram(objects){
  const result=objects.map(o=>({...o})),byId=new Map(result.filter(o=>o.id).map(o=>[o.id,o])),done=new Set(),active=new Set();
  function resolve(o){if(done.has(o))return;if(active.has(o))throw Error('Циклическая связь построений');active.add(o);
-  if(o.construction){const ref=byId.get(o.construction.reference);if(!ref||!['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(ref.kind))throw Error('Не найдена опорная линия построения');resolve(ref);
-   const angle=(ref.rotation||0)*Math.PI/180,dx0=ref.x2-ref.x,dy0=ref.y2-ref.y,dx=dx0*Math.cos(angle)-dy0*Math.sin(angle),dy=dx0*Math.sin(angle)+dy0*Math.cos(angle),length=Math.hypot(dx,dy);if(length<.01)throw Error('Опорная линия должна иметь длину');
-   const perpendicular=o.construction.kind==='perpendicular';o.x2=o.x+(perpendicular?-dy:dx)/length*40;o.y2=o.y+(perpendicular?dx:dy)/length*40;o.rotation=0;
+  if(o.construction){
+   const c=o.construction,ref=byId.get(c.reference);
+   if(!ref)throw Error('Не найдена исходная фигура построения');
+   resolve(ref);
+   const theta=(ref.rotation||0)*Math.PI/180,cs=Math.cos(theta),sn=Math.sin(theta);
+   const center={x:(Math.min(ref.x,ref.x2)+Math.max(ref.x,ref.x2))/2,y:(Math.min(ref.y,ref.y2)+Math.max(ref.y,ref.y2))/2};
+   const rotate=p=>({x:center.x+(p.x-center.x)*cs-(p.y-center.y)*sn,y:center.y+(p.x-center.x)*sn+(p.y-center.y)*cs});
+   if(c.kind==='angleBisector'){
+    if(ref.kind!=='angle')throw Error('Для биссектрисы нужен угол');
+    const v=rotate({x:ref.x,y:ref.y}),b=rotate({x:ref.x2,y:ref.y}),d=rotate({x:ref.x2,y:ref.y2});
+    const u={x:b.x-v.x,y:b.y-v.y},w={x:d.x-v.x,y:d.y-v.y},lu=Math.hypot(u.x,u.y),lw=Math.hypot(w.x,w.y);
+    if(lu<.01||lw<.01)throw Error('Стороны угла должны иметь длину');
+    const direction={x:u.x/lu+w.x/lw,y:u.y/lu+w.y/lw},length=Math.hypot(direction.x,direction.y);
+    if(length<.01)throw Error('Нельзя построить биссектрису развёрнутого угла');
+    o.x=v.x;o.y=v.y;o.x2=v.x+direction.x/length*40;o.y2=v.y+direction.y/length*40;o.rotation=0;
+   }else{
+    if(!['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(ref.kind))
+     throw Error('Не найдена опорная линия построения');
+    if(['midpoint','perpendicularBisector'].includes(c.kind)&&!['line','dashed','arrow','dimension','doubleArrow'].includes(ref.kind))
+     throw Error('Для середины или серединного перпендикуляра нужен конечный отрезок');
+    const p=rotate({x:ref.x,y:ref.y}),q=rotate({x:ref.x2,y:ref.y2});
+    const dx=q.x-p.x,dy=q.y-p.y,length=Math.hypot(dx,dy);
+    if(length<.01)throw Error('Опорная линия должна иметь длину');
+    if(c.kind==='midpoint'){o.x=(p.x+q.x)/2;o.y=(p.y+q.y)/2;o.x2=o.x;o.y2=o.y;}
+    else if(c.kind==='perpendicularBisector'){
+     o.x=(p.x+q.x)/2;o.y=(p.y+q.y)/2;o.x2=o.x-dy/length*40;o.y2=o.y+dx/length*40;
+    }else{
+     const perpendicular=c.kind==='perpendicular';
+     o.x2=o.x+(perpendicular?-dy:dx)/length*40;o.y2=o.y+(perpendicular?dx:dy)/length*40;
+    }
+    o.rotation=0;
+   }
   }active.delete(o);done.add(o);
  }result.forEach(resolve);return result;
 }
@@ -243,4 +287,4 @@ function qwReorder(d,id,gap,part){const i=d.tasks.findIndex(q=>q.id===id);if(i<0
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;return qwReorder(d,id,delta>0?j+1:j,d.tasks[j].part);}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY};
+export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY};

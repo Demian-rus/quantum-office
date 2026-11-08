@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -333,7 +333,7 @@ jobs:
           if-no-files-found: ignore
 
   task150-review:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -391,4 +391,23 @@ jobs:
         with:
           name: task150-diagnostics-incomplete
           path: evidence/task150/
+          if-no-files-found: ignore
+
+  task152-diagrams:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task152_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task152-diagram-evidence
+          path: evidence/task152/
           if-no-files-found: ignore
