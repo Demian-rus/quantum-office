@@ -5,6 +5,7 @@ import re
 import unicodedata
 from pathlib import Path
 import pymupdf
+from pdf_task_numbers import task_numbers
 
 out = Path(os.environ.get('QW_TASK1494_EVIDENCE', Path(__file__).resolve().parents[1] / 'evidence/task149.4'))
 browser = json.loads((out / 'browser-result.json').read_text(encoding='utf-8'))
@@ -24,7 +25,7 @@ for name, counts in expected.items():
     for i, page in enumerate(doc):
         assert abs(page.rect.width - 595.28) < 1 and abs(page.rect.height - 841.89) < 1
         text = unicodedata.normalize('NFKC', page.get_text())
-        current = [int(n) for n in re.findall(r'(?m)^(\d+)\.', text)]
+        current = task_numbers(page)
         assert len(current) == counts[i], (name, i + 1, current)
         numbers.extend(current)
         assert not re.search(r'PRIVATE_|INTERNAL_|Задание \d+|Ответ:|Рисунок\s*/\s*схема|\d+ б\.', text)
