@@ -344,7 +344,7 @@ jobs:
           python-version: '3.12'
       - run: npm ci
       - run: npm run build
-      - run: python -m pip install pymupdf==1.26.6
+      - run: python -m pip install pymupdf==1.26.6 pillow
       - run: npx playwright install --with-deps chromium
       - uses: actions/checkout@v4
         with:
@@ -358,6 +358,23 @@ jobs:
       - run: node tests/task150_browser.cjs
       - run: python tests/task150_pdf.py
       - run: python tests/task150_1_numbering_regression.py
+      - uses: actions/checkout@v4
+        with:
+          ref: 152fbafed393315316de739c991df474fcb6017f
+          path: task1502-baseline
+      - run: node scripts/build.mjs
+        working-directory: task1502-baseline
+      - run: node tests/task150_2_browser.cjs --before
+        env:
+          QW_TASK1502_HTML: ${{ github.workspace }}/task1502-baseline/Quantum-Office.html
+      - run: node tests/task150_2_browser.cjs
+      - run: python tests/task150_2_pdf.py
+      - run: python scripts/package-task1502.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: task1502-compact-polish
+          path: evidence/task1502/TASK150.2-Review.zip
+          if-no-files-found: error
       - name: Check incomplete TASK150 inputs
         run: python tests/task150_1_package_regression.py --missing-inputs
       - name: Package TASK150 review

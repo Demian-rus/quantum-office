@@ -28,7 +28,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
   fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(d,null,2));
   await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
   if(!before){assert.ok(r.layout.pages.every(x=>x.tasks.length),name+' no empty pages');
-   if(options.theme){assert.ok(r.text.includes('Квант Икс | QX'));assert.equal(r.layout.pages.length,options.format==='answers'?1:3,'comparable concept pages');}else assert.ok(!r.text.includes('Квант Икс | QX'),'branding is opt-in');
+   if(options.theme){assert.ok(r.text.includes('Квант Икс | QX'));assert.equal(r.layout.pages.length,options.format==='answers'?1:2,'comparable concept pages');}else assert.ok(!r.text.includes('Квант Икс | QX'),'branding is opt-in');
    const repeat=await browser.newPage();await repeat.setContent(html);await repeat.evaluate(()=>window.qwPrintReady);assert.deepEqual(await repeat.evaluate(()=>window.__qwPrintLayout),r.layout);await repeat.close();
   }
   reports.push({name,...r});await p.close();return r;
@@ -37,9 +37,9 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
   await render('Worksheet',worksheet,{format:'worksheet'});await render('Compact-24',compact,{format:'compact'});
   await render('Practice',task149PrintSamples()[2].project,{format:'practice'});await render('Answers',compact,{format:'answers'});await render('Legacy-Exam',worksheet,{format:'exam'});
   if(!before){
-   // Exactly the same real tasks and explicit page breaks in every concept.
+   // Exactly the same 24 real tasks in every concept, with natural pagination.
    const sample=structuredClone(compact);sample.title='Геометрия и координаты';sample.topic='Углы, площади и координаты';sample.tasks=structuredClone(compact.tasks);
-   sample.tasks.forEach((q,i)=>q.pageBreak=i===8||i===16);sample.tasks[15].prompt+=' Используйте формулу \\(S=\\frac{d_{1}d_{2}}{2}\\).';
+   sample.tasks[15].prompt+=' Используйте формулу \\(S=\\frac{d_{1}d_{2}}{2}\\).';
    for(const theme of ['academic','scientific','minimal'])for(const monochrome of [false,true]){
     const name='QX-'+theme+(monochrome?'-BW':'');await render(name,sample,{format:'compact',theme,monochrome});await render(name+'-Answers',sample,{format:'answers',theme,monochrome});
    }
