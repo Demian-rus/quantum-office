@@ -721,9 +721,9 @@ function qwVisualEditor(kind){
     else o.vertices[Number(t.dataset.polylineVertex)][t.dataset.coordinate]=Number(t.value);
     const validated=qwValidateGraph(next);remember();value=validated;t.defaultValue=t.value;draw();return;
    }
-   if(t.dataset.arcField||t.dataset.diagramField||t.dataset.polygonSides){
+   if(t.dataset.arcField!==undefined||t.dataset.diagramField!==undefined||t.dataset.polygonSides!==undefined){
     const next=structuredClone(value),o=next[selected];if(!o)return;
-    if(t.dataset.polygonSides)o.sides=Number(t.value);
+    if(t.dataset.polygonSides!==undefined)o.sides=Number(t.value);
     else if(t.dataset.arcField){
      const fields={cx:(o.x+o.x2)/2,cy:(o.y+o.y2)/2,radius:(o.x2-o.x)/2,startAngle:o.startAngle,endAngle:o.endAngle};fields[t.dataset.arcField]=Number(t.value);
      Object.assign(o,{x:fields.cx-fields.radius,y:fields.cy-fields.radius,x2:fields.cx+fields.radius,y2:fields.cy+fields.radius,startAngle:fields.startAngle,endAngle:fields.endAngle});

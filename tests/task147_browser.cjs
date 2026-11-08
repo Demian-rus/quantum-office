@@ -39,9 +39,9 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   if(kind==='diagram'){
    if(!before){
     await panel('tools');
-    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Построения','Физика']);
-    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','dashed','arrow','text','rect','circle','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','equalMarks','block','incline','pulley','movablePulley','rope','spring','ground']);
-    assert.equal(await p.locator('[data-tool] span').count(),28);
+    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Построения','Механика']);
+    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','dashed','arrow','text','rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks','block','incline','pulley','movablePulley','rope','spring','ground']);
+    assert.equal(await p.locator('[data-tool] span').count(),33);
     await p.locator('.qw-tool-group summary').first().click();sameBox(stable,await stage.boundingBox(),'collapse must not resize canvas');
     await p.locator('.qw-tool-group summary').first().click();
     await p.locator('#qw-visual-tools').evaluate(e=>e.scrollTop=e.scrollHeight);sameBox(stable,await stage.boundingBox(),'tools scroll independent');
