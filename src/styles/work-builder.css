@@ -181,6 +181,15 @@
 .qw-pdf-controls{flex:0 0 auto}
 .qw-layout-cards{border:0;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .qw-layout-cards legend{font-size:12px;font-weight:600;margin-bottom:6px}
+
+/* TASK153 — four balanced print-format choices and local editor preview. */
+.qw-layout-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+.qw-selected-preview .qw-booklet-entry{grid-template-columns:35px minmax(0,1fr);column-gap:10px;row-gap:5px}
+.qw-selected-preview .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;display:flex;align-items:center;justify-content:center;align-self:start;height:26px;border:1px solid currentColor;margin:0;font:700 13px Georgia,serif}
+.qw-selected-preview .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1}
+.qw-selected-preview .qw-booklet-answer{grid-column:2;grid-row:2;font:13px Georgia,serif;margin-top:6px}
+.qw-selected-preview .qw-booklet-answer span{display:inline-block;width:130px;height:12px;border-bottom:1px solid #444}
+
 .qw-layout-card{position:relative;display:grid!important;grid-template-columns:36px minmax(0,1fr);align-items:center;gap:9px;padding:9px;border:1px solid #cbd5e1;border-radius:5px;cursor:pointer;background:white;color:#334155}
 .qw-layout-card:has(input:checked){border-color:#16835e;background:#f0faf5;box-shadow:inset 0 0 0 1px #16835e}
 .qw-layout-card:has(input:focus-visible){outline:2px solid #1582ce;outline-offset:2px}
