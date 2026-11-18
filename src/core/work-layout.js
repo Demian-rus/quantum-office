@@ -106,6 +106,32 @@ body[data-qw-format="answers"] .qw-print-section{margin-bottom:3mm}
 body[data-qw-format="practice"] .qw-print-section{margin-bottom:4mm}
 .qw-practice-space{margin-top:3mm;width:100%}
 .qw-practice-space svg{display:block;width:100%;height:100%}
+
+/* TASK153: professional print booklet, using bundled OFL fonts. */
+body[data-qw-format="booklet"]{--qw-print-family:"QO Print Serif",Georgia,serif;line-height:1.27}
+body[data-qw-format="booklet"] .qw-print-page{padding:13mm 13mm 17mm}
+body[data-qw-format="booklet"] .qw-page-content{width:184mm;height:267mm}
+body[data-qw-format="booklet"] .qw-print-header{text-align:center;margin:0 0 6mm}
+body[data-qw-format="booklet"] .qw-print-title{font:700 14pt/1.2 "QO Print Sans",Arial,sans-serif;margin:0 0 2mm}
+body[data-qw-format="booklet"] .qw-print-topic{font-size:11pt;line-height:1.25;margin:1mm 0 0;color:#111}
+body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial,sans-serif;color:#444;margin:0 0 2.5mm}
+.qw-booklet-variant{font:700 13pt/1.25 "QO Print Serif",Georgia,serif;margin:1mm 0 0;color:#111}
+body[data-qw-format="booklet"] .qw-running-header{font:8pt/1.3 "QO Print Sans",Arial,sans-serif;color:#333;margin-bottom:5mm;border:none;text-align:center}
+body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-print-section:before{content:none}
+body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:10mm minmax(0,1fr);column-gap:5mm;row-gap:0}
+body[data-qw-format="booklet"] .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;width:10mm;height:6.7mm;border:.28mm solid #151515;display:flex;align-items:center;justify-content:center;margin:0}
+body[data-qw-format="booklet"] .qw-booklet-entry>header .qw-print-number{font:700 11pt/1 "QO Print Serif",Georgia,serif;text-align:center}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1;line-height:1.27;min-height:6.7mm}
+body[data-qw-format="booklet"] .qw-task-text{overflow-wrap:normal;word-break:normal;hyphens:none;text-align:left}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow figure{margin:0 0 1.2mm 4mm}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{margin:2mm 0 0}
+body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:1mm;margin:2.4mm 0 0;font:10.5pt/1.2 "QO Print Serif",Georgia,serif;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;width:52mm;border-bottom:.22mm solid #555;min-width:20mm;height:4.5mm}
+body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
+body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
+body[data-qw-format="booklet"] math{font-size:1em;math-style:normal}
+
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -117,9 +143,9 @@ async function qwPreparePrintDocument(){
  await Promise.all([...document.images].map(img=>img.decode()));
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
- const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers'].includes(format);
+ const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format);
  // Figure geometry is calculated in an A4-width measurement surface.
- source.style.width=modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
+ source.style.width=format==='booklet'?'184mm':modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
   // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
   if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
@@ -137,8 +163,8 @@ async function qwPreparePrintDocument(){
    let wide=flow.classList.contains('qw-figure-below');
    const requested=Number(figure.dataset.requestedWidth)||220;
    const graph=figure.dataset.figureKind==='graph';
-   const maxW=modern?(wide?Math.min(requested,contentWidth-7*MM):(format==='practice'?55:graph?55:40)*MM):wide?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
-   const maxH=modern?(wide?50:format==='practice'?35:34)*MM:wide?(requested>=470?160*MM:requested*320/520):38*MM;let scale=Math.min(maxW/w,maxH/h);
+   const maxW=modern?(wide?Math.min(requested,contentWidth-7*MM):(format==='booklet'?(graph?70:48):format==='practice'?55:graph?55:40)*MM):wide?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
+   const maxH=modern?(wide?50:format==='booklet'?(graph?47:36):format==='practice'?35:34)*MM:wide?(requested>=470?160*MM:requested*320/520):38*MM;let scale=Math.min(maxW/w,maxH/h);
    // A graph's grid has a common physical width, independent of labels around its origin.
    if(modern&&svg&&graph&&!wide)scale=48*MM/369;
    if(modern&&svg){
@@ -169,7 +195,7 @@ async function qwPreparePrintDocument(){
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
  const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
- const footerLabel=[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
+ const footerLabel=format==='booklet'?'':[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
@@ -279,7 +305,7 @@ async function qwPreparePrintDocument(){
  }
  source.remove();
  const report={pages:pages.map(({page,content},i)=>{
-  const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
+  const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=format==='booklet'?String(i+1):(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
   const sections=[...content.querySelectorAll(':scope>.qw-print-section')];
   return {page:i+1,capacityMm:content.getBoundingClientRect().height/MM,usedMm:used({content})/MM,freeMm:(content.getBoundingClientRect().height-used({content}))/MM,tasks:sections.map(section=>{
    const box=section.getBoundingClientRect(),figure=section.querySelector('figure'),f=figure?.getBoundingClientRect();
