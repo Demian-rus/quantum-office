@@ -93,7 +93,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task156');
     assert.equal(info.sheets,info.sheetsDOM);
     assert.ok(info.pageBoxes[0][0]<info.pageBoxes[0][1],'logical page should be portrait-proportioned');
     assert.ok(info.sheetBoxes[0][0]>info.sheetBoxes[0][1],'physical sheet should be landscape');
-    assert.equal(info.sheetBoxes[0][0],info.pageBoxes[0][0]*2);
+    assert.ok(Math.abs(info.sheetBoxes[0][0]-info.pageBoxes[0][0]*2)<=2,'subpixel rounding of a 148.5mm column must not look like clipped sheet');
    } else assert.equal(info.sheetsDOM,0);
    await page.emulateMedia({media:'print'});
    const name=orientation+'-'+landscapeLayout,pdf=path.join(out,name+'.pdf');
