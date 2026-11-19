@@ -27,7 +27,7 @@ test('TASK153: booklet uses the vector-print path, never the canvas/JPEG PDF pat
  const layout=readFileSync(new URL('../src/core/work-layout.js',import.meta.url),'utf8');
  assert.match(builder,/if\(teacher\|\|\['compact','practice','booklet'\]\.includes\(qwDoc\.layout\)\)\{qwPrintTextPDF/);
  assert.match(builder,/\['worksheet','exam','compact','practice','answers','booklet'\]/);
- assert.match(builder,/format==='booklet'&&d\.variant/);
+ assert.match(builder,/format==='booklet'&&showVariant&&d\.variant/);
  assert.match(layout,/body\[data-qw-format="booklet"\] \.qw-booklet-entry>header/);
  assert.match(layout,/modern=\['compact','practice','answers','booklet'\]\.includes\(format\)/);
 });
