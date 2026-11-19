@@ -15,7 +15,7 @@ function qwMeasureSVGInk(svg){
   return {x:box.x-pad,y:box.y-pad,width:Math.max(1,box.width+pad*2),height:Math.max(1,box.height+pad*2)};
  }finally{for(const {e,style} of clipped)if(style===null)e.removeAttribute('style');else e.setAttribute('style',style);}
 }
-function qwPrintStyles(orientation='portrait'){return QW_PRINT_FONT_CSS+`
+function qwPrintStyles(orientation='portrait',landscapeLayout='spread'){return QW_PRINT_FONT_CSS+`
 @page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'};margin:0}
 :root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
@@ -159,6 +159,44 @@ body[data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm}
 body[data-qw-orientation="landscape"] .qw-page-content{width:267mm;height:176mm}
 body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm;padding:13mm 13mm 17mm}
 body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-page-content{width:271mm;height:180mm}
+
+/* TASK156: A4 landscape spread is two independent, portrait-proportioned pages.
+   One physical 297x210mm sheet contains two logical 148.5x210mm pages. */
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+ display:flex;flex-direction:row;align-items:stretch;width:297mm;height:210mm;
+ margin:0;padding:0;break-after:page;page-break-after:always;background:#fff;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet:last-child{
+ break-after:auto;page-break-after:auto;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-page,
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-page{
+ box-sizing:border-box;flex:0 0 148.5mm;width:148.5mm;height:210mm;
+ padding:12mm 9mm 15mm;margin:0;break-after:auto;page-break-after:auto;box-shadow:none;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-page-content,
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{
+ box-sizing:border-box;width:130.5mm;height:183mm;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-page-footer{
+ bottom:5mm;left:9mm;right:9mm;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-booklet-brand{
+ top:5mm;right:9mm;transform:scale(.83);transform-origin:top right;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-header{
+ margin:0 0 4mm;
+}
+@media screen{
+ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+  margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740;
+ }
+}
+@media print{
+ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+  margin:0;box-shadow:none;
+ }
+}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -170,7 +208,7 @@ async function qwPreparePrintDocument(){
  await Promise.all([...document.images].map(img=>img.decode()));
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
- const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape';
+ const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide';
  // Booklet-only MathML typographic correction; QWORK source is unchanged.
  if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
   const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
@@ -179,7 +217,7 @@ async function qwPreparePrintDocument(){
   script.replaceWith(padded);padded.append(script);
  }
  // Figure geometry follows the actual A4 printable width, not a portrait-only ruler.
- source.style.width=landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
+ source.style.width=spread?'130.5mm':landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
   // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
   if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
@@ -240,7 +278,14 @@ async function qwPreparePrintDocument(){
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
   if(!pages.length)content.append(header);else if(format!=='booklet'&&title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
   if(brand)page.append(brand.cloneNode(true));
-  host.append(page);pages.push({page,content});return pages.at(-1);
+  if(spread){
+   let sheet=host.querySelector(':scope > .qw-print-sheet:last-of-type');
+   if(!sheet||sheet.children.length>=2){
+    sheet=document.createElement('section');sheet.className='qw-print-sheet';host.append(sheet);
+   }
+   sheet.append(page);
+  }else host.append(page);
+  pages.push({page,content});return pages.at(-1);
  }
  function used(page){const last=[...page.content.children].reverse().find(e=>getComputedStyle(e).display!=='none');if(!last)return 0;return last.getBoundingClientRect().bottom-page.content.getBoundingClientRect().top+parseFloat(getComputedStyle(last).marginBottom||0);}
  const fits=page=>used(page)<=page.content.getBoundingClientRect().height+.3;
@@ -342,7 +387,8 @@ async function qwPreparePrintDocument(){
   section.remove();splitLong(section);
  }
  source.remove();
- const report={pages:pages.map(({page,content},i)=>{
+ const report={layout:spread?'spread':landscape?'wide':'portrait',sheets:spread?Math.ceil(pages.length/2):pages.length,
+ pages:pages.map(({page,content},i)=>{
   const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=format==='booklet'?String(i+1):(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
   const sections=[...content.querySelectorAll(':scope>.qw-print-section')];
   return {page:i+1,capacityMm:content.getBoundingClientRect().height/MM,usedMm:used({content})/MM,freeMm:(content.getBoundingClientRect().height-used({content}))/MM,tasks:sections.map(section=>{
