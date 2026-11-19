@@ -34,7 +34,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
     const q=qwTask(i===10?'extended':'short');q.prompt=prompt;q.answerVisible=i!==10;
     if(i===3){q.figure='graph';q.graph=qwGraphDefault();q.graph.xmin=0;q.graph.xmax=6;q.graph.ymax=8;q.graph.points=[{x:0,y:1,label:'A'},{x:2,y:3,label:'B'},{x:4,y:4,label:'C'},{x:6,y:7,label:'D'}];}
     if(i===6){q.figure='diagram';q.diagram=[{kind:'ground',x:90,y:240,x2:450,y2:240,label:''},{kind:'block',x:200,y:170,x2:300,y2:240,label:'m'},{kind:'arrow',x:250,y:170,x2:250,y2:90,label:'N'}];}
-    if(i===12){q.figure='diagram';q.diagram=[{kind:'ground',x:90,y:40,x2:430,y2:40,label:''},{kind:'movablePulley',x:220,y:150,x2:292,y2:222,label:''},{kind:'rope',x:220,y:40,x2:220,y2:82,label:''},{kind:'rope',x:292,y:40,x2:292,y2:82,label:''},{kind:'block',x:232,y:235,x2:280,y2:280,label:'m'}];}
+    if(i===12){q.figure='diagram';q.diagram=[{kind:'ground',x:90,y:40,x2:430,y2:40,label:''},{kind:'movablePulley',x:220,y:150,x2:292,y2:222,label:''},{kind:'rope',x:220,y:40,x2:220,y2:118,label:''},{kind:'rope',x:292,y:40,x2:292,y2:118,label:''},{kind:'block',x:232,y:235,x2:280,y2:280,label:'m'}];}
     return q;
    });
    return qwValidate(d);
