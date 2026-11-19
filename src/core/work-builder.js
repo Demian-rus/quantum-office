@@ -126,7 +126,7 @@ function qwPrintTextPDF(teacher=false,options){
  frame.srcdoc=html;
 }
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
-async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
+async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet','worksheet','exam'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(output='tasks'){
  const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim());
  const selected=(name,on)=>'<label class="qw-check"><input type="checkbox" data-print-setting="'+name+'" '+(on?'checked':'')+'>'+({
