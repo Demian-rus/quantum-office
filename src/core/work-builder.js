@@ -23,7 +23,7 @@ function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1]
 function qwToolbar(){return qoWorkGroup('Работа',qoWorkButton('work-new','Создать работу','new')+qoWorkButton('work-open','Открыть QWORK','folder')+qoWorkButton('work-save','Сохранить QWORK','save'))+qoWorkGroup('Готовый вариант',qoWorkButton('work-preview','Макет и экспорт PDF','file-text')+qoWorkButton('work-pdf','Скачать PDF','download')+qoWorkButton('work-answers','Скачать ответы PDF','file-text'));}
 function qwLayoutCards(current){
  const layouts=[['booklet','Экзаменационный сборник','Книжная типографика, номера в рамках и компактные задания.','M8 12h8v8H8zM20 14h9m-9 6h18m-18 6h12m-12 6h16m-16 6h18'],['compact','Компактный сборник','Много заданий на странице. Без места для ответов.','M9 12h18m-18 6h14m-14 6h18m-18 6h12m-12 6h18m-18 6h14'],['practice','Лист для решения','Условия сверху, ниже место для самостоятельного решения.','M9 12h18m-18 6h13M9 24h18v18H9zM15 24v18m6-18v18M9 30h18M9 36h18'],['worksheet','Обычная контрольная','Стандартная контрольная работа с полями ответов и настройками.','M9 12h18m-18 6h14M9 24h18m-18 8h18m-18 6h14M9 44h18']];
- return '<fieldset class="qw-layout-cards" id="qw-pdf-format"><legend>Формат PDF</legend>'+layouts.map(([id,title,description,path])=>'<label class="qw-layout-card"><input type="radio" name="qw-pdf-layout" value="'+id+'" '+(current===id?'checked':'')+'><svg viewBox="0 0 36 52" aria-hidden="true"><rect x="3" y="2" width="30" height="48" rx="1" fill="white" stroke="currentColor"/><path d="'+path+'" fill="none" stroke="currentColor" stroke-width=".8"/></svg><span><strong>'+title+'</strong><small>'+description+'</small></span></label>').join('')+'</fieldset><p class="qw-exam-unavailable qw-muted">ОГЭ / ЕГЭ — будущие шаблоны после проверки ФИПИ.</p>';
+ return '<fieldset class="qw-layout-cards" id="qw-pdf-format"><legend>Формат PDF</legend>'+layouts.map(([id,title,description,path])=>'<label class="qw-layout-card"><input type="radio" name="qw-pdf-layout" value="'+id+'" '+(current===id?'checked':'')+'><svg viewBox="0 0 36 52" aria-hidden="true"><rect x="3" y="2" width="30" height="48" rx="1" fill="white" stroke="currentColor"/><path d="'+path+'" fill="none" stroke="currentColor" stroke-width=".8"/></svg><span><strong>'+title+'</strong></span></label>').join('')+'</fieldset>';
 }
 function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null){
  const visual=q.figure==='graph'?qwGraphSVG(q.graph,false,printing?{axisFont:22,titleFont:24}:{}):q.figure==='diagram'?qwDiagramSVG(q.diagram):q.figure==='image'&&q.image?'<img alt="Иллюстрация задания" src="'+q.image+'">':'';
@@ -84,26 +84,33 @@ function qwAnswerSections(d,options){
  });flush();return sections.join('');
 }
 function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
- const d=qwValidate(project),format=options.format||(teacher?'answers':d.layout),exam=format==='exam',modern=['compact','practice','answers','booklet'].includes(format),subject=QW_SUBJECTS[d.subject];
- if(!['worksheet','exam','compact','practice','answers','booklet'].includes(format))throw Error('Экзаменационный шаблон пока не сверён с ФИПИ');
+ const d=qwValidate(project),format=options.format||(teacher?'answers':d.layout),exam=format==='exam',subject=QW_SUBJECTS[d.subject];
+ if(!['worksheet','exam','compact','practice','answers','booklet'].includes(format))throw Error('Неизвестный формат PDF');
  if(!d.tasks.length)throw Error('Добавьте задания в работу');
+ const p=qwPrintSettings(d.printSettings||{}),showTitle=p.showTitle??(d.title!=='Новая работа'),showMeta=p.showMeta??format!=='booklet',showVariant=p.showVariant!==false;
+ const heading=p.titleText===undefined?d.title:p.titleText;
  const sectionTitle=q=>q.part&&!/^Часть \d+$/.test(q.part)?q.part:q.topic||q.part;
  let previousTopic='';const topics=new Set(d.tasks.map(sectionTitle).filter(Boolean));
  const tasks=format==='answers'?qwAnswerSections(d,options):d.tasks.map((q,i)=>{
   if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));
-  const topic=sectionTitle(q),showTopic=format==='compact'&&d.printSettings?.topicHeadings!==false&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
+  const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
  const printTheme=qwPrintTheme(options),styles=qwPrintStyles();
- const meta=format==='booklet'?'':qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'');
- const brandMarkup=format==='booklet'&&printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':qwPrintBrand(printTheme);
- const header=brandMarkup+'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(d.title)+'</h1>'+
-  (d.topic&&d.topic!==d.title?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
-  (format==='booklet'&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
+ const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
+ const brandMarkup=printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':'';
+ const header=brandMarkup+
+  (showTitle&&heading.trim()?'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(heading)+'</h1>':'')+
+  (showMeta&&d.topic&&d.topic!==heading?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
+  (format==='booklet'&&showVariant&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
   (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
   (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
+ const css='--qw-print-size:'+p.fontPt+'pt;--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
+  ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
-  '</title><style>'+styles+'</style></head><body '+(d.printSettings?'style="--qw-print-size:'+d.printSettings.fontPt+'pt" ':'')+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+'" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??'serif')+'" data-qw-title-font="'+(p.titleFont??'sans')+
+  '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
+  '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){
