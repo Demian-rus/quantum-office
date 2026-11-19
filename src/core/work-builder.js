@@ -96,7 +96,8 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  }).join('');
  const printTheme=qwPrintTheme(options),styles=qwPrintStyles();
  const meta=format==='booklet'?'':qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'');
- const header=qwPrintBrand(printTheme)+'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(d.title)+'</h1>'+
+ const brandMarkup=format==='booklet'&&printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':qwPrintBrand(printTheme);
+ const header=brandMarkup+'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(d.title)+'</h1>'+
   (d.topic&&d.topic!==d.title?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
   (format==='booklet'&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
   (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
@@ -123,17 +124,18 @@ async function qwPreview(output='tasks'){
  const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim());
  const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF','<div class="qw-pdf-controls">'+
   (key?'<div class="qw-row qw-preview-options"><span>Только ответы, без условий и рисунков</span>'+['includeCriteria','includeComments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'">'+['Добавить критерии','Добавить комментарии'][i]+'</label>').join('')+'</div>':qwLayoutCards(qwDoc.layout)+
-   '<div class="qw-row qw-preview-options qw-preview-settings" id="qw-compact-controls"><span>A4</span><label>Размер текста, пт<input type="number" min="9" max="12" step="0.5" data-print-setting="fontPt" value="'+prefs.fontPt+'"></label><label>Расположение рисунков<select data-print-setting="figurePosition">'+qwOptions([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select></label><label class="qw-check"><input type="checkbox" data-print-setting="topicHeadings" '+(prefs.topicHeadings?'checked':'')+'>Заголовки тем</label></div><div class="qw-preview-settings" data-practice-controls><div class="qw-row qw-preview-options">'+qwPracticeControls(qwDoc.practice)+'</div><p class="qw-muted" id="qw-practice-help"></p></div>'+(qwDoc.layout==='exam'?'<p class="qw-muted">Открыт прежний компактный макет. Соответствие ФИПИ не проверено.</p>':''))+
+   '<div class="qw-row qw-preview-options qw-preview-settings" id="qw-compact-controls"><span>A4</span><label>Размер текста, пт<input type="number" min="9" max="12" step="0.5" data-print-setting="fontPt" value="'+prefs.fontPt+'"></label><label>Расположение рисунков<select data-print-setting="figurePosition">'+qwOptions([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select></label><label class="qw-check"><input type="checkbox" data-print-setting="topicHeadings" '+(prefs.topicHeadings?'checked':'')+'>Заголовки тем</label></div><div class="qw-preview-settings" data-practice-controls><div class="qw-row qw-preview-options">'+qwPracticeControls(qwDoc.practice)+'</div><p class="qw-muted" id="qw-practice-help"></p></div>'+'<div class="qw-row qw-preview-options" id="qw-booklet-brand-controls"><label>Оформление QX<select data-qw-print-theme>'+qwOptions([['','Без бренда'],['academic','QX · Academic Tech'],['scientific','QX · Scientific'],['minimal','QX · Minimal']],'')+'</select></label><label class="qw-check"><input type="checkbox" data-qw-print-monochrome>Чёрно-белый</label></div>'+(qwDoc.layout==='exam'?'<p class="qw-muted">Открыт прежний компактный макет. Соответствие ФИПИ не проверено.</p>':''))+
   '</div><p id="qw-label-warnings" class="qw-error" hidden></p><div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div>',
   '<output id="qw-page-count" role="status">Расчёт страниц…</output>'+(key?qwButton('preview-tasks','К макету'):qwButton('preview-answers','Скачать ответы PDF',hasAnswers?'':'disabled title="Добавьте ответы к заданиям"'))+qwButton('preview-pdf',key?'Скачать ответы PDF':'Скачать PDF','class="qw-primary"'));
  d.classList.add('qw-print-preview-dialog');
  const preview=d.querySelector('#qw-print-preview-frame'),printButton=d.querySelector('[data-qw-action="preview-pdf"]');let renderRevision=0;
- const options=()=>({format:key?'answers':qwDoc.layout,...Object.fromEntries([...d.querySelectorAll('[data-key-option]')].map(e=>[e.dataset.keyOption,e.checked]))});
+ const options=()=>({format:key?'answers':qwDoc.layout,theme:qwDoc.layout==='booklet'?d.querySelector('[data-qw-print-theme]')?.value||'':'',monochrome:qwDoc.layout==='booklet'&&!!d.querySelector('[data-qw-print-monochrome]')?.checked,...Object.fromEntries([...d.querySelectorAll('[data-key-option]')].map(e=>[e.dataset.keyOption,e.checked]))});
  const refresh=()=>{
   const revision=++renderRevision;printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');
   d.querySelector('#qw-page-count').textContent='Расчёт страниц…';
   const controls=d.querySelector('[data-practice-controls]');if(controls){controls.hidden=qwDoc.layout!=='practice';d.querySelector('#qw-practice-help').textContent=(qwDoc.practice?.perPage||2)===1?'Одна задача: почти весь свободный лист отводится для решения.':'У каждой задачи будет отдельное пространство для решения.';}
   const compact=d.querySelector('#qw-compact-controls');if(compact)compact.hidden=!['compact','booklet'].includes(qwDoc.layout);
+  const brand=d.querySelector('#qw-booklet-brand-controls');if(brand)brand.hidden=qwDoc.layout!=='booklet';
   preview.onload=async()=>{
    const win=preview.contentWindow,documentAtLoad=win.document;
    if(documentAtLoad.documentElement.dataset.qwRender!==String(revision)||!win.qwPrintReady)return;
@@ -146,7 +148,7 @@ async function qwPreview(output='tasks'){
   try{preview.srcdoc=qwPrintDocumentHTML(qwDoc,false,options()).replace('<html lang="ru">','<html lang="ru" data-qw-render="'+revision+'">');}
   catch(e){preview.srcdoc='<p role="alert">'+qwEsc(e.message)+'</p>';d.querySelector('#qw-page-count').textContent=e.message;d.querySelector('#qw-pages').setAttribute('aria-busy','false');}
  };
- d.querySelectorAll('[data-key-option]').forEach(e=>e.onchange=refresh);
+ d.querySelectorAll('[data-key-option],[data-qw-print-theme],[data-qw-print-monochrome]').forEach(e=>e.onchange=refresh);
  d.querySelectorAll('[name="qw-pdf-layout"],[data-practice],[data-print-setting]').forEach(e=>e.onchange=()=>{
   qwRemember();const layout=d.querySelector('[name="qw-pdf-layout"]:checked');if(layout){const previous=qwDoc.layout;qwDoc.layout=layout.value;if(previous!=='booklet'&&layout.value==='booklet'&&!qwDoc.printSettings)qwDoc.printSettings={...qwPrintSettings(),fontPt:10.5};}
   if(qwDoc.layout==='practice')qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
