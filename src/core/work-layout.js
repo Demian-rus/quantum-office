@@ -137,6 +137,22 @@ body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-task-text{grid-c
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure figure{grid-column:2;grid-row:1 / 3;align-self:start;justify-self:center;margin:0;float:none!important}
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{grid-column:1;grid-row:2;align-self:end;margin:2.4mm 0 0}
 
+
+/* TASK154 — one typographic system for all exported document formats. */
+body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
+body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
+body[data-qw-font="serif"]{--qw-print-family:"QO Print Serif",Georgia,serif}
+body[data-qw-title-font="serif"]{--qw-title-family:"QO Print Serif",Georgia,serif}
+body[data-qw-title-font="sans"]{--qw-title-family:"QO Print Sans",Arial,sans-serif}
+body[data-qw-format] .qw-print-title{font-family:var(--qw-title-family);font-size:var(--qw-title-size,14pt);font-weight:700;color:var(--qw-title-color,#111);text-align:var(--qw-title-align,center);line-height:1.23;max-width:100%;overflow-wrap:break-word}
+body[data-qw-format] .qw-print-header{text-align:var(--qw-title-align,center)}
+body[data-qw-format] .qw-paper-task{color:var(--qw-body-color,#111)}
+body[data-qw-format] math{font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none;math-style:normal}
+body[data-qw-format] math :is(mi,mn,mo,mtext){font-weight:400}
+body[data-qw-show-pages="false"] .qw-page-footer{display:none}
+body[data-qw-format="compact"] .qw-print-header{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+body[data-qw-format="worksheet"] .qw-print-section{margin-bottom:3mm}
+
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
