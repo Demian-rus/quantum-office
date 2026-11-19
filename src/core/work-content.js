@@ -295,9 +295,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
    if(o.kind==='ground'){
     const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
-    for(let i=0;i<=Math.floor(length/14);i++){
-     const t=i*14/length,x=o.x+dx*t,y=o.y+dy*t;
-     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-dy/length*10-dx/length*5)+'" y2="'+numeric(y+dx/length*10-dy/length*5)+'" stroke="#91a0ae" stroke-width="1"/>';
+    for(let distance=10;distance<=length-8;distance+=14){
+     const ux=dx/length,uy=dy/length,x=o.x+ux*distance,y=o.y+uy*distance;
+     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-ux*6-uy*9)+'" y2="'+numeric(y-uy*6+ux*9)+'" stroke="#687889" stroke-width="1.1" stroke-linecap="round"/>';
     }
    }
   }
@@ -322,11 +322,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
   }
   if(o.kind==='block'){
-   const cx=minX+w/2,cy=minY+h/2;
-   shape=
-    '<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>'+
-    '<path d="M'+numeric(minX+w*.12)+' '+numeric(minY+h*.14)+'h'+numeric(w*.34)+'" stroke="#a1adba" stroke-width="1"/>'+
-    '';
+   shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>';
   }
   if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
   if(['pulley','fixedPulley','movablePulley'].includes(o.kind)){
