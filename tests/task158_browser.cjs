@@ -54,6 +54,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
     brandText:brand?.textContent.trim(),brandColor:brand?getComputedStyle(brand).color:'',
     brandBg:brand?getComputedStyle(brand).backgroundColor:'',
     brandClip:brand?getComputedStyle(brand).clipPath:'',
+    badgeFlush:brand?{top:brand.getBoundingClientRect().top-sheet.top,right:sheet.right-brand.getBoundingClientRect().right}:null,
     duplicatedBrandInColumn:!!document.querySelector('.qw-print-page .qw-print-brand'),
     stripes:[...pages].some(page=>getComputedStyle(page,'::before').display!=='none'),
     runningHeaders:spans.length,sheetWidth:sheet.width,sheetHeight:sheet.height,err:window.__qwPrintError||null};
@@ -73,7 +74,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
   assert.equal(data.brandText,'QX | Квант Икс');
   assert.equal(data.brandColor,'rgb(156, 255, 0)');
   assert.equal(data.brandBg,'rgb(7, 8, 9)');
-  assert.match(data.brandClip,/polygon/);
+  assert.match(data.brandClip,/polygon\(0px 0px, calc\(100% - [\d.]+px\) 0px, 100% [\d.]+px, 100% 100%, 0px 100%\)/,'only outer top-right cut');
+  assert.ok(Math.abs(data.badgeFlush.top)<0.1 && Math.abs(data.badgeFlush.right)<0.1,'brand touches top and right sheet edges');
   assert.equal(data.stripes,false);assert.equal(data.runningHeaders,0);
   assert.ok(data.sheetWidth>data.sheetHeight);
   await p.emulateMedia({media:'print'});
