@@ -15,8 +15,8 @@ function qwMeasureSVGInk(svg){
   return {x:box.x-pad,y:box.y-pad,width:Math.max(1,box.width+pad*2),height:Math.max(1,box.height+pad*2)};
  }finally{for(const {e,style} of clipped)if(style===null)e.removeAttribute('style');else e.setAttribute('style',style);}
 }
-function qwPrintStyles(){return QW_PRINT_FONT_CSS+`
-@page{size:A4;margin:0}
+function qwPrintStyles(orientation='portrait'){return QW_PRINT_FONT_CSS+`
+@page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'};margin:0}
 :root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -154,6 +154,11 @@ body:not([data-qw-format="booklet"]) .qw-page-footer{font-family:"QO Print Sans"
 body[data-qw-format="compact"] .qw-print-header{grid-template-columns:minmax(0,1fr) auto;align-items:center}
 body[data-qw-format="worksheet"] .qw-print-section{margin-bottom:3mm}
 
+/* TASK155: physical A4 geometry; preserve consistent margins in either orientation. */
+body[data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm}
+body[data-qw-orientation="landscape"] .qw-page-content{width:267mm;height:176mm}
+body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm;padding:13mm 13mm 17mm}
+body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-page-content{width:271mm;height:180mm}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -165,7 +170,7 @@ async function qwPreparePrintDocument(){
  await Promise.all([...document.images].map(img=>img.decode()));
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
- const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format);
+ const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape';
  // Booklet-only MathML typographic correction; QWORK source is unchanged.
  if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
   const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
@@ -173,8 +178,8 @@ async function qwPreparePrintDocument(){
   padded.setAttribute('lspace','0.09em');padded.setAttribute('width','+0.09em');
   script.replaceWith(padded);padded.append(script);
  }
- // Figure geometry is calculated in an A4-width measurement surface.
- source.style.width=format==='booklet'?'184mm':modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
+ // Figure geometry follows the actual A4 printable width, not a portrait-only ruler.
+ source.style.width=landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
   // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
   if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
