@@ -150,6 +150,7 @@ body[data-qw-format] .qw-paper-task{color:var(--qw-body-color,#111)}
 body[data-qw-format] math{font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none;math-style:normal}
 body[data-qw-format] math :is(mi,mn,mo,mtext){font-weight:400}
 body[data-qw-show-pages="false"] .qw-page-footer{display:none}
+body:not([data-qw-format="booklet"]) .qw-page-footer{font-family:"QO Print Sans",Arial,sans-serif}
 body[data-qw-format="compact"] .qw-print-header{grid-template-columns:minmax(0,1fr) auto;align-items:center}
 body[data-qw-format="worksheet"] .qw-print-section{margin-bottom:3mm}
 
