@@ -223,7 +223,11 @@ function qwBankNormalize(x){
  return {id:qwText(x.id,80)||qwId(),subject:x.subject==='math'?'math':'physics',
   grade:qwText(x.grade??task.grade,24).trim(),exam:['general','oge','ege'].includes(x.exam)?x.exam:task.exam,
   topic:qwText(x.topic??task.topic,120).trim(),subtopic:qwText(x.subtopic??task.subtopic,120).trim(),
-  origin:['original','adapted','generated'].includes(x.origin)?x.origin:task.origin,task};
+  origin:['original','adapted','generated'].includes(x.origin)?x.origin:task.origin,
+  year:/^(19|20)\d{2}$/.test(String(x.year??''))?String(x.year):'',
+  part:['1','2'].includes(String(x.part??''))?String(x.part):'',
+  slot:/^([1-9]|[1-3]\d|40)$/.test(String(x.slot??''))?String(x.slot):'',
+  difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
 function qwBankRead(){
  const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];
@@ -236,7 +240,11 @@ function qwBankSave(){
  const fields='<div class="qw-settings">'+
   '<label>Предмет<select id="qw-bank-new-subject">'+qwOptions(Object.entries(QW_SUBJECTS),qwDoc.subject)+'</select></label>'+
   '<label>Класс<input id="qw-bank-new-grade" maxlength="24" value="'+qwEsc(q.grade||qwDoc.grade)+'"></label>'+
-  '<label>Назначение<select id="qw-bank-new-exam">'+qwOptions([['general','Обычная работа'],['oge','ОГЭ'],['ege','ЕГЭ']],q.exam)+'</select></label>'+
+  '<label>Назначение<select id="qw-bank-new-exam">'+qwOptions([['general','Практика'],['oge','ОГЭ'],['ege','ЕГЭ']],q.exam)+'</select></label>'+
+  '<label>Год<input id="qw-bank-new-year" type="number" min="1900" max="2099" step="1" placeholder="2018" value=""></label>'+
+  '<label>Часть<select id="qw-bank-new-part">'+qwOptions([['','Без части'],['1','Часть 1'],['2','Часть 2']],'')+'</select></label>'+
+  '<label>Номер задания<input id="qw-bank-new-slot" type="number" min="1" max="40" step="1" placeholder="1–40"></label>'+
+  '<label>Уровень<select id="qw-bank-new-difficulty">'+qwOptions([['','Без уровня'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']],'')+'</select></label>'+
   '<label>Тема<input id="qw-bank-new-topic" maxlength="120" placeholder="Механика" value="'+qwEsc(q.topic||qwDoc.topic)+'"></label>'+
   '<label>Подтема<input id="qw-bank-new-subtopic" maxlength="120" placeholder="Кинематика" value="'+qwEsc(q.subtopic)+'"></label>'+
   '<label>Происхождение<select id="qw-bank-new-origin">'+qwOptions([['original','Авторская задача'],['adapted','Самостоятельный аналог'],['generated','С помощью ИИ']],q.origin)+'</select></label></div>';
@@ -246,10 +254,13 @@ function qwBankSave(){
    const xs=qwBankRead();if(xs.length>=500)throw Error('Достигнут лимит 500 заданий. Создайте резервную копию банка.');
    const get=k=>d.querySelector('#qw-bank-new-'+k).value;
    const metadata={subject:get('subject'),grade:get('grade').trim().slice(0,24),exam:get('exam'),
-    topic:get('topic').trim().slice(0,120),subtopic:get('subtopic').trim().slice(0,120),origin:get('origin')};
+    topic:get('topic').trim().slice(0,120),subtopic:get('subtopic').trim().slice(0,120),origin:get('origin'),
+    year:get('year').trim(),part:get('part'),slot:get('slot').trim(),difficulty:get('difficulty')};
+   if(metadata.year&&!/^(19|20)\d{2}$/.test(metadata.year))throw Error('Год должен быть четырёхзначным');
+   if(metadata.slot&&!/^([1-9]|[1-3]\d|40)$/.test(metadata.slot))throw Error('Номер задания: 1–40');
    const task=structuredClone(q);Object.assign(task,{grade:metadata.grade,exam:metadata.exam,
     topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
-   xs.push({id:qwId(),...metadata,task});
+   xs.push(qwBankNormalize({id:qwId(),...metadata,task}));
    localStorage.setItem(QW_BANK_KEY,JSON.stringify(xs));
    d.close();status('Задание сохранено в банке');
   }catch(e){status('Банк: '+e.message,true);}
@@ -279,7 +290,7 @@ function qwBank(){
    const data=JSON.parse(await file.text());
    if(data?.format!=='quantum-work-bank'||data.version!==1||!Array.isArray(data.items)||data.items.length>500)throw Error('Неподдерживаемый формат QWBANK');
    const incoming=data.items.map(qwBankNormalize);
-   const signature=x=>[x.subject,x.grade,x.exam,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
+   const signature=x=>[x.subject,x.grade,x.exam,x.year,x.part,x.slot,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
    const seen=new Set(xs.map(signature));const additions=[];
    for(const x of incoming){const key=signature(x);if(seen.has(key))continue;seen.add(key);additions.push({...x,id:qwId()});}
    if(xs.length+additions.length>500)throw Error('Превышен лимит 500 заданий');
