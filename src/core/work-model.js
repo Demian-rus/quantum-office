@@ -15,7 +15,25 @@ function qwPrintSettings(raw={}){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректные параметры печати');
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
  if(!Number.isFinite(fontPt)||fontPt<9||fontPt>12||!['auto','right','below'].includes(figurePosition)||typeof topicHeadings!=='boolean')throw Error('Проверьте параметры печати');
- return {fontPt,figurePosition,topicHeadings};
+ const options={fontPt,figurePosition,topicHeadings};
+ const flags=['showTitle','showMeta','showVariant','showPageNumbers'];
+ for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
+ const textKeys={titleText:160};
+ for(const [key,max] of Object.entries(textKeys))if(raw[key]!==undefined){
+  if(typeof raw[key]!=='string'||raw[key].length>max)throw Error('Некорректный текст заголовка');
+  options[key]=raw[key];
+ }
+ const choices={titleFont:['sans','serif'],titleAlign:['left','center','right'],bodyFont:['serif','sans']};
+ for(const [key,values] of Object.entries(choices))if(raw[key]!==undefined){
+  if(!values.includes(raw[key]))throw Error('Некорректный шрифт или выравнивание');
+  options[key]=raw[key];
+ }
+ if(raw.titlePt!==undefined){if(!Number.isFinite(raw.titlePt)||raw.titlePt<11||raw.titlePt>26)throw Error('Размер заголовка: 11–26 пт');options.titlePt=raw.titlePt;}
+ for(const key of ['titleColor','bodyColor'])if(raw[key]!==undefined){
+  if(typeof raw[key]!=='string'||!/^#[0-9a-f]{6}$/i.test(raw[key]))throw Error('Цвет должен быть #RRGGBB');
+  options[key]=raw[key].toLowerCase();
+ }
+ return options;
 }
 function qwNum(v,min,max,fallback){return Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;}
 function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t, с',ylabel:'v, м/с',coordinateMode:'first',grid:true,connected:true,smooth:false,snapToGrid:true,curveFamily:'points',curve:{a:1,b:0,c:0,amplitude:3,frequency:1,phase:0,offset:0,trig:'sin'},points:[],elements:[]};}
