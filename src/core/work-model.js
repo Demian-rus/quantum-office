@@ -23,7 +23,7 @@ function qwPrintSettings(raw={}){
   if(typeof raw[key]!=='string'||raw[key].length>max)throw Error('Некорректный текст заголовка');
   options[key]=raw[key];
  }
- const choices={titleFont:['sans','serif'],titleAlign:['left','center','right'],bodyFont:['serif','sans'],theme:['','academic','scientific','minimal'],orientation:['portrait','landscape']};
+ const choices={titleFont:['sans','serif'],titleAlign:['left','center','right'],bodyFont:['serif','sans'],theme:['','academic','scientific','minimal'],orientation:['portrait','landscape'],landscapeLayout:['spread','wide']};
  for(const [key,values] of Object.entries(choices))if(raw[key]!==undefined){
   if(!values.includes(raw[key]))throw Error('Некорректный шрифт или выравнивание');
   options[key]=raw[key];
