@@ -96,7 +96,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
- const printTheme=qwPrintTheme(options),styles=qwPrintStyles();
+ const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles();
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
  const brandMarkup=printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':'';
  const header=brandMarkup+
