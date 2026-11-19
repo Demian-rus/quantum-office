@@ -18,7 +18,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
      for(const e of s.querySelectorAll('math,figure,.qw-task-text,.qw-practice-space')){const a=e.getBoundingClientRect();if(a.left<b.left-1||a.right>b.right+1||a.bottom>b.bottom+1)bounds.push({task:s.dataset.task,tag:e.tagName});}
     }
    }
-   return {layout:window.__qwPrintLayout,bounds,overlaps,text:document.body.innerText,logoLabels:[...document.querySelectorAll('.qw-qx-handwriting')].map(x=>x.getAttribute('aria-label')),math:document.querySelectorAll('math').length,svg:document.querySelectorAll('figure svg').length,
+   return {layout:window.__qwPrintLayout,bounds,overlaps,text:document.body.innerText,logoLabels:[...document.querySelectorAll('.qw-qx-lettering')].map(x=>x.textContent.trim()),math:document.querySelectorAll('math').length,svg:document.querySelectorAll('figure svg').length,
     textBoxes:[...document.querySelectorAll('.qw-task-text')].flatMap(e=>{
      const walker=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){if(n.textContent.trim()&&!n.parentElement.closest('math'))break;}if(!n)return [];
      const range=document.createRange();range.setStart(n,0);range.setEnd(n,Math.min(12,n.textContent.length));const b=range.getClientRects()[0],p=e.closest('.qw-print-page'),pb=p.getBoundingClientRect(),ctx=document.createElement('canvas').getContext('2d');ctx.font=getComputedStyle(n.parentElement).font;
