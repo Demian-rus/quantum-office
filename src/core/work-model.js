@@ -162,6 +162,10 @@ function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
    local.push({x:cx,y:cy},{x:cx,y:['circle','ellipse'].includes(o.kind)?y:cy-r},{x:cx,y:['circle','ellipse'].includes(o.kind)?y2:cy+r},{x:['circle','ellipse'].includes(o.kind)?x:cx-r,y:cy},{x:['circle','ellipse'].includes(o.kind)?x2:cx+r,y:cy});
    if(o.kind==='movablePulley')local.push({x:cx-r,y:cy-r-32},{x:cx+r,y:cy-r-32},{x:cx,y:cy+r+18});
    else if(!['circle','ellipse'].includes(o.kind))local.push({x:cx,y:cy-r-14});
+  }else if(['ground','rope'].includes(o.kind)){
+   const dx=o.x2-o.x,dy=o.y2-o.y,length2=dx*dx+dy*dy;
+   const t=length2?Math.min(1,Math.max(0,((target.x-o.x)*dx+(target.y-o.y)*dy)/length2)):0;
+   local.push({x:o.x,y:o.y},{x:o.x2,y:o.y2},{x:o.x+dx*t,y:o.y+dy*t});
   }else local.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
   const cx=(x+x2)/2,cy=(y+y2)/2,a=(o.rotation||0)*Math.PI/180;
   anchors.push(...local.map(p=>({x:cx+(p.x-cx)*Math.cos(a)-(p.y-cy)*Math.sin(a),y:cy+(p.x-cx)*Math.sin(a)+(p.y-cy)*Math.cos(a)})));
