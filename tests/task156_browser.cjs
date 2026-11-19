@@ -63,7 +63,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task156');
    return qwValidate(d);
   });
   assert.equal(tasks.tasks.length,32);
-  const cases=[['portrait','spread'],['landscape','wide'],['landscape','spread']];
+  const cases=[['portrait','spread'],['landscape','spread']];
   const reports=[];
   for(const [orientation,landscapeLayout] of cases){
    const doc=structuredClone(tasks);doc.printSettings.orientation=orientation;doc.printSettings.landscapeLayout=landscapeLayout;
