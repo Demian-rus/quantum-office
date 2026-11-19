@@ -37,5 +37,18 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
 }
 /* The acid-green QX identity remains in color even in monochrome worksheet mode. */
 body[data-qw-monochrome="true"] :is(.qw-print-topic,.qw-topic-title){color:#222!important}
+
+/* TASK158.5: fixed vector handwritten logo from owner's reference (font-independent). */
+.qw-print-brand,.qw-print-brand.qw-booklet-brand,
+body[data-qw-format="booklet"] .qw-booklet-brand,
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{
+ position:absolute;top:auto;bottom:6mm;right:10.5mm;left:auto;z-index:5;
+ box-sizing:border-box;display:block!important;width:62mm;height:11.2mm;
+ min-width:0;min-height:0;margin:0;padding:0;overflow:visible;
+ border:0;background:transparent!important;clip-path:none!important;transform:none;
+}
+.qw-print-brand::after{display:none!important;content:none!important}
+.qw-print-brand .qw-qx-handwriting{display:block;width:100%;height:100%;overflow:visible}
+
 `;}
 export {QW_PRINT_THEMES,qwPrintTheme,qwPrintBrand,qwPrintThemeStyles};
