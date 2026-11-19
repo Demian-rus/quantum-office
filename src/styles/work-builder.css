@@ -372,3 +372,29 @@
 .qw-visual-tools :is(details,label,select,input,button){min-width:0;max-width:100%}
 .qw-visual-tools label{width:100%}.qw-visual-tools select{box-sizing:border-box;width:100%}
 .qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;list-style-type:decimal;line-height:1.4}
+
+
+/* TASK154 — structured personal bank and PDF selection workspace. */
+.qw-bank-assemble-dialog{width:min(1060px,calc(100vw - 20px));max-width:none;max-height:calc(100dvh - 22px)}
+.qw-bank-assemble-dialog>.qw-dialog-body{overflow:auto;min-height:0}
+.qw-bank-filter-panel{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.qw-bank-filter-panel label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:11px;font-weight:600}
+.qw-bank-filter-panel label:first-child{grid-column:span 2}
+.qw-bank-filter-panel input,.qw-bank-filter-panel select{min-width:0;width:100%;height:32px;box-sizing:border-box;padding:4px 6px;font-weight:400}
+.qw-bank-selection-line{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:6px 0 9px;border-bottom:1px solid var(--qo-border);font-size:12px}
+.qw-bank-card-copy{flex:1;display:flex;flex-direction:column;gap:4px;min-width:0}
+.qw-bank-card-copy strong{font-size:12px;line-height:1.35;font-weight:500;overflow-wrap:anywhere}
+.qw-bank-card-copy small{font-size:10.5px;line-height:1.3;color:var(--qo-text-muted,#5d6878);overflow-wrap:anywhere}
+.qw-bank-choice{display:flex;align-items:center;gap:10px}
+.qw-bank-select-check{display:flex;gap:9px;align-items:flex-start;flex:1;min-width:0}
+.qw-bank-select-check input[type=checkbox]{margin-top:2px;flex:none;width:15px;height:15px}
+.qw-bank-choice>button{flex:none;white-space:nowrap}
+@media(max-width:800px){
+ .qw-bank-filter-panel{grid-template-columns:repeat(3,minmax(0,1fr))}
+ .qw-bank-filter-panel label:first-child{grid-column:span 2}
+}
+@media(max-width:570px){
+ .qw-bank-filter-panel{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .qw-bank-choice{gap:5px}
+ .qw-bank-choice>button{font-size:11px;padding:5px}
+}
