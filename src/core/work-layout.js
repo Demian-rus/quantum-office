@@ -197,6 +197,22 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
   margin:0;box-shadow:none;
  }
 }
+
+/* TASK158: shared first-sheet heading, centered over BOTH independent columns. */
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{position:relative}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet.qw-first-sheet .qw-page-content{
+ padding-top:var(--qw-shared-heading-clearance,0px);
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{
+ position:absolute;z-index:2;box-sizing:border-box;
+ left:42mm;right:42mm;top:6mm;width:auto;margin:0;
+ text-align:center;pointer-events:none;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header .qw-print-title{
+ margin:0 0 1.5mm;line-height:1.15;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{right:0;top:0}
+
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -276,15 +292,38 @@ async function qwPreparePrintDocument(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
-  if(!pages.length)content.append(header);else if(format!=='booklet'&&title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
-  if(brand)page.append(brand.cloneNode(true));
   if(spread){
+   // Paginate into logical columns, but decorate the physical A4 sheet exactly once.
    let sheet=host.querySelector(':scope > .qw-print-sheet:last-of-type');
-   if(!sheet||sheet.children.length>=2){
+   const isNew=!sheet||sheet.querySelectorAll(':scope > .qw-print-page').length>=2;
+   if(isNew){
     sheet=document.createElement('section');sheet.className='qw-print-sheet';host.append(sheet);
+    if(brand)sheet.append(brand.cloneNode(true));
+    if(!pages.length){
+     sheet.classList.add('qw-first-sheet');
+     if(header.childElementCount){
+      header.classList.add('qw-shared-sheet-header');
+      sheet.append(header);
+     }
+    }
    }
    sheet.append(page);
-  }else host.append(page);
+   // Both columns on the first sheet reserve the SAME header height.
+   if(!pages.length&&sheet.contains(header)&&header.childElementCount){
+    const headerBottom=header.getBoundingClientRect().bottom;
+    const contentTop=content.getBoundingClientRect().top;
+    const clearance=Math.max(0,Math.ceil(headerBottom-contentTop+2*MM));
+    sheet.style.setProperty('--qw-shared-heading-clearance',clearance+'px');
+   }
+  }else{
+   if(!pages.length)content.append(header);
+   else if(format!=='booklet'&&title){
+    const running=document.createElement('div');running.className='qw-running-header';
+    running.textContent=title+(meta?' · '+meta:'');content.append(running);
+   }
+   if(brand)page.append(brand.cloneNode(true));
+   host.append(page);
+  }
   pages.push({page,content});return pages.at(-1);
  }
  function used(page){const last=[...page.content.children].reverse().find(e=>getComputedStyle(e).display!=='none');if(!last)return 0;return last.getBoundingClientRect().bottom-page.content.getBoundingClientRect().top+parseFloat(getComputedStyle(last).marginBottom||0);}
