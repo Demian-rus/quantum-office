@@ -95,11 +95,11 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
  const printTheme=qwPrintTheme(options),styles=qwPrintStyles();
- const meta=qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'');
+ const meta=format==='booklet'?'':qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'');
  const header=qwPrintBrand(printTheme)+'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(d.title)+'</h1>'+
   (d.topic&&d.topic!==d.title?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
   (format==='booklet'&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
-  '<div class="qw-print-meta">'+meta+'</div>'+
+  (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
   (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title><style>'+styles+'</style></head><body '+(d.printSettings?'style="--qw-print-size:'+d.printSettings.fontPt+'pt" ':'')+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+'" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
@@ -619,6 +619,10 @@ function qwVisualEditor(kind){
  };
  stage.onpointermove=e=>{
   if(!drag)return;const p=point(e),coordinate=kind==='graph'?gridPoint(p):p;
+  if(kind==='diagram'&&drag.creating&&drag.draft?.kind==='rope'&&snapGeometry&&!e.shiftKey){
+   if(Math.abs(coordinate.x-drag.start.x)<=7)coordinate.x=drag.start.x;
+   if(Math.abs(coordinate.y-drag.start.y)<=7)coordinate.y=drag.start.y;
+  }
   if(drag.label){
    let dx=p.x-drag.start.x,dy=p.y-drag.start.y;const bounds=kind==='graph'?{x:84,y:48,x2:449,y2:260}:{x:3,y:3,x2:517,y2:317};
    dx=qwNum(dx,bounds.x-drag.box.x,bounds.x2-drag.box.x-drag.box.w,0);dy=qwNum(dy,bounds.y-drag.box.y,bounds.y2-drag.box.y-drag.box.h,0);
