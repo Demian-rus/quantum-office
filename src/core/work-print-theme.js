@@ -7,29 +7,34 @@ function qwPrintTheme(options={}){
 }
 function qwPrintBrand(theme){
  if(!theme.id)return '';
- return '<div class="qw-print-brand">Квант Икс | QX</div>';
+ return '<div class="qw-print-brand">QX | Квант Икс</div>';
 }
 function qwPrintThemeStyles(){return `
-body[data-qw-theme]{--qw-accent:#2458a6;--qw-rule:#aebed2;color:#111}
-body[data-qw-theme] .qw-print-page:before{content:"";position:absolute;left:12mm;right:12mm;top:4mm;height:.4mm;background:var(--qw-accent)}
-.qw-print-brand{position:absolute;right:12mm;top:7.3mm;margin:0;color:#555;font:7pt/1.2 "QO Print Sans",sans-serif;white-space:nowrap}
-body[data-qw-theme] .qw-print-topic{color:#b42318}
+/* TASK158: single paper-cut brand on each physical A4 sheet. */
+body[data-qw-theme]{--qw-accent:#9cff00;--qw-rule:#111;color:#111}
+body[data-qw-theme] .qw-print-page:before{content:none!important;display:none!important}
+.qw-print-brand{
+ position:absolute;right:0;top:0;z-index:5;
+ box-sizing:border-box;min-width:42mm;min-height:11mm;
+ display:flex!important;align-items:center;justify-content:flex-end;
+ padding:2.4mm 4.2mm 2.3mm 8.3mm;margin:0;
+ background:#070809;color:#9cff00;
+ font:800 8pt/1.15 "QO Print Sans",Arial,sans-serif;
+ letter-spacing:.015em;text-transform:none;white-space:nowrap;
+ clip-path:polygon(0 0,100% 0,100% 100%,13% 100%,0 65%);
+}
+.qw-print-brand strong,.qw-print-brand span{font:inherit;color:inherit;letter-spacing:inherit}
+body[data-qw-theme] .qw-print-topic{color:#111}
 body[data-qw-theme] .qw-page-footer{color:#555}
-body[data-qw-theme="scientific"]{--qw-print-family:"QO Print Serif",serif;--qw-accent:#41454c;--qw-rule:#aaa}
-body[data-qw-theme="minimal"]{--qw-accent:#555;--qw-rule:#ccc}
-body[data-qw-theme="minimal"] .qw-print-page:before{right:auto;width:18mm;height:.3mm}
-body[data-qw-format="booklet"][data-qw-theme] .qw-print-page:before{top:4mm;left:13mm;right:13mm;height:.23mm;background:var(--qw-rule)}
-body[data-qw-format="booklet"] .qw-booklet-brand{right:13mm;top:6mm;display:flex;align-items:baseline;gap:2mm;color:#1b2e43;white-space:nowrap}
-body[data-qw-format="booklet"] .qw-booklet-brand strong{font:800 17pt/1 "QO Print Sans",Arial,sans-serif;letter-spacing:-.08em}
-body[data-qw-format="booklet"] .qw-booklet-brand span{font:600 6.3pt/1 "QO Print Sans",Arial,sans-serif;letter-spacing:.13em}
-body[data-qw-format="booklet"][data-qw-theme="academic"] .qw-booklet-brand strong{color:#2458a6}
-body[data-qw-format="booklet"][data-qw-theme="scientific"] .qw-booklet-brand{color:#2f3743}
-body[data-qw-format="booklet"][data-qw-theme="scientific"] .qw-booklet-brand strong{font-family:"QO Print Serif",Georgia,serif;font-weight:700;letter-spacing:-.04em}
-body[data-qw-format="booklet"][data-qw-theme="minimal"] .qw-booklet-brand strong{color:#171717;font-size:15pt}
-body[data-qw-format="booklet"][data-qw-theme="minimal"] .qw-booklet-brand span{font-size:6pt;color:#555}
-body[data-qw-format="booklet"][data-qw-monochrome="true"] .qw-booklet-brand strong{color:#222}
-body[data-qw-monochrome="true"]{--qw-accent:#222;--qw-rule:#888}
-body[data-qw-monochrome="true"] .qw-print-section:before{background:#ddd!important}
+body[data-qw-theme="scientific"]{--qw-print-family:"QO Print Serif",serif}
+body[data-qw-theme="minimal"]{--qw-accent:#9cff00}
+body[data-qw-format="booklet"] .qw-booklet-brand{
+ right:0;top:0;display:flex!important;transform:none;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{
+ right:0;top:0;transform:none;
+}
+body[data-qw-monochrome="true"] .qw-print-brand{background:#111;color:#fff}
 body[data-qw-monochrome="true"] :is(.qw-print-topic,.qw-topic-title){color:#222!important}
 `;}
 export {QW_PRINT_THEMES,qwPrintTheme,qwPrintBrand,qwPrintThemeStyles};
