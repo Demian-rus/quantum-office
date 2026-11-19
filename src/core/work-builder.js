@@ -375,7 +375,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
 }
 function qwBank(previousFilters={}){
  let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
- const selected=new Map(),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
+ const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
  const filters='<div id="qw-bank-filters" class="qw-bank-filter-panel">'+
   '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Поиск по условию или теме"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
@@ -496,6 +496,7 @@ function qwBank(previousFilters={}){
   const edit=e.target.closest('[data-bank-edit]');
   if(edit){
    const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type'].map(k=>[k,pick(k)]));
+   filters.__selected=[...selected.keys()];
    qwBankEdit(edit.dataset.bankEdit,null,filters);return;
   }
   const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');
