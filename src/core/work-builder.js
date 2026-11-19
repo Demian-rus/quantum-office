@@ -187,7 +187,7 @@ async function qwPreview(output='tasks'){
    if(revision!==renderRevision||preview.contentDocument!==atLoad)return;
    preview.dataset.ready=String(revision);d.querySelector('#qw-pages').setAttribute('aria-busy','false');
    printButton.disabled=!!win.__qwPrintError;
-   d.querySelector('#qw-page-count').textContent=win.__qwPrintError?'Ошибка: '+win.__qwPrintError:'Страниц: '+win.__qwPrintLayout.pages.length;
+   d.querySelector('#qw-page-count').textContent=win.__qwPrintError?'Ошибка: '+win.__qwPrintError:win.__qwPrintLayout.layout==='spread'?'Листов A4: '+win.__qwPrintLayout.sheets+' · полос: '+win.__qwPrintLayout.pages.length:'Страниц: '+win.__qwPrintLayout.pages.length;
    const n=win.document.querySelectorAll('[data-label-conflict="true"]').length,w=d.querySelector('#qw-label-warnings');
    w.hidden=!n;w.textContent=n?'Пересечение подписей на рисунке: '+n:'';
   };
@@ -274,7 +274,8 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  let stored;try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
  if(!stored){status('Задание больше не найдено в банке',true);return;}
  draft??=structuredClone(stored);
- const opts=(k,items)=>'<label>'+k+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
+ const titles={subject:'Предмет',exam:'Экзамен',part:'Часть',difficulty:'Сложность',origin:'Происхождение'};
+ const opts=(k,items)=>'<label>'+(titles[k]||k)+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
  const task=draft.task;
  const taskFields='<div class="qw-bank-edit-fields">'+
@@ -340,7 +341,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   qwVisualEditor(kind,task,(updatedKind,validated)=>{
    task[updatedKind]=validated;task.figure=updatedKind;
    qwBankEdit(id,draft,returnFilters);
-  });
+  },()=>qwBankEdit(id,draft,returnFilters));
  });
  d.querySelector('#qw-bank-edit-image').onchange=async(event)=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -513,7 +514,7 @@ function qwBank(previousFilters={}){
  };
  fillYears();
  for(const [key,value] of Object.entries(previousFilters)){
-  const input=get(key);if(input&&[...input.options||[]].some(o=>o.value===value)||input?.type==='search')input.value=value;
+  const input=get(key);if(input&&(input.type==='search'||[...(input.options||[])].some(o=>o.value===value)))input.value=value;
  }
  refresh();
 }
@@ -630,7 +631,7 @@ function qwGraphSidebar(tool,coordinateMode){
   '<details class="qw-tool-group qw-coordinate-group" open><summary>Координатная система</summary><label>Режим осей<select id="qw-coordinate-mode" aria-label="Координатная система" title="Координатная система">'+qwOptions([['first','Первая четверть'],['positiveX','X ≥ 0, Y ±'],['math','X ±, Y ±'],['custom','Свой диапазон']],coordinateMode||'first')+'</select></label><p class="qw-muted" id="qw-coordinate-hint"></p></details>'+
   '<details class="qw-tool-group qw-template-group" open><summary>Шаблоны</summary><label>Готовый график<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label><div id="qw-graph-mode"></div><button type="button" id="qw-add-point" data-tool="legacyPoint" aria-label="Добавить точку шаблона">'+qwVisualIcon('point')+'<span>Точка шаблона</span></button></details>';
 }
-function qwVisualEditor(kind,bankTask=null,onCommit=null){
+function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  const q=bankTask||qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,labelSelected='',tool='select',drag=null,history=[],snapGeometry=true,geometryStep=20,multi=new Set(),polyline=[],constructionReference=-1;
  const linear=o=>o&&['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind);
  const panelButton=(panel,title)=>'<button type="button" data-visual-panel="'+panel+'" aria-controls="qw-visual-'+panel+'" aria-expanded="false">'+title+'</button>';
@@ -643,6 +644,8 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null){
   '<aside class="qw-visual-inspector" aria-label="Свойства и действия"><div id="qw-visual-properties" aria-label="Свойства выбранного объекта" tabindex="0"></div><div class="qw-visual-actions" aria-label="Действия с выделением"><button type="button" id="qw-visual-undo" aria-label="Отменить" title="Отменить последнее изменение" disabled>'+qwVisualIcon('undo')+'<span>Отменить</span></button><button type="button" id="qw-visual-delete" aria-label="Удалить выбранное" title="Удалить выбранный объект" disabled>'+qwVisualIcon('trash')+'<span>Удалить</span></button></div></aside>',
   '<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
  d.classList.add('qw-visual-dialog','qw-visual-'+kind);d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
+ let visualCommitted=false;
+ if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  let inspectorSelection='';
  const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect(),x=qwNum((e.clientX-b.left)/b.width*520,0,520,0),y=qwNum((e.clientY-b.top)/b.height*320,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
@@ -1034,7 +1037,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null){
     value.coordinateMode=value.xmin<0&&value.ymin<0?'math':value.xmin===0&&value.ymin<0?'positiveX':'first';
     selected=-1;draw();
    }if(t instanceof HTMLInputElement)t.defaultValue=t.value;}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
- d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{if(polyline.length){hint.textContent='Завершите ломаную или отмените её клавишей Escape';return;}const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);if(onCommit){d.close();onCommit(kind,validated);}else{qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}}catch(e){hint.textContent=e.message;}};draw();
+ d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{if(polyline.length){hint.textContent='Завершите ломаную или отмените её клавишей Escape';return;}const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);if(onCommit){visualCommitted=true;d.close();onCommit(kind,validated);}else{qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}}catch(e){hint.textContent=e.message;}};draw();
 }
 function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();qwCorrupt='';qwDoc=qwProject();qwDoc.layout='compact';qwSelected='';qwPersist();qwRender();}
 function qwAction(action,button){
