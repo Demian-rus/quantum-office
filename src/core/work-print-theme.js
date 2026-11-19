@@ -21,7 +21,8 @@ body[data-qw-theme] .qw-print-page:before{content:none!important;display:none!im
  background:#070809;color:#9cff00;
  font:800 8pt/1.15 "QO Print Sans",Arial,sans-serif;
  letter-spacing:.015em;text-transform:none;white-space:nowrap;
- clip-path:polygon(0 0,100% 0,100% 100%,13% 100%,0 65%);
+ /* Only the OUTER top-right corner is cut. The badge touches both sheet edges. */
+ clip-path:polygon(0 0,calc(100% - 8mm) 0,100% 8mm,100% 100%,0 100%);
 }
 .qw-print-brand strong,.qw-print-brand span{font:inherit;color:inherit;letter-spacing:inherit}
 body[data-qw-theme] .qw-print-topic{color:#111}
