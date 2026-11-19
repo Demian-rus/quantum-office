@@ -105,10 +105,10 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   (format==='booklet'&&showVariant&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
   (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
   (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
- const css='--qw-print-size:'+p.fontPt+'pt;--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
+ const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
   ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
-  '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??'serif')+'" data-qw-title-font="'+(p.titleFont??'sans')+
+  '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
@@ -144,7 +144,7 @@ async function qwPreview(output='tasks'){
    label('Выравнивание','<select data-print-setting="titleAlign">'+opt([['left','Слева'],['center','По центру'],['right','Справа']],prefs.titleAlign??'center')+'</select>')+
    label('Цвет заголовка','<input type="color" data-print-setting="titleColor" value="'+(prefs.titleColor??'#111111')+'">')+
   '</div><h3>Текст и страница</h3>'+
-  label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??'serif')+'</select>')+
+  label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??(qwDoc.layout==='booklet'?'serif':'sans'))+'</select>')+
   label('Размер текста, пт','<input type="number" data-print-setting="fontPt" min="9" max="12" step="0.5" value="'+prefs.fontPt+'">')+
   label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#111111')+'">')+
   label('Рисунки','<select data-print-setting="figurePosition">'+opt([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select>')+
