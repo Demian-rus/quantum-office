@@ -155,7 +155,7 @@ async function qwPreview(output='tasks'){
   selected('topicHeadings',prefs.topicHeadings)+
   '<div data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div>'+
   '<h3>Оформление QX</h3>'+
-  label('Фирменный уголок','<select data-print-setting="theme">'+opt([['','Без бренда'],['academic','QX | Квант Икс']],prefs.theme===undefined?'academic':prefs.theme?'academic':'')+'</select>')+
+  label('Фирменный уголок','<select data-print-setting="theme">'+opt([['','Без бренда'],['academic','QX | Квант Икс']],prefs.theme===undefined?(qwDoc.layout==='booklet'?'academic':''):prefs.theme?'academic':'')+'</select>')+
   selected('monochrome',prefs.monochrome===true)+
   '</aside>';
  const answers='<div class="qw-row qw-preview-options">'+
