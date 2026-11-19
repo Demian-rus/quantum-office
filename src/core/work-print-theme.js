@@ -34,7 +34,7 @@ body[data-qw-format="booklet"] .qw-booklet-brand{
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{
  right:0;top:0;transform:none;
 }
-body[data-qw-monochrome="true"] .qw-print-brand{background:#111;color:#fff}
+/* The acid-green QX identity remains in color even in monochrome worksheet mode. */
 body[data-qw-monochrome="true"] :is(.qw-print-topic,.qw-topic-title){color:#222!important}
 `;}
 export {QW_PRINT_THEMES,qwPrintTheme,qwPrintBrand,qwPrintThemeStyles};
