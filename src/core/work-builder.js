@@ -128,42 +128,92 @@ function qwPrintTextPDF(teacher=false,options){
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(output='tasks'){
- const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim());
- const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF','<div class="qw-pdf-controls">'+
-  (key?'<div class="qw-row qw-preview-options"><span>Только ответы, без условий и рисунков</span>'+['includeCriteria','includeComments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'">'+['Добавить критерии','Добавить комментарии'][i]+'</label>').join('')+'</div>':qwLayoutCards(qwDoc.layout)+
-   '<div class="qw-row qw-preview-options qw-preview-settings" id="qw-compact-controls"><span>A4</span><label>Размер текста, пт<input type="number" min="9" max="12" step="0.5" data-print-setting="fontPt" value="'+prefs.fontPt+'"></label><label>Расположение рисунков<select data-print-setting="figurePosition">'+qwOptions([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select></label><label class="qw-check"><input type="checkbox" data-print-setting="topicHeadings" '+(prefs.topicHeadings?'checked':'')+'>Заголовки тем</label></div><div class="qw-preview-settings" data-practice-controls><div class="qw-row qw-preview-options">'+qwPracticeControls(qwDoc.practice)+'</div><p class="qw-muted" id="qw-practice-help"></p></div>'+'<div class="qw-row qw-preview-options" id="qw-booklet-brand-controls"><label>Оформление QX<select data-qw-print-theme>'+qwOptions([['','Без бренда'],['academic','QX · Academic Tech'],['scientific','QX · Scientific'],['minimal','QX · Minimal']],'')+'</select></label><label class="qw-check"><input type="checkbox" data-qw-print-monochrome>Чёрно-белый</label></div>'+(qwDoc.layout==='exam'?'<p class="qw-muted">Открыт прежний компактный макет. Соответствие ФИПИ не проверено.</p>':''))+
-  '</div><p id="qw-label-warnings" class="qw-error" hidden></p><div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div>',
-  '<output id="qw-page-count" role="status">Расчёт страниц…</output>'+(key?qwButton('preview-tasks','К макету'):qwButton('preview-answers','Скачать ответы PDF',hasAnswers?'':'disabled title="Добавьте ответы к заданиям"'))+qwButton('preview-pdf',key?'Скачать ответы PDF':'Скачать PDF','class="qw-primary"'));
- d.classList.add('qw-print-preview-dialog');
- const preview=d.querySelector('#qw-print-preview-frame'),printButton=d.querySelector('[data-qw-action="preview-pdf"]');let renderRevision=0;
- const options=()=>({format:key?'answers':qwDoc.layout,theme:qwDoc.layout==='booklet'?d.querySelector('[data-qw-print-theme]')?.value||'':'',monochrome:qwDoc.layout==='booklet'&&!!d.querySelector('[data-qw-print-monochrome]')?.checked,...Object.fromEntries([...d.querySelectorAll('[data-key-option]')].map(e=>[e.dataset.keyOption,e.checked]))});
+ const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim());
+ const selected=(name,on)=>'<label class="qw-check"><input type="checkbox" data-print-setting="'+name+'" '+(on?'checked':'')+'>'+({
+  showTitle:'Добавить заголовок',showMeta:'Предмет и класс',showVariant:'Номер варианта',
+  showPageNumbers:'Номера страниц',topicHeadings:'Заголовки тем',monochrome:'Чёрно-белый PDF'
+ }[name]||name)+'</label>';
+ const label=(title,control)=>'<label class="qw-pdf-field"><span>'+title+'</span>'+control+'</label>';
+ const opt=(items,current)=>qwOptions(items,current);
+ const design='<aside class="qw-pdf-design" aria-label="Оформление PDF">'+
+  '<h3>Заголовок</h3>'+selected('showTitle',prefs.showTitle??qwDoc.title!=='Новая работа')+
+  '<div id="qw-title-controls" class="qw-design-fields">'+
+   label('Текст заголовка','<input type="text" data-print-setting="titleText" maxlength="160" placeholder="Введите заголовок" value="'+qwEsc(prefs.titleText??(qwDoc.title==='Новая работа'?'':qwDoc.title))+'">')+
+   label('Шрифт заголовка','<select data-print-setting="titleFont">'+opt([['sans','Без засечек'],['serif','Книжный']],prefs.titleFont??'sans')+'</select>')+
+   label('Размер заголовка, пт','<input type="number" data-print-setting="titlePt" min="11" max="26" step="1" value="'+(prefs.titlePt??14)+'">')+
+   label('Выравнивание','<select data-print-setting="titleAlign">'+opt([['left','Слева'],['center','По центру'],['right','Справа']],prefs.titleAlign??'center')+'</select>')+
+   label('Цвет заголовка','<input type="color" data-print-setting="titleColor" value="'+(prefs.titleColor??'#111111')+'">')+
+  '</div><h3>Текст и страница</h3>'+
+  label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??'serif')+'</select>')+
+  label('Размер текста, пт','<input type="number" data-print-setting="fontPt" min="9" max="12" step="0.5" value="'+prefs.fontPt+'">')+
+  label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#111111')+'">')+
+  label('Рисунки','<select data-print-setting="figurePosition">'+opt([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select>')+
+  selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
+  selected('showVariant',prefs.showVariant!==false)+selected('showPageNumbers',prefs.showPageNumbers!==false)+
+  selected('topicHeadings',prefs.topicHeadings)+
+  '<div data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div>'+
+  '<h3>Оформление QX</h3>'+
+  label('Печатный стиль','<select data-print-setting="theme">'+opt([['','Без бренда'],['academic','QX · Academic Tech'],['scientific','QX · Scientific'],['minimal','QX · Minimal']],prefs.theme??'')+'</select>')+
+  selected('monochrome',prefs.monochrome===true)+
+  '</aside>';
+ const answers='<div class="qw-row qw-preview-options">'+
+  ['includeCriteria','includeComments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'">'+['Критерии','Комментарии'][i]+'</label>').join('')+'</div>';
+ const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF',
+  '<div class="qw-pdf-controls">'+(key?answers:qwLayoutCards(qwDoc.layout))+'</div>'+
+  '<div class="qw-pdf-workspace">'+design+
+  '<div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div></div>'+
+  '<p id="qw-label-warnings" class="qw-error" hidden></p>',
+  '<output id="qw-page-count" role="status">Расчёт страниц…</output>'+
+  (key?qwButton('preview-tasks','К макету'):qwButton('preview-answers','Скачать ответы PDF',hasAnswers?'':'disabled'))+
+  qwButton('preview-pdf',key?'Скачать ответы PDF':'Скачать PDF','class="qw-primary"'));
+ d.classList.add('qw-print-preview-dialog','qw-print-design-dialog');
+ const preview=d.querySelector('#qw-print-preview-frame'),printButton=d.querySelector('[data-qw-action="preview-pdf"]');
+ const options=()=>({format:key?'answers':qwDoc.layout,
+  ...Object.fromEntries([...d.querySelectorAll('[data-key-option]')].map(e=>[e.dataset.keyOption,e.checked]))});
+ let renderRevision=0,typingTimer=0;
  const refresh=()=>{
-  const revision=++renderRevision;printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');
+  const revision=++renderRevision;
+  printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');
   d.querySelector('#qw-page-count').textContent='Расчёт страниц…';
-  const controls=d.querySelector('[data-practice-controls]');if(controls){controls.hidden=qwDoc.layout!=='practice';d.querySelector('#qw-practice-help').textContent=(qwDoc.practice?.perPage||2)===1?'Одна задача: почти весь свободный лист отводится для решения.':'У каждой задачи будет отдельное пространство для решения.';}
-  const compact=d.querySelector('#qw-compact-controls');if(compact)compact.hidden=!['compact','booklet'].includes(qwDoc.layout);
-  const brand=d.querySelector('#qw-booklet-brand-controls');if(brand)brand.hidden=qwDoc.layout!=='booklet';
+  const practice=d.querySelector('[data-practice-controls]');if(practice)practice.hidden=qwDoc.layout!=='practice';
+  const title=d.querySelector('#qw-title-controls');if(title)title.hidden=!d.querySelector('[data-print-setting="showTitle"]').checked;
   preview.onload=async()=>{
-   const win=preview.contentWindow,documentAtLoad=win.document;
-   if(documentAtLoad.documentElement.dataset.qwRender!==String(revision)||!win.qwPrintReady)return;
+   const win=preview.contentWindow,atLoad=win.document;
+   if(atLoad.documentElement.dataset.qwRender!==String(revision)||!win.qwPrintReady)return;
    await win.qwPrintReady;
-   if(revision!==renderRevision||preview.contentDocument!==documentAtLoad)return;
-   d.querySelector('#qw-pages').setAttribute('aria-busy','false');preview.dataset.ready=String(revision);printButton.disabled=!!win.__qwPrintError;
+   if(revision!==renderRevision||preview.contentDocument!==atLoad)return;
+   preview.dataset.ready=String(revision);d.querySelector('#qw-pages').setAttribute('aria-busy','false');
+   printButton.disabled=!!win.__qwPrintError;
    d.querySelector('#qw-page-count').textContent=win.__qwPrintError?'Ошибка: '+win.__qwPrintError:'Страниц: '+win.__qwPrintLayout.pages.length;
-   const n=win.document.querySelectorAll('[data-label-conflict="true"]').length,warning=d.querySelector('#qw-label-warnings');warning.hidden=!n;warning.textContent=n?'Подписей с пересечениями: '+n+'. Ручные положения сохранены; проверьте рисунки в редакторе.':'';
+   const n=win.document.querySelectorAll('[data-label-conflict="true"]').length,w=d.querySelector('#qw-label-warnings');
+   w.hidden=!n;w.textContent=n?'Пересечение подписей на рисунке: '+n:'';
   };
   try{preview.srcdoc=qwPrintDocumentHTML(qwDoc,false,options()).replace('<html lang="ru">','<html lang="ru" data-qw-render="'+revision+'">');}
-  catch(e){preview.srcdoc='<p role="alert">'+qwEsc(e.message)+'</p>';d.querySelector('#qw-page-count').textContent=e.message;d.querySelector('#qw-pages').setAttribute('aria-busy','false');}
+  catch(error){preview.srcdoc='<p role="alert">'+qwEsc(error.message)+'</p>';d.querySelector('#qw-page-count').textContent=error.message;d.querySelector('#qw-pages').setAttribute('aria-busy','false');}
  };
- d.querySelectorAll('[data-key-option],[data-qw-print-theme],[data-qw-print-monochrome]').forEach(e=>e.onchange=refresh);
- d.querySelectorAll('[name="qw-pdf-layout"],[data-practice],[data-print-setting]').forEach(e=>e.onchange=()=>{
-  qwRemember();const layout=d.querySelector('[name="qw-pdf-layout"]:checked');if(layout){const previous=qwDoc.layout;qwDoc.layout=layout.value;if(previous!=='booklet'&&layout.value==='booklet'&&!qwDoc.printSettings)qwDoc.printSettings={...qwPrintSettings(),fontPt:10.5};}
-  if(qwDoc.layout==='practice')qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
-  if(e.dataset.printSetting){const next=qwPrintSettings(qwDoc.printSettings),field=e.dataset.printSetting;next[field]=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value;try{qwDoc.printSettings=qwPrintSettings(next);}catch(error){d.querySelector('#qw-page-count').textContent=error.message;return;}}
-  qwPersist();qwRender();refresh();
+ function commit(e){
+  const layout=d.querySelector('[name="qw-pdf-layout"]:checked');
+  const next=qwPrintSettings(qwDoc.printSettings||{});
+  if(e?.dataset?.printSetting){
+   const field=e.dataset.printSetting;
+   next[field]=e.type==='checkbox'?e.checked:e.type==='number'?Number(e.value):e.value;
+   if(field==='titleText'&&e.value.trim()){next.showTitle=true;d.querySelector('[data-print-setting="showTitle"]').checked=true;}
+  }
+  try{
+   const normalized=qwPrintSettings(next);
+   qwRemember();
+   if(layout)qwDoc.layout=layout.value;
+   if(e?.dataset?.practice)qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
+   qwDoc.printSettings=normalized;qwPersist();qwRender();refresh();
+  }catch(error){d.querySelector('#qw-page-count').textContent=error.message;}
+ }
+ d.querySelectorAll('[name="qw-pdf-layout"],[data-practice],[data-print-setting]').forEach(e=>{
+  e.addEventListener('change',()=>{clearTimeout(typingTimer);commit(e);});
+  if(e.matches('[data-print-setting="titleText"]'))e.addEventListener('input',()=>{clearTimeout(typingTimer);typingTimer=setTimeout(()=>commit(e),280);});
  });
- const answers=d.querySelector('[data-qw-action="preview-answers"]');if(answers)answers.onclick=()=>qwPreview('answers');
- const tasks=d.querySelector('[data-qw-action="preview-tasks"]');if(tasks)tasks.onclick=()=>qwPreview();
+ d.querySelectorAll('[data-key-option]').forEach(e=>e.addEventListener('change',refresh));
+ const answersBtn=d.querySelector('[data-qw-action="preview-answers"]');if(answersBtn)answersBtn.onclick=()=>{d.close();qwPreview('answers');};
+ const tasksBtn=d.querySelector('[data-qw-action="preview-tasks"]');if(tasksBtn)tasksBtn.onclick=()=>{d.close();qwPreview();};
  printButton.onclick=()=>qwPrintTextPDF(false,options());
  refresh();
 }
