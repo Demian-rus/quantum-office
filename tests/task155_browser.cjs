@@ -22,7 +22,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task155');
    return qwValidate(d);
   });
   const render=async orientation=>{
-   const input=JSON.parse(JSON.stringify(project));input.printSettings.orientation=orientation;input.printSettings.landscapeLayout='wide';
+   const input=JSON.parse(JSON.stringify(project));input.printSettings.orientation=orientation;input.printSettings.landscapeLayout='wide'; // legacy value must render as canonical spread
    const html=await app.evaluate(p=>qwPrintDocumentHTML(p,false,{format:'booklet'}),input);
    const p=await browser.newPage();
    p.on('pageerror',e=>errors.push(e.message));
@@ -33,7 +33,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task155');
       const bb=part.getBoundingClientRect(),cc=part.closest('.qw-print-page').querySelector('.qw-page-content').getBoundingClientRect();
       if(bb.right>cc.right+1||bb.left<cc.left-1||bb.bottom>cc.bottom+1)overflow.push(part.dataset.task);
     }
-    return {pages:pages.length,taskIds:parts.map(x=>x.dataset.task),width:first.width,height:first.height,mode:document.body.dataset.qwOrientation,
+    const physical=(document.querySelector('.qw-print-sheet')||pages[0]).getBoundingClientRect();
+    return {pages:pages.length,taskIds:parts.map(x=>x.dataset.task),width:physical.width,height:physical.height,mode:document.body.dataset.qwOrientation,
      overflow,ready:!window.__qwPrintError,images:[...document.images].filter(i=>!i.complete).length};
    });
    assert.equal(info.mode,orientation);
