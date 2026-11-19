@@ -22,7 +22,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task155');
    return qwValidate(d);
   });
   const render=async orientation=>{
-   const input=JSON.parse(JSON.stringify(project));input.printSettings.orientation=orientation;
+   const input=JSON.parse(JSON.stringify(project));input.printSettings.orientation=orientation;input.printSettings.landscapeLayout='wide';
    const html=await app.evaluate(p=>qwPrintDocumentHTML(p,false,{format:'booklet'}),input);
    const p=await browser.newPage();
    p.on('pageerror',e=>errors.push(e.message));
