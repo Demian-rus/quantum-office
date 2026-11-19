@@ -96,7 +96,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
- const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles();
+ const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles(p.orientation??'portrait');
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
  const brandMarkup=format==='booklet'&&printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':qwPrintBrand(printTheme);
  const header=brandMarkup+
@@ -109,7 +109,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
-  '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
+  '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
 }
@@ -146,6 +146,7 @@ async function qwPreview(output='tasks'){
   '</div><h3>Текст и страница</h3>'+
   label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??(qwDoc.layout==='booklet'?'serif':'sans'))+'</select>')+
   label('Размер текста, пт','<input type="number" data-print-setting="fontPt" min="9" max="12" step="0.5" value="'+prefs.fontPt+'">')+
+  label('Ориентация A4','<select data-print-setting="orientation">'+opt([['portrait','Книжная (вертикальная)'],['landscape','Альбомная (горизонтальная)']],prefs.orientation??'portrait')+'</select>')+
   label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#111111')+'">')+
   label('Рисунки','<select data-print-setting="figurePosition">'+opt([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select>')+
   selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
