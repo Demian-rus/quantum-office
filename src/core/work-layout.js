@@ -130,7 +130,12 @@ body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;displ
 body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;width:52mm;border-bottom:.22mm solid #555;min-width:20mm;height:4.5mm}
 body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
 body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
-body[data-qw-format="booklet"] math{font-size:1em;math-style:normal}
+body[data-qw-format="booklet"] math{font-size:1em;math-style:normal;font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none}
+body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow.qw-booklet-answer-by-figure{display:grid!important;grid-template-columns:minmax(0,1fr) 48mm;grid-template-rows:auto minmax(0,1fr);column-gap:4mm;min-height:0}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-task-text{grid-column:1;grid-row:1;min-width:0}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure figure{grid-column:2;grid-row:1 / 3;align-self:start;justify-self:center;margin:0;float:none!important}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{grid-column:1;grid-row:2;align-self:end;margin:2.4mm 0 0}
 
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
@@ -144,6 +149,13 @@ async function qwPreparePrintDocument(){
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
  const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format);
+ // Booklet-only MathML typographic correction; QWORK source is unchanged.
+ if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
+  const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
+  const padded=document.createElementNS('http://www.w3.org/1998/Math/MathML','mpadded');
+  padded.setAttribute('lspace','0.09em');padded.setAttribute('width','+0.09em');
+  script.replaceWith(padded);padded.append(script);
+ }
  // Figure geometry is calculated in an A4-width measurement surface.
  source.style.width=format==='booklet'?'184mm':modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
@@ -187,6 +199,10 @@ async function qwPreparePrintDocument(){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
   }
+  if(format==='booklet'&&figure&&flow.classList.contains('qw-figure-right')){
+   const answer=section.querySelector('.qw-booklet-answer');
+   if(answer){flow.append(answer);flow.classList.add('qw-booklet-answer-by-figure');}
+  }
   if(figure&&!flow.classList.contains('qw-figure-below')){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
    if(answer)text.append(answer);if(notes)text.append(notes);
@@ -200,7 +216,7 @@ async function qwPreparePrintDocument(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
-  if(!pages.length)content.append(header);else if(title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
+  if(!pages.length)content.append(header);else if(format!=='booklet'&&title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
   if(brand)page.append(brand.cloneNode(true));
   host.append(page);pages.push({page,content});return pages.at(-1);
  }
