@@ -398,3 +398,35 @@
  .qw-bank-choice{gap:5px}
  .qw-bank-choice>button{font-size:11px;padding:5px}
 }
+
+
+/* TASK156: bank entry editor; same workbench geometry, no tutorial overlays. */
+.qw-bank-edit-dialog{width:min(1180px,calc(100vw - 20px));max-width:none;max-height:calc(100dvh - 20px)}
+.qw-bank-edit-dialog>.qw-dialog-body{min-height:0;overflow:auto}
+.qw-bank-edit-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.9fr);gap:15px;align-items:start}
+.qw-bank-edit-layout h3{font-size:13px;margin:0 0 8px}
+.qw-bank-edit-main,.qw-bank-edit-side{min-width:0}
+.qw-bank-edit-fields,.qw-bank-edit-categories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.qw-bank-edit-fields>label,.qw-bank-edit-categories>label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:11px;font-weight:600}
+.qw-bank-edit-fields>label:has(textarea),.qw-bank-choice-field,.qw-bank-edit-visual-actions,#qw-bank-edit-preview{grid-column:1/-1}
+.qw-bank-edit-fields label.qw-check{display:flex;flex-direction:row;align-items:center;gap:6px}
+.qw-bank-edit-fields input,.qw-bank-edit-fields select,.qw-bank-edit-fields textarea,
+.qw-bank-edit-categories input,.qw-bank-edit-categories select{
+ width:100%;min-width:0;box-sizing:border-box;border:1px solid var(--qo-border);
+ background:var(--qo-surface);color:var(--qo-text);border-radius:5px;
+ padding:6px;font:12px/1.4 "Segoe UI",Arial,sans-serif
+}
+.qw-bank-edit-fields textarea{resize:vertical;min-height:50px}
+.qw-bank-edit-fields select,.qw-bank-edit-categories select,.qw-bank-edit-categories input{min-height:32px}
+.qw-bank-edit-visual-actions{display:flex;gap:7px;flex-wrap:wrap}
+.qw-bank-edit-visual-actions button{flex:1;min-width:125px}
+#qw-bank-edit-preview{margin-top:3px;padding:12px;border:1px solid var(--qo-border);
+ background:#fff;color:#171717;min-height:70px;max-height:350px;overflow:auto}
+.qw-bank-edit-dialog [hidden]{display:none!important}
+@media(max-width:820px){
+ .qw-bank-edit-layout{grid-template-columns:minmax(0,1fr)}
+ .qw-bank-edit-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:530px){
+ .qw-bank-edit-fields,.qw-bank-edit-categories{grid-template-columns:minmax(0,1fr)}
+}
