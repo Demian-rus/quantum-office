@@ -60,7 +60,7 @@ function qwPracticeControls(settings={},attribute='data-practice'){
  return '<label>Задач на странице<select '+attribute+'="perPage">'+qwOptions([[1,'Одна'],[2,'Две'],[3,'Три'],[4,'Четыре']],settings.perPage||2)+'</select></label><label>Пространство для решения<select '+attribute+'="grid">'+qwOptions([['none','Без разлиновки'],['fine','Мелкая светлая клетка'],['normal','Обычная клетка']],settings.grid||'fine')+'</select></label>';
 }
 function qwSettings(){
- const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions(Object.entries(QW_SUBJECTS),qwDoc.subject)+'</select></label><label>Формат PDF<select data-meta="layout">'+qwFormatOptions(qwDoc.layout)+'</select></label><div class="qw-settings-wide qw-row" data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div><p class="qw-settings-wide qw-muted">Шаблоны ОГЭ / ЕГЭ будут отдельным этапом после сверки с ФИПИ по году и предмету.</p><label class="qw-settings-wide">Инструкция для обычной контрольной<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));
+ const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions(Object.entries(QW_SUBJECTS),qwDoc.subject)+'</select></label><label>Формат PDF<select data-meta="layout">'+qwFormatOptions(qwDoc.layout)+'</select></label><div class="qw-settings-wide qw-row" data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div><label class="qw-settings-wide">Инструкция для обычной контрольной<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));
  const format=d.querySelector('[data-meta="layout"]'),toggle=()=>d.querySelector('[data-practice-controls]').hidden=format.value!=='practice';format.onchange=toggle;toggle();
  d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{
   for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=qwText(e.value,e.dataset.meta==='instructions'?4000:160);
@@ -220,7 +220,7 @@ async function qwPreview(output='tasks'){
 function qwBankNormalize(x){
  if(!x||typeof x!=='object'||!x.task)throw Error('Некорректная запись банка');
  const task=qwValidate({...qwProject(),tasks:[x.task]}).tasks[0];
- return {id:qwText(x.id,80)||qwId(),subject:x.subject==='math'?'math':'physics',
+ return {id:qwText(x.id,80)||qwId(),subject:['physics','math','geometry','algebra'].includes(x.subject)?x.subject:'physics',
   grade:qwText(x.grade??task.grade,24).trim(),exam:['general','oge','ege'].includes(x.exam)?x.exam:task.exam,
   topic:qwText(x.topic??task.topic,120).trim(),subtopic:qwText(x.subtopic??task.subtopic,120).trim(),
   origin:['original','adapted','generated'].includes(x.origin)?x.origin:task.origin,
