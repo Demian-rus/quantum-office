@@ -51,11 +51,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
       getComputedStyle(first.querySelector('.qw-page-content')).paddingTop,
       getComputedStyle(second.querySelector('.qw-page-content')).paddingTop],
     brandCounts:sheets.map(s=>s.querySelectorAll(':scope > .qw-print-brand').length),
-    brandText:brand?.querySelector('svg[aria-label]')?.getAttribute('aria-label'),brandColor:brand?getComputedStyle(brand.querySelector('path')).fill:'',
+    brandText:brand?.querySelector('.qw-qx-lettering')?.textContent,brandColor:brand?getComputedStyle(brand.querySelector('.qw-qx-lettering')).color:'',
     brandBg:brand?getComputedStyle(brand).backgroundColor:'',
     brandClip:brand?getComputedStyle(brand).clipPath:'',
-    badgeFlush:brand?{top:brand.getBoundingClientRect().top-sheet.top,right:sheet.right-brand.getBoundingClientRect().right}:null,
+    badgeFlush:brand?{bottom:sheet.bottom-brand.getBoundingClientRect().bottom,right:sheet.right-brand.getBoundingClientRect().right}:null,
     duplicatedBrandInColumn:!!document.querySelector('.qw-print-page .qw-print-brand'),
+    handwrittenFont:brand?getComputedStyle(brand).fontFamily:'',fontReady:document.fonts.check('700 18px "QX Handwritten"','QX | Квант Икс'),svgBrandCount:document.querySelectorAll('svg.qw-qx-handwriting').length,
     stripes:[...pages].some(page=>getComputedStyle(page,'::before').display!=='none'),
     runningHeaders:spans.length,sheetWidth:sheet.width,sheetHeight:sheet.height,err:window.__qwPrintError||null};
   });
@@ -75,7 +76,10 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
   assert.equal(data.brandColor,'rgb(156, 255, 0)');
   assert.equal(data.brandBg,'rgba(0, 0, 0, 0)');
   assert.equal(data.brandClip,'none','handwritten signature has no geometric badge');
-  assert.ok(data.badgeFlush.top>0&&data.badgeFlush.right>0,'handwritten signature is inset at bottom-right');
+  assert.ok(data.badgeFlush.bottom>=0&&data.badgeFlush.bottom<25&&data.badgeFlush.right>=0&&data.badgeFlush.right<25,'handwritten signature is close to bottom-right');
+  assert.ok(data.handwrittenFont.includes('QX Handwritten'),'brand must use embedded font');
+  assert.equal(data.fontReady,true,'Latin + Cyrillic branded font loaded offline');
+  assert.equal(data.svgBrandCount,0,'do not trace handwritten glyphs manually');
   assert.equal(data.stripes,false);assert.equal(data.runningHeaders,0);
   assert.ok(data.sheetWidth>data.sheetHeight);
   await p.emulateMedia({media:'print'});
