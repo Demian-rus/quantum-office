@@ -52,7 +52,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
       while(node=walker.nextNode()){if(!node.textContent.trim())continue;const range=document.createRange();range.selectNodeContents(node);
        for(const r of range.getClientRects())if(Math.min(r.right,fr.right)-Math.max(r.left,fr.left)>.5&&Math.min(r.bottom,fr.bottom)-Math.max(r.top,fr.top)>.5)collisions.push(section.dataset.task);}
     }
-    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:pages.map(p=>p.querySelector('.qw-booklet-brand')?.textContent||''),collisions,answer:{left:bounds(answer).left,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
+    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:pages.map(p=>p.querySelector('.qw-booklet-brand svg[aria-label]')?.getAttribute('aria-label')||''),collisions,answer:{left:bounds(answer).left,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
      sqrt:document.querySelectorAll('math msqrt').length,figures:document.querySelectorAll('.qw-print-section svg').length,
      footer:pages.map(p=>p.querySelector('.qw-page-footer')?.textContent||''),report:window.__qwPrintLayout};
    });
