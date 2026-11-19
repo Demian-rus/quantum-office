@@ -96,9 +96,9 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(showTopic?'<h2 class="qw-topic-title">'+qwEsc(topic)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
  }).join('');
- const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles(p.orientation??'portrait',p.landscapeLayout??'spread');
+ const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles(p.orientation??'portrait','spread');
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
- const brandMarkup=format==='booklet'&&printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':qwPrintBrand(printTheme);
+ const brandMarkup=printTheme.id?'<div class="qw-print-brand qw-booklet-brand">QX | Квант Икс</div>':'';
  const header=brandMarkup+
   (showTitle&&heading.trim()?'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(heading)+'</h1>':'')+
   (showMeta&&d.topic&&d.topic!==heading?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
@@ -109,7 +109,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
-  '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="'+(p.landscapeLayout??'spread')+'" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
+  '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
 }
@@ -147,7 +147,7 @@ async function qwPreview(output='tasks'){
   label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??(qwDoc.layout==='booklet'?'serif':'sans'))+'</select>')+
   label('Размер текста, пт','<input type="number" data-print-setting="fontPt" min="9" max="12" step="0.5" value="'+prefs.fontPt+'">')+
   label('Ориентация A4','<select data-print-setting="orientation">'+opt([['portrait','Книжная (вертикальная)'],['landscape','Альбомная (горизонтальная)']],prefs.orientation??'portrait')+'</select>')+
-  '<div id="qw-landscape-layout-controls">'+label('Расположение на альбомном листе','<select data-print-setting="landscapeLayout">'+opt([['spread','Две полосы (как разворот)'],['wide','Одна широкая полоса']],prefs.landscapeLayout??'spread')+'</select>')+'</div>'+
+
   label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#111111')+'">')+
   label('Рисунки','<select data-print-setting="figurePosition">'+opt([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select>')+
   selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
@@ -155,7 +155,7 @@ async function qwPreview(output='tasks'){
   selected('topicHeadings',prefs.topicHeadings)+
   '<div data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div>'+
   '<h3>Оформление QX</h3>'+
-  label('Печатный стиль','<select data-print-setting="theme">'+opt([['','Без бренда'],['academic','QX · Academic Tech'],['scientific','QX · Scientific'],['minimal','QX · Minimal']],prefs.theme??'')+'</select>')+
+  label('Фирменный уголок','<select data-print-setting="theme">'+opt([['','Без бренда'],['academic','QX | Квант Икс']],prefs.theme&&prefs.theme!==''?'academic':'')+'</select>')+
   selected('monochrome',prefs.monochrome===true)+
   '</aside>';
  const answers='<div class="qw-row qw-preview-options">'+
@@ -178,7 +178,7 @@ async function qwPreview(output='tasks'){
   printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');
   d.querySelector('#qw-page-count').textContent='Расчёт страниц…';
   const practice=d.querySelector('[data-practice-controls]');if(practice)practice.hidden=qwDoc.layout!=='practice';
-  const landscapeLayout=d.querySelector('#qw-landscape-layout-controls');if(landscapeLayout)landscapeLayout.hidden=d.querySelector('[data-print-setting="orientation"]').value!=='landscape';
+
   const title=d.querySelector('#qw-title-controls');if(title)title.hidden=!d.querySelector('[data-print-setting="showTitle"]').checked;
   preview.onload=async()=>{
    const win=preview.contentWindow,atLoad=win.document;
