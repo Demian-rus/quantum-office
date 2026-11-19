@@ -98,7 +98,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  }).join('');
  const printTheme=qwPrintTheme({theme:p.theme??'',monochrome:p.monochrome??false,...options}),styles=qwPrintStyles();
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
- const brandMarkup=printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':'';
+ const brandMarkup=format==='booklet'&&printTheme.id?'<div class="qw-print-brand qw-booklet-brand"><strong>QX</strong><span>КВАНТ ИКС</span></div>':qwPrintBrand(printTheme);
  const header=brandMarkup+
   (showTitle&&heading.trim()?'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(heading)+'</h1>':'')+
   (showMeta&&d.topic&&d.topic!==heading?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
