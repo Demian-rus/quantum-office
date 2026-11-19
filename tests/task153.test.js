@@ -25,7 +25,7 @@ test('TASK153: old QWORK print formats preserve their original semantics',()=>{
 test('TASK153: booklet uses the vector-print path, never the canvas/JPEG PDF path',()=>{
  const builder=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
  const layout=readFileSync(new URL('../src/core/work-layout.js',import.meta.url),'utf8');
- assert.match(builder,/if\(teacher\|\|\['compact','practice','booklet'\]\.includes\(qwDoc\.layout\)\)\{qwPrintTextPDF/);
+ assert.match(builder,/if\(teacher\|\|\['compact','practice','booklet','worksheet','exam'\]\.includes\(qwDoc\.layout\)\)\{qwPrintTextPDF/);
  assert.match(builder,/\['worksheet','exam','compact','practice','answers','booklet'\]/);
  assert.match(builder,/format==='booklet'&&showVariant&&d\.variant/);
  assert.match(layout,/body\[data-qw-format="booklet"\] \.qw-booklet-entry>header/);
