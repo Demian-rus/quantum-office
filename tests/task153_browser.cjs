@@ -38,7 +38,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task153');
     if(i===6){q.figure='diagram';q.diagram=[{kind:'block',x:200,y:150,x2:300,y2:240,label:'m'},{kind:'ground',x:110,y:240,x2:420,y2:240,label:''},{kind:'arrow',x:250,y:150,x2:250,y2:80,label:'N'}];}
     return q;
    });
-   const before=JSON.stringify(d),normalized=qwValidate(d),html=qwPrintDocumentHTML(normalized,false,{format:'booklet'});
+   const before=JSON.stringify(d),normalized=qwValidate(d),html=qwPrintDocumentHTML(normalized,false,{format:'booklet',theme:''});
    const old=qwPrintDocumentHTML({...normalized,layout:'compact'},false,{format:'compact'});
    return {html,qwork:JSON.stringify(normalized,null,2),unchanged:before===JSON.stringify(d),
     legacy:old.includes('data-qw-format="compact"'),printedTasks:d.tasks.length};
