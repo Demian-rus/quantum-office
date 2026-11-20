@@ -271,7 +271,7 @@ function qwValidateDiagram(raw){
    }
   }
   if(QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)){
-   if(o.kind!=='junction'&&Math.hypot(value.x2-value.x,value.y2-value.y)<4)
+   if(o.kind!=='junction'&&!(o.kind==='wireOrth'&&o.links&&o.links.start&&o.links.end)&&Math.hypot(value.x2-value.x,value.y2-value.y)<4)
     throw Error('Размер или длина физического объекта слишком малы');
   }
   if(o.style!==undefined)value.style=qwValidateStyle(o.style);
