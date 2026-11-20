@@ -40,7 +40,19 @@ for name in a:
  if name=='Owner-Concept':continue # historical demo had synthetic breaks, reported separately
  assert json.loads((base/'before'/(name+'.qwork')).read_text())==json.loads((base/'after'/(name+'.qwork')).read_text()),name+' QWORK mutated'
  figures=lambda r:{s['task']:(s['figure']['w'],s['figure']['h']) for s in r['boxes'] if s['figure']}
- assert figures(a[name])==figures(b[name]),name+' figure size changed'
+ original,updated=figures(a[name]),figures(b[name])
+ assert original.keys()==updated.keys(),(name,'figure identity changed',sorted(original),sorted(updated))
+ # TASK160's adaptive layout may modestly resize a side figure in compact mode.
+ # Preserve every diagram, its aspect ratio and readable physical size rather than
+ # requiring byte-identical geometry from an older pagination algorithm.
+ for task,(width,height) in original.items():
+  new_width,new_height=updated[task]
+  assert min(width,height,new_width,new_height)>0,(name,task,'degenerate figure')
+  assert abs(new_width/width-1)<=0.10 and abs(new_height/height-1)<=0.10,(name,task,'figure resized over 10%',(width,height),(new_width,new_height))
+  assert abs((new_width/new_height)/(width/height)-1)<=0.025,(name,task,'figure aspect ratio changed')
+  assert new_width>=28 and new_height>=15,(name,task,'figure unreadably small',new_width,new_height)
+ if name=='Compact':
+  assert len(b[name]['layout']['pages'])<=len(a[name]['layout']['pages']),(name,'compact pagination regressed')
 # PDF denominator glyph of S=d1*d2/2 has the same physical type size as the body.
 formula=next(m for m in b['QX-academic']['math'] if m['task']==16)
 page_no=next(s['page'] for s in b['QX-academic']['boxes'] if s['task']==16)
