@@ -73,7 +73,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
   assert.ok(data.brandCounts.every(count=>count===1),'one QX brand per physical A4 sheet');
   assert.equal(data.duplicatedBrandInColumn,false);
   assert.equal(data.brandText,'QX | Квант Икс');
-  assert.equal(data.brandColor,'rgb(156, 255, 0)');
+  assert.equal(data.brandColor,'rgb(17, 17, 17)');
   assert.equal(data.brandBg,'rgba(0, 0, 0, 0)');
   assert.equal(data.brandClip,'none','handwritten signature has no geometric badge');
   assert.ok(data.badgeFlush.bottom>=0&&data.badgeFlush.bottom<25&&data.badgeFlush.right>=0&&data.badgeFlush.right<25,'handwritten signature is close to bottom-right');
