@@ -20,7 +20,7 @@ for entry in report['reports']:
         for s in spans:
             x0,y0,x1,y1=s['bbox']
             if s['text'].strip()=='QX | Квант Икс':
-                assert 8<=x0<x1<=p.rect.width-7 and 7<=y0<y1<=35,(name,i,'badge bounds',s)
+                assert p.rect.width-115<=x0<x1<=p.rect.width+1 and p.rect.height-35<=y0<y1<=p.rect.height+1,(name,i,'bottom-right handwritten signature bounds',s)
             else:
                 assert 25<=x0<x1<=p.rect.width-25 and 20<=y0<y1<=p.rect.height-10,(name,i,s)
         if '-BW' in name:
@@ -31,7 +31,7 @@ for entry in report['reports']:
             for s in spans:
                 c=s['color'];channels=[(c>>16)&255,(c>>8)&255,c&255]
                 if s['text'].strip()=='QX | Квант Икс':
-                    assert channels==[156,255,0],(name,'neon QX badge',channels)
+                    assert max(channels)==min(channels) and channels[0]<=50,(name,'black QX signature',channels)
                 else:
                     assert max(channels)==min(channels),(name,s['text'],hex(c))
         # DOM glyph baselines vs native PDF glyph origins, not unrelated screen ink boxes.
