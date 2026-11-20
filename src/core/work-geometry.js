@@ -1,5 +1,6 @@
 /* Shared geometric operations. Model coordinates never depend on viewport size. */
 import {qwGeometryVertices,qwPlotXY,qwEvaluateCurve,QW_PLOT} from './work-model.js';
+import {QW_MECHANICS,QW_ELECTRICS} from './work-physics.js';
 function qwRotatePoint(p,center,degrees){
  const a=degrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),x=p.x-center.x,y=p.y-center.y;
  return {...p,x:center.x+x*c-y*s,y:center.y+x*s+y*c};
@@ -68,6 +69,20 @@ function qwExtendedSegment(o){
 function qwHitObject(o,point,tolerance=6){
  const p=qwRotatePoint(point,qwObjectCenter(o),-(o.rotation||0)),a={x:o.x,y:o.y},b={x:o.x2,y:o.y2},t=tolerance+(o.style?.width||2)/2;
  if(o.kind==='point')return Math.hypot(p.x-o.x,p.y-o.y)<=t+3;
+ if(['forceVector','velocityVector','accelerationVector','wireOrth'].includes(o.kind)){
+  if(o.kind==='wireOrth'){
+   const mid=o.bend??(o.x+o.x2)/2,segments=[
+    [{x:o.x,y:o.y},{x:mid,y:o.y}],
+    [{x:mid,y:o.y},{x:mid,y:o.y2}],
+    [{x:mid,y:o.y2},{x:o.x2,y:o.y2}]];
+   return segments.some(([a,b])=>qwSegmentDistance(p,a,b)<=t+2);
+  }
+  return qwSegmentDistance(p,a,b)<=t+3;
+ }
+ if(QW_ELECTRICS.includes(o.kind)||QW_MECHANICS.includes(o.kind)){
+  return p.x>=Math.min(o.x,o.x2)-t&&p.x<=Math.max(o.x,o.x2)+t&&
+   p.y>=Math.min(o.y,o.y2)-t&&p.y<=Math.max(o.y,o.y2)+t;
+ }
  if(['ray','infiniteLine'].includes(o.kind)){const ps=qwExtendedSegment(o);return ps.length===2&&qwSegmentDistance(p,ps[0],ps[1])<=t;}
  if(o.kind==='text')return p.x>=o.x-t&&p.x<=o.x+Math.max(10,[...(o.label||'')].length*12)+t&&p.y>=o.y-20-t&&p.y<=o.y+5+t;
  if(o.kind==='arc'||o.kind==='polyline'){
@@ -97,7 +112,7 @@ function qwHitDiagram(objects,p,tolerance=6){
 }
 function qwValidDrag(o,pixels){
  if(pixels<4)return false;
- if(['rect','circle','ellipse','regularPolygon','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
+ if(['rect','circle','ellipse','regularPolygon','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley',...QW_ELECTRICS.filter(k=>k!=='wireOrth'),...QW_MECHANICS.filter(k=>!['forceVector','velocityVector','accelerationVector'].includes(k))].includes(o.kind))return Math.abs(o.x2-o.x)>8&&Math.abs(o.y2-o.y)>8;
  return Math.hypot(o.x2-o.x,o.y2-o.y)>.01;
 }
 function qwGraphObjectPoints(g,o){
