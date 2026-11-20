@@ -75,33 +75,37 @@ const obj=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
    const O=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
    const W=(id,from,to,position={})=>O('wireOrth',from.x,from.y,to.x,to.y,'',{id,...position});
    d.tasks=[
-    item('1. Тело на наклонной плоскости. Определите направления сил.',[
+    item('Тело на наклонной плоскости. Определите направления сил.',[
      O('incline',95,100,440,255),O('block',225,138,310,188,'m',{rotation:-24}),
      O('forceVector',270,170,270,75,'N'),O('forceVector',270,170,270,260,'mg'),O('velocityVector',270,170,390,112,'v')]),
-    item('2. Грузы и подвижный блок. Сравните натяжения нитей.',[
+    item('Грузы и подвижный блок. Сравните натяжения нитей.',[
      O('fixedPulley',160,70,235,145),O('movablePulley',285,137,360,212),
      O('rope',197,80,197,240),O('rope',323,78,323,208),
      O('weightSet',86,206,245,297,'m₁, m₂',{count:2})]),
-    item('3. Динамометр с подвешенными грузами. Найдите показание.',[
+    item('Динамометр с подвешенными грузами. Найдите показание.',[
      O('dynamometer',205,24,304,208,'',{reading:47}),
      O('rope',254,208,254,234),O('weightSet',198,229,315,307,'',{count:2})]),
-    item('4. Плечо силы и момент силы относительно опоры.',[
+    item('Плечо силы и момент силы относительно опоры.',[
      O('line',70,210,442,210),O('point',255,210,255,210,'O'),
      O('forceVector',383,210,383,86,'F'),O('torque',190,84,310,200,'M',{direction:'cw'})]),
-    item('5. Последовательная цепь: батарея, лампа, выключатель.',[
+    item('Последовательная цепь: батарея, лампа, выключатель.',[
      O('battery',65,111,158,175,'ε',{id:'bat'}),
      O('lamp',238,111,326,175,'L',{id:'lamp'}),
      O('switchClosed',361,111,470,175,'K',{id:'sw'}),
      O('wireOrth',0,0,0,0,'',{id:'w1',links:{start:{id:'bat',port:'R'},end:{id:'lamp',port:'L'}}}),
      O('wireOrth',0,0,0,0,'',{id:'w2',links:{start:{id:'lamp',port:'R'},end:{id:'sw',port:'L'}}}),
-     O('wireOrth',110,217,420,245)]),
-    item('6. Измерение силы тока амперметром.',[
+     O('wireOrth',470,143,470,250,'',{id:'return1',links:{start:{id:'sw',port:'R'}}}),
+     O('wireOrth',470,250,65,250),
+     O('wireOrth',65,250,65,143,'',{id:'return2',links:{end:{id:'bat',port:'L'}}})]),
+    item('Измерение силы тока амперметром.',[
      O('cell',55,120,155,180,'',{id:'cell'}),
      O('ammeter',204,120,294,180,'',{id:'amp'}),
      O('resistor',350,120,461,180,'R',{id:'load'}),
      O('wireOrth',0,0,0,0,'',{links:{start:{id:'cell',port:'R'},end:{id:'amp',port:'L'}}}),
-     O('wireOrth',0,0,0,0,'',{links:{start:{id:'amp',port:'R'},end:{id:'load',port:'L'}}})]),
-    item('7. Параллельное соединение резисторов.',[
+     O('wireOrth',0,0,0,0,'',{links:{start:{id:'amp',port:'R'},end:{id:'load',port:'L'}}}),
+     O('wireOrth',461,150,461,251,'',{links:{start:{id:'load',port:'R'}}}),
+     O('wireOrth',461,251,55,251),O('wireOrth',55,251,55,150,'',{links:{end:{id:'cell',port:'L'}}})]),
+    item('Параллельное соединение резисторов.',[
      O('junction',85,75,85,75,'',{id:'j1'}),O('junction',435,75,435,75,'',{id:'j2'}),
      O('junction',85,246,85,246,'',{id:'j3'}),O('junction',435,246,435,246,'',{id:'j4'}),
      O('resistor',197,75,312,135,'R₁',{id:'r1'}),
@@ -109,18 +113,20 @@ const obj=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
      W('p1',{x:85,y:75},{x:197,y:105}),W('p2',{x:312,y:105},{x:435,y:75}),
      W('p3',{x:85,y:246},{x:197,y:245}),W('p4',{x:312,y:245},{x:435,y:246}),
      W('p5',{x:85,y:75},{x:85,y:246}),W('p6',{x:435,y:75},{x:435,y:246})]),
-    item('8. Вольтметр параллельно сопротивлению.',[
+    item('Вольтметр параллельно сопротивлению.',[
      O('cell',75,60,172,120,'',{id:'src'}),O('resistor',236,60,357,120,'R',{id:'r'}),
      O('voltmeter',242,214,347,281,'',{id:'voltm'}),
      W('a',{x:172,y:90},{x:236,y:90}),
      W('b',{x:275,y:90},{x:242,y:250}),
      W('c',{x:347,y:250},{x:345,y:90})]),
-    item('9. Реостат и разомкнутый ключ в цепи.',[
+    item('Реостат и разомкнутый ключ в цепи.',[
      O('battery',60,121,154,183,'',{id:'bat2'}),
      O('rheostat',195,121,328,183,'R',{id:'rh'}),
      O('switchOpen',366,121,469,183,'K',{id:'open'}),
      O('wireOrth',0,0,0,0,'',{links:{start:{id:'bat2',port:'R'},end:{id:'rh',port:'L'}}}),
-     O('wireOrth',0,0,0,0,'',{links:{start:{id:'rh',port:'R'},end:{id:'open',port:'L'}}})])
+     O('wireOrth',0,0,0,0,'',{links:{start:{id:'rh',port:'R'},end:{id:'open',port:'L'}}}),
+     O('wireOrth',469,152,469,260,'',{links:{start:{id:'open',port:'R'}}}),
+     O('wireOrth',469,260,60,260),O('wireOrth',60,260,60,152,'',{links:{end:{id:'bat2',port:'L'}}})])
    ];
    return qwValidate(d);
   });
