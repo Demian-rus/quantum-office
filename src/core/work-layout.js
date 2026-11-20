@@ -260,17 +260,43 @@ async function qwPreparePrintDocument(){
    else {const img=figure.querySelector('img');w=img.naturalWidth;h=img.naturalHeight;}
    let wide=flow.classList.contains('qw-figure-below');
    const requested=Number(figure.dataset.requestedWidth)||220;
-   const graph=figure.dataset.figureKind==='graph';
-   const maxW=modern?(wide?Math.min(requested,contentWidth-7*MM):(format==='booklet'?(graph?70:48):format==='practice'?55:graph?55:40)*MM):wide?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
-   const maxH=modern?(wide?50:format==='booklet'?(graph?47:36):format==='practice'?35:34)*MM:wide?(requested>=470?160*MM:requested*320/520):38*MM;let scale=Math.min(maxW/w,maxH/h);
-   // A graph's grid has a common physical width, independent of labels around its origin.
-   if(modern&&svg&&graph&&!wide)scale=48*MM/369;
-   if(modern&&svg){
-    const fonts=[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim()).map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0);
-    if(fonts.length)scale=Math.max(scale,6.6/.75/Math.min(...fonts));
-    if(w*scale>contentWidth-7*MM)throw Error('Подписи рисунка не помещаются: сократите подписи или разделите рисунок.');
+   const graph=figure.dataset.figureKind==='graph',auto=flow.classList.contains('qw-figure-auto');
+   const available=flow.getBoundingClientRect().width;
+   // Side and below modes have different physical constraints. In particular,
+   // landscape spread side figures must leave enough width for the condition.
+   const widthLimit=below=>modern?(below?Math.min(available-2*MM,graph?Math.max(requested,85*MM):requested):
+    (format==='booklet'?(graph?62:55):format==='practice'?55:graph?55:46)*MM):
+    below?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
+   const heightLimit=below=>modern?(below?70:format==='booklet'?(graph?47:42):format==='practice'?35:34)*MM:
+    below?(requested>=470?160*MM:requested*320/520):38*MM;
+   const fontSizes=modern&&svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim())
+    .map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0):[];
+   const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
+   const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
+   let scale=calculate(wide);
+   if(modern&&auto&&!wide){
+    // Measure the actual laid-out text in the hypothetical side column. This
+    // prevents long conditions from collapsing into an unreadable strip.
+    const sideTextWidth=available-w*Math.max(scale,minLabelScale)-4*MM;
+    let sideTextHeight=Infinity;
+    if(sideTextWidth>0){
+     const probe=text.cloneNode(true);
+     probe.style.cssText='position:absolute;visibility:hidden;float:none;width:'+sideTextWidth+'px;height:auto;max-width:none;';
+     flow.append(probe);sideTextHeight=probe.getBoundingClientRect().height;probe.remove();
+    }
+    const minTextWidth=format==='booklet'?50*MM:55*MM;
+    const denseGraph=graph&&svg.querySelectorAll('.qw-axis-number').length>12;
+    const wideImage=figure.dataset.figureKind==='image'&&w/h>1.8;
+    wide=w/h>2.5||sideTextWidth<minTextWidth||
+     sideTextHeight>Math.max(h*scale+8*MM,50*MM)||denseGraph||
+     wideImage||scale<minLabelScale;
    }
-   if(modern&&flow.classList.contains('qw-figure-auto'))wide=w/h>3.2||w*scale>contentWidth*.45;
+   if(modern&&!wide&&scale<minLabelScale)wide=true;
+   if(wide)scale=calculate(true);
+   if(modern&&svg&&fontSizes.length){
+    scale=Math.max(scale,minLabelScale);
+    if(w*scale>available-2*MM)throw Error('Подписи рисунка не помещаются: сократите подписи или разделите рисунок.');
+   }
    const position=wide?'below':flow.classList.contains('qw-figure-left')?'left':'right';
    flow.classList.remove('qw-figure-auto','qw-figure-left','qw-figure-right','qw-figure-below');flow.classList.add('qw-figure-'+position);
    if(modern&&!wide)flow.prepend(figure);
