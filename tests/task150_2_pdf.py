@@ -26,7 +26,8 @@ for stage,report in reports.items():
     assert f'{i+1} / {len(doc)}' in page.get_text()
     topics=[s for s in spans if 'Углы, площади и координаты' in s['text']]
     if i==0 and name!='Compact':
-     expected=0x222222 if name.endswith('-BW') else 0x111111 if name.startswith('QX-') else 0xB42318
+     # The PDF ink depends on the selected theme, not the fixture filename.
+     expected=0x222222 if entry.get('monochrome') else 0x111111 if entry.get('theme') else 0xB42318
      assert topics and all(s['color']==expected for s in topics),(name,'topic ink',expected)
    page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False).save(base/stage/(name+f'-page-{i+1:02}.png'))
   assert numbers==list(range(1,49 if name=='Dense-48' else 25)),(stage,name,numbers)
