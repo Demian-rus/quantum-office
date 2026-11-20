@@ -39,9 +39,12 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   if(kind==='diagram'){
    if(!before){
     await panel('tools');
-    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Построения','Механика']);
-    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),['select','point','line','dashed','arrow','text','rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks','block','incline','pulley','movablePulley','rope','spring','ground']);
-    assert.equal(await p.locator('[data-tool] span').count(),33);
+    assert.deepEqual(await p.locator('.qw-tool-group summary').allTextContents(),['Основные','Геометрия','Механика','Электричество']);
+    const legacyTools=['select','point','line','dashed','arrow','text','rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks','block','incline','pulley','movablePulley','rope','spring','ground'];
+    const newTools=['forceVector','velocityVector','accelerationVector','torque','dynamometer','weightSet','resistor','rheostat','cell','battery','lamp','switchOpen','switchClosed','ammeter','voltmeter','wireOrth','junction'];
+    assert.equal(new Set([...legacyTools,...newTools]).size,50,'tool IDs must remain unique');
+    assert.deepEqual(await p.locator('[data-tool]').evaluateAll(xs=>xs.map(x=>x.dataset.tool)),[...legacyTools.slice(0,33),...newTools], 'keep all 33 existing tools and 17 TASK161 additions in palette order');
+    assert.equal(await p.locator('[data-tool] span').count(),legacyTools.length+newTools.length);
     await p.locator('.qw-tool-group summary').first().click();sameBox(stable,await stage.boundingBox(),'collapse must not resize canvas');
     await p.locator('.qw-tool-group summary').first().click();
     await p.locator('#qw-visual-tools').evaluate(e=>e.scrollTop=e.scrollHeight);sameBox(stable,await stage.boundingBox(),'tools scroll independent');
