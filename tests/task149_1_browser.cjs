@@ -17,7 +17,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
    const data=await stage.evaluate(svg=>{
     const box=e=>{const b=e.getBBox();return {x:b.x,y:b.y,w:b.width,h:b.height};};
     return {labels:[...svg.querySelectorAll('.qw-axis-number,.qw-axis-title')].map(e=>({axis:e.dataset.axis,value:e.dataset.value,box:box(e)})),
-     arrows:[...svg.querySelectorAll('line[marker-end]')].map(e=>({x:+e.getAttribute('x2'),y:+e.getAttribute('y2')})),
+     arrows:['x','y'].map(axis=>{
+      const tip=svg.querySelector('path[data-qw-axis-head="'+axis+'"]');
+      assert.ok(tip,'separate axis arrowhead required: '+axis);
+      const m=tip.getAttribute('d').match(/M\s*(-?[\d.]+)\s*(-?[\d.]+)/);
+      return {x:Number(m[1]),y:Number(m[2])};
+     }),
      grid:svg.querySelectorAll('line[stroke="#d9dee4"]').length};
    });
    const labels=data.labels;
