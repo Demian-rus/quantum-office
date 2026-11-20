@@ -286,7 +286,7 @@ async function qwPreparePrintDocument(){
    // Side and below modes have different physical constraints. In particular,
    // landscape spread side figures must leave enough width for the condition.
    const widthLimit=below=>modern?(below?Math.min(available-2*MM,graph?Math.max(requested,85*MM):requested):
-    (format==='booklet'?(graph?62:55):format==='practice'?55:graph?55:46)*MM):
+    (format==='booklet'?(graph?62:55):format==='practice'?55:graph?55:40)*MM):
     below?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
    const heightLimit=below=>modern?(below?70:format==='booklet'?(graph?47:42):format==='practice'?35:34)*MM:
     below?(requested>=470?160*MM:requested*320/520):38*MM;
@@ -295,7 +295,8 @@ async function qwPreparePrintDocument(){
    const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
    const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
    let scale=calculate(wide);
-   if(modern&&auto&&!wide){
+   if(modern&&graph&&!wide&&format!=='booklet'&&svg)scale=48*MM/369;
+   if(modern&&auto&&!wide&&format==='booklet'){
     // Measure the actual laid-out text in the hypothetical side column. This
     // prevents long conditions from collapsing into an unreadable strip.
     const sideTextWidth=available-w*Math.max(scale,minLabelScale)-4*MM;
@@ -312,7 +313,8 @@ async function qwPreparePrintDocument(){
      sideTextHeight>Math.max(h*scale+8*MM,50*MM)||denseGraph||
      wideImage||scale<minLabelScale;
    }
-   if(modern&&!wide&&scale<minLabelScale)wide=true;
+   if(modern&&auto&&!wide&&format!=='booklet')wide=w/h>3.2||w*scale>contentWidth*.45;
+   if(modern&&format==='booklet'&&!wide&&scale<minLabelScale)wide=true;
    if(wide)scale=calculate(true);
    if(modern&&svg&&fontSizes.length){
     scale=Math.max(scale,minLabelScale);
