@@ -39,7 +39,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
     if(options.theme){assert.equal(measurement.brands.length,measurement.layout.pages.length);assert.ok(measurement.brands.every(b=>b.text==='QX | Квант Икс'));}
    }
    await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
-   fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(project,null,2));reports.push({name,...measurement});await p.close();return measurement;
+   fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(project,null,2));reports.push({name,theme:options.theme||'',monochrome:options.monochrome===true,...measurement});await p.close();return measurement;
   }
   const standard=structuredClone(d);standard.topic='';await render('Compact',standard);await render('Unbranded',d);
   for(const theme of ['academic','scientific','minimal']){await render('QX-'+theme,d,{theme});await render('QX-'+theme+'-Answers',d,{theme,format:'answers'});}
