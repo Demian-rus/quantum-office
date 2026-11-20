@@ -6,7 +6,7 @@ root=Path(os.environ.get('QW_TASK150_ROOT',Path(__file__).resolve().parents[1]))
 base=root/'evidence/task150';review=base/'review';archive=base/'TASK150-Review.zip'
 # A previous successful archive must never survive an incomplete rerun.
 archive.unlink(missing_ok=True)
-formats=['Worksheet','Compact-24','Practice','Answers','Legacy-Exam']
+formats=['Worksheet','No-QX','Compact-24','Practice','Answers','Legacy-Exam']
 concepts=[f'QX-{theme}{suffix}' for theme in ['academic','scientific','minimal']
           for suffix in ['', '-Answers','-BW','-BW-Answers']]
 stages={'before':formats,'after':formats+['Long-Flow']+concepts}
