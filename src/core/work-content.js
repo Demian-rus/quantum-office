@@ -108,9 +108,13 @@ function qwGraphSVG(g,interactive=false,typography={}){
   if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'stroke="#d9dee4" stroke-width="0.8"'));
   parts.push(line(axisX-3,t.pos,axisX+3,t.pos,'stroke="#333"'));
  }
- // Arrows deliberately extend beyond the rectangular grid.
- parts.push(line(b.left,axisY,b.right+16,axisY,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'),
-  line(axisX,b.bottom,axisX,b.top-16,'stroke="#111" stroke-width="1.7" marker-end="url(#qw-arrow)"'));
+ // Draw arrowheads separately: the visible shaft ends at the head's base,
+ // not at the tip (marker-end used to leave a line through the arrowhead).
+ const xTip=b.right+16,xBase=xTip-11,yTip=b.top-16,yBase=yTip+11;
+ parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="x"'),
+  '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-4.2)+' L'+xBase+' '+(axisY+4.2)+' Z" fill="#111"/>',
+  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="y"'),
+  '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-4.2)+' '+yBase+' L'+(axisX+4.2)+' '+yBase+' Z" fill="#111"/>');
  const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
  const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
  const numberBoxes=[];
