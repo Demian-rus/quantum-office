@@ -103,8 +103,34 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
    results.push({...data,pdfBytes:fs.statSync(pdf).size});
    await p.close();
   }
+  const bankProof=await app.evaluate(()=>{
+   const original=localStorage.getItem(QW_BANK_KEY);
+   const counter=localStorage.getItem(QW_BANK_NUMBER_KEY);
+   try{
+    const t1=qwTask('short'),t2=qwTask('choice'),t3=qwTask('short');
+    t1.prompt='Укажите время';t2.prompt='Найдите ускорение';
+    t3.prompt='Определите давление';
+    localStorage.setItem(QW_BANK_KEY,JSON.stringify([
+     {id:'legacy1',slot:'7',subject:'physics',exam:'ege',task:t1},
+     {id:'legacy2',slot:'8',subject:'physics',exam:'ege',bankNumber:1807,task:t2},
+     {id:'legacy3',slot:'9',subject:'physics',exam:'ege',bankNumber:1807,task:t3}
+    ]));
+    const entries=qwBankRead();const n=entries.map(x=>x.bankNumber);
+    if(new Set(n).size!==3||n.some(x=>!Number.isInteger(x)||x<1))throw Error('duplicate or missing bank numbers');
+    if(qwBankRead().map(x=>x.bankNumber).join()!==n.join())throw Error('unstable bank number');
+    const doc=qwProject();doc.layout='booklet';doc.tasks=[qwTask('short')];
+    doc.tasks[0].prompt='Укажите скорость';
+    doc.tasks[0].source={kind:'bank',id:'legacy2',number:1807,slot:'7'};
+    const page=qwPrintDocumentHTML(qwValidate(doc),false,{format:'booklet'});
+    if(!page.includes('Тип 7 № 01807'))throw Error('missing printed bank identity');
+    return {numbers:n,printedIdentity:true,legacyPreserved:true};
+   }finally{
+    if(original===null)localStorage.removeItem(QW_BANK_KEY);else localStorage.setItem(QW_BANK_KEY,original);
+    if(counter===null)localStorage.removeItem(QW_BANK_NUMBER_KEY);else localStorage.setItem(QW_BANK_NUMBER_KEY,counter);
+   }
+  });
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',synthetic:true,results},null,2));
+  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',synthetic:true,results,bankProof},null,2));
   console.log('PASS TASK160.1: 32 synthetic tasks, flow, axes, tables, portrait and landscape');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
