@@ -129,8 +129,63 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
     if(counter===null)localStorage.removeItem(QW_BANK_NUMBER_KEY);else localStorage.setItem(QW_BANK_NUMBER_KEY,counter);
    }
   });
+  // A real QWBANK-v1 upload colliding with an existing bank number must
+  // assign new entry IDs and new display numbers, not make false references.
+  const importSetup=await app.evaluate(()=>{
+   const backup={bank:localStorage.getItem(QW_BANK_KEY),counter:localStorage.getItem(QW_BANK_NUMBER_KEY)};
+   const originalTask=qwTask('short');originalTask.prompt='Исходная задача о напряжении';
+   originalTask.answer='12';
+   const incomingTask=qwTask('short');incomingTask.prompt='Импортированная задача о токе';incomingTask.answer='3';
+   const legacyTask=qwTask('short');legacyTask.prompt='Импортированная задача о давлении';legacyTask.answer='25';
+   const base={subject:'physics',grade:'11',exam:'ege',year:'2018',part:'1',slot:'7',topic:'Электричество',origin:'original'};
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify([{...base,id:'original-local',bankNumber:1807,task:originalTask}]));
+   localStorage.setItem(QW_BANK_NUMBER_KEY,'1807');
+   qwBank();
+   return {backup,imported:{format:'quantum-work-bank',version:1,items:[
+    {...base,id:'same-name-remote',bankNumber:1807,task:incomingTask},
+    {...base,id:'legacy-no-number',task:legacyTask}
+   ]}};
+  });
+  let importProof;
+  try{
+   await app.locator('#qw-bank-import-file').setInputFiles({
+    name:'collision-test.qwbank',mimeType:'application/json',
+    buffer:Buffer.from(JSON.stringify(importSetup.imported),'utf8')
+   });
+   await app.waitForFunction(()=>qwBankRead().length===3);
+   importProof=await app.evaluate(()=>{
+    const entries=qwBankRead(),numbers=entries.map(x=>x.bankNumber);
+    const original=entries.find(x=>x.id==='original-local');
+    const imported=entries.find(x=>x.task.prompt==='Импортированная задача о токе');
+    const legacy=entries.find(x=>x.task.prompt==='Импортированная задача о давлении');
+    if(!original||!imported||!legacy)throw Error('an item disappeared during bank merge');
+    if(new Set(numbers).size!==3||new Set(entries.map(x=>x.id)).size!==3)throw Error('duplicate id after merge');
+    if(original.bankNumber!==1807||imported.bankNumber===1807||legacy.bankNumber===1807)
+     throw Error('collision overwrote local task identity');
+    if(['same-name-remote','legacy-no-number','original-local'].includes(imported.id)||
+     ['same-name-remote','legacy-no-number','original-local'].includes(legacy.id))
+     throw Error('imported source id should be newly allocated');
+    const task=qwTask('short');task.prompt=imported.task.prompt;
+    task.source={kind:'bank',id:imported.id,number:imported.bankNumber,slot:imported.slot};
+    const q=qwProject();q.tasks=[task];
+    const saved=qwValidate(JSON.parse(JSON.stringify(q)));
+    if(saved.tasks[0].source.id!==imported.id||
+     saved.tasks[0].source.number!==imported.bankNumber)throw Error('false QWORK bank link after import');
+    const again=qwBankRead();
+    if(again.map(x=>x.bankNumber).join()!==numbers.join())throw Error('numbers changed on reopen');
+    return {numbers,originalId:original.id,importedId:imported.id,legacyId:legacy.id,
+     qworkLink:task.source,stableOnReopen:true};
+   });
+  }finally{
+   await app.evaluate(backup=>{
+    if(backup.bank===null)localStorage.removeItem(QW_BANK_KEY);
+    else localStorage.setItem(QW_BANK_KEY,backup.bank);
+    if(backup.counter===null)localStorage.removeItem(QW_BANK_NUMBER_KEY);
+    else localStorage.setItem(QW_BANK_NUMBER_KEY,backup.counter);
+   },importSetup.backup);
+  }
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',synthetic:true,results,bankProof},null,2));
+  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',synthetic:true,results,bankProof,importProof},null,2));
   console.log('PASS TASK160.1: 32 synthetic tasks, flow, axes, tables, portrait and landscape');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
