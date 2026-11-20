@@ -1045,9 +1045,22 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   else if(e.key==='Escape'){e.preventDefault();cancelDrag();polyline=[];selectOnly(-1);draw();}
   else if(e.key==='Enter'&&polyline.length){e.preventDefault();finishPolyline();}
   else if(e.key==='Delete'||e.key==='Backspace'){e.preventDefault();remove();}
-  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();d.querySelector('#qw-visual-undo').click();}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();d.querySelector(e.shiftKey?'#qw-visual-redo':'#qw-visual-undo').click();}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){e.preventDefault();d.querySelector('#qw-visual-redo').click();}
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='d'){e.preventDefault();copySelection();}
  };
- d.querySelector('#qw-visual-undo').onclick=()=>{cancelDrag();polyline=[];if(history.length){value=history.pop();selectOnly(-1);draw();}};d.querySelector('#qw-visual-delete').onclick=remove;
+ d.querySelector('#qw-visual-undo').onclick=()=>{
+  cancelDrag();polyline=[];if(history.length){
+   future.push(structuredClone(value));value=history.pop();selectOnly(-1);draw();
+  }
+ };
+ d.querySelector('#qw-visual-redo').onclick=()=>{
+  cancelDrag();polyline=[];if(future.length){
+   history.push(structuredClone(value));value=future.pop();selectOnly(-1);draw();
+  }
+ };
+ d.querySelector('#qw-visual-copy').onclick=copySelection;
+ d.querySelector('#qw-visual-delete').onclick=remove;
  d.addEventListener('click',e=>{const t=e.target.closest('button');if(!t)return;if(t.dataset.tool){polyline=[];tool=t.dataset.tool;constructionReference=kind==='diagram'&&['parallel','perpendicular'].includes(tool)&&linear(value[selected])?selected:-1;for(const b of d.querySelectorAll('[data-tool]'))b.setAttribute('aria-pressed',String(b===t));if(matchMedia('(max-width:1000px)').matches)showPanel('');draw();}
   if(t.id==='qw-label-reset'&&labelSelected){const info=labelInfo(labelSelected);if(info&&!info.free){remember();info.set({mode:'auto',dx:0,dy:0});draw();}return;}
   if(t.id==='qw-finish-polyline'){finishPolyline();return;}
