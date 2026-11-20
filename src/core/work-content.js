@@ -1,6 +1,7 @@
 /* A bounded mathematical syntax shared by MathML preview and PDF canvas layout. */
 import {qwGraphGridStep,qwEvaluateCurve,qwGeometryVertices,qwValidateStyle,qwResolveDiagram,QW_PLOT,qwPlotXY} from './work-model.js';
 import {qwArcPoints,qwLinearSegments,qwExtendedSegment} from './work-geometry.js';
+import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape} from './work-physics.js';
 import {qwLabelSVG,qwPlaceSVGLabels} from './work-labels.js';
 const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',iota:'ι',kappa:'κ',nu:'ν',xi:'ξ',tau:'τ',upsilon:'υ',chi:'χ',psi:'ψ',Gamma:'Γ',Theta:'Θ',Lambda:'Λ',Pi:'Π',Sigma:'Σ',Phi:'Φ',Psi:'Ψ',Delta:'Δ',theta:'θ',lambda:'λ',mu:'μ',pi:'π',rho:'ρ',sigma:'σ',phi:'φ',omega:'ω',Omega:'Ω',cdot:'·',times:'×',pm:'±',le:'≤',ge:'≥',neq:'≠',infty:'∞'};
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -324,6 +325,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     path+=' L'+numeric(o.x+dx*t-uy*offset)+' '+numeric(o.y+dy*t+ux*offset);
    }
    shape='<path d="'+path+' L'+o.x2+' '+o.y2+'"'+a+' stroke-linejoin="round"/>';
+  }
+  if(QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)){
+   shape=qwPhysicsShape(o,interactive);
   }
   if(o.kind==='block'){
    shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>';
