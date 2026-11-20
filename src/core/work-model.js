@@ -64,7 +64,18 @@ function qwValidate(raw){
   q.figure=['none','graph','diagram','image'].includes(raw.figure)?raw.figure:'none';q.position=['auto','left','right','below'].includes(raw.position)?raw.position:'right';q.figureWidth=qwNum(raw.figureWidth,120,470,220);
   const g=raw.graph||qwGraphDefault();q.graph=qwValidateGraph(g);q.diagram=qwValidateDiagram(raw.diagram||[]);
   if(raw.image){if(typeof raw.image!=='string'||raw.image.length>6000000||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(raw.image))throw Error('Недопустимое изображение');q.image=raw.image;}
-  if(raw.source&&typeof raw.source==='object')q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
+  if(raw.source&&typeof raw.source==='object'){
+   q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
+   const number=raw.source.number,slot=raw.source.slot;
+   if(number!==undefined){
+    if(!Number.isInteger(number)||number<1||number>99999)throw Error('Некорректный постоянный номер задания банка');
+    q.source.number=number;
+   }
+   if(slot!==undefined){
+    if(!/^(?:[1-9]|[1-3]\\d|40)$/.test(String(slot)))throw Error('Некорректный тип экзаменационного задания');
+    q.source.slot=String(slot);
+   }
+  }
   return q;
  });
  if(new TextEncoder().encode(JSON.stringify(d)).length>QW_LIMITS.bytes)throw Error('Проект больше 18 МБ');return d;
