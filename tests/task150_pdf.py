@@ -18,14 +18,22 @@ for entry in report['reports']:
         drawings=p.get_drawings();vectors+=len(drawings)
         spans=[s for b in p.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
         for s in spans:
-            x0,y0,x1,y1=s['bbox'];assert 25<=x0<x1<=p.rect.width-25 and 20<=y0<y1<=p.rect.height-10,(name,i,s)
+            x0,y0,x1,y1=s['bbox']
+            if s['text'].strip()=='QX | Квант Икс':
+                assert p.rect.width-115<=x0<x1<=p.rect.width+1 and p.rect.height-35<=y0<y1<=p.rect.height+1,(name,i,'bottom-right handwritten signature bounds',s)
+            else:
+                assert 25<=x0<x1<=p.rect.width-25 and 20<=y0<y1<=p.rect.height-10,(name,i,s)
         if '-BW' in name:
             for d in drawings:
                 for key in ['color','fill']:
                     c=d.get(key)
                     if c and len(c)==3:assert max(c)-min(c)<.005,(name,key,c)
             for s in spans:
-                c=s['color'];channels=[(c>>16)&255,(c>>8)&255,c&255];assert max(channels)==min(channels),(name,s['text'],hex(c))
+                c=s['color'];channels=[(c>>16)&255,(c>>8)&255,c&255]
+                if s['text'].strip()=='QX | Квант Икс':
+                    assert max(channels)==min(channels) and channels[0]<=50,(name,'black QX signature',channels)
+                else:
+                    assert max(channels)==min(channels),(name,s['text'],hex(c))
         # DOM glyph baselines vs native PDF glyph origins, not unrelated screen ink boxes.
         for expected in [b for b in entry['textBoxes'] if b['page']==i]:
             candidates=[]

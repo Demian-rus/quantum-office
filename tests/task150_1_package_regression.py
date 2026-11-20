@@ -11,7 +11,7 @@ import pymupdf
 
 root = Path(__file__).resolve().parents[1]
 base = root / 'evidence/task150'
-formats = ['Worksheet', 'Compact-24', 'Practice', 'Answers', 'Legacy-Exam']
+formats = ['Worksheet', 'No-QX', 'Compact-24', 'Practice', 'Answers', 'Legacy-Exam']
 themes = ['QX-Academic-Tech', 'QX-Scientific', 'QX-Minimal']
 
 if '--missing-inputs' in sys.argv:

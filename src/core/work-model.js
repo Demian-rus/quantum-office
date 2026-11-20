@@ -1,4 +1,5 @@
 /* TASK144: independent, portable work projects. No diagnostic/student mutations. */
+import {QW_MECHANICS,QW_ELECTRICS,QW_ELECTRIC_TERMINALS,qwDiagramPorts,qwNearestDiagramPort,qwPhysicsPortPoint} from './work-physics.js';
 const QW_TYPES={short:'Краткий ответ',extended:'Развёрнутый ответ',choice:'Тест',graph:'Задание с графиком',diagram:'Рисунок / схема',blanks:'Пустые вставки',combined:'Комбинированное'};
 const QW_SUBJECTS={math:'Математика',geometry:'Геометрия',algebra:'Алгебра',physics:'Физика',mixed:'Математика и физика',other:'Авторская подборка'};
 const QW_PLOT={left:82,right:451,top:46,bottom:262};
@@ -15,7 +16,25 @@ function qwPrintSettings(raw={}){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректные параметры печати');
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
  if(!Number.isFinite(fontPt)||fontPt<9||fontPt>12||!['auto','right','below'].includes(figurePosition)||typeof topicHeadings!=='boolean')throw Error('Проверьте параметры печати');
- return {fontPt,figurePosition,topicHeadings};
+ const options={fontPt,figurePosition,topicHeadings};
+ const flags=['showTitle','showMeta','showVariant','showPageNumbers','monochrome'];
+ for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
+ const textKeys={titleText:160};
+ for(const [key,max] of Object.entries(textKeys))if(raw[key]!==undefined){
+  if(typeof raw[key]!=='string'||raw[key].length>max)throw Error('Некорректный текст заголовка');
+  options[key]=raw[key];
+ }
+ const choices={titleFont:['sans','serif'],titleAlign:['left','center','right'],bodyFont:['serif','sans'],theme:['','academic','scientific','minimal'],orientation:['portrait','landscape'],landscapeLayout:['spread','wide']};
+ for(const [key,values] of Object.entries(choices))if(raw[key]!==undefined){
+  if(!values.includes(raw[key]))throw Error('Некорректный шрифт или выравнивание');
+  options[key]=raw[key];
+ }
+ if(raw.titlePt!==undefined){if(!Number.isFinite(raw.titlePt)||raw.titlePt<11||raw.titlePt>26)throw Error('Размер заголовка: 11–26 пт');options.titlePt=raw.titlePt;}
+ for(const key of ['titleColor','bodyColor'])if(raw[key]!==undefined){
+  if(typeof raw[key]!=='string'||!/^#[0-9a-f]{6}$/i.test(raw[key]))throw Error('Цвет должен быть #RRGGBB');
+  options[key]=raw[key].toLowerCase();
+ }
+ return options;
 }
 function qwNum(v,min,max,fallback){return Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;}
 function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t, с',ylabel:'v, м/с',coordinateMode:'first',grid:true,connected:true,smooth:false,snapToGrid:true,curveFamily:'points',curve:{a:1,b:0,c:0,amplitude:3,frequency:1,phase:0,offset:0,trig:'sin'},points:[],elements:[]};}
@@ -28,7 +47,7 @@ function qwValidate(raw){
  if(!raw||raw.format!=='quantum-work'||raw.version!==1||!Array.isArray(raw.tasks)||raw.tasks.length>QW_LIMITS.tasks)throw Error('Неподдерживаемый проект QWORK');
  const d=qwProject(),ids=new Set();
  for(const key of ['title','grade','topic','variant','instructions'])d[key]=qwText(raw[key],key==='instructions'?4000:key==='title'||key==='topic'?160:24);
- d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=Object.hasOwn(QW_SUBJECTS,raw.subject)?raw.subject:'physics';d.identity=raw.identity===true;d.layout=['compact','practice','exam'].includes(raw.layout)?raw.layout:'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
+ d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=Object.hasOwn(QW_SUBJECTS,raw.subject)?raw.subject:'physics';d.identity=raw.identity===true;d.layout=['compact','practice','booklet','exam'].includes(raw.layout)?raw.layout:'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
  if(raw.practice!==undefined){
   const p=raw.practice;if(!p||typeof p!=='object'||![1,2,3,4].includes(p.perPage)||!['none','fine','normal'].includes(p.grid))throw Error('Некорректные параметры листа для решения');
   d.practice={perPage:p.perPage,grid:p.grid};
@@ -46,7 +65,18 @@ function qwValidate(raw){
   q.figure=['none','graph','diagram','image'].includes(raw.figure)?raw.figure:'none';q.position=['auto','left','right','below'].includes(raw.position)?raw.position:'right';q.figureWidth=qwNum(raw.figureWidth,120,470,220);
   const g=raw.graph||qwGraphDefault();q.graph=qwValidateGraph(g);q.diagram=qwValidateDiagram(raw.diagram||[]);
   if(raw.image){if(typeof raw.image!=='string'||raw.image.length>6000000||!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(raw.image))throw Error('Недопустимое изображение');q.image=raw.image;}
-  if(raw.source&&typeof raw.source==='object')q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
+  if(raw.source&&typeof raw.source==='object'){
+   q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
+   const number=raw.source.number,slot=raw.source.slot;
+   if(number!==undefined){
+    if(!Number.isInteger(number)||number<1||number>99999)throw Error('Некорректный постоянный номер задания банка');
+    q.source.number=number;
+   }
+   if(slot!==undefined){
+    if(!/^(?:[1-9]|[1-3]\d|40)$/.test(String(slot)))throw Error('Некорректный тип экзаменационного задания');
+    q.source.slot=String(slot);
+   }
+  }
   return q;
  });
  if(new TextEncoder().encode(JSON.stringify(d)).length>QW_LIMITS.bytes)throw Error('Проект больше 18 МБ');return d;
@@ -114,7 +144,13 @@ function qwEvaluateCurve(graph,x){
  if(graph.curveFamily==='trigonometric')return p.amplitude*Math[p.trig==='cos'?'cos':'sin'](p.frequency*x+p.phase)+p.offset;
  return NaN;
 }
+function qwRegularPolygonVertices(object){
+ const x=Math.min(object.x,object.x2),x2=Math.max(object.x,object.x2),y=Math.min(object.y,object.y2),y2=Math.max(object.y,object.y2);
+ const n=object.sides||6,cx=(x+x2)/2,cy=(y+y2)/2,r=Math.min(x2-x,y2-y)/2;
+ return Array.from({length:n},(_,i)=>{const a=-Math.PI/2+2*Math.PI*i/n;return {x:cx+r*Math.cos(a),y:cy+r*Math.sin(a),label:''};});
+}
 function qwGeometryVertices(object){
+ if(object.kind==='regularPolygon')return qwRegularPolygonVertices(object);
  if(Array.isArray(object.vertices)&&object.vertices.length>=3)return object.vertices;
  const x=Math.min(object.x,object.x2),x2=Math.max(object.x,object.x2),
   y=Math.min(object.y,object.y2),y2=Math.max(object.y,object.y2);
@@ -144,17 +180,22 @@ function qwSnapDiagramPoint(point,objects,step=20,excludeIndex=-1){
   const x=Math.min(o.x,o.x2),x2=Math.max(o.x,o.x2),
    y=Math.min(o.y,o.y2),y2=Math.max(o.y,o.y2);
   let local=[];
-  if(Array.isArray(o.vertices))local.push(...o.vertices);
+  if(o.kind==='regularPolygon')local.push(...qwGeometryVertices(o),{x:(x+x2)/2,y:(y+y2)/2});
+  else if(Array.isArray(o.vertices))local.push(...o.vertices);
   else if(['block','rect','incline'].includes(o.kind)){
    local.push(...(o.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x,y:y2},{x:x2,y:y2}]),
     {x:(x+x2)/2,y:y2},{x:x2,y:(y+y2)/2});
    if(o.kind==='incline')local.push({x:(x+x2)/2,y:(y+y2)/2});
    else local.push({x:(x+x2)/2,y},{x,y:(y+y2)/2});
-  }else if(['circle','pulley','fixedPulley','movablePulley'].includes(o.kind)){
+  }else if(['circle','ellipse','pulley','fixedPulley','movablePulley'].includes(o.kind)){
    const cx=(x+x2)/2,cy=(y+y2)/2,r=Math.max(8,Math.min(x2-x,y2-y)/2);
-   local.push({x:cx,y:cy},{x:cx,y:o.kind==='circle'?y:cy-r},{x:cx,y:o.kind==='circle'?y2:cy+r},{x:o.kind==='circle'?x:cx-r,y:cy},{x:o.kind==='circle'?x2:cx+r,y:cy});
+   local.push({x:cx,y:cy},{x:cx,y:['circle','ellipse'].includes(o.kind)?y:cy-r},{x:cx,y:['circle','ellipse'].includes(o.kind)?y2:cy+r},{x:['circle','ellipse'].includes(o.kind)?x:cx-r,y:cy},{x:['circle','ellipse'].includes(o.kind)?x2:cx+r,y:cy});
    if(o.kind==='movablePulley')local.push({x:cx-r,y:cy-r-32},{x:cx+r,y:cy-r-32},{x:cx,y:cy+r+18});
-   else if(o.kind!=='circle')local.push({x:cx,y:cy-r-14});
+   else if(!['circle','ellipse'].includes(o.kind))local.push({x:cx,y:cy-r-14});
+  }else if(['ground','rope'].includes(o.kind)){
+   const dx=o.x2-o.x,dy=o.y2-o.y,length2=dx*dx+dy*dy;
+   const t=length2?Math.min(1,Math.max(0,((target.x-o.x)*dx+(target.y-o.y)*dy)/length2)):0;
+   local.push({x:o.x,y:o.y},{x:o.x2,y:o.y2},{x:o.x+dx*t,y:o.y+dy*t});
   }else local.push({x:o.x,y:o.y},{x:o.x2,y:o.y2});
   const cx=(x+x2)/2,cy=(y+y2)/2,a=(o.rotation||0)*Math.PI/180;
   anchors.push(...local.map(p=>({x:cx+(p.x-cx)*Math.cos(a)-(p.y-cy)*Math.sin(a),y:cy+(p.x-cx)*Math.sin(a)+(p.y-cy)*Math.cos(a)})));
@@ -181,14 +222,58 @@ function qwValidateStyle(raw){
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  const ids=new Set(),result=raw.map(o=>{
-  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
+  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','ellipse','regularPolygon','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope',...QW_MECHANICS,...QW_ELECTRICS].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
+  if(o.kind==='regularPolygon'){
+   if(!Number.isInteger(o.sides)||o.sides<3||o.sides>12)throw Error('Правильный многоугольник: 3–12 сторон');
+   value.sides=o.sides;
+  }
   if(o.id!==undefined){if(typeof o.id!=='string'||!o.id||o.id.length>80||ids.has(o.id))throw Error('Некорректный или повторный ID фигуры');value.id=o.id;ids.add(o.id);}
   if(['ray','infiniteLine'].includes(o.kind)){if(Math.abs(o.x2)>1040||Math.abs(o.y2)>1040||Math.hypot(o.x2-o.x,o.y2-o.y)<.01)throw Error('Построение: задайте ненулевое направление');value.x2=o.x2;value.y2=o.y2;}
-  if(o.construction!==undefined){const c=o.construction;if(o.kind!=='infiniteLine'||!c||!['parallel','perpendicular'].includes(c.kind)||typeof c.reference!=='string'||!c.reference)throw Error('Некорректная связь построения');value.construction={kind:c.kind,reference:c.reference};}
+  if(o.construction!==undefined){const c=o.construction;if(!c||!['parallel','perpendicular','midpoint','angleBisector','perpendicularBisector'].includes(c.kind)
+   ||typeof c.reference!=='string'||!c.reference
+   ||(['parallel','perpendicular','perpendicularBisector'].includes(c.kind)&&o.kind!=='infiniteLine')
+   ||(c.kind==='midpoint'&&o.kind!=='point')||(c.kind==='angleBisector'&&o.kind!=='ray'))
+   throw Error('Некорректная связь построения');value.construction={kind:c.kind,reference:c.reference};}
   if(o.ticks!==undefined){if(!['line','arrow','dashed','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind)||![0,1,2,3].includes(o.ticks))throw Error('Засечки: от 0 до 3 на линейном объекте');value.ticks=o.ticks;}
-  if(o.kind==='block'||o.rotation!==undefined){if(o.rotation!==undefined&&!Number.isFinite(o.rotation))throw Error('Некорректный угол');value.rotation=qwNum(o.rotation,-180,180,0);}
+  if(o.kind==='block'||QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)||o.rotation!==undefined){
+   if(o.rotation!==undefined&&!Number.isFinite(o.rotation))throw Error('Некорректный угол');
+   value.rotation=qwNum(o.rotation,-180,180,0);
+  }
+  if(o.kind==='torque'){
+   if(o.direction!==undefined&&!['cw','ccw'].includes(o.direction))throw Error('Некорректное направление момента');
+   value.direction=o.direction||'cw';
+  }
+  if(o.kind==='weightSet'){
+   if(o.count!==undefined&&(!Number.isInteger(o.count)||o.count<2||o.count>6))throw Error('Количество грузов: 2–6');
+   value.count=o.count||2;
+  }
+  if(o.kind==='dynamometer'){
+   if(o.reading!==undefined&&(!Number.isFinite(o.reading)||o.reading<0||o.reading>100))throw Error('Показания динамометра: 0–100');
+   value.reading=o.reading||0;
+  }
+  if(o.kind==='wireOrth'){
+   if(o.bend!==undefined){
+    if(!Number.isFinite(o.bend)||o.bend<0||o.bend>520)throw Error('Угол изгиба проводника вне холста');
+    value.bend=o.bend;
+   }
+   if(o.links!==undefined){
+    if(!o.links||typeof o.links!=='object'||Array.isArray(o.links))throw Error('Некорректные соединения проводника');
+    const links={};
+    for(const side of ['start','end'])if(o.links[side]!==undefined){
+     const p=o.links[side];
+     if(!p||typeof p.id!=='string'||!p.id||p.id.length>80||!['L','R','U','D'].includes(p.port))
+      throw Error('Некорректный порт подключения');
+     links[side]={id:p.id,port:p.port};
+    }
+    value.links=links;
+   }
+  }
+  if(QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)){
+   if(o.kind!=='junction'&&!(o.kind==='wireOrth'&&o.links&&o.links.start&&o.links.end)&&Math.hypot(value.x2-value.x,value.y2-value.y)<4)
+    throw Error('Размер или длина физического объекта слишком малы');
+  }
   if(o.style!==undefined)value.style=qwValidateStyle(o.style);
   if(o.labelPosition!==undefined)value.labelPosition=qwLabelPosition(o.labelPosition);
   if(['polyline','arc','dimension','doubleArrow'].includes(o.kind)){
@@ -228,19 +313,68 @@ function qwValidateDiagram(raw){
    if(o.edgeLabelPositions!==undefined){if(!Array.isArray(o.edgeLabelPositions)||o.edgeLabelPositions.length!==vertices.length)throw Error('Некорректные положения подписей сторон');value.edgeLabelPositions=o.edgeLabelPositions.map(p=>p===null?null:qwLabelPosition(p));}
   }
   return value;
- });return qwResolveDiagram(result);
+ });
+ const byId=new Map(result.filter(o=>o.id).map(o=>[o.id,o]));
+ for(const o of result)if(o.kind==='wireOrth'&&o.links){
+  for(const linked of Object.values(o.links)){
+   const target=byId.get(linked.id);
+   if(!target||!QW_ELECTRIC_TERMINALS.includes(target.kind)||
+    !qwDiagramPorts(target).some(p=>p.port===linked.port))throw Error('Соединение с несуществующим контактом');
+  }
+ }
+ return qwResolveDiagram(result);
 }
 function qwResolveDiagram(objects){
  const result=objects.map(o=>({...o})),byId=new Map(result.filter(o=>o.id).map(o=>[o.id,o])),done=new Set(),active=new Set();
  function resolve(o){if(done.has(o))return;if(active.has(o))throw Error('Циклическая связь построений');active.add(o);
-  if(o.construction){const ref=byId.get(o.construction.reference);if(!ref||!['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(ref.kind))throw Error('Не найдена опорная линия построения');resolve(ref);
-   const angle=(ref.rotation||0)*Math.PI/180,dx0=ref.x2-ref.x,dy0=ref.y2-ref.y,dx=dx0*Math.cos(angle)-dy0*Math.sin(angle),dy=dx0*Math.sin(angle)+dy0*Math.cos(angle),length=Math.hypot(dx,dy);if(length<.01)throw Error('Опорная линия должна иметь длину');
-   const perpendicular=o.construction.kind==='perpendicular';o.x2=o.x+(perpendicular?-dy:dx)/length*40;o.y2=o.y+(perpendicular?dx:dy)/length*40;o.rotation=0;
+  if(o.construction){
+   const c=o.construction,ref=byId.get(c.reference);
+   if(!ref)throw Error('Не найдена исходная фигура построения');
+   resolve(ref);
+   const theta=(ref.rotation||0)*Math.PI/180,cs=Math.cos(theta),sn=Math.sin(theta);
+   const center={x:(Math.min(ref.x,ref.x2)+Math.max(ref.x,ref.x2))/2,y:(Math.min(ref.y,ref.y2)+Math.max(ref.y,ref.y2))/2};
+   const rotate=p=>({x:center.x+(p.x-center.x)*cs-(p.y-center.y)*sn,y:center.y+(p.x-center.x)*sn+(p.y-center.y)*cs});
+   if(c.kind==='angleBisector'){
+    if(ref.kind!=='angle')throw Error('Для биссектрисы нужен угол');
+    const v=rotate({x:ref.x,y:ref.y}),b=rotate({x:ref.x2,y:ref.y}),d=rotate({x:ref.x2,y:ref.y2});
+    const u={x:b.x-v.x,y:b.y-v.y},w={x:d.x-v.x,y:d.y-v.y},lu=Math.hypot(u.x,u.y),lw=Math.hypot(w.x,w.y);
+    if(lu<.01||lw<.01)throw Error('Стороны угла должны иметь длину');
+    const direction={x:u.x/lu+w.x/lw,y:u.y/lu+w.y/lw},length=Math.hypot(direction.x,direction.y);
+    if(length<.01)throw Error('Нельзя построить биссектрису развёрнутого угла');
+    o.x=v.x;o.y=v.y;o.x2=v.x+direction.x/length*40;o.y2=v.y+direction.y/length*40;o.rotation=0;
+   }else{
+    if(!['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(ref.kind))
+     throw Error('Не найдена опорная линия построения');
+    if(['midpoint','perpendicularBisector'].includes(c.kind)&&!['line','dashed','arrow','dimension','doubleArrow'].includes(ref.kind))
+     throw Error('Для середины или серединного перпендикуляра нужен конечный отрезок');
+    const p=rotate({x:ref.x,y:ref.y}),q=rotate({x:ref.x2,y:ref.y2});
+    const dx=q.x-p.x,dy=q.y-p.y,length=Math.hypot(dx,dy);
+    if(length<.01)throw Error('Опорная линия должна иметь длину');
+    if(c.kind==='midpoint'){o.x=(p.x+q.x)/2;o.y=(p.y+q.y)/2;o.x2=o.x;o.y2=o.y;}
+    else if(c.kind==='perpendicularBisector'){
+     o.x=(p.x+q.x)/2;o.y=(p.y+q.y)/2;o.x2=o.x-dy/length*40;o.y2=o.y+dx/length*40;
+    }else{
+     const perpendicular=c.kind==='perpendicular';
+     o.x2=o.x+(perpendicular?-dy:dx)/length*40;o.y2=o.y+(perpendicular?dx:dy)/length*40;
+    }
+    o.rotation=0;
+   }
   }active.delete(o);done.add(o);
- }result.forEach(resolve);return result;
+ }result.forEach(resolve);
+ // A wire has geometry determined by its referenced component ports. Recompute
+ // in the model before rendering, hit testing and exporting, never in CSS.
+ for(const o of result)if(o.kind==='wireOrth'&&o.links){
+  for(const [side,fieldX,fieldY] of [['start','x','y'],['end','x2','y2']]){
+   const reference=o.links[side],target=reference&&byId.get(reference.id);
+   if(!target)continue;
+   const p=qwPhysicsPortPoint(target,reference.port);
+   o[fieldX]=p.x;o[fieldY]=p.y;
+  }
+ }
+ return result;
 }
 function qwReorder(d,id,gap,part){const i=d.tasks.findIndex(q=>q.id===id);if(i<0||!Number.isInteger(gap)||gap<0||gap>d.tasks.length)return false;const j=gap>i?gap-1:gap,q=d.tasks[i],nextPart=part===undefined?q.part:qwText(part,120);if(i===j&&q.part===nextPart)return false;d.tasks.splice(i,1);q.part=nextPart;d.tasks.splice(j,0,q);return true;}
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;return qwReorder(d,id,delta>0?j+1:j,d.tasks[j].part);}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY};
+export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};

@@ -17,9 +17,15 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
    const data=await stage.evaluate(svg=>{
     const box=e=>{const b=e.getBBox();return {x:b.x,y:b.y,w:b.width,h:b.height};};
     return {labels:[...svg.querySelectorAll('.qw-axis-number,.qw-axis-title')].map(e=>({axis:e.dataset.axis,value:e.dataset.value,box:box(e)})),
-     arrows:[...svg.querySelectorAll('line[marker-end]')].map(e=>({x:+e.getAttribute('x2'),y:+e.getAttribute('y2')})),
+     arrows:['x','y'].map(axis=>{
+      const tip=svg.querySelector('path[data-qw-axis-head="'+axis+'"]');
+      if(!tip)return null;
+      const m=tip.getAttribute('d')?.match(/M\s*(-?[\d.]+)\s*(-?[\d.]+)/);
+      return m?{x:Number(m[1]),y:Number(m[2]),path:tip.getAttribute('d')}:null;
+     }),
      grid:svg.querySelectorAll('line[stroke="#d9dee4"]').length};
    });
+   assert.ok(data.arrows.every(a=>a&&Number.isFinite(a.x)&&Number.isFinite(a.y)),name+' axis heads must exist');
    const labels=data.labels;
    assert.equal(labels.filter(x=>x.value==='0').length,zero,name+' origin count');
    for(let i=0;i<labels.length;i++){

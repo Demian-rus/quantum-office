@@ -1,5 +1,6 @@
 /* Shared geometric operations. Model coordinates never depend on viewport size. */
 import {qwGeometryVertices,qwPlotXY,qwEvaluateCurve,QW_PLOT} from './work-model.js';
+import {QW_MECHANICS,QW_ELECTRICS} from './work-physics.js';
 function qwRotatePoint(p,center,degrees){
  const a=degrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),x=p.x-center.x,y=p.y-center.y;
  return {...p,x:center.x+x*c-y*s,y:center.y+x*s+y*c};
@@ -9,7 +10,7 @@ function qwObjectCenter(o){
  return {x:(Math.min(...ps.map(p=>p.x))+Math.max(...ps.map(p=>p.x)))/2,y:(Math.min(...ps.map(p=>p.y))+Math.max(...ps.map(p=>p.y)))/2};
 }
 function qwObjectPolygon(o){
- if(['triangle','rightTriangle','quadrilateral'].includes(o.kind))return qwGeometryVertices(o);
+ if(['triangle','rightTriangle','quadrilateral','regularPolygon'].includes(o.kind))return qwGeometryVertices(o);
  const x=Math.min(o.x,o.x2),y=Math.min(o.y,o.y2),x2=Math.max(o.x,o.x2),y2=Math.max(o.y,o.y2);
  return o.kind==='incline'?[{x,y:y2},{x:x2,y:y2},{x:x2,y}]:[{x,y},{x:x2,y},{x:x2,y:y2},{x,y:y2}];
 }
@@ -33,7 +34,7 @@ function qwObjectBounds(o){
   if(!ps.length)return {x:o.x,y:o.y,x2:o.x,y2:o.y};
   return {x:Math.min(...ps.map(p=>p.x)),y:Math.min(...ps.map(p=>p.y)),x2:Math.max(...ps.map(p=>p.x)),y2:Math.max(...ps.map(p=>p.y))};
  }
- let ps=o.kind==='polyline'?o.vertices:o.kind==='arc'?qwArcPoints(o):['dimension','doubleArrow'].includes(o.kind)?qwLinearSegments(o).flat():qwObjectPolygon(o);
+ let ps=o.kind==='polyline'?o.vertices:o.kind==='arc'?qwArcPoints(o):o.kind==='regularPolygon'?qwGeometryVertices(o):['dimension','doubleArrow'].includes(o.kind)?qwLinearSegments(o).flat():qwObjectPolygon(o);
  if(o.kind==='text')ps=[{x:o.x,y:o.y-20},{x:o.x+Math.max(10,[...(o.label||'')].length*12),y:o.y+5}];
  const c=qwObjectCenter(o);
  if(['pulley','fixedPulley','movablePulley'].includes(o.kind)){const r=Math.max(8,Math.min(Math.abs(o.x2-o.x),Math.abs(o.y2-o.y))/2);ps=[{x:c.x-r,y:c.y-r-(o.kind==='movablePulley'?32:14)},{x:c.x+r,y:c.y+r+(o.kind==='movablePulley'?18:0)}];}
@@ -68,6 +69,20 @@ function qwExtendedSegment(o){
 function qwHitObject(o,point,tolerance=6){
  const p=qwRotatePoint(point,qwObjectCenter(o),-(o.rotation||0)),a={x:o.x,y:o.y},b={x:o.x2,y:o.y2},t=tolerance+(o.style?.width||2)/2;
  if(o.kind==='point')return Math.hypot(p.x-o.x,p.y-o.y)<=t+3;
+ if(['forceVector','velocityVector','accelerationVector','wireOrth'].includes(o.kind)){
+  if(o.kind==='wireOrth'){
+   const mid=o.bend??(o.x+o.x2)/2,segments=[
+    [{x:o.x,y:o.y},{x:mid,y:o.y}],
+    [{x:mid,y:o.y},{x:mid,y:o.y2}],
+    [{x:mid,y:o.y2},{x:o.x2,y:o.y2}]];
+   return segments.some(([a,b])=>qwSegmentDistance(p,a,b)<=t+2);
+  }
+  return qwSegmentDistance(p,a,b)<=t+3;
+ }
+ if(QW_ELECTRICS.includes(o.kind)||QW_MECHANICS.includes(o.kind)){
+  return p.x>=Math.min(o.x,o.x2)-t&&p.x<=Math.max(o.x,o.x2)+t&&
+   p.y>=Math.min(o.y,o.y2)-t&&p.y<=Math.max(o.y,o.y2)+t;
+ }
  if(['ray','infiniteLine'].includes(o.kind)){const ps=qwExtendedSegment(o);return ps.length===2&&qwSegmentDistance(p,ps[0],ps[1])<=t;}
  if(o.kind==='text')return p.x>=o.x-t&&p.x<=o.x+Math.max(10,[...(o.label||'')].length*12)+t&&p.y>=o.y-20-t&&p.y<=o.y+5+t;
  if(o.kind==='arc'||o.kind==='polyline'){
@@ -75,11 +90,11 @@ function qwHitObject(o,point,tolerance=6){
   return ps.slice(1).some((b,i)=>qwSegmentDistance(p,ps[i],b)<=t);
  }
  if(['dimension','doubleArrow'].includes(o.kind))return qwLinearSegments(o).some(([a,b])=>qwSegmentDistance(p,a,b)<=t);
- if(['circle','pulley','fixedPulley','movablePulley'].includes(o.kind)){
-  const c=qwObjectCenter(o),r=Math.max(8,Math.min(Math.abs(o.x2-o.x),Math.abs(o.y2-o.y))/2),rx=o.kind==='circle'?Math.max(1,Math.abs(o.x2-o.x)/2):r,ry=o.kind==='circle'?Math.max(1,Math.abs(o.y2-o.y)/2):rx;
+ if(['circle','ellipse','pulley','fixedPulley','movablePulley'].includes(o.kind)){
+  const c=qwObjectCenter(o),r=Math.max(8,Math.min(Math.abs(o.x2-o.x),Math.abs(o.y2-o.y))/2),rx=['circle','ellipse'].includes(o.kind)?Math.max(1,Math.abs(o.x2-o.x)/2):r,ry=['circle','ellipse'].includes(o.kind)?Math.max(1,Math.abs(o.y2-o.y)/2):rx;
   if(o.kind==='movablePulley'&&[ [{x:c.x-r,y:c.y-r-32},{x:c.x-r,y:c.y}], [{x:c.x+r,y:c.y-r-32},{x:c.x+r,y:c.y}], [{x:c.x,y:c.y},{x:c.x,y:c.y+r+18}] ].some(([a,b])=>qwSegmentDistance(p,a,b)<=t))return true;
   if(['pulley','fixedPulley'].includes(o.kind)&&qwSegmentDistance(p,c,{x:c.x,y:c.y-r-14})<=t)return true;
-  const d=Math.hypot((p.x-c.x)/rx,(p.y-c.y)/ry),filled=o.style?.fill!==undefined?o.style.fill!=='none':o.kind!=='circle';
+  const d=Math.hypot((p.x-c.x)/rx,(p.y-c.y)/ry),filled=o.style?.fill!==undefined?o.style.fill!=='none':!['circle','ellipse'].includes(o.kind);
   return filled?d<=1+t/Math.min(rx,ry):Math.abs(d-1)*Math.min(rx,ry)<=t;
  }
  if(['line','arrow','dashed','rope','ground'].includes(o.kind))return qwSegmentDistance(p,a,b)<=t;
@@ -92,12 +107,21 @@ function qwHitObject(o,point,tolerance=6){
 function qwHitDiagram(objects,p,tolerance=6){
  for(let i=objects.length-1;i>=0;i--)if(qwHitObject(objects[i],p,tolerance))return i;
  // Empty interiors remain convenient drag targets only when no visible object is hit.
- for(let i=objects.length-1;i>=0;i--)if(['rect','triangle','rightTriangle','quadrilateral'].includes(objects[i].kind)&&qwInPolygon(qwRotatePoint(p,qwObjectCenter(objects[i]),-(objects[i].rotation||0)),qwObjectPolygon(objects[i])))return i;
+ for(let i=objects.length-1;i>=0;i--)if(['rect','triangle','rightTriangle','quadrilateral','regularPolygon'].includes(objects[i].kind)&&qwInPolygon(qwRotatePoint(p,qwObjectCenter(objects[i]),-(objects[i].rotation||0)),qwObjectPolygon(objects[i])))return i;
  return -1;
 }
 function qwValidDrag(o,pixels){
  if(pixels<4)return false;
- if(['rect','circle','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
+ if(QW_ELECTRICS.includes(o.kind)){
+  if(o.kind==='junction')return true;
+  return Math.hypot(o.x2-o.x,o.y2-o.y)>20;
+ }
+ if(QW_MECHANICS.includes(o.kind)){
+  if(['forceVector','velocityVector','accelerationVector'].includes(o.kind))
+   return Math.hypot(o.x2-o.x,o.y2-o.y)>10;
+  return Math.hypot(o.x2-o.x,o.y2-o.y)>20;
+ }
+ if(['rect','circle','ellipse','regularPolygon','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
  return Math.hypot(o.x2-o.x,o.y2-o.y)>.01;
 }
 function qwGraphObjectPoints(g,o){

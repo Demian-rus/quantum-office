@@ -15,8 +15,8 @@ function qwMeasureSVGInk(svg){
   return {x:box.x-pad,y:box.y-pad,width:Math.max(1,box.width+pad*2),height:Math.max(1,box.height+pad*2)};
  }finally{for(const {e,style} of clipped)if(style===null)e.removeAttribute('style');else e.setAttribute('style',style);}
 }
-function qwPrintStyles(){return QW_PRINT_FONT_CSS+`
-@page{size:A4;margin:0}
+function qwPrintStyles(orientation='portrait',landscapeLayout='spread'){return QW_PRINT_FONT_CSS+`
+@page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'};margin:0}
 :root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -106,6 +106,135 @@ body[data-qw-format="answers"] .qw-print-section{margin-bottom:3mm}
 body[data-qw-format="practice"] .qw-print-section{margin-bottom:4mm}
 .qw-practice-space{margin-top:3mm;width:100%}
 .qw-practice-space svg{display:block;width:100%;height:100%}
+
+/* TASK153: professional print booklet, using bundled OFL fonts. */
+body[data-qw-format="booklet"]{--qw-print-family:"QO Print Serif",Georgia,serif;font-size:var(--qw-print-size,10pt);line-height:1.23}
+body[data-qw-format="booklet"] .qw-print-page{padding:13mm 13mm 17mm}
+body[data-qw-format="booklet"] .qw-page-content{width:184mm;height:267mm}
+body[data-qw-format="booklet"] .qw-print-header{text-align:center;margin:0 0 6mm}
+body[data-qw-format="booklet"] .qw-print-title{font:700 14pt/1.2 "QO Print Sans",Arial,sans-serif;margin:0 0 2mm}
+body[data-qw-format="booklet"] .qw-print-topic{font-size:11pt;line-height:1.25;margin:1mm 0 0;color:#111}
+body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial,sans-serif;color:#444;margin:0 0 2.5mm}
+.qw-booklet-variant{font:700 13pt/1.25 "QO Print Serif",Georgia,serif;margin:1mm 0 0;color:#111}
+body[data-qw-format="booklet"] .qw-running-header{font:8pt/1.3 "QO Print Sans",Arial,sans-serif;color:#333;margin-bottom:5mm;border:none;text-align:center}
+body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-print-section:before{content:none}
+body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:8mm minmax(0,1fr);column-gap:3mm;row-gap:0}
+body[data-qw-format="booklet"] .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;width:8mm;height:7mm;border:.28mm solid #151515;display:flex;align-items:center;justify-content:center;margin:0}
+body[data-qw-format="booklet"] .qw-booklet-entry>header .qw-print-number{font:700 11pt/1 "QO Print Serif",Georgia,serif;text-align:center}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1;line-height:1.23;min-height:7mm}
+body[data-qw-format="booklet"] .qw-task-text{overflow-wrap:normal;word-break:normal;hyphens:none;text-align:left}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow figure{margin:0 0 1.2mm 4mm}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{float:none!important;display:block;margin:2mm auto 0!important;max-width:100%}
+body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:1mm;margin:1.5mm 0 0;font:10.5pt/1.2 "QO Print Serif",Georgia,serif;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;width:52mm;border-bottom:.22mm solid #555;min-width:20mm;height:4.5mm}
+body[data-qw-format="booklet"] .qw-booklet-answer{white-space:nowrap}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{min-width:0;align-items:baseline}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer span{width:auto;min-width:12mm;max-width:52mm;flex:1 1 auto}
+body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
+body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
+body[data-qw-format="booklet"] math{font-size:1em;math-style:normal;font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none}
+body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
+/* The default answer stays in normal flow after the condition and figure.
+   Only measured-safe short text uses a two-column grid, allowing the answer
+   to align to the lower figure edge without overlapping the condition. */
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow.qw-booklet-answer-by-figure{
+ display:grid!important;grid-template-columns:minmax(0,1fr) auto;
+ grid-template-rows:auto minmax(0,1fr);column-gap:4mm;row-gap:0;align-items:start
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-task-text{
+ grid-column:1;grid-row:1;min-width:0
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure figure{
+ grid-column:2;grid-row:1 / span 2;justify-self:center;align-self:start;
+ float:none!important;margin:0!important
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{
+ grid-column:1;grid-row:2;align-self:end;margin:0!important;padding-bottom:.5mm
+}
+
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self:start;min-width:0}
+.qw-task-tables{clear:both;display:flex;flex-direction:column;align-items:center;gap:1.5mm;width:100%;margin:1.5mm auto 0}
+.qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;overflow-wrap:anywhere}
+.qw-task-tables :is(th,td){padding:.8mm 1.8mm;vertical-align:middle}
+body[data-qw-format="booklet"] .qw-booklet-bank-id{font:600 8.5pt/1.2 var(--qw-print-family);color:#333;white-space:nowrap;margin-right:1.5mm}
+
+
+/* TASK154 — one typographic system for all exported document formats. */
+body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
+body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
+body[data-qw-font="serif"]{--qw-print-family:"QO Print Serif",Georgia,serif}
+body[data-qw-title-font="serif"]{--qw-title-family:"QO Print Serif",Georgia,serif}
+body[data-qw-title-font="sans"]{--qw-title-family:"QO Print Sans",Arial,sans-serif}
+body[data-qw-title-custom="true"] .qw-print-title{font-family:var(--qw-title-family);font-size:var(--qw-title-size,14pt);font-weight:700;color:var(--qw-title-color,#111);text-align:var(--qw-title-align,center);line-height:1.23;max-width:100%;overflow-wrap:break-word}
+body[data-qw-title-custom="true"] .qw-print-header{text-align:var(--qw-title-align,center)}
+body[data-qw-format] .qw-paper-task{color:var(--qw-body-color,#111)}
+body[data-qw-math-custom="true"] math{font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none;math-style:normal}
+body[data-qw-math-custom="true"] math :is(mi,mn,mo,mtext){font-weight:400}
+body[data-qw-show-pages="false"] .qw-page-footer{display:none}
+body:not([data-qw-format="booklet"]) .qw-page-footer{font-family:"QO Print Sans",Arial,sans-serif}
+body[data-qw-format="compact"] .qw-print-header{grid-template-columns:minmax(0,1fr) auto;align-items:center}
+body[data-qw-format="worksheet"] .qw-print-section{margin-bottom:3mm}
+
+/* TASK155: physical A4 geometry; preserve consistent margins in either orientation. */
+body[data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm}
+body[data-qw-orientation="landscape"] .qw-page-content{width:267mm;height:176mm}
+body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-print-page{width:297mm;height:210mm;padding:13mm 13mm 17mm}
+body[data-qw-format="booklet"][data-qw-orientation="landscape"] .qw-page-content{width:271mm;height:180mm}
+
+/* TASK156: A4 landscape spread is two independent, portrait-proportioned pages.
+   One physical 297x210mm sheet contains two logical 148.5x210mm pages. */
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+ display:flex;flex-direction:row;align-items:stretch;width:297mm;height:210mm;
+ margin:0;padding:0;break-after:page;page-break-after:always;background:#fff;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet:last-child{
+ break-after:auto;page-break-after:auto;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-page,
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-page{
+ box-sizing:border-box;flex:0 0 148.5mm;width:148.5mm;height:210mm;
+ padding:12mm 9mm 15mm;margin:0;break-after:auto;page-break-after:auto;box-shadow:none;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-page-content,
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{
+ box-sizing:border-box;width:130.5mm;height:183mm;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-page-footer{
+ bottom:5mm;left:9mm;right:9mm;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-booklet-brand{
+ top:5mm;right:9mm;transform:scale(.83);transform-origin:top right;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-header{
+ margin:0 0 4mm;
+}
+@media screen{
+ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+  margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740;
+ }
+}
+@media print{
+ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{
+  margin:0;box-shadow:none;
+ }
+}
+
+/* TASK158: shared first-sheet heading, centered over BOTH independent columns. */
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet{position:relative}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet.qw-first-sheet .qw-page-content{
+ padding-top:var(--qw-shared-heading-clearance,0px);
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{
+ position:absolute;z-index:2;box-sizing:border-box;
+ left:42mm;right:42mm;top:6mm;width:auto;margin:0;
+ text-align:center;pointer-events:none;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header .qw-print-title{
+ margin:0 0 1.5mm;line-height:1.15;
+}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{right:0;top:0}
+
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -117,9 +246,16 @@ async function qwPreparePrintDocument(){
  await Promise.all([...document.images].map(img=>img.decode()));
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
- const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers'].includes(format);
- // Figure geometry is calculated in an A4-width measurement surface.
- source.style.width=modern?'186mm':'180mm';const contentWidth=source.getBoundingClientRect().width;
+ const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide';
+ // Booklet-only MathML typographic correction; QWORK source is unchanged.
+ if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
+  const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
+  const padded=document.createElementNS('http://www.w3.org/1998/Math/MathML','mpadded');
+  padded.setAttribute('lspace','0.09em');padded.setAttribute('width','+0.09em');
+  script.replaceWith(padded);padded.append(script);
+ }
+ // Figure geometry follows the actual A4 printable width, not a portrait-only ruler.
+ source.style.width=spread?'130.5mm':landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
   // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
   if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
@@ -129,6 +265,15 @@ async function qwPreparePrintDocument(){
   }
 
   const flow=section.querySelector('.qw-task-flow'),figure=flow.querySelector('figure');
+  const text=section.querySelector('.qw-task-text');
+  // Move native tables after the complete condition, at any column count.
+  const tables=[...text.querySelectorAll('table')];
+  if(tables.length){
+   const group=document.createElement('div');group.className='qw-task-tables';
+   for(const table of tables)group.append(table);
+   text.after(group);
+   if(figure)flow.classList.add('qw-figure-below');
+  }
   flow.classList.toggle('qw-print-has-figure',!!figure);
   if(figure){
    const svg=figure.querySelector('svg');let w,h;
@@ -136,30 +281,83 @@ async function qwPreparePrintDocument(){
    else {const img=figure.querySelector('img');w=img.naturalWidth;h=img.naturalHeight;}
    let wide=flow.classList.contains('qw-figure-below');
    const requested=Number(figure.dataset.requestedWidth)||220;
-   const graph=figure.dataset.figureKind==='graph';
-   const maxW=modern?(wide?Math.min(requested,contentWidth-7*MM):(format==='practice'?55:graph?55:40)*MM):wide?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
-   const maxH=modern?(wide?50:format==='practice'?35:34)*MM:wide?(requested>=470?160*MM:requested*320/520):38*MM;let scale=Math.min(maxW/w,maxH/h);
-   // A graph's grid has a common physical width, independent of labels around its origin.
-   if(modern&&svg&&graph&&!wide)scale=48*MM/369;
-   if(modern&&svg){
-    const fonts=[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim()).map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0);
-    if(fonts.length)scale=Math.max(scale,6.6/.75/Math.min(...fonts));
-    if(w*scale>contentWidth-7*MM)throw Error('Подписи рисунка не помещаются: сократите подписи или разделите рисунок.');
+   const graph=figure.dataset.figureKind==='graph',auto=flow.classList.contains('qw-figure-auto');
+   const available=flow.getBoundingClientRect().width;
+   // Side and below modes have different physical constraints. In particular,
+   // landscape spread side figures must leave enough width for the condition.
+   const widthLimit=below=>modern?(below?Math.min(available-2*MM,graph?Math.max(requested,85*MM):requested):
+    (format==='booklet'?(graph?62:55):format==='practice'?55:graph?55:40)*MM):
+    below?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
+   const heightLimit=below=>modern?(below?70:format==='booklet'?(graph?47:42):format==='practice'?35:34)*MM:
+    below?(requested>=470?160*MM:requested*320/520):38*MM;
+   const fontSizes=modern&&svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim())
+    .map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0):[];
+   const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
+   const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
+   let scale=calculate(wide);
+   if(modern&&graph&&!wide&&format!=='booklet'&&svg)scale=48*MM/369;
+   if(modern&&auto&&!wide&&format==='booklet'){
+    // Measure the actual laid-out text in the hypothetical side column. This
+    // prevents long conditions from collapsing into an unreadable strip.
+    const sideTextWidth=available-w*Math.max(scale,minLabelScale)-4*MM;
+    let sideTextHeight=Infinity;
+    if(sideTextWidth>0){
+     const probe=text.cloneNode(true);
+     probe.style.cssText='position:absolute;visibility:hidden;float:none;width:'+sideTextWidth+'px;height:auto;max-width:none;';
+     flow.append(probe);sideTextHeight=probe.getBoundingClientRect().height;probe.remove();
+    }
+    const minTextWidth=format==='booklet'?50*MM:55*MM;
+    const denseGraph=graph&&svg.querySelectorAll('.qw-axis-number').length>12;
+    const wideImage=figure.dataset.figureKind==='image'&&w/h>1.8;
+    wide=w/h>2.5||sideTextWidth<minTextWidth||
+     sideTextHeight>Math.max(h*scale+8*MM,50*MM)||denseGraph||
+     wideImage||scale<minLabelScale;
    }
-   if(modern&&flow.classList.contains('qw-figure-auto'))wide=w/h>3.2||w*scale>contentWidth*.45;
+   if(modern&&auto&&!wide&&format!=='booklet')wide=w/h>3.2||w*scale>contentWidth*.45;
+   if(modern&&format==='booklet'&&!wide&&scale<minLabelScale)wide=true;
+   if(wide)scale=calculate(true);
+   if(modern&&svg&&fontSizes.length){
+    scale=Math.max(scale,minLabelScale);
+    if(w*scale>available-2*MM)throw Error('Подписи рисунка не помещаются: сократите подписи или разделите рисунок.');
+   }
    const position=wide?'below':flow.classList.contains('qw-figure-left')?'left':'right';
    flow.classList.remove('qw-figure-auto','qw-figure-left','qw-figure-right','qw-figure-below');flow.classList.add('qw-figure-'+position);
    if(modern&&!wide)flow.prepend(figure);
    figure.style.width=w*scale+'px';figure.style.height=h*scale+'px';
    figure.dataset.printPosition=position;
   }
-  const text=section.querySelector('.qw-task-text');
   if(format==='answers'&&text.classList.contains('qw-answer-columns')&&[...text.querySelectorAll('.qw-answer-item math')].some(m=>m.getBoundingClientRect().width>m.closest('.qw-answer-item').getBoundingClientRect().width))text.style.gridTemplateColumns='1fr';
   if(!modern&&!figure&&!section.querySelector('.qw-solution-preview')&&text.getBoundingClientRect().height<=parseFloat(getComputedStyle(text).lineHeight)*2+1)section.classList.add('qw-compact-task');
   // A wide indivisible expression gets the whole text width, without modifying QWORK.
   if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
+  }
+  // Reuse figure's lower level only when the rendered text plus answer
+  // fits safely inside the *actual* narrowed left column. Long text and all
+  // below-figure layouts retain the normal answer-after-flow fallback.
+  if(format==='booklet'&&figure&&flow.classList.contains('qw-figure-right')&&!tables.length){
+   const answer=section.querySelector('.qw-booklet-answer');
+   if(answer){
+    const available=flow.getBoundingClientRect().width-figure.getBoundingClientRect().width-4*MM;
+    if(available>37*MM){
+     const probe=text.cloneNode(true);
+     probe.style.cssText='position:absolute;visibility:hidden;float:none;width:'+available+'px;height:auto;max-width:none;';
+     flow.append(probe);
+     const textHeight=probe.getBoundingClientRect().height;probe.remove();
+     const answerHeight=answer.getBoundingClientRect().height;
+     const figureHeight=figure.getBoundingClientRect().height;
+     if(textHeight+answerHeight+2*MM<=figureHeight-2){
+      flow.append(answer);flow.classList.add('qw-booklet-answer-by-figure');
+      // If font metrics changed on activation, do not retain an unsafe layout.
+      const textBottom=text.getBoundingClientRect().bottom,answerTop=answer.getBoundingClientRect().top;
+      if(answerTop<textBottom+MM){
+       flow.classList.remove('qw-booklet-answer-by-figure');
+       section.querySelector('.qw-booklet-entry').append(answer);
+      }
+     }
+    }
+   }
   }
   if(figure&&!flow.classList.contains('qw-figure-below')){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
@@ -169,14 +367,44 @@ async function qwPreparePrintDocument(){
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
  const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
- const footerLabel=[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
+ const footerLabel=format==='booklet'?'':[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
   const content=document.createElement('div');content.className='qw-page-content';page.append(content);
-  if(!pages.length)content.append(header);else if(title){const running=document.createElement('div');running.className='qw-running-header';running.textContent=title+(meta?' · '+meta:'');content.append(running);}
-  if(brand)page.append(brand.cloneNode(true));
-  host.append(page);pages.push({page,content});return pages.at(-1);
+  if(spread){
+   // Paginate into logical columns, but decorate the physical A4 sheet exactly once.
+   let sheet=host.querySelector(':scope > .qw-print-sheet:last-of-type');
+   const isNew=!sheet||sheet.querySelectorAll(':scope > .qw-print-page').length>=2;
+   if(isNew){
+    sheet=document.createElement('section');sheet.className='qw-print-sheet';host.append(sheet);
+    if(brand)sheet.append(brand.cloneNode(true));
+    if(!pages.length){
+     sheet.classList.add('qw-first-sheet');
+     if(header.childElementCount){
+      header.classList.add('qw-shared-sheet-header');
+      sheet.append(header);
+     }
+    }
+   }
+   sheet.append(page);
+   // Both columns on the first sheet reserve the SAME header height.
+   if(!pages.length&&sheet.contains(header)&&header.childElementCount){
+    const headerBottom=header.getBoundingClientRect().bottom;
+    const contentTop=content.getBoundingClientRect().top;
+    const clearance=Math.max(0,Math.ceil(headerBottom-contentTop+2*MM));
+    sheet.style.setProperty('--qw-shared-heading-clearance',clearance+'px');
+   }
+  }else{
+   if(!pages.length)content.append(header);
+   else if(format!=='booklet'&&title){
+    const running=document.createElement('div');running.className='qw-running-header';
+    running.textContent=title+(meta?' · '+meta:'');content.append(running);
+   }
+   if(brand)page.append(brand.cloneNode(true));
+   host.append(page);
+  }
+  pages.push({page,content});return pages.at(-1);
  }
  function used(page){const last=[...page.content.children].reverse().find(e=>getComputedStyle(e).display!=='none');if(!last)return 0;return last.getBoundingClientRect().bottom-page.content.getBoundingClientRect().top+parseFloat(getComputedStyle(last).marginBottom||0);}
  const fits=page=>used(page)<=page.content.getBoundingClientRect().height+.3;
@@ -278,8 +506,9 @@ async function qwPreparePrintDocument(){
   section.remove();splitLong(section);
  }
  source.remove();
- const report={pages:pages.map(({page,content},i)=>{
-  const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
+ const report={layout:spread?'spread':landscape?'wide':'portrait',sheets:spread?Math.ceil(pages.length/2):pages.length,
+ pages:pages.map(({page,content},i)=>{
+  const footer=document.createElement('footer');footer.className='qw-page-footer';const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=format==='booklet'?String(i+1):(i+1)+' / '+pages.length;footer.append(label,number);page.append(footer);
   const sections=[...content.querySelectorAll(':scope>.qw-print-section')];
   return {page:i+1,capacityMm:content.getBoundingClientRect().height/MM,usedMm:used({content})/MM,freeMm:(content.getBoundingClientRect().height-used({content}))/MM,tasks:sections.map(section=>{
    const box=section.getBoundingClientRect(),figure=section.querySelector('figure'),f=figure?.getBoundingClientRect();

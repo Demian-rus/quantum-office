@@ -7,7 +7,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   browser:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -333,7 +333,7 @@ jobs:
           if-no-files-found: ignore
 
   task150-review:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -392,3 +392,190 @@ jobs:
           name: task150-diagnostics-incomplete
           path: evidence/task150/
           if-no-files-found: ignore
+
+  task152-diagrams:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task152_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task152-diagram-evidence
+          path: evidence/task152/
+          if-no-files-found: ignore
+
+  task153-booklet:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task153_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task153-exam-booklet-evidence
+          path: |
+            evidence/task153/
+            Quantum-Office.html
+          if-no-files-found: error
+
+  task1531-print-polish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task1531_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1531-print-math-diagram-qx
+          path: |
+            evidence/task1531/
+            Quantum-Office.html
+          if-no-files-found: error
+
+  task154-print-bank:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task154_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task154-print-bank-preview
+          path: |
+            evidence/task154/
+            Quantum-Office.html
+          if-no-files-found: ignore
+
+  task155-a4-orientation:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task155_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task155-a4-evidence-and-html
+          path: |
+            evidence/task155/
+            Quantum-Office.html
+          if-no-files-found: ignore
+
+  task156-spread-bank-edit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task156_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task156-spread-bank-evidence
+          path: |
+            evidence/task156/
+            Quantum-Office.html
+          if-no-files-found: warn
+
+  task158-canonical-spread:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task158_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task158-canonical-spread-html-pdf
+          path: |
+            evidence/task158/
+            Quantum-Office.html
+          if-no-files-found: warn
+
+  task1601-layout:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task1601_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1601-layout-portrait-landscape
+          path: |
+            evidence/task1601/
+            Quantum-Office.html
+          if-no-files-found: warn
+
+  task161-physics-circuits:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task161_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task161-editable-mechanics-electrical-schemes
+          path: |
+            evidence/task161/
+            Quantum-Office.html
+          if-no-files-found: warn

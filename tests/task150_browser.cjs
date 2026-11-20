@@ -18,7 +18,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
      for(const e of s.querySelectorAll('math,figure,.qw-task-text,.qw-practice-space')){const a=e.getBoundingClientRect();if(a.left<b.left-1||a.right>b.right+1||a.bottom>b.bottom+1)bounds.push({task:s.dataset.task,tag:e.tagName});}
     }
    }
-   return {layout:window.__qwPrintLayout,bounds,overlaps,text:document.body.innerText,math:document.querySelectorAll('math').length,svg:document.querySelectorAll('figure svg').length,
+   return {layout:window.__qwPrintLayout,bounds,overlaps,text:document.body.innerText,logoLabels:[...document.querySelectorAll('.qw-qx-lettering')].map(x=>x.textContent.trim()),math:document.querySelectorAll('math').length,svg:document.querySelectorAll('figure svg').length,
     textBoxes:[...document.querySelectorAll('.qw-task-text')].flatMap(e=>{
      const walker=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){if(n.textContent.trim()&&!n.parentElement.closest('math'))break;}if(!n)return [];
      const range=document.createRange();range.setStart(n,0);range.setEnd(n,Math.min(12,n.textContent.length));const b=range.getClientRects()[0],p=e.closest('.qw-print-page'),pb=p.getBoundingClientRect(),ctx=document.createElement('canvas').getContext('2d');ctx.font=getComputedStyle(n.parentElement).font;
@@ -28,13 +28,15 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
   fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(d,null,2));
   await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
   if(!before){assert.ok(r.layout.pages.every(x=>x.tasks.length),name+' no empty pages');
-   if(options.theme){assert.ok(r.text.includes('Квант Икс | QX'));assert.equal(r.layout.pages.length,options.format==='answers'?1:2,'comparable concept pages');}else assert.ok(!r.text.includes('Квант Икс | QX'),'branding is opt-in');
+   if(options.theme)assert.ok(r.logoLabels.includes('QX | Квант Икс'),'explicit theme must render handwritten QX');
+   else assert.equal(r.logoLabels.length,0,'unchanged standard worksheets must remain unbranded');
+   if(options.theme)assert.equal(r.layout.pages.length,options.format==='answers'?1:2,'comparable concept pages');
    const repeat=await browser.newPage();await repeat.setContent(html);await repeat.evaluate(()=>window.qwPrintReady);assert.deepEqual(await repeat.evaluate(()=>window.__qwPrintLayout),r.layout);await repeat.close();
   }
   reports.push({name,...r});await p.close();return r;
  }
  try{
-  await render('Worksheet',worksheet,{format:'worksheet'});await render('Compact-24',compact,{format:'compact'});
+  await render('Worksheet',worksheet,{format:'worksheet'});await render('No-QX',worksheet,{format:'worksheet',theme:''});await render('Compact-24',compact,{format:'compact'});
   await render('Practice',task149PrintSamples()[2].project,{format:'practice'});await render('Answers',compact,{format:'answers'});await render('Legacy-Exam',worksheet,{format:'exam'});
   if(!before){
    // Exactly the same 24 real tasks in every concept, with natural pagination.

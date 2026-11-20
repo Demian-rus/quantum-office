@@ -20,8 +20,8 @@ test('TASK149 axis typography: negative values use small labels near their own t
    const y=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));
    assert.ok(x*y<.01,'numbers must not overlap '+JSON.stringify([a.n,b.n]));
   }
-  assert.ok(svg.includes('x2="'+(QW_PLOT.right+16)+'"'),'X arrow extends beyond grid');
-  assert.ok(svg.includes('y2="'+(QW_PLOT.top-16)+'"'),'Y arrow extends beyond grid');
+  assert.ok(svg.includes('data-qw-axis-head="x" d="M'+(QW_PLOT.right+16)+' '),'X arrowhead extends beyond grid');
+  assert.ok(new RegExp('data-qw-axis-head="y" d="M[^ ]+ '+(QW_PLOT.top-16)+' ').test(svg),'Y arrowhead extends beyond grid');
  }
  const math=qwValidateGraph({...qwTask('graph').graph,xmin:-10,xmax:10,ymin:-10,ymax:10,coordinateMode:'math'});
  const ticks=qwAxisLayout(math);
