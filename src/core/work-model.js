@@ -1,4 +1,5 @@
 /* TASK144: independent, portable work projects. No diagnostic/student mutations. */
+import {QW_MECHANICS,QW_ELECTRICS,QW_ELECTRIC_TERMINALS,qwDiagramPorts,qwNearestDiagramPort,qwPhysicsPortPoint} from './work-physics.js';
 const QW_TYPES={short:'Краткий ответ',extended:'Развёрнутый ответ',choice:'Тест',graph:'Задание с графиком',diagram:'Рисунок / схема',blanks:'Пустые вставки',combined:'Комбинированное'};
 const QW_SUBJECTS={math:'Математика',geometry:'Геометрия',algebra:'Алгебра',physics:'Физика',mixed:'Математика и физика',other:'Авторская подборка'};
 const QW_PLOT={left:82,right:451,top:46,bottom:262};
@@ -221,7 +222,7 @@ function qwValidateStyle(raw){
 function qwValidateDiagram(raw){
  if(!Array.isArray(raw)||raw.length>QW_LIMITS.objects)throw Error('Максимум 60 фигур');
  const ids=new Set(),result=raw.map(o=>{
-  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','ellipse','regularPolygon','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope'].includes(o.kind))throw Error('Неизвестная фигура');
+  if(!o||!['ray','infiniteLine','line','arrow','doubleArrow','dimension','polyline','arc','dashed','rect','circle','ellipse','regularPolygon','point','text','angle','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley','spring','ground','rope',...QW_MECHANICS,...QW_ELECTRICS].includes(o.kind))throw Error('Неизвестная фигура');
   for(const k of ['x','y','x2','y2'])if(!Number.isFinite(o[k]))throw Error('Повреждены координаты фигуры');
   const value={kind:o.kind,x:qwNum(o.x,0,520,0),y:qwNum(o.y,0,320,0),x2:qwNum(o.x2,0,520,0),y2:qwNum(o.y2,0,320,0),label:qwText(o.label,80)};
   if(o.kind==='regularPolygon'){
@@ -236,7 +237,43 @@ function qwValidateDiagram(raw){
    ||(c.kind==='midpoint'&&o.kind!=='point')||(c.kind==='angleBisector'&&o.kind!=='ray'))
    throw Error('Некорректная связь построения');value.construction={kind:c.kind,reference:c.reference};}
   if(o.ticks!==undefined){if(!['line','arrow','dashed','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind)||![0,1,2,3].includes(o.ticks))throw Error('Засечки: от 0 до 3 на линейном объекте');value.ticks=o.ticks;}
-  if(o.kind==='block'||o.rotation!==undefined){if(o.rotation!==undefined&&!Number.isFinite(o.rotation))throw Error('Некорректный угол');value.rotation=qwNum(o.rotation,-180,180,0);}
+  if(o.kind==='block'||QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)||o.rotation!==undefined){
+   if(o.rotation!==undefined&&!Number.isFinite(o.rotation))throw Error('Некорректный угол');
+   value.rotation=qwNum(o.rotation,-180,180,0);
+  }
+  if(o.kind==='torque'){
+   if(o.direction!==undefined&&!['cw','ccw'].includes(o.direction))throw Error('Некорректное направление момента');
+   value.direction=o.direction||'cw';
+  }
+  if(o.kind==='weightSet'){
+   if(o.count!==undefined&&(!Number.isInteger(o.count)||o.count<2||o.count>6))throw Error('Количество грузов: 2–6');
+   value.count=o.count||2;
+  }
+  if(o.kind==='dynamometer'){
+   if(o.reading!==undefined&&(!Number.isFinite(o.reading)||o.reading<0||o.reading>100))throw Error('Показания динамометра: 0–100');
+   value.reading=o.reading||0;
+  }
+  if(o.kind==='wireOrth'){
+   if(o.bend!==undefined){
+    if(!Number.isFinite(o.bend)||o.bend<0||o.bend>520)throw Error('Угол изгиба проводника вне холста');
+    value.bend=o.bend;
+   }
+   if(o.links!==undefined){
+    if(!o.links||typeof o.links!=='object'||Array.isArray(o.links))throw Error('Некорректные соединения проводника');
+    const links={};
+    for(const side of ['start','end'])if(o.links[side]!==undefined){
+     const p=o.links[side];
+     if(!p||typeof p.id!=='string'||!p.id||p.id.length>80||!['L','R','U','D'].includes(p.port))
+      throw Error('Некорректный порт подключения');
+     links[side]={id:p.id,port:p.port};
+    }
+    value.links=links;
+   }
+  }
+  if(QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind)){
+   if(o.kind!=='junction'&&Math.hypot(value.x2-value.x,value.y2-value.y)<4)
+    throw Error('Размер или длина физического объекта слишком малы');
+  }
   if(o.style!==undefined)value.style=qwValidateStyle(o.style);
   if(o.labelPosition!==undefined)value.labelPosition=qwLabelPosition(o.labelPosition);
   if(['polyline','arc','dimension','doubleArrow'].includes(o.kind)){
@@ -276,7 +313,16 @@ function qwValidateDiagram(raw){
    if(o.edgeLabelPositions!==undefined){if(!Array.isArray(o.edgeLabelPositions)||o.edgeLabelPositions.length!==vertices.length)throw Error('Некорректные положения подписей сторон');value.edgeLabelPositions=o.edgeLabelPositions.map(p=>p===null?null:qwLabelPosition(p));}
   }
   return value;
- });return qwResolveDiagram(result);
+ });
+ const byId=new Map(result.filter(o=>o.id).map(o=>[o.id,o]));
+ for(const o of result)if(o.kind==='wireOrth'&&o.links){
+  for(const linked of Object.values(o.links)){
+   const target=byId.get(linked.id);
+   if(!target||!QW_ELECTRIC_TERMINALS.includes(target.kind)||
+    !qwDiagramPorts(target).some(p=>p.port===linked.port))throw Error('Соединение с несуществующим контактом');
+  }
+ }
+ return qwResolveDiagram(result);
 }
 function qwResolveDiagram(objects){
  const result=objects.map(o=>({...o})),byId=new Map(result.filter(o=>o.id).map(o=>[o.id,o])),done=new Set(),active=new Set();
@@ -314,10 +360,21 @@ function qwResolveDiagram(objects){
     o.rotation=0;
    }
   }active.delete(o);done.add(o);
- }result.forEach(resolve);return result;
+ }result.forEach(resolve);
+ // A wire has geometry determined by its referenced component ports. Recompute
+ // in the model before rendering, hit testing and exporting, never in CSS.
+ for(const o of result)if(o.kind==='wireOrth'&&o.links){
+  for(const [side,fieldX,fieldY] of [['start','x','y'],['end','x2','y2']]){
+   const reference=o.links[side],target=reference&&byId.get(reference.id);
+   if(!target)continue;
+   const p=qwPhysicsPortPoint(target,reference.port);
+   o[fieldX]=p.x;o[fieldY]=p.y;
+  }
+ }
+ return result;
 }
 function qwReorder(d,id,gap,part){const i=d.tasks.findIndex(q=>q.id===id);if(i<0||!Number.isInteger(gap)||gap<0||gap>d.tasks.length)return false;const j=gap>i?gap-1:gap,q=d.tasks[i],nextPart=part===undefined?q.part:qwText(part,120);if(i===j&&q.part===nextPart)return false;d.tasks.splice(i,1);q.part=nextPart;d.tasks.splice(j,0,q);return true;}
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;return qwReorder(d,id,delta>0?j+1:j,d.tasks[j].part);}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY};
+export {qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};
