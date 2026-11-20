@@ -44,8 +44,24 @@ const obj=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
   await page.locator('#qw-block-rotation').fill('90');
   await page.locator('#qw-block-rotation').press('Tab');
   assert.match(await stage().locator('[data-qw-object="2"]').getAttribute('transform'),/rotate\(90/);
+  // Draw a wire directly between the rendered contact handles, not by
+  // manually inserting links into the editor's state.
+  const port1=await stage().locator('[data-qw-object="0"] [data-qw-port="R"]').boundingBox();
+  const port2=await stage().locator('[data-qw-object="2"] [data-qw-port="L"]').boundingBox();
+  assert.ok(port1&&port2);
+  await tool('wireOrth');
+  await page.mouse.move(port1.x+port1.width/2,port1.y+port1.height/2);
+  await page.mouse.down();
+  await page.mouse.move(port2.x+port2.width/2,port2.y+port2.height/2,{steps:15});
+  await page.mouse.up();
+  assert.equal(await stage().locator('[data-qw-object]').count(),4);
   await page.screenshot({path:path.join(dir,'editor-circuit-tools.png')});
   await page.locator('[data-qw-action="visual-apply"]').click();
+  const edited=await page.evaluate(()=>structuredClone(qwCurrent().diagram));
+  assert.equal(edited.length,4);
+  assert.equal(edited[3].kind,'wireOrth');
+  assert.equal(edited[3].links?.start?.id,edited[0].id);
+  assert.equal(edited[3].links?.end?.id,edited[2].id);
   const qwork=await page.evaluate(()=>{
    const d=qwProject();d.subject='physics';d.grade='11';d.exam='ege';
    d.title='Редактируемые физические и электрические схемы — TASK161';
