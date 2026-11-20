@@ -827,7 +827,13 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
    if(c.links)for(const p of Object.values(c.links))if(idMap.has(p.id))p.id=idMap.get(p.id);
   }
   const next=structuredClone(value);
-  if(kind==='diagram')next.push(...copies);else next.elements.push(...copies);
+  if(kind==='diagram')next.push(...copies);
+  else{
+   selectedIndices().forEach((index,j)=>{
+    if(index<value.points.length)next.points.push(copies[j]);
+    else next.elements.push(copies[j]);
+   });
+  }
   try{const validated=kind==='diagram'?qwValidateDiagram(next):qwValidateGraph(next);
    remember();value=validated;selected=objects().length-1;multi=new Set(copies.map((_,i)=>selected-copies.length+1+i));draw();
   }catch(e){hint.textContent=e.message;hint.className='qw-error';}
@@ -1039,7 +1045,14 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  function cancelDrag(){if(!drag)return;value=drag.before;selected=drag.previous;multi=drag.selection||new Set();drag=null;draw();}
  stage.onpointercancel=cancelDrag;stage.onlostpointercapture=cancelDrag;
  d.addEventListener('cancel',e=>{if(polyline.length||drag||multi.size){e.preventDefault();cancelDrag();polyline=[];selectOnly(-1);draw();}});
- function remove(){if(selected<0)return;const caption=labelSelected&&labelInfo(labelSelected);if(caption&&!caption.free){remember();caption.clear();labelSelected='';draw();return;}remember();if(kind==='graph'){const count=value.points.length;value.points=value.points.filter((_,i)=>!multi.has(i));value.elements=value.elements.filter((_,i)=>!multi.has(i+count));}else{const removed=new Set(value.filter((_,i)=>multi.has(i)).map(o=>o.id).filter(Boolean));value=qwResolveDiagram(value).filter((_,i)=>!multi.has(i)).map(o=>{if(o.construction&&removed.has(o.construction.reference)){const copy={...o};delete copy.construction;return copy;}return o;});}selectOnly(-1);draw();}
+ function remove(){if(selected<0)return;const caption=labelSelected&&labelInfo(labelSelected);if(caption&&!caption.free){remember();caption.clear();labelSelected='';draw();return;}remember();if(kind==='graph'){const count=value.points.length;value.points=value.points.filter((_,i)=>!multi.has(i));value.elements=value.elements.filter((_,i)=>!multi.has(i+count));}else{const removed=new Set(value.filter((_,i)=>multi.has(i)).map(o=>o.id).filter(Boolean));value=qwResolveDiagram(value).filter((_,i)=>!multi.has(i)).map(o=>{const copy={...o};
+   if(copy.construction&&removed.has(copy.construction.reference))delete copy.construction;
+   if(copy.kind==='wireOrth'&&copy.links){
+    copy.links={...copy.links};
+    for(const [end,link] of Object.entries(copy.links))if(removed.has(link.id))delete copy.links[end];
+    if(!Object.keys(copy.links).length)delete copy.links;
+   }
+   return copy;});}selectOnly(-1);draw();}
  stage.onkeydown=e=>{
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='a'){e.preventDefault();multi=new Set(objects().map((_,i)=>i));selected=objects().length-1;draw();}
   else if(e.key==='Escape'){e.preventDefault();cancelDrag();polyline=[];selectOnly(-1);draw();}
