@@ -19,11 +19,15 @@ for stage,report in reports.items():
     assert not re.search(r'Academic|Scientific|Minimal|Tech',text)
     spans=[s for b in page.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
     for span in spans:
-     x0,y0,x1,y1=span['bbox'];assert 25<=x0<x1<=page.rect.width-25 and 20<=y0<y1<=page.rect.height-10,(name,span)
+     x0,y0,x1,y1=span['bbox']
+     if span['text'].strip()=='QX | Квант Икс':
+      assert page.rect.width-115<=x0<x1<=page.rect.width+1 and page.rect.height-35<=y0<y1<=page.rect.height+1,(name,'lower-right QX',span)
+     else: assert 25<=x0<x1<=page.rect.width-25 and 20<=y0<y1<=page.rect.height-10,(name,span)
     assert f'{i+1} / {len(doc)}' in page.get_text()
     topics=[s for s in spans if 'Углы, площади и координаты' in s['text']]
     if i==0 and name!='Compact':
-     assert topics and all(s['color']==(0x222222 if name.endswith('-BW') else 0xB42318) for s in topics)
+     expected=0x222222 if name.endswith('-BW') else 0x111111 if name.startswith('QX-') else 0xB42318
+     assert topics and all(s['color']==expected for s in topics),(name,'topic ink',expected)
    page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False).save(base/stage/(name+f'-page-{i+1:02}.png'))
   assert numbers==list(range(1,49 if name=='Dense-48' else 25)),(stage,name,numbers)
   if name.endswith('-Answers'):assert 'Найдите третий угол' not in text and 'Ответы' in text
