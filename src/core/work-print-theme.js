@@ -119,6 +119,7 @@ body[data-qw-theme] .qw-page-footer{color:#555}
 body[data-qw-theme="scientific"]{--qw-print-family:"QO Print Serif",serif}
 body[data-qw-theme="minimal"]{--qw-accent:#9cff00}
 body[data-qw-monochrome="true"] :is(.qw-print-topic,.qw-topic-title){color:#222!important}
+body[data-qw-monochrome="true"] .qw-print-page .qw-print-section:before{background:#e2e2e2!important}
 /* Brand is inserted once per physical A4 sheet by the pagination engine. */
 .qw-print-brand,.qw-print-brand.qw-booklet-brand,
 body[data-qw-format="booklet"] .qw-booklet-brand,
