@@ -47,7 +47,9 @@ test('TASK161 port connections survive component motion and rotation',()=>{
  assert.ok(Math.abs(rotated[2].x-newPort.x)<1e-6);
  assert.ok(Math.abs(rotated[2].y-newPort.y)<1e-6);
  assert.equal(qwNearestDiagramPort(rotated,{x:newPort.x+2,y:newPort.y+2},10).id,'power');
- assert.ok(qwDiagramSVG(rotated).includes('wire'));
+ const svg=qwDiagramSVG(rotated);
+ assert.match(svg,/<path d="M[^"]+ H[^"]+ V[^"]+ H[^"]+"/);
+ assert.doesNotMatch(svg,/NaN|undefined/);
  assert.notEqual(rotated[2].x,original[2].x);
 });
 
