@@ -752,7 +752,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  }
  function rotationPanel(){
   const o=value[selected];if(!o||multi.size!==1||['point','ray','infiniteLine'].includes(o.kind))return '';
-  return '<section class="qw-object-rotation"><label>'+(o.kind==='block'?'Поворот бруска, °':'Поворот, °')+'<input id="qw-block-rotation" type="number" min="-180" max="180" step="1" value="'+Number((o.rotation||0).toFixed(2))+'"></label><div class="qw-row">'+[15,45,90].map(n=>'<button type="button" data-rotate="'+n+'">+'+n+'°</button>').join('')+'</div>'+(o.kind==='block'&&value.some(p=>p.kind==='incline')?'<label>Наклонная плоскость<select id="qw-align-plane">'+value.map((p,i)=>p.kind==='incline'?'<option value="'+i+'">Плоскость '+(i+1)+'</option>':'').join('')+'</select></label><button type="button" id="qw-align-block">Выровнять брусок по плоскости</button>':'')+'</section>';
+  return '<section class="qw-object-rotation"><label>'+(o.kind==='block'?'Поворот бруска, °':'Поворот, °')+'<input id="qw-block-rotation" type="number" min="-180" max="180" step="1" value="'+Number((o.rotation||0).toFixed(2))+'"></label><div class="qw-row">'+[15,45,90,-90].map(n=>'<button type="button" data-rotate="'+n+'">+'+n+'°</button>').join('')+'</div>'+(o.kind==='block'&&value.some(p=>p.kind==='incline')?'<label>Наклонная плоскость<select id="qw-align-plane">'+value.map((p,i)=>p.kind==='incline'?'<option value="'+i+'">Плоскость '+(i+1)+'</option>':'').join('')+'</select></label><button type="button" id="qw-align-block">Выровнять брусок по плоскости</button>':'')+'</section>';
  }
  function diagramProperties(){
   const o=multi.size===1?value[selected]:null;
@@ -766,6 +766,15 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
    parameters='<div class="qw-primitive-settings">'+['x','y','x2','y2'].map((key,i)=>'<label>'+['Граница X1','Граница Y1','Граница X2','Граница Y2'][i]+'<input data-diagram-field="'+key+'" type="number" min="0" max="'+(key[0]==='x'?520:320)+'" step="any" value="'+o[key]+'"></label>').join('')+'</div>';
   }else if(o?.construction&&['midpoint','angleBisector','perpendicularBisector'].includes(o.construction.kind)){
    parameters='<p class="qw-muted">Зависимое построение: геометрия пересчитывается при изменении исходной фигуры. Настройте подпись и оформление здесь.</p>';
+  }else if(o&&(QW_MECHANICS.includes(o.kind)||QW_ELECTRICS.includes(o.kind))){
+   const coords='<div class="qw-primitive-settings">'+['x','y','x2','y2'].map(k=>
+    '<label>'+k.toUpperCase()+'<input data-diagram-field="'+k+'" type="number" min="0" max="'+(k[0]==='x'?520:320)+'" step="any" value="'+o[k]+'"></label>').join('')+'</div>';
+   const options=o.kind==='torque'?'<label>Направление<select data-physics-field="direction">'+qwOptions([['cw','По часовой'],['ccw','Против часовой']],o.direction||'cw')+'</select></label>':
+    o.kind==='weightSet'?'<label>Количество грузов<input data-physics-field="count" type="number" min="2" max="6" step="1" value="'+(o.count||2)+'"></label>':
+    o.kind==='dynamometer'?'<label>Показание, Н<input data-physics-field="reading" type="number" min="0" max="100" step="any" value="'+(o.reading||0)+'"></label>':
+    o.kind==='wireOrth'?'<label>X изгиба<input data-physics-field="bend" type="number" min="0" max="520" step="1" value="'+(o.bend??(o.x+o.x2)/2)+'"></label>'+
+     (o.links&&Object.keys(o.links).length?'<button type="button" id="qw-unlink-wire">Отключить привязки</button>':''):'';
+   parameters=coords+options;
   }else if(o?.kind==='arc'){
    const values={cx:(o.x+o.x2)/2,cy:(o.y+o.y2)/2,radius:(o.x2-o.x)/2,startAngle:o.startAngle,endAngle:o.endAngle};
    const labels={cx:'Центр X',cy:'Центр Y',radius:'Радиус',startAngle:'Начало, °',endAngle:'Конец, °'};
@@ -909,7 +918,10 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
    if(!multi.has(hit))selectOnly(hit);else selected=hit;
   }else{
    if(value.length>=60)return;let label='';if(tool==='text'){label=prompt('Подпись','')||'';if(!label)return;}
-   if(['point','text'].includes(tool)){remember();value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label});selectOnly(value.length-1);draw();return;}
+   if(['point','text','junction'].includes(tool)){
+    remember();value.push({kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label,...(tool==='junction'?{id:qwId()}: {})});
+    selectOnly(value.length-1);draw();return;
+   }
    creating=true;draft={kind:tool,x:p.x,y:p.y,x2:p.x,y2:p.y,label:'',...(tool==='arc'?{startAngle:0,endAngle:90}:tool==='regularPolygon'?{sides:6}:{})};
   }
   let handle=kind==='diagram'&&multi.size===1&&tool==='select'?e.target.closest('[data-qw-vertex]'):null;
@@ -972,7 +984,30 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
    multi=new Set(pending.prior);objects().forEach((o,i)=>{const b=kind==='graph'?graphObjectBounds(o):qwObjectBounds(o);if(b.x>=r.x&&b.x2<=r.x2&&b.y>=r.y&&b.y2<=r.y2)multi.add(i);});selected=[...multi].at(-1)??-1;
   }
   if(pending.creating&&(kind==='graph'?pending.pixels>=4&&Math.hypot(pending.draft.x2-pending.draft.x,pending.draft.y2-pending.draft.y)>1e-9:qwValidDrag(pending.draft,pending.pixels))){
-   const o=pending.draft;if(kind==='diagram'){if(['triangle','rightTriangle','quadrilateral'].includes(o.kind))o.vertices=qwGeometryVertices(o);value.push(o);}else value.elements.push(o);selectOnly(objects().length-1);
+   const o=pending.draft;
+   if(kind==='diagram'){
+    if(['triangle','rightTriangle','quadrilateral'].includes(o.kind))o.vertices=qwGeometryVertices(o);
+    if(QW_ELECTRICS.includes(o.kind)){
+     o.id=qwId();
+     if(o.kind!=='wireOrth'&&Math.abs(o.y2-o.y)<22){
+      const cy=(o.y+o.y2)/2;o.y=Math.max(0,cy-24);o.y2=Math.min(320,cy+24);
+     }
+     if(o.kind==='wireOrth'){
+      const start=qwNearestDiagramPort(value,{x:o.x,y:o.y},19),
+       end=qwNearestDiagramPort(value,{x:o.x2,y:o.y2},19);
+      if(start||end)o.links={...(start?{start:{id:start.id,port:start.port}}:{}),
+       ...(end?{end:{id:end.id,port:end.port}}:{})};
+     }
+    }
+    if(o.kind==='forceVector')o.label='F';
+    if(o.kind==='velocityVector')o.label='v';
+    if(o.kind==='accelerationVector')o.label='a';
+    if(o.kind==='torque'){o.label='M';o.direction='cw';}
+    if(o.kind==='weightSet')o.count=2;
+    if(o.kind==='dynamometer')o.reading=0;
+    value.push(o);
+   }else value.elements.push(o);
+   selectOnly(objects().length-1);
   }
   if(JSON.stringify(value)!==JSON.stringify(pending.before)){
    try{value=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);history.push(pending.before);history=history.slice(-30);}
@@ -998,6 +1033,9 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   if(t.dataset.graphObject!==undefined){const i=Number(t.dataset.graphObject);if(e.shiftKey){if(multi.has(i))multi.delete(i);else multi.add(i);selected=[...multi].at(-1)??-1;}else selectOnly(i);tool='select';draw();return;}
   if(t.dataset.styleColor){applyStyle(t.dataset.styleKey,t.dataset.styleColor);return;}
   if(t.dataset.rotate){rotateSelected((value[selected]?.rotation||0)+Number(t.dataset.rotate));return;}
+  if(t.id==='qw-unlink-wire'&&kind==='diagram'&&value[selected]?.kind==='wireOrth'){
+   remember();delete value[selected].links;draw();return;
+  }
   if(t.id==='qw-align-block'){const plane=value[Number(d.querySelector('#qw-align-plane').value)];rotateSelected(qwInclineAngle(plane));return;}
   if(t.dataset.layer&&multi.size){labelSelected='';remember();const picked=value.filter((_,i)=>multi.has(i)),rest=value.filter((_,i)=>!multi.has(i));value=t.dataset.layer==='front'?[...rest,...picked]:[...picked,...rest];multi=new Set(picked.map((_,i)=>t.dataset.layer==='front'?rest.length+i:i));selected=[...multi].at(-1);draw();return;}
   if(t.dataset.construction){
@@ -1027,6 +1065,11 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
     else if(t.dataset.elementCurve){const k=t.dataset.elementCurve;o.curve[k]=k==='trig'?t.value:Number(t.value);}
     else o.vertices[Number(t.dataset.polylineVertex)][t.dataset.coordinate]=Number(t.value);
     const validated=qwValidateGraph(next);remember();value=validated;t.defaultValue=t.value;draw();return;
+   }
+   if(t.dataset.physicsField!==undefined){
+    const next=structuredClone(value),o=next[selected];if(!o)return;
+    const key=t.dataset.physicsField;o[key]=key==='direction'?t.value:Number(t.value);
+    const validated=qwValidateDiagram(next);remember();value=validated;t.defaultValue=t.value;draw();return;
    }
    if(t.dataset.arcField!==undefined||t.dataset.diagramField!==undefined||t.dataset.polygonSides!==undefined){
     const next=structuredClone(value),o=next[selected];if(!o)return;
