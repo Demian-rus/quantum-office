@@ -33,10 +33,10 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
    assert.deepEqual(measurement.collisions,[],name+' ink collision');assert.deepEqual(measurement.outside,[],name+' bounds');
    if(!before){
     assert.ok(Math.abs(measurement.bodyPt-10)<.001);assert.deepEqual(measurement.english,[]);assert.equal(measurement.brandIcons,0);
-    if(project.topic)assert.equal(measurement.topicColor,options.monochrome?'rgb(34, 34, 34)':'rgb(180, 35, 24)');
-    for(const b of measurement.brands){assert.equal(b.position,'absolute');assert.ok(b.box.y+b.box.h<=11,'brand outside 12mm content top');}
+    if(project.topic)assert.equal(measurement.topicColor,options.monochrome?'rgb(34, 34, 34)':options.theme?'rgb(17, 17, 17)':'rgb(180, 35, 24)');
+    for(const b of measurement.brands){assert.equal(b.position,'absolute');assert.ok(b.box.y>285&&b.box.y+b.box.h<=297,'QX handwritten signature must stay at bottom-right of A4');}
     assert.ok(measurement.math.every(m=>m.size>=measurement.bodyPt&&m.fraction.every(s=>s>=measurement.bodyPt-.01)),'full-size main fraction operands');
-    if(options.theme){assert.equal(measurement.brands.length,measurement.layout.pages.length);assert.ok(measurement.brands.every(b=>b.text==='Квант Икс | QX'));}
+    if(options.theme){assert.equal(measurement.brands.length,measurement.layout.pages.length);assert.ok(measurement.brands.every(b=>b.text==='QX | Квант Икс'));}
    }
    await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
    fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(project,null,2));reports.push({name,...measurement});await p.close();return measurement;
