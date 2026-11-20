@@ -128,11 +128,11 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
  min-width:0!important;min-height:0!important;padding:0!important;margin:0!important;overflow:visible!important;
  display:block!important;clip-path:none!important;transform:none!important;pointer-events:none!important;
  background:transparent!important;border:0!important;box-shadow:none!important;
- color:#9cff00!important;font:700 13pt/1 "QX Handwritten",cursive!important;
+ color:#111!important;font:700 15pt/1 "QX Handwritten",cursive!important;
  letter-spacing:0!important;white-space:nowrap!important;text-transform:none!important;
 }
 .qw-print-brand .qw-qx-lettering{display:block;white-space:nowrap;font:inherit;color:inherit;letter-spacing:inherit;
- -webkit-text-stroke:0.075mm #101010;paint-order:stroke fill;text-shadow:none}
+ -webkit-text-stroke:0;paint-order:normal;text-shadow:none}
 .qw-print-brand::after,.qw-print-brand::before{display:none!important;content:none!important}
 `; }
 export {QW_PRINT_THEMES,qwPrintTheme,qwPrintBrand,qwPrintThemeStyles};
