@@ -109,7 +109,7 @@ function qwPhysicsShape(o,interactive=false){
   out+=line(bodyL,cy,bodyR,kind==='switchOpen'?cy-h*.36:cy);
  }
  if(interactive){
-  out+=qwDiagramPorts(o).map(p=>'<circle data-qw-port="'+p.port+'" cx="'+n(p.x)+'" cy="'+n(p.y)+
+  out+=qwDiagramPorts({...o,rotation:0}).map(p=>'<circle data-qw-port="'+p.port+'" cx="'+n(p.x)+'" cy="'+n(p.y)+
    '" r="4.2" fill="white" stroke="#0871b9" stroke-width="1" vector-effect="non-scaling-stroke"/>').join('');
  }
  return out;
