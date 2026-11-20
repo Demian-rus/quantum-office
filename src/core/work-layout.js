@@ -108,7 +108,7 @@ body[data-qw-format="practice"] .qw-print-section{margin-bottom:4mm}
 .qw-practice-space svg{display:block;width:100%;height:100%}
 
 /* TASK153: professional print booklet, using bundled OFL fonts. */
-body[data-qw-format="booklet"]{--qw-print-family:"QO Print Serif",Georgia,serif;line-height:1.27}
+body[data-qw-format="booklet"]{--qw-print-family:"QO Print Serif",Georgia,serif;font-size:var(--qw-print-size,10pt);line-height:1.23}
 body[data-qw-format="booklet"] .qw-print-page{padding:13mm 13mm 17mm}
 body[data-qw-format="booklet"] .qw-page-content{width:184mm;height:267mm}
 body[data-qw-format="booklet"] .qw-print-header{text-align:center;margin:0 0 6mm}
@@ -119,24 +119,25 @@ body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial
 body[data-qw-format="booklet"] .qw-running-header{font:8pt/1.3 "QO Print Sans",Arial,sans-serif;color:#333;margin-bottom:5mm;border:none;text-align:center}
 body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-print-section:before{content:none}
-body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:10mm minmax(0,1fr);column-gap:5mm;row-gap:0}
-body[data-qw-format="booklet"] .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;width:10mm;height:6.7mm;border:.28mm solid #151515;display:flex;align-items:center;justify-content:center;margin:0}
+body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:8mm minmax(0,1fr);column-gap:3mm;row-gap:0}
+body[data-qw-format="booklet"] .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;width:8mm;height:7mm;border:.28mm solid #151515;display:flex;align-items:center;justify-content:center;margin:0}
 body[data-qw-format="booklet"] .qw-booklet-entry>header .qw-print-number{font:700 11pt/1 "QO Print Serif",Georgia,serif;text-align:center}
-body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1;line-height:1.27;min-height:6.7mm}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1;line-height:1.23;min-height:7mm}
 body[data-qw-format="booklet"] .qw-task-text{overflow-wrap:normal;word-break:normal;hyphens:none;text-align:left}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow figure{margin:0 0 1.2mm 4mm}
-body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{margin:2mm 0 0}
-body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:1mm;margin:2.4mm 0 0;font:10.5pt/1.2 "QO Print Serif",Georgia,serif;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{float:none!important;display:block;margin:2mm auto 0!important;max-width:100%}
+body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:1mm;margin:1.5mm 0 0;font:10.5pt/1.2 "QO Print Serif",Georgia,serif;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;width:52mm;border-bottom:.22mm solid #555;min-width:20mm;height:4.5mm}
 body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
 body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
 body[data-qw-format="booklet"] math{font-size:1em;math-style:normal;font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none}
 body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
-body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow.qw-booklet-answer-by-figure{display:grid!important;grid-template-columns:minmax(0,1fr) 48mm;grid-template-rows:auto minmax(0,1fr);column-gap:4mm;min-height:0}
-body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-task-text{grid-column:1;grid-row:1;min-width:0}
-body[data-qw-format="booklet"] .qw-booklet-answer-by-figure figure{grid-column:2;grid-row:1 / 3;align-self:start;justify-self:center;margin:0;float:none!important}
-body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{grid-column:1;grid-row:2;align-self:end;margin:2.4mm 0 0}
-
+/* The answer remains a sibling after the full flow-root (including floats).
+   It cannot overlap the condition when that condition grows longer. */
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self:start;min-width:0}
+.qw-task-tables{clear:both;display:flex;flex-direction:column;align-items:center;gap:1.5mm;width:100%;margin:1.5mm auto 0}
+.qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;overflow-wrap:anywhere}
+.qw-task-tables :is(th,td){padding:.8mm 1.8mm;vertical-align:middle}
 
 /* TASK154 — one typographic system for all exported document formats. */
 body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
@@ -243,6 +244,15 @@ async function qwPreparePrintDocument(){
   }
 
   const flow=section.querySelector('.qw-task-flow'),figure=flow.querySelector('figure');
+  const text=section.querySelector('.qw-task-text');
+  // Move native tables after the complete condition, at any column count.
+  const tables=[...text.querySelectorAll('table')];
+  if(tables.length){
+   const group=document.createElement('div');group.className='qw-task-tables';
+   for(const table of tables)group.append(table);
+   text.after(group);
+   if(figure)flow.classList.add('qw-figure-below');
+  }
   flow.classList.toggle('qw-print-has-figure',!!figure);
   if(figure){
    const svg=figure.querySelector('svg');let w,h;
@@ -267,17 +277,12 @@ async function qwPreparePrintDocument(){
    figure.style.width=w*scale+'px';figure.style.height=h*scale+'px';
    figure.dataset.printPosition=position;
   }
-  const text=section.querySelector('.qw-task-text');
   if(format==='answers'&&text.classList.contains('qw-answer-columns')&&[...text.querySelectorAll('.qw-answer-item math')].some(m=>m.getBoundingClientRect().width>m.closest('.qw-answer-item').getBoundingClientRect().width))text.style.gridTemplateColumns='1fr';
   if(!modern&&!figure&&!section.querySelector('.qw-solution-preview')&&text.getBoundingClientRect().height<=parseFloat(getComputedStyle(text).lineHeight)*2+1)section.classList.add('qw-compact-task');
   // A wide indivisible expression gets the whole text width, without modifying QWORK.
   if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
-  }
-  if(format==='booklet'&&figure&&flow.classList.contains('qw-figure-right')){
-   const answer=section.querySelector('.qw-booklet-answer');
-   if(answer){flow.append(answer);flow.classList.add('qw-booklet-answer-by-figure');}
   }
   if(figure&&!flow.classList.contains('qw-figure-below')){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
