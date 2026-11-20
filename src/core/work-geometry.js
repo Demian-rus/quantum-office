@@ -112,7 +112,16 @@ function qwHitDiagram(objects,p,tolerance=6){
 }
 function qwValidDrag(o,pixels){
  if(pixels<4)return false;
- if(['rect','circle','ellipse','regularPolygon','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley',...QW_ELECTRICS.filter(k=>k!=='wireOrth'),...QW_MECHANICS.filter(k=>!['forceVector','velocityVector','accelerationVector'].includes(k))].includes(o.kind))return Math.abs(o.x2-o.x)>8&&Math.abs(o.y2-o.y)>8;
+ if(QW_ELECTRICS.includes(o.kind)){
+  if(o.kind==='junction')return true;
+  return Math.hypot(o.x2-o.x,o.y2-o.y)>20;
+ }
+ if(QW_MECHANICS.includes(o.kind)){
+  if(['forceVector','velocityVector','accelerationVector'].includes(o.kind))
+   return Math.hypot(o.x2-o.x,o.y2-o.y)>10;
+  return Math.hypot(o.x2-o.x,o.y2-o.y)>20;
+ }
+ if(['rect','circle','ellipse','regularPolygon','arc','triangle','rightTriangle','quadrilateral','block','incline','pulley','fixedPulley','movablePulley'].includes(o.kind))return Math.abs(o.x2-o.x)>.01&&Math.abs(o.y2-o.y)>.01;
  return Math.hypot(o.x2-o.x,o.y2-o.y)>.01;
 }
 function qwGraphObjectPoints(g,o){
