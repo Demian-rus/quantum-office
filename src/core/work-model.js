@@ -72,7 +72,7 @@ function qwValidate(raw){
     q.source.number=number;
    }
    if(slot!==undefined){
-    if(!/^(?:[1-9]|[1-3]\\d|40)$/.test(String(slot)))throw Error('Некорректный тип экзаменационного задания');
+    if(!/^(?:[1-9]|[1-3]\d|40)$/.test(String(slot)))throw Error('Некорректный тип экзаменационного задания');
     q.source.slot=String(slot);
    }
   }
