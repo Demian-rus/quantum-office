@@ -132,8 +132,24 @@ body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;j
 body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
 body[data-qw-format="booklet"] math{font-size:1em;math-style:normal;font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none}
 body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
-/* The answer remains a sibling after the full flow-root (including floats).
-   It cannot overlap the condition when that condition grows longer. */
+/* The default answer stays in normal flow after the condition and figure.
+   Only measured-safe short text uses a two-column grid, allowing the answer
+   to align to the lower figure edge without overlapping the condition. */
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow.qw-booklet-answer-by-figure{
+ display:grid!important;grid-template-columns:minmax(0,1fr) auto;
+ grid-template-rows:auto minmax(0,1fr);column-gap:4mm;row-gap:0;align-items:start
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-task-text{
+ grid-column:1;grid-row:1;min-width:0
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure figure{
+ grid-column:2;grid-row:1 / span 2;justify-self:center;align-self:start;
+ float:none!important;margin:0!important
+}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{
+ grid-column:1;grid-row:2;align-self:end;margin:0!important;padding-bottom:.5mm
+}
+
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self:start;min-width:0}
 .qw-task-tables{clear:both;display:flex;flex-direction:column;align-items:center;gap:1.5mm;width:100%;margin:1.5mm auto 0}
 .qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;overflow-wrap:anywhere}
@@ -309,6 +325,32 @@ async function qwPreparePrintDocument(){
   if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
+  }
+  // Reuse figure's lower level only when the rendered text plus answer
+  // fits safely inside the *actual* narrowed left column. Long text and all
+  // below-figure layouts retain the normal answer-after-flow fallback.
+  if(format==='booklet'&&figure&&flow.classList.contains('qw-figure-right')&&!tables.length){
+   const answer=section.querySelector('.qw-booklet-answer');
+   if(answer){
+    const available=flow.getBoundingClientRect().width-figure.getBoundingClientRect().width-4*MM;
+    if(available>37*MM){
+     const probe=text.cloneNode(true);
+     probe.style.cssText='position:absolute;visibility:hidden;float:none;width:'+available+'px;height:auto;max-width:none;';
+     flow.append(probe);
+     const textHeight=probe.getBoundingClientRect().height;probe.remove();
+     const answerHeight=answer.getBoundingClientRect().height;
+     const figureHeight=figure.getBoundingClientRect().height;
+     if(textHeight+answerHeight+2*MM<=figureHeight-2){
+      flow.append(answer);flow.classList.add('qw-booklet-answer-by-figure');
+      // If font metrics changed on activation, do not retain an unsafe layout.
+      const textBottom=text.getBoundingClientRect().bottom,answerTop=answer.getBoundingClientRect().top;
+      if(answerTop<textBottom+MM){
+       flow.classList.remove('qw-booklet-answer-by-figure');
+       section.querySelector('.qw-booklet-entry').append(answer);
+      }
+     }
+    }
+   }
   }
   if(figure&&!flow.classList.contains('qw-figure-below')){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
