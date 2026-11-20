@@ -562,7 +562,10 @@ const QW_VISUAL_TOOLS=[
  ['rect','Прямоугольник'],['circle','Окружность'],['ellipse','Эллипс'],['regularPolygon','Правильный многоугольник'],['text','Текстовая подпись'],
  ['angle','Угол'],['triangle','Треугольник'],['rightTriangle','Прямоугольный треугольник'],
  ['quadrilateral','Четырёхугольник'],['block','Брусок'],['incline','Наклонная плоскость'],
- ['pulley','Неподвижный блок'],['movablePulley','Подвижный блок'],['spring','Пружина'],['ground','Опора']
+ ['pulley','Неподвижный блок'],['movablePulley','Подвижный блок'],['spring','Пружина'],['ground','Опора'],
+ ['forceVector','Вектор силы'],['velocityVector','Вектор скорости'],['accelerationVector','Вектор ускорения'],['torque','Момент силы'],['dynamometer','Динамометр'],['weightSet','Система грузов'],
+ ['resistor','Резистор'],['rheostat','Реостат'],['cell','Элемент питания'],['battery','Батарея'],['lamp','Лампа'],['switchOpen','Выключатель разомкнут'],['switchClosed','Выключатель замкнут'],
+ ['ammeter','Амперметр'],['voltmeter','Вольтметр'],['wireOrth','Проводник'],['junction','Узел']
 ];
 function qwVisualIcon(kind){
  const paths={
@@ -600,6 +603,23 @@ function qwVisualIcon(kind){
  pulley:'<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2"/><path d="M12 4V1"/>',
  spring:'<path d="M2 12h3l2-7 3 14 3-14 3 14 3-7h3"/>',
  ground:'<path d="M2 12h20M5 12l-3 5m9-5l-3 5m9-5l-3 5"/>',
+ forceVector:'<path d="M3 19L20 4m-7 1l7-1-1 7"/><circle cx="3" cy="19" r="2"/>',
+ velocityVector:'<path d="M2 19L22 6m-8 0h8v8"/>',
+ accelerationVector:'<path d="M4 20L20 5m-9 0h9v9"/>',
+ torque:'<path d="M7 19a9 9 0 1 1 12-8m-6-1h6V4"/>',
+ dynamometer:'<rect x="7" y="3" width="10" height="15"/><path d="M11 7h3m-3 3h3m-3 3h3M12 18v3"/>',
+ weightSet:'<path d="M2 5h20M7 5v8m10-8v8"/><rect x="4" y="13" width="6" height="8"/><rect x="14" y="13" width="6" height="8"/>',
+ resistor:'<path d="M1 12h5m12 0h5"/><rect x="6" y="8" width="12" height="8"/>',
+ rheostat:'<path d="M1 12h5m12 0h5"/><rect x="6" y="8" width="12" height="8"/><path d="M6 19L18 5m-5 0h5v5"/>',
+ cell:'<path d="M2 12h7m4 0h9M9 5v14M13 8v8"/>',
+ battery:'<path d="M2 12h4m12 0h4M6 5v14m3-11v8m4-11v14m4-11v8"/>',
+ lamp:'<circle cx="12" cy="12" r="8"/><path d="M6 6l12 12M18 6L6 18M1 12h3m16 0h3"/>',
+ switchOpen:'<path d="M2 12h5m10 0h5M7 12l10-7"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/>',
+ switchClosed:'<path d="M2 12h5l10 0h5"/><circle cx="7" cy="12" r="2"/><circle cx="17" cy="12" r="2"/>',
+ ammeter:'<circle cx="12" cy="12" r="9"/><text x="12" y="16" font-size="12" text-anchor="middle" stroke="none" fill="currentColor">A</text>',
+ voltmeter:'<circle cx="12" cy="12" r="9"/><text x="12" y="16" font-size="12" text-anchor="middle" stroke="none" fill="currentColor">V</text>',
+ wireOrth:'<path d="M2 4h10v16h10"/>',
+ junction:'<path d="M2 12h20M12 2v20"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/>',
  undo:'<path d="M9 4L4 9l5 5M4 9h10a6 6 0 010 12"/>',
  up:'<path d="M12 20V4m-6 6l6-6 6 6"/>',
  trash:'<path d="M4 6h16M9 3h6M7 6l1 15h8l1-15M10 9v8m4-8v8"/>'
@@ -648,7 +668,7 @@ function qwPhysicsPreset(kind){
 }
 function qwVisualPalette(selected){
  const titles={select:'Выделение',point:'Точка',line:'Отрезок',arrow:'Стрелка',text:'Подпись',rightTriangle:'Прям. треугольник',quadrilateral:'4-угольник',dashed:'Вспом. линия',pulley:'Неподвижный блок',movablePulley:'Подвижный блок',rope:'Нить'};
- return [['Основные',['select','point','line','dashed','arrow','text']],['Геометрия',['rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral']],['Построения',['ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks']],['Механика',['block','incline','pulley','movablePulley','rope','spring','ground']]].map(([title,keys])=>
+ return [['Основные',['select','point','line','dashed','arrow','text']],['Геометрия',['rect','circle','ellipse','regularPolygon','polyline','arc','dimension','doubleArrow','angle','triangle','rightTriangle','quadrilateral','ray','infiniteLine','parallel','perpendicular','midpoint','angleBisector','perpendicularBisector','equalMarks']],['Механика',['block','incline','pulley','movablePulley','rope','spring','ground','forceVector','velocityVector','accelerationVector','torque','dynamometer','weightSet']],['Электричество',['resistor','rheostat','cell','battery','lamp','switchOpen','switchClosed','ammeter','voltmeter','wireOrth','junction']]].map(([title,keys])=>
   '<details class="qw-tool-group" open><summary>'+title+'</summary><div>'+keys.map(kind=>{
    const title=titles[kind]||Object.fromEntries(QW_VISUAL_TOOLS)[kind];
    return '<button type="button" class="qw-tool-tile" data-tool="'+kind+'" title="'+qwEsc(title)+'" aria-label="'+qwEsc(title)+'" aria-pressed="'+(selected===kind)+'">'+qwVisualIcon(kind)+'<span>'+qwEsc(kind==='rect'?'Прямоуг.':title)+'</span></button>';
@@ -672,7 +692,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   (kind==='graph'?qwGraphSidebar(tool,value.coordinateMode):qwVisualPalette(tool))+'</aside>'+
   '<section class="qw-visual-canvas" aria-label="Рабочий холст"><div class="qw-visual-stage-space"><div id="qw-visual-stage" tabindex="0" aria-label="Поле редактирования '+(kind==='graph'?'графика':'схемы')+'"></div></div>'+
   (kind==='diagram'?'<div class="qw-visual-canvas-footer"><label class="qw-check"><input id="qw-snap-geometry" type="checkbox" checked>Сетка и привязка</label><label class="qw-grid-step-label">Шаг<select id="qw-grid-step-geometry" aria-label="Шаг сетки">'+qwOptions([['10','10 px'],['20','20 px'],['40','40 px']],'20')+'</select></label></div>':'')+'</section>'+
-  '<aside class="qw-visual-inspector" aria-label="Свойства и действия"><div id="qw-visual-properties" aria-label="Свойства выбранного объекта" tabindex="0"></div><div class="qw-visual-actions" aria-label="Действия с выделением"><button type="button" id="qw-visual-undo" aria-label="Отменить" title="Отменить последнее изменение" disabled>'+qwVisualIcon('undo')+'<span>Отменить</span></button><button type="button" id="qw-visual-delete" aria-label="Удалить выбранное" title="Удалить выбранный объект" disabled>'+qwVisualIcon('trash')+'<span>Удалить</span></button></div></aside>',
+  '<aside class="qw-visual-inspector" aria-label="Свойства и действия"><div id="qw-visual-properties" aria-label="Свойства выбранного объекта" tabindex="0"></div><div class="qw-visual-actions" aria-label="Действия с выделением"><button type="button" id="qw-visual-undo" aria-label="Отменить" title="Отменить последнее изменение" disabled>'+qwVisualIcon('undo')+'<span>Отменить</span></button><button type="button" id="qw-visual-copy" aria-label="Копировать выбранное" title="Дублировать выделение" disabled>'+qwVisualIcon('rect')+'<span>Копия</span></button><button type="button" id="qw-visual-delete" aria-label="Удалить выбранное" title="Удалить выбранный объект" disabled>'+qwVisualIcon('trash')+'<span>Удалить</span></button></div></aside>',
   '<span id="qw-visual-state" role="status"></span>'+qwButton('visual-apply','Применить','class="qw-primary"'));
  d.classList.add('qw-visual-dialog','qw-visual-'+kind);d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
  let visualCommitted=false;
@@ -782,7 +802,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  }
  function rotateSelected(angle){if(selected<0)return;remember();value[selected].rotation=((angle+180)%360+360)%360-180;draw();}
  function remember(){history.push(structuredClone(value));history=history.slice(-30);}
- function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';if(['midpoint','perpendicularBisector'].includes(tool))hint.textContent+=' · Нажмите исходный отрезок.';if(tool==='angleBisector')hint.textContent+=' · Нажмите исходный угол.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
+ function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';if(['midpoint','perpendicularBisector'].includes(tool))hint.textContent+=' · Нажмите исходный отрезок.';if(tool==='angleBisector')hint.textContent+=' · Нажмите исходный угол.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelector('#qw-visual-copy').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
   const conflicts=stage.querySelectorAll('[data-label-conflict="true"]').length;if(conflicts){hint.className='qw-error';hint.textContent+=' · Подписей с пересечениями: '+conflicts+'. Выберите подпись и перетащите её.';}
   if(!labelSelected)props.querySelector('.qw-label-settings')?.remove();
   if(!full)return;
