@@ -306,6 +306,25 @@ function qwBankRichField(key,title,value,rows=5){
  '<div class="qw-bank-rich-render qw-rich" data-bank-render="'+key+'" hidden></div>'+
  '<small class="qw-bank-rich-hint">Markdown: **жирный**, *курсив*, заголовки, списки, таблицы, формулы.</small></div>';
 }
+function qwBankInsertMarkup(input,kind){
+ if(!input||input.disabled)return;
+ const from=input.selectionStart,to=input.selectionEnd,selected=input.value.slice(from,to),value=selected||'текст';
+ let content='';
+ if(kind==='bold')content='**'+value+'**';
+ else if(kind==='italic')content='*'+value+'*';
+ else if(kind==='math')content='\\('+ (selected||'F=ma') +'\\)';
+ else if(kind==='heading')content='### '+(selected||'Название раздела');
+ else if(kind==='quote')content='> '+(selected||'Пояснение');
+ else if(kind==='list')content=(selected||'Первый пункт').split('\n').map(x=>'- '+x).join('\n');
+ else if(kind==='numbered')content=(selected||'Первый шаг').split('\n').map((x,i)=>(i+1)+'. '+x).join('\n');
+ else if(kind==='table')content='| Величина | Значение |\n| --- | --- |\n| '+(selected||'Название')+' | Значение |';
+ else if(kind==='ege')content='### Физическая модель и обоснование\n[Объясните применимость физических законов.]\n\n### Решение\n1. [Запишите законы и формулы.]\n2. [Выполните преобразования.]\n3. [Подставьте значения с единицами.]\n\n### Ответ\n[Результат с единицей измерения.]';
+ else if(kind==='rubric')content='### Критерии для этой задачи\n| Элемент решения | Баллы |\n| --- | --- |\n| Обоснование физических законов | — |\n| Преобразования и вычисления | — |\n| Результат и единица измерения | — |\n\n> Сверьте с критериями конкретного задания ЕГЭ.';
+ else return;
+ if((kind==='ege'||kind==='rubric')&&input.value.trim())content='\n\n'+content;
+ input.setRangeText(content,from,to,'end');input.focus();
+ input.dispatchEvent(new Event('input',{bubbles:true}));
+}
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 function qwBankEdit(id,draft=null,returnFilters={}){
  const creating=id===null;
