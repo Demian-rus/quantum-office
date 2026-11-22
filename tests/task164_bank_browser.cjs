@@ -1,0 +1,64 @@
+/* TASK164: browser acceptance for readable EGE solution editing and enlarged preview. */
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE_PATH||'playwright');
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url');
+const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-bank');
+(async()=>{
+ fs.mkdirSync(out,{recursive:true});
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+ try{
+  const p=await browser.newPage({viewport:{width:1560,height:970}}),errors=[];
+  p.on('pageerror',e=>errors.push(e.message));
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
+  await p.evaluate(()=>{
+   const q=qwTask('extended');q.prompt='Тело массой 2 кг движется с ускорением 3 м/с². Найдите силу.';
+   q.answer='6 Н';q.comment='Используем второй закон Ньютона.';q.criteria='Записан закон Ньютона.';
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify([qwBankNormalize({id:'task164',bankNumber:1901,subject:'physics',grade:'11',exam:'ege',slot:'27',topic:'Динамика',task:q})]));
+  });
+  await p.locator('[data-action="launcher-bank"]').click();
+  await p.locator('#qw-dialog [data-bank-view="task164"]').click();
+  await p.locator('#qw-dialog [data-bank-edit="task164"]').last().click();
+  const editor=p.locator('.qw-bank-edit-dialog');
+  assert.equal(await editor.locator('.qw-bank-rich-editor').count(),3);
+  const prompt=editor.locator('[data-bank-task-field="prompt"]');
+  await prompt.fill('Дано: тело **массой 2 кг** имеет ускорение \\(a=3\\). Найдите силу.');
+  await editor.locator('[data-bank-preview-toggle="prompt"]').click();
+  assert.equal(await editor.locator('[data-bank-render="prompt"] strong').count(),1);
+  assert.equal(await editor.locator('[data-bank-render="prompt"] math').count(),1);
+  await editor.locator('[data-bank-preview-toggle="prompt"]').click();
+  const solution=editor.locator('[data-bank-task-field="comment"]');
+  await solution.fill('');
+  await editor.locator('[data-bank-format="ege"]').click();
+  assert.match(await solution.inputValue(),/### Физическая модель/);
+  await solution.fill('### Обоснование\nПрименим **второй закон Ньютона**.\n\n1. \\(F=ma\\).\n2. \\(F=2\\cdot3=6\\).');
+  await editor.locator('[data-bank-preview-toggle="comment"]').click();
+  assert.equal(await editor.locator('[data-bank-render="comment"] strong').count(),1);
+  assert.equal(await editor.locator('[data-bank-render="comment"] ol li').count(),2);
+  assert.equal(await editor.locator('[data-bank-render="comment"] math').count(),2);
+  await editor.locator('[data-bank-preview-toggle="comment"]').click();
+  const criteria=editor.locator('[data-bank-task-field="criteria"]');
+  await criteria.fill('');
+  await editor.locator('[data-bank-format="rubric"]').click();
+  await editor.locator('[data-bank-preview-toggle="criteria"]').click();
+  assert.ok(await editor.locator('[data-bank-render="criteria"] table').count(), 'criteria table');
+  await editor.locator('[data-bank-preview-toggle="criteria"]').click();
+  await editor.locator('[data-qw-action="bank-edit-save"]').click();
+  assert.equal(await p.evaluate(()=>qwBankRead().length),1,'existing bank record is updated, not duplicated');
+  const saved=await p.evaluate(()=>qwBankRead()[0]);
+  assert.equal(saved.bankNumber,1901);assert.match(saved.task.comment,/### Обоснование/);assert.match(saved.task.criteria,/Элемент решения/);
+  const catalog=p.locator('#qw-dialog');
+  await catalog.locator('[data-bank-view="task164"]').click();
+  assert.equal(await catalog.locator('.qw-bank-video-canvas strong').count()>0,true,'formatted prompt');
+  await catalog.locator('.qw-bank-solution summary').click();
+  assert.equal(await catalog.locator('.qw-bank-solution-body ol li').count(),2);
+  assert.equal(await catalog.locator('.qw-bank-solution-body table').count(),1);
+  await catalog.locator('[data-bank-enlarge]').click();
+  assert.equal(await catalog.evaluate(e=>e.classList.contains('qw-bank-expanded')),true);
+  assert.equal(await catalog.locator('.qw-bank-solution').isVisible(),true,'solution remains available when enlarged');
+  await p.screenshot({path:path.join(out,'expanded-with-solution.png'),fullPage:true});
+  await catalog.locator('[data-bank-enlarge]').click();
+  assert.equal(await catalog.evaluate(e=>e.classList.contains('qw-bank-expanded')),false);
+  assert.deepEqual(errors,[]);
+  console.log('PASS TASK164 Markdown editors, EGE templates, MathML, criteria table and enlarge with solution');
+  await p.close();
+ }finally{await browser.close();}
+})().catch(e=>{console.error(e);process.exitCode=1;});
