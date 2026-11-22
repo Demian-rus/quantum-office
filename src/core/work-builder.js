@@ -508,6 +508,7 @@ function qwBank(previousFilters={}){
    control.innerHTML=qwOptions([['all',key==='topic'?'Все темы':'Все подтемы'],...names.map(name=>[name,name])],names.includes(old)?old:'all');
   }
  }
+ const summary=value=>String(value||'').replace(/^\s{0,3}#{1,4}\s+/gm,'').replace(/\*\*|__|~~|`/g,'').replace(/\\\((.*?)\\\)/g,(_,inner)=>inner).replace(/\s+/g,' ').trim().slice(0,185);
  const signature=x=>[x.subject,x.grade,x.exam,x.year,x.part,x.slot,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
  const markSelection=()=>{
   d.querySelector('#qw-bank-selected-count').textContent='Выбрано: '+selected.size;
@@ -549,6 +550,8 @@ function qwBank(previousFilters={}){
   const shown=xs.filter(x=>keys.every(key=>{const value=pick(key);return value==='all'||(key==='type'?x.task.type:x[key])===value;})&&
    [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer,x.task.comment,x.task.criteria].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
   get('count').textContent='Найдено: '+shown.length+' / '+xs.length;
+  const advanced=['grade','year','part','slot','difficulty','type','subtopic','origin'].filter(key=>pick(key)!=='all');
+  d.querySelector('.qw-bank-extra-filters summary').textContent='Дополнительные фильтры'+(advanced.length?' · применено: '+advanced.length:'');
   const items=shown.map(x=>{
    const tags=[x.subject==='math'?'Математика':x.subject==='physics'?'Физика':x.subject,
     x.grade?x.grade+' кл.':'',
@@ -558,7 +561,7 @@ function qwBank(previousFilters={}){
     x.topic,x.subtopic].filter(Boolean).join(' · ');
    return '<div class="qw-bank-item qw-bank-choice" data-bank-entry="'+qwEsc(x.id)+'"><label class="qw-bank-select-check">'+
     '<input type="checkbox" data-bank-select="'+qwEsc(x.id)+'" '+(selected.has(x.id)?'checked':'')+' aria-label="Выбрать задание">'+
-    '<span class="qw-bank-card-copy"><strong>№ '+String(x.bankNumber).padStart(5,'0')+' · '+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+'</strong>'+
+    '<span class="qw-bank-card-copy"><strong>№ '+String(x.bankNumber).padStart(5,'0')+' · '+qwEsc(summary(x.task.prompt)||QW_TYPES[x.task.type])+'</strong>'+
     '<small>'+qwEsc(tags)+'</small></span></label>'+
     '<button type="button" data-bank-view="'+qwEsc(x.id)+'">Просмотр</button>'+
     '<button type="button" data-bank-edit="'+qwEsc(x.id)+'">Редактировать</button>'+
@@ -679,6 +682,8 @@ function qwBank(previousFilters={}){
  for(const [key,value] of Object.entries(previousFilters)){
   const input=get(key);if(input&&(input.type==='search'||[...(input.options||[])].some(o=>o.value===value)))input.value=value;
  }
+ const extraKeys=['grade','year','part','slot','difficulty','type','subtopic','origin'];
+ if(extraKeys.some(key=>pick(key)!=='all'))d.querySelector('.qw-bank-extra-filters').open=true;
  refresh();
 }
 function qwExample(subject='physics'){
