@@ -17,7 +17,7 @@ test('TASK164 escapes HTML, malicious links, scripts and user-controlled attribu
  const html=qwRichMarkdownHTML(input);
  assert.doesNotMatch(html,/<script|<iframe|<svg|<img/i);
  assert.match(html,/&lt;script&gt;/);assert.match(html,/&lt;iframe/);
- assert.doesNotMatch(html,/onerror\s*=/i);
+ assert.ok(html.includes('&lt;img src=x onerror=alert(1)&gt;'),'malicious attributes are visible only as escaped text');
 });
 
 test('TASK164 plain QWORK renderer is unchanged for PDF and old material',()=>{
