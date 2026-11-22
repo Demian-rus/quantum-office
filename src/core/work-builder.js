@@ -356,7 +356,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
     '<button type="button" data-bank-visual="image">Заменить изображение</button>'+
     '<input type="file" id="qw-bank-edit-image" accept="image/png,image/jpeg,image/webp" hidden>'+
   '</div>'+
-  '<div id="qw-bank-edit-preview" class="qw-selected-preview" aria-label="Предпросмотр задания"></div>'+
+
  '</div>';
  const category='<div class="qw-bank-edit-categories">'+
   opts('subject',Object.entries(QW_SUBJECTS))+
@@ -372,7 +372,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  const d=qwDialog(creating?'Новое задание в банке':'Редактировать задание в банке',
   '<div class="qw-bank-edit-layout">'+
    '<section class="qw-bank-edit-main"><h3>Содержание</h3>'+taskFields+'</section>'+
-   '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'</aside>'+
+   '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'<div class="qw-bank-edit-preview-side"><h3>Предпросмотр задачи</h3><div id="qw-bank-edit-preview" class="qw-selected-preview" aria-label="Предпросмотр задания"></div></div></aside>'+
   '</div><p id="qw-bank-edit-error" role="alert" class="qw-error" hidden></p>',
   qwButton('bank-edit-back','В банк')+qwButton('bank-edit-save','Сохранить изменения','class="qw-primary"'));
  d.classList.add('qw-bank-edit-dialog');
