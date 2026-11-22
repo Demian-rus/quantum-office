@@ -19,6 +19,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await p.locator('#qw-dialog [data-bank-edit="task164"]').last().click();
   const editor=p.locator('.qw-bank-edit-dialog');
   assert.equal(await editor.locator('.qw-bank-rich-editor').count(),3);
+  assert.equal(await editor.locator('.qw-bank-edit-preview-side #qw-bank-edit-preview').count(),1,'live task preview appears beside input fields');
   const prompt=editor.locator('[data-bank-task-field="prompt"]');
   await prompt.fill('Дано: тело **массой 2 кг** имеет ускорение \\(a=3\\). Найдите силу.');
   await editor.locator('[data-bank-preview-toggle="prompt"]').click();
