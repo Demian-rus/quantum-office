@@ -295,9 +295,16 @@ function qwBankSave(){
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 function qwBankEdit(id,draft=null,returnFilters={}){
- let stored;try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
- if(!stored){status('Задание больше не найдено в банке',true);return;}
- draft??=structuredClone(stored);
+ const creating=id===null;
+ let stored;
+ if(!creating){
+  try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
+  if(!stored){status('Задание больше не найдено в банке',true);return;}
+ }
+ draft??=creating
+  ?{id:qwId(),bankNumber:0,subject:'physics',grade:'11',exam:'ege',year:'',part:'1',slot:'',
+    difficulty:'',topic:'',subtopic:'',origin:'adapted',task:qwTask('short')}
+  :structuredClone(stored);
  const titles={subject:'Предмет',exam:'Экзамен',part:'Часть',difficulty:'Сложность',origin:'Происхождение'};
  const opts=(k,items)=>'<label>'+(titles[k]||k)+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
@@ -329,7 +336,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   field('topic','Тема')+field('subtopic','Подтема')+
   opts('origin',[['original','Авторская'],['adapted','Авторский аналог'],['generated','С помощью ИИ']])+
  '</div>';
- const d=qwDialog('Редактировать задание в банке',
+ const d=qwDialog(creating?'Новое задание в банке':'Редактировать задание в банке',
   '<div class="qw-bank-edit-layout">'+
    '<section class="qw-bank-edit-main"><h3>Содержание</h3>'+taskFields+'</section>'+
    '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'</aside>'+
@@ -386,13 +393,20 @@ function qwBankEdit(id,draft=null,returnFilters={}){
    collect();if(!task.prompt.trim())throw Error('Условие задания не может быть пустым');
    if(draft.year&&!/^(19|20)\d{2}$/.test(draft.year))throw Error('Введите год из четырёх цифр');
    if(draft.slot&&!/^([1-9]|[1-3]\d|40)$/.test(draft.slot))throw Error('Номер задания: от 1 до 40');
-   const candidate=qwBankNormalize({...draft,id,task});
-   const all=qwBankRead(),index=all.findIndex(x=>x.id===id);
-   if(index<0)throw Error('Запись удалена из банка в другом окне');
-   all[index]=candidate;
+   const candidate=qwBankNormalize({...draft,id:creating?draft.id:id,task});
+   const all=qwBankRead();
+   if(creating){
+    if(all.length>=500)throw Error('Локальный банк содержит 500 заданий. Экспортируйте QWBANK перед расширением.');
+    candidate.bankNumber=qwBankAllocateNumber(all);
+    all.push(candidate);
+   }else{
+    const index=all.findIndex(x=>x.id===id);
+    if(index<0)throw Error('Запись удалена из банка в другом окне');
+    all[index]=candidate;
+   }
    localStorage.setItem(QW_BANK_KEY,JSON.stringify(all));
-   d.close();qwBank(returnFilters);
-   status('Задание сохранено в банке');
+   d.close();qwBank({...returnFilters,__view:candidate.id});
+   status(creating?'Задание добавлено в банк':'Задание сохранено в банке');
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
