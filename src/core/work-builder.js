@@ -441,11 +441,46 @@ function qwBank(previousFilters={}){
   const years=[...new Set([...xs.map(x=>x.year).filter(Boolean),'2018'])].sort((a,b)=>Number(b)-Number(a));
   get('year').innerHTML=qwOptions([['all','Все годы'],...years.map(v=>[v,v])],years.includes(old)?old:'all');
  }
+ function fillCategories(){
+  for(const key of ['topic','subtopic']){
+   const control=get(key),old=control.value||'all';
+   const names=[...new Set(xs.map(x=>x[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+   control.innerHTML=qwOptions([['all',key==='topic'?'Все темы':'Все подтемы'],...names.map(name=>[name,name])],names.includes(old)?old:'all');
+  }
+ }
  const signature=x=>[x.subject,x.grade,x.exam,x.year,x.part,x.slot,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
  const markSelection=()=>{
   d.querySelector('#qw-bank-selected-count').textContent='Выбрано: '+selected.size;
   for(const k of ['bank-add-selection','bank-assemble'])d.querySelector('[data-qw-action="'+k+'"]').disabled=!selected.size;
  };
+ function showPreview(){
+  const entry=xs.find(x=>x.id===activeId),host=d.querySelector('#qw-bank-preview');
+  for(const row of d.querySelectorAll('[data-bank-entry]'))
+   row.classList.toggle('is-active',row.dataset.bankEntry===activeId);
+  if(!entry){
+   host.innerHTML='<div class="qw-bank-preview-placeholder">Выберите задание в списке, чтобы открыть условие, рисунки и решение.</div>';
+   return;
+  }
+  const task={...entry.task,answerVisible:false,solutionVisible:false};
+  const number=String(entry.bankNumber).padStart(5,'0');
+  const subject=QW_SUBJECTS[entry.subject]||entry.subject;
+  const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
+   (entry.grade?' · '+entry.grade+' класс':'');
+  const paper=qwTaskPreview(task,Math.max(0,(Number(entry.slot)||1)-1),'worksheet',false);
+  const answer=entry.task.answer?.trim()?qwContentHTML(entry.task.answer):'<p>Ответ ещё не внесён.</p>';
+  const details=entry.task.comment?.trim()?qwContentHTML(entry.task.comment):'<p>Решение пока не добавлено.</p>';
+  host.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
+   '<strong>№ '+number+'</strong><span>'+qwEsc(subject+' · '+designation)+'</span>'+
+   (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+
+   '<div class="qw-bank-preview-actions"><button type="button" data-bank-edit="'+qwEsc(entry.id)+'">Редактировать</button>'+
+   '<button type="button" data-bank-capture aria-pressed="false">Режим для видео</button></div></div>'+
+   '<div class="qw-bank-video-canvas" aria-label="Крупное изображение задания для скриншота">'+
+    '<div class="qw-bank-video-id">Тип '+qwEsc(entry.slot||'—')+' № '+number+'</div>'+
+    paper+'</div>'+
+   '<details class="qw-bank-solution"><summary>Ответ и решение</summary>'+
+    '<div class="qw-bank-solution-body"><h3>Ответ</h3>'+answer+
+    '<h3>Решение</h3>'+details+'</div></details>';
+ }
  const refresh=()=>{
   const search=pick('search').toLocaleLowerCase('ru-RU').trim();
   const keys=['subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'];
@@ -542,6 +577,19 @@ function qwBank(previousFilters={}){
  });
  d.onclick=e=>{
   const action=e.target.closest('[data-qw-action]')?.dataset.qwAction;
+  if(action==='bank-new'){
+   const saved=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
+   qwBankEdit(null,null,{...saved,__view:activeId,__selected:[...selected.keys()]});return;
+  }
+  const view=e.target.closest('[data-bank-view]');
+  if(view){activeId=view.dataset.bankView;showPreview();return;}
+  if(e.target.closest('[data-bank-capture]')){
+   const on=!d.classList.contains('qw-bank-capture');
+   d.classList.toggle('qw-bank-capture',on);
+   e.target.textContent=on?'Вернуться к каталогу':'Режим для видео';
+   e.target.setAttribute('aria-pressed',String(on));
+   return;
+  }
   if(action==='bank-assemble'){addTasks(entries(),true);return;}
   if(action==='bank-add-selection'){addTasks(entries(),false);return;}
   const edit=e.target.closest('[data-bank-edit]');
