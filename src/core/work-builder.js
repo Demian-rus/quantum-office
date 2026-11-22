@@ -394,7 +394,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  }
  function preview(){
   try{
-   d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview(task,Number(draft.slot||1)-1,'worksheet',false,null,true);
+   d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview({...task,answerVisible:false,solutionVisible:false},Number(draft.slot||1)-1,'worksheet',false,null,true);
    for(const key of ['prompt','comment','criteria']){
     const area=d.querySelector('[data-bank-render="'+key+'"]');
     if(area)area.innerHTML=qwRichMarkdownHTML(task[key]||'');
