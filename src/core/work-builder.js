@@ -474,18 +474,20 @@ function qwBank(previousFilters={}){
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
  let activeId=previousFilters.__view||xs[0]?.id||'';
  const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
-  '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие или тема"></label>'+
+  '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие, ответ или тема"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
-  '<label>Класс<select id="qw-bank-grade">'+qwOptions([['all','Все'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select></label>'+
   '<label>Экзамен<select id="qw-bank-exam">'+qwOptions([['all','Все'],['general','Практика'],['oge','ОГЭ'],['ege','ЕГЭ']],'all')+'</select></label>'+
-  '<label>Год<select id="qw-bank-year"></select></label>'+
-  '<label>Часть<select id="qw-bank-part">'+qwOptions([['all','Все'],['1','Часть 1'],['2','Часть 2']],'all')+'</select></label>'+
-  '<label>№ задания<select id="qw-bank-slot">'+qwOptions([['all','Все'],...Array.from({length:40},(_,i)=>[String(i+1),String(i+1)])],'all')+'</select></label>'+
-  '<label>Уровень<select id="qw-bank-difficulty">'+qwOptions([['all','Все'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']],'all')+'</select></label>'+
-  '<label>Тип<select id="qw-bank-type">'+qwOptions([['all','Все'],...Object.entries(QW_TYPES)],'all')+'</select></label>'+
   '<label>Тема<select id="qw-bank-topic"></select></label>'+
-  '<label>Подтема<select id="qw-bank-subtopic"></select></label>'+
-  '<label>Происхождение<select id="qw-bank-origin">'+qwOptions([['all','Все'],['original','Авторская'],['adapted','Аналог'],['generated','С помощью ИИ']],'all')+'</select></label>'+
+  '<details class="qw-bank-extra-filters"><summary>Дополнительные фильтры</summary><div class="qw-bank-extra-grid">'+
+   '<label>Класс<select id="qw-bank-grade">'+qwOptions([['all','Все'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select></label>'+
+   '<label>Год<select id="qw-bank-year"></select></label>'+
+   '<label>Часть<select id="qw-bank-part">'+qwOptions([['all','Все'],['1','Часть 1'],['2','Часть 2']],'all')+'</select></label>'+
+   '<label>№ задания<select id="qw-bank-slot">'+qwOptions([['all','Все'],...Array.from({length:40},(_,i)=>[String(i+1),String(i+1)])],'all')+'</select></label>'+
+   '<label>Уровень<select id="qw-bank-difficulty">'+qwOptions([['all','Все'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']],'all')+'</select></label>'+
+   '<label>Тип<select id="qw-bank-type">'+qwOptions([['all','Все'],...Object.entries(QW_TYPES)],'all')+'</select></label>'+
+   '<label>Подтема<select id="qw-bank-subtopic"></select></label>'+
+   '<label>Происхождение<select id="qw-bank-origin">'+qwOptions([['all','Все'],['original','Авторская'],['adapted','Аналог'],['generated','С помощью ИИ']],'all')+'</select></label>'+
+  '</div></details>'+
   '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div></section>'+
   '<section class="qw-bank-catalogue-preview" aria-label="Подробный просмотр задания"><div id="qw-bank-preview"></div></section></div>';
  const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
