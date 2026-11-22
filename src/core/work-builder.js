@@ -25,13 +25,14 @@ function qwLayoutCards(current){
  const layouts=[['booklet','Экзаменационный сборник','Книжная типографика, номера в рамках и компактные задания.','M8 12h8v8H8zM20 14h9m-9 6h18m-18 6h12m-12 6h16m-16 6h18'],['compact','Компактный сборник','Много заданий на странице. Без места для ответов.','M9 12h18m-18 6h14m-14 6h18m-18 6h12m-12 6h18m-18 6h14'],['practice','Лист для решения','Условия сверху, ниже место для самостоятельного решения.','M9 12h18m-18 6h13M9 24h18v18H9zM15 24v18m6-18v18M9 30h18M9 36h18'],['worksheet','Обычная контрольная','Стандартная контрольная работа с полями ответов и настройками.','M9 12h18m-18 6h14M9 24h18m-18 8h18m-18 6h14M9 44h18']];
  return '<fieldset class="qw-layout-cards" id="qw-pdf-format"><legend>Формат PDF</legend>'+layouts.map(([id,title,description,path])=>'<label class="qw-layout-card"><input type="radio" name="qw-pdf-layout" value="'+id+'" '+(current===id?'checked':'')+'><svg viewBox="0 0 36 52" aria-hidden="true"><rect x="3" y="2" width="30" height="48" rx="1" fill="white" stroke="currentColor"/><path d="'+path+'" fill="none" stroke="currentColor" stroke-width=".8"/></svg><span><strong>'+title+'</strong></span></label>').join('')+'</fieldset>';
 }
-function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null){
+function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false){
  const visual=q.figure==='graph'?qwGraphSVG(q.graph,false,printing?{axisFont:22,titleFont:24}:{}):q.figure==='diagram'?qwDiagramSVG(q.diagram):q.figure==='image'&&q.image?'<img alt="Иллюстрация задания" src="'+q.image+'">':'';
  const figure=visual?'<figure data-figure-kind="'+q.figure+'" data-requested-width="'+Math.min(q.figureWidth,470)+'" style="width:'+Math.min(q.figureWidth,470)+'px">'+visual+'</figure>':'';
  const bankLabel=layout==='booklet'&&q.source?.kind==='bank'&&qwBankNumber(q.source.number)?
   '<span class="qw-booklet-bank-id" data-qw-bank-number="'+q.source.number+'">'+
   (q.source.slot?'Тип '+qwEsc(q.source.slot)+' ':'')+'№ '+String(q.source.number).padStart(5,'0')+'</span> ':'';
- const text='<div class="qw-task-text">'+bankLabel+qwContentHTML(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+qwContentHTML(c)+'</li>').join('')+'</ol>':'')+'</div>';
+ const format=rich?qwRichMarkdownHTML:qwContentHTML;
+ const text='<div class="qw-task-text'+(rich?' qw-rich':'')+'">'+bankLabel+format(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+format(c)+'</li>').join('')+'</ol>':'')+'</div>';
  const effectivePreferences=preferences||(printing?null:qwDoc.printSettings);
  const position=effectivePreferences?.figurePosition&&effectivePreferences.figurePosition!=='auto'?effectivePreferences.figurePosition:q.position;
  const flow='<div class="qw-task-flow qw-figure-'+(!printing&&position==='auto'?'right':position)+'">'+(printing?text+figure:figure+text)+'</div>';
@@ -471,20 +472,22 @@ function qwBank(previousFilters={}){
   const subject=QW_SUBJECTS[entry.subject]||entry.subject;
   const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
    (entry.grade?' · '+entry.grade+' класс':'');
-  const paper=qwTaskPreview(task,Math.max(0,(Number(entry.slot)||1)-1),'worksheet',false);
-  const answer=entry.task.answer?.trim()?qwContentHTML(entry.task.answer):'<p>Ответ ещё не внесён.</p>';
-  const details=entry.task.comment?.trim()?qwContentHTML(entry.task.comment):'<p>Решение пока не добавлено.</p>';
+  const paper=qwTaskPreview(task,Math.max(0,(Number(entry.slot)||1)-1),'worksheet',false,null,true);
+  const answer=entry.task.answer?.trim()?qwRichMarkdownHTML(entry.task.answer):'<p>Ответ не указан.</p>';
+  const details=entry.task.comment?.trim()?qwRichMarkdownHTML(entry.task.comment):'<p>Решение ещё не записано.</p>';
+  const criteria=entry.task.criteria?.trim()?qwRichMarkdownHTML(entry.task.criteria):'<p>Критерии ещё не указаны.</p>';
   host.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
    '<strong>№ '+number+'</strong><span>'+qwEsc(subject+' · '+designation)+'</span>'+
    (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+
    '<div class="qw-bank-preview-actions"><button type="button" data-bank-edit="'+qwEsc(entry.id)+'">Редактировать</button>'+
-   '<button type="button" data-bank-capture aria-pressed="false">Режим для видео</button></div></div>'+
-   '<div class="qw-bank-video-canvas" aria-label="Крупное изображение задания для скриншота">'+
+   '<button type="button" data-bank-enlarge aria-pressed="false">Увеличить</button></div></div>'+
+   '<div class="qw-bank-video-canvas" aria-label="Просмотр условия задачи">'+
     '<div class="qw-bank-video-id">Тип '+qwEsc(entry.slot||'—')+' № '+number+'</div>'+
     paper+'</div>'+
    '<details class="qw-bank-solution"><summary>Ответ и решение</summary>'+
-    '<div class="qw-bank-solution-body"><h3>Ответ</h3>'+answer+
-    '<h3>Решение</h3>'+details+'</div></details>';
+    '<div class="qw-bank-solution-body qw-rich"><section><h3>Решение</h3>'+details+'</section>'+
+    '<section><h3>Ответ</h3>'+answer+'</section>'+
+    '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
  }
  const refresh=()=>{
   const search=pick('search').toLocaleLowerCase('ru-RU').trim();
@@ -588,10 +591,10 @@ function qwBank(previousFilters={}){
   }
   const view=e.target.closest('[data-bank-view]');
   if(view){activeId=view.dataset.bankView;showPreview();return;}
-  if(e.target.closest('[data-bank-capture]')){
-   const on=!d.classList.contains('qw-bank-capture');
-   d.classList.toggle('qw-bank-capture',on);
-   e.target.textContent=on?'Вернуться к каталогу':'Режим для видео';
+  if(e.target.closest('[data-bank-enlarge]')){
+   const on=!d.classList.contains('qw-bank-expanded');
+   d.classList.toggle('qw-bank-expanded',on);
+   e.target.textContent=on?'Свернуть':'Увеличить';
    e.target.setAttribute('aria-pressed',String(on));
    return;
   }
