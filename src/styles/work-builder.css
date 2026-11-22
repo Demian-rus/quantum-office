@@ -511,3 +511,5 @@
  .qw-bank-capture .qw-bank-video-canvas {padding:36px 14px}
  .qw-bank-capture .qw-bank-video-canvas .qw-paper-task {font-size:18px}
 }
+
+.qw-bank-edit-fields [data-bank-choices-wrap][hidden]{display:none!important}
