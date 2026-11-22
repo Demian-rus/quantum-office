@@ -294,6 +294,18 @@ function qwBankSave(){
   }catch(e){status('Банк: '+e.message,true);}
  };
 }
+/* TASK164: Markdown editing of existing bank fields; QWBANK schema stays unchanged. */
+function qwBankRichField(key,title,value,rows=5){
+ const tools=[['bold','Ж','Жирный'],['italic','К','Курсив'],['heading','H3','Заголовок'],['list','•','Список'],['numbered','1.','Нумерация'],['quote','❝','Цитата'],['math','ƒx','Формула'],['table','▦','Таблица']];
+ const buttons=tools.map(([cmd,label,hint])=>'<button type="button" data-bank-format="'+cmd+'" data-bank-format-field="'+key+'" title="'+hint+'" aria-label="'+hint+'">'+label+'</button>').join('');
+ const extra=key==='comment'?'<button type="button" data-bank-format="ege" data-bank-format-field="comment">Шаблон решения</button>':key==='criteria'?'<button type="button" data-bank-format="rubric" data-bank-format-field="criteria">Шаблон критериев</button>':'';
+ return '<div class="qw-bank-rich-editor" data-bank-rich="'+key+'">'+
+ '<div class="qw-bank-rich-head"><strong>'+title+'</strong><button type="button" data-bank-preview-toggle="'+key+'" aria-pressed="false">Предпросмотр</button></div>'+
+ '<div class="qw-bank-rich-tools">'+buttons+extra+'</div>'+
+ '<textarea data-bank-task-field="'+key+'" rows="'+rows+'" maxlength="16000" spellcheck="true" aria-label="'+title+'">'+qwEsc(value)+'</textarea>'+
+ '<div class="qw-bank-rich-render qw-rich" data-bank-render="'+key+'" hidden></div>'+
+ '<small class="qw-bank-rich-hint">Markdown: **жирный**, *курсив*, заголовки, списки, таблицы, формулы.</small></div>';
+}
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 function qwBankEdit(id,draft=null,returnFilters={}){
  const creating=id===null;
