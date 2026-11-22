@@ -414,7 +414,8 @@ function qwBankEdit(id,draft=null,returnFilters={}){
 function qwBank(previousFilters={}){
  let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
- const filters='<div id="qw-bank-filters" class="qw-bank-filter-panel">'+
+ let activeId=previousFilters.__view||xs[0]?.id||'';
+ const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
   '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие или тема"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
   '<label>Класс<select id="qw-bank-grade">'+qwOptions([['all','Все'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select></label>'+
@@ -424,9 +425,13 @@ function qwBank(previousFilters={}){
   '<label>№ задания<select id="qw-bank-slot">'+qwOptions([['all','Все'],...Array.from({length:40},(_,i)=>[String(i+1),String(i+1)])],'all')+'</select></label>'+
   '<label>Уровень<select id="qw-bank-difficulty">'+qwOptions([['all','Все'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']],'all')+'</select></label>'+
   '<label>Тип<select id="qw-bank-type">'+qwOptions([['all','Все'],...Object.entries(QW_TYPES)],'all')+'</select></label>'+
-  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list"></div>';
+  '<label>Тема<select id="qw-bank-topic"></select></label>'+
+  '<label>Подтема<select id="qw-bank-subtopic"></select></label>'+
+  '<label>Происхождение<select id="qw-bank-origin">'+qwOptions([['all','Все'],['original','Авторская'],['adapted','Аналог'],['generated','С помощью ИИ']],'all')+'</select></label>'+
+  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div></section>'+
+  '<section class="qw-bank-catalogue-preview" aria-label="Подробный просмотр задания"><div id="qw-bank-preview"></div></section></div>';
  const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
-  qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
+  qwButton('bank-new','+ Новая задача','class="qw-primary"')+qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
@@ -443,9 +448,9 @@ function qwBank(previousFilters={}){
  };
  const refresh=()=>{
   const search=pick('search').toLocaleLowerCase('ru-RU').trim();
-  const keys=['subject','grade','exam','year','part','slot','difficulty','type'];
+  const keys=['subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'];
   const shown=xs.filter(x=>keys.every(key=>{const value=pick(key);return value==='all'||(key==='type'?x.task.type:x[key])===value;})&&
-   [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
+   [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer,x.task.comment,x.task.criteria].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
   get('count').textContent='Найдено: '+shown.length+' / '+xs.length;
   const items=shown.map(x=>{
    const tags=[x.subject==='math'?'Математика':x.subject==='physics'?'Физика':x.subject,
@@ -454,10 +459,11 @@ function qwBank(previousFilters={}){
     x.year,x.part?'Часть '+x.part:'',x.slot?'№ '+x.slot:'',
     x.difficulty==='basic'?'Базовый':x.difficulty==='advanced'?'Повышенный':x.difficulty==='high'?'Высокий':'',
     x.topic,x.subtopic].filter(Boolean).join(' · ');
-   return '<div class="qw-bank-item qw-bank-choice"><label class="qw-bank-select-check">'+
+   return '<div class="qw-bank-item qw-bank-choice" data-bank-entry="'+qwEsc(x.id)+'"><label class="qw-bank-select-check">'+
     '<input type="checkbox" data-bank-select="'+qwEsc(x.id)+'" '+(selected.has(x.id)?'checked':'')+' aria-label="Выбрать задание">'+
     '<span class="qw-bank-card-copy"><strong>№ '+String(x.bankNumber).padStart(5,'0')+' · '+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+'</strong>'+
     '<small>'+qwEsc(tags)+'</small></span></label>'+
+    '<button type="button" data-bank-view="'+qwEsc(x.id)+'">Просмотр</button>'+
     '<button type="button" data-bank-edit="'+qwEsc(x.id)+'">Редактировать</button>'+
     '<button type="button" data-bank-add="'+qwEsc(x.id)+'">Добавить</button>'+
     '<button type="button" data-bank-delete="'+qwEsc(x.id)+'" aria-label="Удалить из банка">×</button></div>';
@@ -466,8 +472,9 @@ function qwBank(previousFilters={}){
   const other=diag.length?'<h3>Из диагностики</h3>'+diag.map(x=>
    '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
    '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Добавить</button></div>').join(''):'';
-  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено</p>';
-  markSelection();
+  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено. Создайте задачу кнопкой «+ Новая задача».</p>';
+  if(!shown.some(x=>x.id===activeId))activeId=shown[0]?.id||'';
+  showPreview();markSelection();
  };
  d.querySelector('[data-qw-action="bank-export"]').onclick=()=>{
   download('QuantumOffice_банк_заданий.qwbank',JSON.stringify({format:'quantum-work-bank',version:1,items:xs},null,2),'application/json');
@@ -491,7 +498,7 @@ function qwBank(previousFilters={}){
    if(xs.length+additions.length>500)throw Error('Превышен лимит 500 заданий');
    if(!additions.length){status('Новых заданий нет');return;}
    const next=[...xs,...additions];localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));
-   xs=next;fillYears();refresh();status('Импортировано: '+additions.length);
+   xs=next;fillYears();fillCategories();refresh();status('Импортировано: '+additions.length);
   }catch(error){status('Импорт банка: '+error.message,true);}
  };
  const entries=()=>[...selected.keys()].map(id=>xs.find(x=>x.id===id)).filter(Boolean);
@@ -539,7 +546,8 @@ function qwBank(previousFilters={}){
   if(action==='bank-add-selection'){addTasks(entries(),false);return;}
   const edit=e.target.closest('[data-bank-edit]');
   if(edit){
-   const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type'].map(k=>[k,pick(k)]));
+   const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
+   filters.__view=activeId;
    filters.__selected=[...selected.keys()];
    qwBankEdit(edit.dataset.bankEdit,null,filters);return;
   }
@@ -553,11 +561,11 @@ function qwBank(previousFilters={}){
   }
   if(del&&confirm('Удалить задание из личного банка?')){
    const next=xs.filter(x=>x.id!==del.dataset.bankDelete);
-   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;selected.delete(del.dataset.bankDelete);fillYears();refresh();}
+   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;selected.delete(del.dataset.bankDelete);fillYears();fillCategories();refresh();}
    catch(error){status('Не удалось изменить банк',true);}
   }
  };
- fillYears();
+ fillYears();fillCategories();
  for(const [key,value] of Object.entries(previousFilters)){
   const input=get(key);if(input&&(input.type==='search'||[...(input.options||[])].some(o=>o.value===value)))input.value=value;
  }
