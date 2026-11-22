@@ -35,13 +35,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'search by subtopic');
   await dialog.locator('#qw-bank-search').fill('');
   await dialog.locator('[data-bank-view="bank-kinematics"]').click();
-  await dialog.locator('[data-bank-capture]').click();
-  assert.equal(await dialog.evaluate(el=>el.classList.contains('qw-bank-capture')),true);
+  await dialog.locator('[data-bank-enlarge]').click();
+  assert.equal(await dialog.evaluate(el=>el.classList.contains('qw-bank-expanded')),true);
   assert.equal(await dialog.locator('.qw-bank-video-canvas').isVisible(),true);
-  assert.equal(await dialog.locator('.qw-bank-solution').isVisible(),false);
-  await p.screenshot({path:path.join(out,'video-capture.png'),fullPage:true});
-  await dialog.locator('[data-bank-capture]').click();
-  assert.equal(await dialog.evaluate(el=>el.classList.contains('qw-bank-capture')),false);
+  assert.equal(await dialog.locator('.qw-bank-solution').isVisible(),true,'solution remains available in enlarged view');
+  await p.screenshot({path:path.join(out,'large-preview.png'),fullPage:true});
+  await dialog.locator('[data-bank-enlarge]').click();
+  assert.equal(await dialog.evaluate(el=>el.classList.contains('qw-bank-expanded')),false);
   await dialog.locator('.qw-bank-preview-actions [data-bank-edit]').click();
   const editor=p.locator('#qw-dialog');
   await editor.locator('[data-bank-task-field="prompt"]').fill('Изменённая задача о движении.');
@@ -68,7 +68,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   assert.deepEqual(await p.evaluate(()=>qwBankRead().at(-1).task.choices),['Вольт','Ампер','Ом'],'choice options survive bank validation');
   await p.screenshot({path:path.join(out,'catalogue.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  console.log('PASS TASK163: filter, select, enlarged SVG, hidden solution, video mode, edit/save, new entry and safe cancel');
+  console.log('PASS TASK163: filter, select, enlarged SVG, collapsed solution, large view, edit/save, new entry and safe cancel');
   await p.close();
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
