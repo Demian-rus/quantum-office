@@ -122,7 +122,7 @@ function qwRichMarkdownHTML(value){
    continue;
   }
   if(/^\s*(?:\$\$|\\\[)\s*$/.test(line)){
-   const end=line.trim()==='$'?'$':'\\]',body=[];
+   const end=line.trim().charCodeAt(0)===36?String.fromCharCode(36,36):'\\]',body=[];
    i++;while(i<lines.length&&lines[i].trim()!==end)body.push(lines[i++]);
    if(i<lines.length)i++;
    result.push('<div class="qw-rich-equation">'+qwRichMath(body.join(' ').trim(),true)+'</div>');
