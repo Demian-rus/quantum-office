@@ -25,6 +25,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
   });
   assert.deepEqual(setup.map(x=>x.year),['2018','2018','2020']);
   await page.evaluate(()=>qwBank());
+  await page.locator('.qw-bank-extra-filters summary').click();
   assert.ok(await page.locator('#qw-bank-year option[value="2018"]').count());
   await page.locator('#qw-bank-exam').selectOption('ege');
   await page.locator('#qw-bank-year').selectOption('2018');

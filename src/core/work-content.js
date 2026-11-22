@@ -55,6 +55,112 @@ function qwMathML(n,upright=false,unary=false){
 }
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
+/* TASK164: safe, bounded Markdown-style rendering for the PERSONAL bank preview.
+   No HTML passthrough, remote markup, script, or raw CSS. The PDF engine and
+   existing qwContentHTML contract remain unchanged. */
+function qwRichInlineText(input,depth=0){
+ const source=String(input||'');
+ if(depth>4)return qwEsc(source);
+ const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_)/g;
+ let html='',pos=0,m;
+ while((m=pattern.exec(source))){
+  html+=qwEsc(source.slice(pos,m.index));
+  if(m[2]!==undefined||m[3]!==undefined)html+='<strong>'+qwRichInlineText(m[2]??m[3],depth+1)+'</strong>';
+  else if(m[4]!==undefined)html+='<del>'+qwEsc(m[4])+'</del>';
+  else if(m[5]!==undefined)html+='<code>'+qwEsc(m[5])+'</code>';
+  else if(m[6]!==undefined)html+='<em>'+qwRichInlineText(m[6],depth+1)+'</em>';
+  else html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
+  pos=pattern.lastIndex;
+ }
+ return html+qwEsc(source.slice(pos));
+}
+function qwRichMath(value,display=false){
+ try{
+  return '<math xmlns="http://www.w3.org/1998/Math/MathML" display="'+(display?'block':'inline')+'" aria-label="'+qwEsc(value)+'">'+qwMathML(qwMath(value))+'</math>';
+ }catch(error){
+  return '<span class="qw-formula-error" title="'+qwEsc(error.message)+'">'+qwEsc(value)+'</span>';
+ }
+}
+function qwRichInline(source){
+ return qwTokens(String(source||'')).map(token=>{
+  if(token.t==='math')return qwRichMath(token.v);
+  if(token.t==='blank')return '<span class="qw-inline-blank" style="width:'+token.size+'ch" aria-label="Место для ответа"></span>';
+  if(token.t==='error')return '<span class="qw-formula-error" title="'+qwEsc(token.error)+'">'+qwEsc(token.v)+'</span>';
+  // Obsidian-compatible $...$ maths, without changing QWORK's original formula grammar.
+  const text=token.v,formula=/\$([^$\n]{1,600})\$/g;
+  let match,start=0,out='';
+  while((match=formula.exec(text))){
+   out+=qwRichInlineText(text.slice(start,match.index));
+   out+=qwRichMath(match[1]);
+   start=formula.lastIndex;
+  }
+  return out+qwRichInlineText(text.slice(start));
+ }).join('');
+}
+function qwRichMarkdownHTML(value){
+ const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');
+ const result=[];
+ const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
+ const numbered=line=>/^\s{0,3}\d{1,3}[.)]\s+/.test(line);
+ const heading=line=>/^\s{0,3}#{1,4}\s+/.test(line);
+ const quote=line=>/^\s{0,3}>\s?/.test(line);
+ const fence=line=>/^\s{0,3}```/.test(line);
+ const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
+ const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
+ const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
+ const startBlock=line=>bullet(line)||numbered(line)||heading(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
+ let i=0;
+ while(i<lines.length){
+  const line=lines[i];
+  if(!line.trim()){i++;continue;}
+  if(fence(line)){
+   const lang=line.trim().slice(3).trim().slice(0,30);
+   i++;const code=[];
+   while(i<lines.length&&!fence(lines[i]))code.push(lines[i++]);
+   if(i<lines.length)i++;
+   result.push('<pre><code'+(lang?' data-language="'+qwEsc(lang)+'"':'')+'>'+qwEsc(code.join('\n'))+'</code></pre>');
+   continue;
+  }
+  if(/^\s*(?:\$\$|\\\[)\s*$/.test(line)){
+   const end=line.trim().charCodeAt(0)===36?String.fromCharCode(36,36):'\\]',body=[];
+   i++;while(i<lines.length&&lines[i].trim()!==end)body.push(lines[i++]);
+   if(i<lines.length)i++;
+   result.push('<div class="qw-rich-equation">'+qwRichMath(body.join(' ').trim(),true)+'</div>');
+   continue;
+  }
+  if(heading(line)){
+   const m=line.match(/^\s{0,3}(#{1,4})\s+(.*)$/),level=Math.min(5,m[1].length+2);
+   result.push('<h'+level+'>'+qwRichInline(m[2])+'</h'+level+'>');i++;continue;
+  }
+  if(ruler(line)){result.push('<hr>');i++;continue;}
+  if(quote(line)){
+   const chunk=[];
+   while(i<lines.length&&quote(lines[i]))chunk.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
+   result.push('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');continue;
+  }
+  if(bullet(line)||numbered(line)){
+   const ordered=numbered(line),items=[],regex=ordered?/^\s{0,3}\d{1,3}[.)]\s+/:/^\s{0,3}[-*+]\s+/;
+   while(i<lines.length&&regex.test(lines[i]))items.push('<li>'+qwRichInline(lines[i++].replace(regex,''))+'</li>');
+   result.push((ordered?'<ol>':'<ul>')+items.join('')+(ordered?'</ol>':'</ul>'));continue;
+  }
+  if(i+1<lines.length&&line.includes('|')&&tableSep(lines[i+1])){
+   const head=cells(line);i+=2;const rows=[];
+   while(i<lines.length&&lines[i].trim()&&lines[i].includes('|')&&!startBlock(lines[i])){
+    const row=cells(lines[i++]);rows.push('<tr>'+head.map((_,j)=>'<td>'+qwRichInline(row[j]||'')+'</td>').join('')+'</tr>');
+   }
+   if(head.length<=12)result.push('<div class="qw-rich-table-scroll"><table><thead><tr>'+head.map(c=>'<th>'+qwRichInline(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>');
+   else result.push('<p>'+qwRichInline(line)+'</p>');
+   continue;
+  }
+  const paragraph=[line];i++;
+  while(i<lines.length&&lines[i].trim()&&!startBlock(lines[i])&&!(lines[i].includes('|')&&tableSep(lines[i+1]||''))){
+   paragraph.push(lines[i++]);
+  }
+  result.push('<p>'+paragraph.map(qwRichInline).join('<br>')+'</p>');
+ }
+ return result.join('');
+}
+
 /* Axes use true coordinate positions. Tick marks and labels have independent
    density: labels never determine the grid spacing or collide at the origin. */
 function qwAxisLayout(g,axisFont){
@@ -426,4 +532,4 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
  }).join('')));
 }
-export {qwMath,qwMathML,qwTokens,qwContentHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
+export {qwMath,qwMathML,qwTokens,qwContentHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
