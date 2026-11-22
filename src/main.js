@@ -1168,6 +1168,24 @@ function homepage(){
  <button class="launcher-tile writer" data-action="route" data-target="writer" aria-label="Тексты" title="Тексты"><span class="launcher-art">${launcherIcon('writer')}</span><span class="launcher-name">Тексты</span><span class="launcher-description">Документы и оформление</span><span class="launcher-state available">Первая версия</span></button>
  <button class="launcher-tile slides" data-action="route" data-target="slides" aria-label="Презентации" title="Презентации"><span class="launcher-art">${launcherIcon('slides')}</span><span class="launcher-name">Презентации</span><span class="launcher-description">Слайды и выступления</span><span class="launcher-state available">Первая версия</span></button>
  <button class="launcher-tile photo" data-action="route" data-target="photo" aria-label="Фото — Quantum Studio" title="Фото — Quantum Studio"><span class="launcher-art">${qoHeaderIcon('photo')}</span><span class="launcher-name">Фото</span><span class="launcher-description">Изображения, рисование и коррекция</span><span class="launcher-state available">Базовый редактор</span></button></div>
+ <div class="launcher-insets" aria-label="Быстрый доступ к инструментам редакторов">
+  <div class="launcher-inset-col" aria-label="Инструменты таблиц">
+   <button class="launcher-inset" data-action="template-create" data-template="schedule"><span class="launcher-inset-art">${qoHeaderIcon('sheet')}</span><span>Расписание</span></button>
+   <button class="launcher-inset" data-action="example"><span class="launcher-inset-art">${qoHeaderIcon('sheet')}</span><span>Пример</span></button>
+  </div>
+  <div class="launcher-inset-col" aria-label="Инструменты текстов">
+   <button class="launcher-inset" data-action="launcher-work"><span class="launcher-inset-art">${qoHeaderIcon('writer')}</span><span>Конструктор</span></button>
+   <button class="launcher-inset" data-action="launcher-bank"><span class="launcher-inset-art">${qoHeaderIcon('sheet')}</span><span>Банк заданий</span></button>
+  </div>
+  <div class="launcher-inset-col" aria-label="Инструменты презентаций">
+   <button class="launcher-inset" data-action="template-create" data-template="slides-blank"><span class="launcher-inset-art">${qoHeaderIcon('slides')}</span><span>Новая</span></button>
+   <button class="launcher-inset" data-action="template-create" data-template="slides-lesson"><span class="launcher-inset-art">${qoHeaderIcon('slides')}</span><span>Учебная</span></button>
+  </div>
+  <div class="launcher-inset-col" aria-label="Инструменты фото">
+   <button class="launcher-inset" data-action="route" data-target="photo"><span class="launcher-inset-art">${qoHeaderIcon('photo')}</span><span>Рисование</span></button>
+   <button class="launcher-inset" data-action="launcher-photo-open"><span class="launcher-inset-art">${qoHeaderIcon('photo')}</span><span>Открыть фото</span></button>
+  </div>
+ </div>
  <div class="launcher-template-actions" aria-label="Каталоги шаблонов"><button data-action="templates" data-kind="sheet">Шаблоны таблиц <span>→</span></button><button data-action="templates" data-kind="writer">Шаблоны текстов <span>→</span></button><button data-action="templates" data-kind="slides">Шаблоны презентаций <span>→</span></button></div>
  <div class="launcher-secondary"><button data-action="example">Открыть пример таблицы</button><button data-action="import">Открыть файл XLSX / QBOOK / CSV</button><button data-action="open-disk">Открыть QBOOK с диска</button></div>
  <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Скачать резервную копию всех черновиков">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
@@ -2904,6 +2922,12 @@ window.addEventListener('pointercancel',()=>{headerSelectionDrag=null;});
 app.addEventListener('click',async e=>{const target=e.target.closest('[data-action]');if(!target)return;const {action,id,value,ref,fn}=target.dataset;
  if(action==='workspace-tab'){qoWorkSwitchTab(target.dataset.editor,target.dataset.tab);return;}
  if(action==='theme-toggle'){qoToggleTheme();return;}
+ if(action==='launcher-work'||action==='launcher-bank'){
+  route('writer');qoWorkSwitchTab('writer','work');
+  if(action==='launcher-bank')qwBank();
+  return;
+ }
+ if(action==='launcher-photo-open'){route('photo');document.getElementById('qo-photo-file')?.click();return;}
 
  if(action.startsWith('photo-')){
   if(qoPhotoExtraAction(action,target))return;
