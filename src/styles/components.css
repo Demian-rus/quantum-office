@@ -1190,6 +1190,103 @@ body.is-fill-dragging * {
 }
 }
 
+
+/* TASK162 — each editor owns its large tile, inset tools and aligned template link. */
+.office-launcher .launcher-tools,
+.office-launcher .launcher-secondary,
+.office-launcher .launcher-files,
+.office-launcher .launcher-note {
+  width: min(1280px,100%);
+}
+.office-launcher .launcher-tools {
+  display: grid;
+  grid-template-columns: repeat(4,minmax(0,1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.office-launcher .launcher-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  min-width: 0;
+}
+.office-launcher .launcher-tile {
+  min-height: 255px;
+  width: 100%;
+  padding: 28px 25px 24px;
+  border-radius: 16px;
+  gap: 9px;
+}
+.office-launcher .launcher-art {width:83px;height:83px;margin-bottom:10px}
+.office-launcher .launcher-art svg {width:82px;height:82px}
+.office-launcher .launcher-tile.photo .launcher-art .qo-top-icon {width:82px;height:82px}
+.office-launcher .launcher-name {font-size:22px}
+.office-launcher .launcher-description {font-size:12px;line-height:1.45}
+.office-launcher .launcher-insets {
+  display: flex;
+  justify-content: flex-start;
+  align-items: stretch;
+  gap: 11px;
+  min-height: 105px;
+  padding: 0 3px;
+}
+.office-launcher .launcher-inset {
+  display: flex;
+  flex: 0 0 94px;
+  height: 99px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--qo-border);
+  border-radius: 12px;
+  background: var(--qo-surface);
+  color: var(--qo-text);
+  font: 650 11px/1.15 "Segoe UI",Arial,sans-serif;
+  text-align: center;
+  padding: 8px 5px;
+}
+.office-launcher .launcher-inset:hover {background:var(--qo-hover);border-color:var(--qo-border-strong)}
+.office-launcher .launcher-inset:focus-visible {outline:3px solid var(--qo-focus);outline-offset:2px}
+.office-launcher .launcher-inset-art {display:grid;place-items:center;width:30px;height:30px;color:var(--qo-accent)}
+.office-launcher .launcher-inset-art .qo-top-icon,
+.office-launcher .launcher-inset-art svg {display:block;width:28px;height:28px;flex:none}
+.office-launcher .launcher-inset span:last-child {max-width:100%;overflow-wrap:anywhere}
+.office-launcher .launcher-template-actions {
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  display: block;
+}
+.office-launcher .launcher-template-actions button {width:100%;height:44px;min-height:44px}
+.office-launcher .launcher-template-empty {visibility:hidden}
+.office-launcher .launcher-secondary {margin-top:16px;flex-wrap:wrap}
+.office-launcher .launcher-files {margin-top:32px}
+@media(max-width:1050px){
+ .office-launcher .launcher-tools{grid-template-columns:repeat(2,minmax(0,1fr));gap:22px}
+ .office-launcher .launcher-tile{min-height:235px}
+}
+@media(max-width:600px){
+ .office-launcher .launcher-tools{grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}
+ .office-launcher .launcher-tile{min-height:190px;padding:17px;display:flex;gap:5px}
+ .office-launcher .launcher-art{height:60px;width:60px;margin-bottom:5px}
+ .office-launcher .launcher-art svg,
+ .office-launcher .launcher-tile.photo .launcher-art .qo-top-icon{width:60px;height:60px}
+ .office-launcher .launcher-name{font-size:17px}
+ .office-launcher .launcher-insets{gap:7px;min-height:86px;padding:0}
+ .office-launcher .launcher-inset{flex:1 1 0;min-width:0;height:83px;font-size:10px;padding:6px 3px}
+ .office-launcher .launcher-inset-art{height:24px}
+ .office-launcher .launcher-inset-art .qo-top-icon,
+ .office-launcher .launcher-inset-art svg{width:23px;height:23px}
+ .office-launcher .launcher-template-actions button{padding:8px 9px;font-size:10px}
+}
+@media(max-width:410px){
+ .office-launcher .launcher-tools{grid-template-columns:1fr}
+ .office-launcher .launcher-tile{min-height:135px}
+ .office-launcher .launcher-inset{flex:0 0 99px}
+ .office-launcher .launcher-insets{justify-content:flex-start}
+}
+
 .qo-appearance-menu {
   position: fixed;
   right: 14px;
