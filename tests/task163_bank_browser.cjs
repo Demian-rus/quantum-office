@@ -59,6 +59,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await p.locator('#qw-dialog [data-qw-action="bank-new"]').click();
   await p.locator('#qw-dialog [data-qw-action="bank-edit-back"]').click();
   assert.equal(await p.evaluate(()=>qwBankRead().length),3,'cancel does not create empty entry');
+  await p.locator('#qw-dialog [data-qw-action="bank-new"]').click();
+  await p.locator('#qw-dialog [data-bank-task-field="type"]').selectOption('choice');
+  await p.locator('#qw-dialog [data-bank-task-field="prompt"]').fill('Какой величиной измеряется напряжение?');
+  await p.locator('#qw-dialog [data-bank-choices]').fill('Вольт\nАмпер\nОм');
+  await p.locator('#qw-dialog [data-qw-action="bank-edit-save"]').click();
+  assert.equal(await p.evaluate(()=>qwBankRead().length),4,'choice task created');
+  assert.deepEqual(await p.evaluate(()=>qwBankRead().at(-1).task.choices),['Вольт','Ампер','Ом'],'choice options survive bank validation');
   await p.screenshot({path:path.join(out,'catalogue.png'),fullPage:true});
   assert.deepEqual(errors,[]);
   console.log('PASS TASK163: filter, select, enlarged SVG, hidden solution, video mode, edit/save, new entry and safe cancel');
