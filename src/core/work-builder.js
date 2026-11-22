@@ -295,9 +295,16 @@ function qwBankSave(){
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 function qwBankEdit(id,draft=null,returnFilters={}){
- let stored;try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
- if(!stored){status('Задание больше не найдено в банке',true);return;}
- draft??=structuredClone(stored);
+ const creating=id===null;
+ let stored;
+ if(!creating){
+  try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
+  if(!stored){status('Задание больше не найдено в банке',true);return;}
+ }
+ draft??=creating
+  ?{id:qwId(),bankNumber:0,subject:'physics',grade:'11',exam:'ege',year:'',part:'1',slot:'',
+    difficulty:'',topic:'',subtopic:'',origin:'adapted',task:qwTask('short')}
+  :structuredClone(stored);
  const titles={subject:'Предмет',exam:'Экзамен',part:'Часть',difficulty:'Сложность',origin:'Происхождение'};
  const opts=(k,items)=>'<label>'+(titles[k]||k)+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
@@ -305,6 +312,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  const taskFields='<div class="qw-bank-edit-fields">'+
   '<label>Тип<select data-bank-task-field="type">'+qwOptions(Object.entries(QW_TYPES),task.type)+'</select></label>'+
   '<label>Условие<textarea data-bank-task-field="prompt" rows="7" maxlength="16000">'+qwEsc(task.prompt)+'</textarea></label>'+
+  '<label data-bank-choices-wrap '+(task.type==='choice'?'':'hidden')+'>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>'+ 
   '<label>Ответ<textarea data-bank-task-field="answer" rows="2" maxlength="8000">'+qwEsc(task.answer)+'</textarea></label>'+
   '<label>Критерии<textarea data-bank-task-field="criteria" rows="3" maxlength="8000">'+qwEsc(task.criteria)+'</textarea></label>'+
   '<label>Решение / пояснение<textarea data-bank-task-field="comment" rows="4" maxlength="12000">'+qwEsc(task.comment)+'</textarea></label>'+
@@ -329,7 +337,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   field('topic','Тема')+field('subtopic','Подтема')+
   opts('origin',[['original','Авторская'],['adapted','Авторский аналог'],['generated','С помощью ИИ']])+
  '</div>';
- const d=qwDialog('Редактировать задание в банке',
+ const d=qwDialog(creating?'Новое задание в банке':'Редактировать задание в банке',
   '<div class="qw-bank-edit-layout">'+
    '<section class="qw-bank-edit-main"><h3>Содержание</h3>'+taskFields+'</section>'+
    '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'</aside>'+
@@ -344,6 +352,10 @@ function qwBankEdit(id,draft=null,returnFilters={}){
    const k=el.dataset.bankTaskField;
    task[k]=el.type==='checkbox'?el.checked:el.value;
   }
+  const choicesControl=d.querySelector('[data-bank-choices]'),choicesWrap=d.querySelector('[data-bank-choices-wrap]');
+  const isChoice=task.type==='choice';
+  choicesWrap.hidden=!isChoice;
+  if(isChoice)task.choices=choicesControl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   task.grade=draft.grade;task.exam=draft.exam;task.topic=draft.topic;
   task.subtopic=draft.subtopic;task.origin=draft.origin;
   if(draft.part)task.part='Часть '+draft.part;
@@ -353,10 +365,10 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   catch(e){d.querySelector('#qw-bank-edit-preview').textContent='Предпросмотр: '+e.message;}
  }
  d.addEventListener('input',event=>{
-  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field]')){collect();preview();}
+  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('change',event=>{
-  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field]')){collect();preview();}
+  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.querySelectorAll('[data-bank-visual]').forEach(button=>button.onclick=()=>{
   collect();
@@ -386,13 +398,20 @@ function qwBankEdit(id,draft=null,returnFilters={}){
    collect();if(!task.prompt.trim())throw Error('Условие задания не может быть пустым');
    if(draft.year&&!/^(19|20)\d{2}$/.test(draft.year))throw Error('Введите год из четырёх цифр');
    if(draft.slot&&!/^([1-9]|[1-3]\d|40)$/.test(draft.slot))throw Error('Номер задания: от 1 до 40');
-   const candidate=qwBankNormalize({...draft,id,task});
-   const all=qwBankRead(),index=all.findIndex(x=>x.id===id);
-   if(index<0)throw Error('Запись удалена из банка в другом окне');
-   all[index]=candidate;
+   const candidate=qwBankNormalize({...draft,id:creating?draft.id:id,task});
+   const all=qwBankRead();
+   if(creating){
+    if(all.length>=500)throw Error('Локальный банк содержит 500 заданий. Экспортируйте QWBANK перед расширением.');
+    candidate.bankNumber=qwBankAllocateNumber(all);
+    all.push(candidate);
+   }else{
+    const index=all.findIndex(x=>x.id===id);
+    if(index<0)throw Error('Запись удалена из банка в другом окне');
+    all[index]=candidate;
+   }
    localStorage.setItem(QW_BANK_KEY,JSON.stringify(all));
-   d.close();qwBank(returnFilters);
-   status('Задание сохранено в банке');
+   d.close();qwBank({...returnFilters,__view:candidate.id});
+   status(creating?'Задание добавлено в банк':'Задание сохранено в банке');
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
@@ -400,7 +419,8 @@ function qwBankEdit(id,draft=null,returnFilters={}){
 function qwBank(previousFilters={}){
  let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
- const filters='<div id="qw-bank-filters" class="qw-bank-filter-panel">'+
+ let activeId=previousFilters.__view||xs[0]?.id||'';
+ const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
   '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие или тема"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
   '<label>Класс<select id="qw-bank-grade">'+qwOptions([['all','Все'],...['5','6','7','8','9','10','11'].map(v=>[v,v])],'all')+'</select></label>'+
@@ -410,9 +430,13 @@ function qwBank(previousFilters={}){
   '<label>№ задания<select id="qw-bank-slot">'+qwOptions([['all','Все'],...Array.from({length:40},(_,i)=>[String(i+1),String(i+1)])],'all')+'</select></label>'+
   '<label>Уровень<select id="qw-bank-difficulty">'+qwOptions([['all','Все'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']],'all')+'</select></label>'+
   '<label>Тип<select id="qw-bank-type">'+qwOptions([['all','Все'],...Object.entries(QW_TYPES)],'all')+'</select></label>'+
-  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list"></div>';
+  '<label>Тема<select id="qw-bank-topic"></select></label>'+
+  '<label>Подтема<select id="qw-bank-subtopic"></select></label>'+
+  '<label>Происхождение<select id="qw-bank-origin">'+qwOptions([['all','Все'],['original','Авторская'],['adapted','Аналог'],['generated','С помощью ИИ']],'all')+'</select></label>'+
+  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div></section>'+
+  '<section class="qw-bank-catalogue-preview" aria-label="Подробный просмотр задания"><div id="qw-bank-preview"></div></section></div>';
  const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
-  qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
+  qwButton('bank-new','+ Новая задача','class="qw-primary"')+qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
@@ -422,16 +446,51 @@ function qwBank(previousFilters={}){
   const years=[...new Set([...xs.map(x=>x.year).filter(Boolean),'2018'])].sort((a,b)=>Number(b)-Number(a));
   get('year').innerHTML=qwOptions([['all','Все годы'],...years.map(v=>[v,v])],years.includes(old)?old:'all');
  }
+ function fillCategories(){
+  for(const key of ['topic','subtopic']){
+   const control=get(key),old=control.value||'all';
+   const names=[...new Set(xs.map(x=>x[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+   control.innerHTML=qwOptions([['all',key==='topic'?'Все темы':'Все подтемы'],...names.map(name=>[name,name])],names.includes(old)?old:'all');
+  }
+ }
  const signature=x=>[x.subject,x.grade,x.exam,x.year,x.part,x.slot,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
  const markSelection=()=>{
   d.querySelector('#qw-bank-selected-count').textContent='Выбрано: '+selected.size;
   for(const k of ['bank-add-selection','bank-assemble'])d.querySelector('[data-qw-action="'+k+'"]').disabled=!selected.size;
  };
+ function showPreview(){
+  const entry=xs.find(x=>x.id===activeId),host=d.querySelector('#qw-bank-preview');
+  for(const row of d.querySelectorAll('[data-bank-entry]'))
+   row.classList.toggle('is-active',row.dataset.bankEntry===activeId);
+  if(!entry){
+   host.innerHTML='<div class="qw-bank-preview-placeholder">Выберите задание в списке, чтобы открыть условие, рисунки и решение.</div>';
+   return;
+  }
+  const task={...entry.task,answerVisible:false,solutionVisible:false};
+  const number=String(entry.bankNumber).padStart(5,'0');
+  const subject=QW_SUBJECTS[entry.subject]||entry.subject;
+  const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
+   (entry.grade?' · '+entry.grade+' класс':'');
+  const paper=qwTaskPreview(task,Math.max(0,(Number(entry.slot)||1)-1),'worksheet',false);
+  const answer=entry.task.answer?.trim()?qwContentHTML(entry.task.answer):'<p>Ответ ещё не внесён.</p>';
+  const details=entry.task.comment?.trim()?qwContentHTML(entry.task.comment):'<p>Решение пока не добавлено.</p>';
+  host.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
+   '<strong>№ '+number+'</strong><span>'+qwEsc(subject+' · '+designation)+'</span>'+
+   (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+
+   '<div class="qw-bank-preview-actions"><button type="button" data-bank-edit="'+qwEsc(entry.id)+'">Редактировать</button>'+
+   '<button type="button" data-bank-capture aria-pressed="false">Режим для видео</button></div></div>'+
+   '<div class="qw-bank-video-canvas" aria-label="Крупное изображение задания для скриншота">'+
+    '<div class="qw-bank-video-id">Тип '+qwEsc(entry.slot||'—')+' № '+number+'</div>'+
+    paper+'</div>'+
+   '<details class="qw-bank-solution"><summary>Ответ и решение</summary>'+
+    '<div class="qw-bank-solution-body"><h3>Ответ</h3>'+answer+
+    '<h3>Решение</h3>'+details+'</div></details>';
+ }
  const refresh=()=>{
   const search=pick('search').toLocaleLowerCase('ru-RU').trim();
-  const keys=['subject','grade','exam','year','part','slot','difficulty','type'];
+  const keys=['subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'];
   const shown=xs.filter(x=>keys.every(key=>{const value=pick(key);return value==='all'||(key==='type'?x.task.type:x[key])===value;})&&
-   [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
+   [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer,x.task.comment,x.task.criteria].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
   get('count').textContent='Найдено: '+shown.length+' / '+xs.length;
   const items=shown.map(x=>{
    const tags=[x.subject==='math'?'Математика':x.subject==='physics'?'Физика':x.subject,
@@ -440,10 +499,11 @@ function qwBank(previousFilters={}){
     x.year,x.part?'Часть '+x.part:'',x.slot?'№ '+x.slot:'',
     x.difficulty==='basic'?'Базовый':x.difficulty==='advanced'?'Повышенный':x.difficulty==='high'?'Высокий':'',
     x.topic,x.subtopic].filter(Boolean).join(' · ');
-   return '<div class="qw-bank-item qw-bank-choice"><label class="qw-bank-select-check">'+
+   return '<div class="qw-bank-item qw-bank-choice" data-bank-entry="'+qwEsc(x.id)+'"><label class="qw-bank-select-check">'+
     '<input type="checkbox" data-bank-select="'+qwEsc(x.id)+'" '+(selected.has(x.id)?'checked':'')+' aria-label="Выбрать задание">'+
     '<span class="qw-bank-card-copy"><strong>№ '+String(x.bankNumber).padStart(5,'0')+' · '+qwEsc(x.task.prompt||QW_TYPES[x.task.type])+'</strong>'+
     '<small>'+qwEsc(tags)+'</small></span></label>'+
+    '<button type="button" data-bank-view="'+qwEsc(x.id)+'">Просмотр</button>'+
     '<button type="button" data-bank-edit="'+qwEsc(x.id)+'">Редактировать</button>'+
     '<button type="button" data-bank-add="'+qwEsc(x.id)+'">Добавить</button>'+
     '<button type="button" data-bank-delete="'+qwEsc(x.id)+'" aria-label="Удалить из банка">×</button></div>';
@@ -452,8 +512,9 @@ function qwBank(previousFilters={}){
   const other=diag.length?'<h3>Из диагностики</h3>'+diag.map(x=>
    '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
    '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Добавить</button></div>').join(''):'';
-  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено</p>';
-  markSelection();
+  d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено. Создайте задачу кнопкой «+ Новая задача».</p>';
+  if(!shown.some(x=>x.id===activeId))activeId=shown[0]?.id||'';
+  showPreview();markSelection();
  };
  d.querySelector('[data-qw-action="bank-export"]').onclick=()=>{
   download('QuantumOffice_банк_заданий.qwbank',JSON.stringify({format:'quantum-work-bank',version:1,items:xs},null,2),'application/json');
@@ -477,7 +538,7 @@ function qwBank(previousFilters={}){
    if(xs.length+additions.length>500)throw Error('Превышен лимит 500 заданий');
    if(!additions.length){status('Новых заданий нет');return;}
    const next=[...xs,...additions];localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));
-   xs=next;fillYears();refresh();status('Импортировано: '+additions.length);
+   xs=next;fillYears();fillCategories();refresh();status('Импортировано: '+additions.length);
   }catch(error){status('Импорт банка: '+error.message,true);}
  };
  const entries=()=>[...selected.keys()].map(id=>xs.find(x=>x.id===id)).filter(Boolean);
@@ -521,11 +582,25 @@ function qwBank(previousFilters={}){
  });
  d.onclick=e=>{
   const action=e.target.closest('[data-qw-action]')?.dataset.qwAction;
+  if(action==='bank-new'){
+   const saved=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
+   qwBankEdit(null,null,{...saved,__view:activeId,__selected:[...selected.keys()]});return;
+  }
+  const view=e.target.closest('[data-bank-view]');
+  if(view){activeId=view.dataset.bankView;showPreview();return;}
+  if(e.target.closest('[data-bank-capture]')){
+   const on=!d.classList.contains('qw-bank-capture');
+   d.classList.toggle('qw-bank-capture',on);
+   e.target.textContent=on?'Вернуться к каталогу':'Режим для видео';
+   e.target.setAttribute('aria-pressed',String(on));
+   return;
+  }
   if(action==='bank-assemble'){addTasks(entries(),true);return;}
   if(action==='bank-add-selection'){addTasks(entries(),false);return;}
   const edit=e.target.closest('[data-bank-edit]');
   if(edit){
-   const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type'].map(k=>[k,pick(k)]));
+   const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
+   filters.__view=activeId;
    filters.__selected=[...selected.keys()];
    qwBankEdit(edit.dataset.bankEdit,null,filters);return;
   }
@@ -539,11 +614,11 @@ function qwBank(previousFilters={}){
   }
   if(del&&confirm('Удалить задание из личного банка?')){
    const next=xs.filter(x=>x.id!==del.dataset.bankDelete);
-   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;selected.delete(del.dataset.bankDelete);fillYears();refresh();}
+   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;selected.delete(del.dataset.bankDelete);fillYears();fillCategories();refresh();}
    catch(error){status('Не удалось изменить банк',true);}
   }
  };
- fillYears();
+ fillYears();fillCategories();
  for(const [key,value] of Object.entries(previousFilters)){
   const input=get(key);if(input&&(input.type==='search'||[...(input.options||[])].some(o=>o.value===value)))input.value=value;
  }
