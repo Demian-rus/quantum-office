@@ -28,6 +28,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await dialog.locator('.qw-bank-solution summary').click();
   assert.match(await dialog.locator('.qw-bank-solution-body').innerText(),/18 м/);
   assert.match(await dialog.locator('.qw-bank-solution-body').innerText(),/площади под графиком/);
+  assert.equal(await dialog.locator('.qw-bank-extra-filters').evaluate(e=>e.open),false,'advanced filters initially collapsed');
+  await dialog.locator('.qw-bank-extra-filters summary').click();
+  await dialog.locator('#qw-bank-year').selectOption('2019');
+  assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'advanced year filter');
+  await dialog.locator('#qw-bank-year').selectOption('all');
+  await dialog.locator('.qw-bank-extra-filters summary').click();
   await dialog.locator('#qw-bank-topic').selectOption('Электричество');
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'topic filter');
   await dialog.locator('#qw-bank-topic').selectOption('all');
