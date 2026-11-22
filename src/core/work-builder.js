@@ -343,11 +343,11 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  const task=draft.task;
  const taskFields='<div class="qw-bank-edit-fields">'+
   '<label>Тип<select data-bank-task-field="type">'+qwOptions(Object.entries(QW_TYPES),task.type)+'</select></label>'+
-  '<label>Условие<textarea data-bank-task-field="prompt" rows="7" maxlength="16000">'+qwEsc(task.prompt)+'</textarea></label>'+
+  qwBankRichField('prompt','Условие задачи',task.prompt,7)+
   '<label data-bank-choices-wrap '+(task.type==='choice'?'':'hidden')+'>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>'+ 
   '<label>Ответ<textarea data-bank-task-field="answer" rows="2" maxlength="8000">'+qwEsc(task.answer)+'</textarea></label>'+
-  '<label>Критерии<textarea data-bank-task-field="criteria" rows="3" maxlength="8000">'+qwEsc(task.criteria)+'</textarea></label>'+
-  '<label>Решение / пояснение<textarea data-bank-task-field="comment" rows="4" maxlength="12000">'+qwEsc(task.comment)+'</textarea></label>'+
+  qwBankRichField('criteria','Критерии оценивания',task.criteria,4)+
+  qwBankRichField('comment','Подробное решение',task.comment,8)+
   '<label class="qw-bank-choice-field">Иллюстрация<select data-bank-task-field="figure">'+qwOptions([['none','Без рисунка'],['graph','График (редактируемый)'],['diagram','Схема (редактируемая)'],['image','Изображение']],task.figure)+'</select></label>'+
   '<label class="qw-check"><input type="checkbox" data-bank-task-field="answerVisible" '+(task.answerVisible?'checked':'')+'>Поле для краткого ответа в PDF</label>'+
   '<div class="qw-bank-edit-visual-actions">'+
@@ -393,7 +393,13 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   if(draft.part)task.part='Часть '+draft.part;
  }
  function preview(){
-  try{d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview(task,Number(draft.slot||1)-1,'booklet',false);}
+  try{
+   d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview(task,Number(draft.slot||1)-1,'worksheet',false,null,true);
+   for(const key of ['prompt','comment','criteria']){
+    const area=d.querySelector('[data-bank-render="'+key+'"]');
+    if(area)area.innerHTML=qwRichMarkdownHTML(task[key]||'');
+   }
+  }
   catch(e){d.querySelector('#qw-bank-edit-preview').textContent='Предпросмотр: '+e.message;}
  }
  d.addEventListener('input',event=>{
@@ -401,6 +407,21 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  });
  d.addEventListener('change',event=>{
   if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
+ });
+ d.addEventListener('click',event=>{
+  const action=event.target.closest('[data-bank-format]');
+  if(action){qwBankInsertMarkup(d.querySelector('[data-bank-task-field="'+action.dataset.bankFormatField+'"]'),action.dataset.bankFormat);return;}
+  const toggle=event.target.closest('[data-bank-preview-toggle]');
+  if(!toggle)return;
+  collect();preview();
+  const key=toggle.dataset.bankPreviewToggle,block=d.querySelector('[data-bank-rich="'+key+'"]');
+  const editing=block.dataset.mode==='preview';
+  block.dataset.mode=editing?'edit':'preview';
+  block.querySelector('textarea').hidden=!editing;
+  block.querySelector('.qw-bank-rich-tools').hidden=!editing;
+  block.querySelector('[data-bank-render]').hidden=editing;
+  toggle.textContent=editing?'Предпросмотр':'Редактировать';
+  toggle.setAttribute('aria-pressed',String(!editing));
  });
  d.querySelectorAll('[data-bank-visual]').forEach(button=>button.onclick=()=>{
   collect();
