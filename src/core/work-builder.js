@@ -312,6 +312,7 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  const taskFields='<div class="qw-bank-edit-fields">'+
   '<label>Тип<select data-bank-task-field="type">'+qwOptions(Object.entries(QW_TYPES),task.type)+'</select></label>'+
   '<label>Условие<textarea data-bank-task-field="prompt" rows="7" maxlength="16000">'+qwEsc(task.prompt)+'</textarea></label>'+
+  '<label data-bank-choices-wrap '+(task.type==='choice'?'':'hidden')+'>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>'+ 
   '<label>Ответ<textarea data-bank-task-field="answer" rows="2" maxlength="8000">'+qwEsc(task.answer)+'</textarea></label>'+
   '<label>Критерии<textarea data-bank-task-field="criteria" rows="3" maxlength="8000">'+qwEsc(task.criteria)+'</textarea></label>'+
   '<label>Решение / пояснение<textarea data-bank-task-field="comment" rows="4" maxlength="12000">'+qwEsc(task.comment)+'</textarea></label>'+
@@ -351,6 +352,10 @@ function qwBankEdit(id,draft=null,returnFilters={}){
    const k=el.dataset.bankTaskField;
    task[k]=el.type==='checkbox'?el.checked:el.value;
   }
+  const choicesControl=d.querySelector('[data-bank-choices]'),choicesWrap=d.querySelector('[data-bank-choices-wrap]');
+  const isChoice=task.type==='choice';
+  choicesWrap.hidden=!isChoice;
+  if(isChoice)task.choices=choicesControl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   task.grade=draft.grade;task.exam=draft.exam;task.topic=draft.topic;
   task.subtopic=draft.subtopic;task.origin=draft.origin;
   if(draft.part)task.part='Часть '+draft.part;
@@ -360,10 +365,10 @@ function qwBankEdit(id,draft=null,returnFilters={}){
   catch(e){d.querySelector('#qw-bank-edit-preview').textContent='Предпросмотр: '+e.message;}
  }
  d.addEventListener('input',event=>{
-  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field]')){collect();preview();}
+  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('change',event=>{
-  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field]')){collect();preview();}
+  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.querySelectorAll('[data-bank-visual]').forEach(button=>button.onclick=()=>{
   collect();
