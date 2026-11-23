@@ -31,8 +31,9 @@ function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=
  const bankLabel=layout==='booklet'&&q.source?.kind==='bank'&&qwBankNumber(q.source.number)?
   '<span class="qw-booklet-bank-id" data-qw-bank-number="'+q.source.number+'">'+
   (q.source.slot?'Тип '+qwEsc(q.source.slot)+' ':'')+'№ '+String(q.source.number).padStart(5,'0')+'</span> ':'';
- const format=rich?qwRichMarkdownHTML:qwContentHTML;
- const text='<div class="qw-task-text'+(rich?' qw-rich':'')+'">'+bankLabel+format(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+format(c)+'</li>').join('')+'</ol>':'')+'</div>';
+ const richText=rich||(printing&&qwHasRichSyntax(q.prompt||''));
+ const format=richText?qwRichMarkdownHTML:qwContentHTML;
+ const text='<div class="qw-task-text'+(richText?' qw-rich qw-print-rich':'')+'">'+bankLabel+format(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+(printing?qwPrintFieldHTML(c):format(c))+'</li>').join('')+'</ol>':'')+'</div>';
  const effectivePreferences=preferences||(printing?null:qwDoc.printSettings);
  const position=effectivePreferences?.figurePosition&&effectivePreferences.figurePosition!=='auto'?effectivePreferences.figurePosition:q.position;
  const flow='<div class="qw-task-flow qw-figure-'+(!printing&&position==='auto'?'right':position)+'">'+(printing?text+figure:figure+text)+'</div>';
@@ -78,13 +79,23 @@ function qwSymbols(){const groups={...(typeof QO_WRITER_SYMBOLS==='object'?QO_WR
 /* Online publishing: browser's native print-to-PDF preserves selectable text and vector SVG.
    The older one-click raster PDF exporter remains available as a compatibility fallback. */
 /* Unified high-quality browser PDF. Native font shaping and vector SVG are kept. */
-function qwAnswerSections(d,options){
+function qwAnswerSections(d,options={}){
  const columns=d.tasks.length>=12?3:d.tasks.length>=6?2:1,sections=[];let short=[];
  const flush=()=>{if(!short.length)return;sections.push('<section class="qw-print-section qw-answer-row" data-task="'+short[0].number+'"><article class="qw-paper-task"><div class="qw-task-flow"><div class="qw-task-text qw-answer-columns" style="--qw-answer-columns:'+columns+'">'+short.map(({q,number})=>'<div class="qw-answer-item" data-answer-number="'+number+'"><b class="qw-print-number">'+number+'.</b><span class="qw-answer-text">'+qwContentHTML(q.answer.trim()||'—')+'</span></div>').join('')+'</div></div></article></section>');short=[];};
  d.tasks.forEach((q,i)=>{
-  const extra=(options.includeCriteria===true&&q.criteria?'<br><b>Критерии:</b> '+qwContentHTML(q.criteria):'')+(options.includeComments===true&&q.comment?'<br><b>Комментарий:</b> '+qwContentHTML(q.comment):'');
-  if(q.type==='extended'||q.answer.length>70||q.answer.includes('\n')||extra){flush();sections.push('<section class="qw-print-section qw-answer-long" data-task="'+(i+1)+'"><article class="qw-paper-task qw-compact-entry"><header><b class="qw-print-number">'+(i+1)+'.</b></header><div class="qw-task-flow"><div class="qw-task-text" data-answer-number="'+(i+1)+'">'+qwContentHTML(q.answer.trim()||'—')+extra+'</div></div></article></section>');}
-  else{short.push({q,number:i+1});if(short.length===columns)flush();}
+  const showSolution=options.includeComments===true&&!!q.comment.trim();
+  const showCriteria=options.includeCriteria===true&&!!q.criteria.trim();
+  const details=showSolution||showCriteria,richAnswer=qwHasRichSyntax(q.answer);
+  if(q.type==='extended'||q.answer.length>70||q.answer.includes('\n')||details||richAnswer){
+   flush();
+   const answer=qwPrintFieldHTML(q.answer.trim()||'—');
+   const solutionTitle=/^\s*#{1,4}\s*Решение\b/i.test(q.comment)?'':'<h3 class="qw-print-answer-heading">Решение</h3>';
+   const criteriaTitle=/^\s*#{1,4}\s*Критерии\b/i.test(q.criteria)?'':'<h3 class="qw-print-answer-heading">Критерии оценивания</h3>';
+   const body=(details?'<h3 class="qw-print-answer-heading">Ответ</h3>':'')+answer+
+    (showSolution?solutionTitle+qwPrintFieldHTML(q.comment):'')+
+    (showCriteria?criteriaTitle+qwPrintFieldHTML(q.criteria):'');
+   sections.push('<section class="qw-print-section qw-answer-long" data-task="'+(i+1)+'"><article class="qw-paper-task qw-compact-entry"><header><b class="qw-print-number">'+(i+1)+'.</b></header><div class="qw-task-flow"><div class="qw-task-text qw-print-rich" data-answer-number="'+(i+1)+'">'+body+'</div></div></article></section>');
+  }else{short.push({q,number:i+1});if(short.length===columns)flush();}
  });flush();return sections.join('');
 }
 function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
