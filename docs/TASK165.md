@@ -8,7 +8,7 @@ After TASK164's interactive task-bank Markdown authoring, use the same authored 
 - Rich print fields support headings, emphasis, lists, quotations, formulae (inline MathML and displayed blocks), code and simple Markdown tables. HTML is escaped.
 - For student task PDFs, *all* tables are placed after the condition and centered in the available column. When both a figure and a native table are present, the figure is below the text; the table wrapper is retained instead of being destroyed during relocation.
 - In the answer/solution PDF, table order is preserved within the written explanation or rubric and centered. Do not move a scoring rubric to the very end if the author wrote explanatory text after it.
-- Optional teacher `Подробные решения` and `Критерии оценивания` controls are preselected when relevant fields have content. The answer-only export remains possible by unchecking them.
+- Optional teacher `Подробные решения` and `Критерии оценивания` controls are **off by default** to preserve historical compact answer keys; users may enable either for a separate worked-solutions export.
 - Do not duplicate `Решение` or `Критерии` headings when already provided in the author's Markdown.
 - Display MathML can occupy a full-width box while having narrow ink; print overflow validation measures its first math child, not the display wrapper.
 
