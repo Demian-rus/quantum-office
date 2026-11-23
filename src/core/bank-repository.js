@@ -517,7 +517,11 @@ class BankRepository{
   const after=await this._captureBackupSnapshot();
   if(after.records.length!==archived.records.length||
    bankStableJSON(after.records)!==bankStableJSON(archived.records.slice().sort((a,b)=>a.id.localeCompare(b.id)))||
-   after.meta.sequence!==archived.meta.sequence)
+   after.meta.sequence!==archived.meta.sequence||
+   (archived.meta.legacyMigration?
+    bankStableJSON(after.meta.legacyMigration)!==bankStableJSON(archived.meta.legacyMigration):
+    after.meta.legacyMigration?.state!=='none')||
+   bankStableJSON(after.meta.legacyBackup)!==bankStableJSON(archived.meta.legacyBackup||null))
    throw new BankStorageError('Контроль после записи не совпал. Не считайте восстановление успешным.','RESTORE_VERIFY');
   return {restored:archived.count,sequence:archived.meta.sequence,verified:true};
  }
