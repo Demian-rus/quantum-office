@@ -143,7 +143,7 @@ function qwPrintTextPDF(teacher=false,options){
 function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet','worksheet','exam'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(output='tasks'){
- const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim());
+ const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim()||q.comment.trim()||q.criteria.trim());
  const selected=(name,on)=>'<label class="qw-check"><input type="checkbox" data-print-setting="'+name+'" '+(on?'checked':'')+'>'+({
   showTitle:'Добавить заголовок',showMeta:'Предмет и класс',showVariant:'Номер варианта',
   showPageNumbers:'Номера страниц',topicHeadings:'Заголовки тем',monochrome:'Чёрно-белый PDF'
@@ -174,7 +174,7 @@ async function qwPreview(output='tasks'){
   selected('monochrome',prefs.monochrome===true)+
   '</aside>';
  const answers='<div class="qw-row qw-preview-options">'+
-  ['includeCriteria','includeComments'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'">'+['Критерии','Комментарии'][i]+'</label>').join('')+'</div>';
+  ['includeComments','includeCriteria'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'" '+(qwDoc.tasks.some(q=>(k==='includeComments'?q.comment:q.criteria).trim())?'checked':'')+'>'+['Подробные решения','Критерии оценивания'][i]+'</label>').join('')+'</div>';
  const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF',
   '<div class="qw-pdf-controls">'+(key?answers:qwLayoutCards(qwDoc.layout))+'</div>'+
   '<div class="qw-pdf-workspace">'+design+
