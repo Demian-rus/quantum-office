@@ -245,8 +245,11 @@ class BankRepository{
  }
  async importBank(file){
   const data=typeof file==='string'?JSON.parse(file):file;
-  if(!data||data.format!=='quantum-work-bank'||data.version!==1||!Array.isArray(data.items)||
-   data.items.length>500)throw new BankStorageError('Требуется корректный QWBANK v1 (до 500 заданий)', 'BAD_IMPORT');
+  if(!data||data.format!=='quantum-work-bank'||!Array.isArray(data.items)||
+   ![1,2].includes(data.version)||data.items.length>(data.version===1?500:20000))
+   throw new BankStorageError('Требуется QWBANK v1 или расширенный QWBANK v2','BAD_IMPORT');
+  if(data.version===2&&(data.count!==data.items.length||data.checksum!==bankHash(JSON.stringify(data.items))))
+   throw new BankStorageError('Контрольная сумма QWBANK v2 не совпадает. Импорт не выполнен.','BAD_CHECKSUM');
   const entries=data.items.map(e=>this._clean({...e,id:e.id||bankIdentity()}));
   return bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),meta=tx.objectStore('meta'),signatures=new Set(),used=new Set(),ids=new Set();
@@ -287,7 +290,11 @@ class BankRepository{
    req.onerror=()=>fail(req.error);
    req.onsuccess=()=>{const c=req.result;if(!c){set(list);return;}list.push(bankPortable(c.value));c.continue();};
   });
-  return {format:'quantum-work-bank',version:1,items};
+  if(items.length<=500)return {format:'quantum-work-bank',version:1,items};
+  // QWBANK v2 is the preliminary large-bank interchange format. A complete
+  // binary-attachment backup with cryptographic manifest belongs to TASK166.4.
+  return {format:'quantum-work-bank',version:2,schema:BANK_DB_VERSION,
+   count:items.length,checksum:bankHash(JSON.stringify(items)),items};
  }
  async getStatistics(){
   const [count,migration,backup]=await Promise.all([
