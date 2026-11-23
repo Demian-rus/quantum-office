@@ -30,8 +30,10 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task166');
    const stats=await qwBankRepository.getStatistics();
    const raw=await qwBankRepository._meta('legacyBackup');
    const items=await qwBankRepository.exportBank();
+   // IndexedDB object-store cursors are key-sorted, not insertion-sorted.
+   const bySourceOrder=items.items.sort((a,b)=>Number(a.id.slice(6))-Number(b.id.slice(6)));
    return {stats,hasBackup:raw?.raw===localStorage.getItem(QW_BANK_KEY),
-    count:items.items.length,ids:items.items.map(e=>e.id),numbers:items.items.map(e=>e.bankNumber)};
+    count:items.items.length,ids:bySourceOrder.map(e=>e.id),numbers:bySourceOrder.map(e=>e.bankNumber)};
   });
   assert.equal(migration.stats.migration,'complete');
   assert.equal(migration.count,32);
