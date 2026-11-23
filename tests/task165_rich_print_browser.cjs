@@ -21,7 +21,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task165-ric
    rich.graph.points=[{x:0,y:1,label:''},{x:4,y:5,label:''}];
    rich.prompt='### Задание на график\nСкорость тела описана **графиком**. Найдите путь по зависимости \\(v(t)\\).\n\n| Время, с | 0 | 4 |\n| --- | --- | --- |\n| Скорость, м/с | 1 | 5 |';
    rich.answer='12 м';
-   rich.comment='### Решение\n1. Используем **площадь** под графиком скорости.\n2. Вычисляем путь по формуле \\(S=(v_0+v_1)t/2\\).\n\n\\[\n\\frac{(1+5)\\cdot4}{2}=12\n\\]';
+   rich.comment='### Обоснование\nИспользуем закон движения.\n\n### Решение\n1. Используем **площадь** под графиком скорости.\n2. Вычисляем путь по формуле \\(S=(v_0+v_1)t/2\\).\n\n\\[\n\\frac{(1+5)\\cdot4}{2}=12\n\\]';
    rich.criteria='### Критерии оценивания\n| Шаг | Баллы |\n| --- | --- |\n| Физическая модель | 1 |\n| Вычисления | 1 |\n| Ответ с единицами | 1 |';
    return qwValidate(d);
   });
@@ -61,12 +61,14 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task165-ric
     const tb=table?.getBoundingClientRect(),title=h?.getBoundingClientRect(),region=s?.querySelector('.qw-task-text')?.getBoundingClientRect();
     return {rich:!!s?.querySelector('.qw-print-rich'),math:!!s?.querySelector('math'),table:!!table,
      solution:s?.textContent?.includes('Решение'),criteria:s?.textContent?.includes('Критерии оценивания'),
+     duplicatedHeading:[...s.querySelectorAll('.qw-print-answer-heading')].filter(h=>h.textContent.trim()==='Решение').length,
      tableAfterCriteria:!!tb&&!!title&&tb.top>=title.bottom-1,
      tableCentered:!!tb&&!!region&&Math.abs((tb.left+tb.right-region.left-region.right)/2)<4,
      count:window.__qwPrintLayout?.pages?.length||0};
    });
    assert.equal(detail.rich,true);assert.equal(detail.math,true);assert.equal(detail.table,true);
    assert.equal(detail.solution,true);assert.equal(detail.criteria,true);assert.equal(detail.tableAfterCriteria,true);assert.equal(detail.tableCentered,true);
+   assert.equal(detail.duplicatedHeading,0,'do not duplicate Markdown solution heading');
    assert.ok(detail.count>=1);
    await a.screenshot({path:path.join(out,'answers-'+orientation+'.png'),fullPage:true});
    await a.close();
