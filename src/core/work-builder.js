@@ -1,5 +1,6 @@
 /* TASK144: standalone mathematics/physics workbench, reusing Office shell/symbols. */
-const QW_KEY='quantum-office.work-builder.v1',QW_BANK_KEY='quantum-office.work-bank.v1';
+const QW_KEY='quantum-office.work-builder.v1',QW_BANK_KEY='quantum-office.work-bank.v1',
+ QW_BANK_NUMBER_KEY='quantum-office.work-bank.number-sequence.v1';
 let qwDoc=qwProject(),qwSelected='',qwLeft=false,qwRight=false,qwStorageError='',qwCorrupt='',qwUndo=[],qwRedo=[],qwExported='',qwBusy=false;
 qwDoc.layout='compact';
 try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.parse(raw));}catch(e){qwCorrupt=raw;qwStorageError='Не удалось открыть черновик. Скачайте исходные данные.';}}catch(e){qwStorageError='Хранилище недоступно. Сохраняйте QWORK.';}
@@ -257,7 +258,25 @@ async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
  qwBankSnapshot=stats.count<=500?(await qwBankRepository.exportBank()).items:[];
 }
-function qwBankRead(){return structuredClone(qwBankSnapshot);}
+function qwBankRead(){
+ // Read-only compatibility for historical QWBANK test fixtures before the
+ // first IndexedDB migration. UI never writes to or lists this legacy store.
+ if(!qwBankRepository.db){
+  let raw;try{raw=qwBankRepository.legacyStorage?.getItem(BANK_LEGACY_KEY);}catch{}
+  if(raw){
+   const entries=JSON.parse(raw).map(qwBankNormalize),used=new Set();
+   let next=Math.max(0,...entries.map(e=>e.bankNumber));
+   for(const item of entries){
+    if(!item.bankNumber||used.has(item.bankNumber)){
+     item.bankNumber=++next;
+    }
+    used.add(item.bankNumber);
+   }
+   return entries;
+  }
+ }
+ return structuredClone(qwBankSnapshot);
+}
 function qwBankSave(){
  const q=qwCurrent();if(!q)return;
  if(!q.prompt.trim()){status('Заполните условие задания перед сохранением в банк',true);return;}
