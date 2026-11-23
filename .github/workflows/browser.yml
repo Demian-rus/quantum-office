@@ -108,6 +108,7 @@ jobs:
       - run: node tests/task162_launcher_browser.cjs
       - run: node tests/task163_bank_browser.cjs
       - run: node tests/task164_bank_browser.cjs
+      - run: node tests/task165_rich_print_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -116,6 +117,7 @@ jobs:
             evidence/task162-launcher/*.png
             evidence/task163-bank/*.png
             evidence/task164-bank/*.png
+            evidence/task165-rich-print/*.png
           if-no-files-found: warn
       - run: python tests/templates_headers_browser.py
       - run: python tests/color_border_browser.py
