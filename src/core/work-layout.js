@@ -177,6 +177,7 @@ body[data-qw-format="booklet"] .qw-booklet-bank-id{font:600 8.5pt/1.2 var(--qw-p
 .qw-print-rich .qw-rich-equation{text-align:center;max-width:100%;margin:1.3mm 0;break-inside:avoid}
 .qw-print-rich .qw-rich-equation math{max-width:100%}
 .qw-print-rich .qw-rich-table-scroll{max-width:100%;overflow:visible;margin:1.2mm auto}
+body[data-qw-format="answers"] .qw-print-rich .qw-rich-table-scroll{display:flex;justify-content:center;break-inside:avoid}
 .qw-print-rich table,.qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;break-inside:avoid}
 .qw-print-rich :is(th,td),.qw-task-tables :is(th,td){border:.2mm solid #888;padding:.7mm 1.5mm;text-align:left;vertical-align:middle;overflow-wrap:anywhere}
 .qw-print-rich th,.qw-task-tables th{font-weight:700;background:#f1f1f1}
@@ -295,7 +296,7 @@ async function qwPreparePrintDocument(){
   const text=section.querySelector('.qw-task-text');
   // Move native tables after the complete condition, at any column count.
   const tables=[...text.querySelectorAll('table')];
-  if(tables.length){
+  if(tables.length&&format!=='answers'){
    const group=document.createElement('div');group.className='qw-task-tables';
    for(const table of tables){
     const richWrapper=table.closest('.qw-rich-table-scroll');
