@@ -3,7 +3,7 @@ on:
   push:
   pull_request:
 concurrency:
-  group: chromium-${{ github.head_ref || github.ref_name }}
+  group: chromium-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 jobs:
   browser:
@@ -614,4 +614,13 @@ jobs:
           path: |
             evidence/task166/
             Quantum-Office.html
+            src/core/bank-repository.js
+            src/core/work-builder.js
+            src/styles/work-builder.css
+            scripts/build.mjs
+            tests/task166.test.js
+            tests/task166_browser.cjs
+            tests/task166_scale_browser.cjs
+            docs/TASK166.md
+            docs/PROJECT_CONTEXT.md
           if-no-files-found: warn
