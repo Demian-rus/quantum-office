@@ -593,3 +593,24 @@ jobs:
             evidence/task161/
             Quantum-Office.html
           if-no-files-found: warn
+
+  task166-indexeddb:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/task166_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task166-indexeddb-browser-evidence
+          path: |
+            evidence/task166/
+            Quantum-Office.html
+          if-no-files-found: warn
