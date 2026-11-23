@@ -126,6 +126,41 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task166');
   assert.equal(broken.code,'LEGACY_CORRUPT');
   assert.equal(broken.source,'{ incomplete JSON');
   await corruptContext.close();
+  // Full-size legacy QWBANK-v1 migration: all 500 records must retain
+  // their exact IDs, permanent numbers and user-authored solution fields.
+  const fiveHundredContext=await browser.newContext({offline:true});
+  const bulkPage=await fiveHundredContext.newPage();
+  await bulkPage.goto(url);
+  const bulk=await bulkPage.evaluate(async()=>{
+   const source=Array.from({length:500},(_,i)=>{
+    const task=qwTask('short');
+    task.prompt='Старинная задача № '+(i+1);
+    task.answer='Ответ '+i;
+    task.comment='### Решение для задачи '+i+'\\nФормула сохраняется';
+    task.criteria='Критерии задачи '+i;
+    return {id:'legacy500-'+(i+1),bankNumber:20001+i,subject:'physics',
+     grade:'11',exam:'ege',year:'2018',part:'1',slot:String(i%32+1),
+     topic:'Физика',subtopic:'Динамика',origin:'original',task};
+   });
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify(source));
+   const raw=localStorage.getItem(QW_BANK_KEY);
+   await qwBankOpen();
+   const found=await qwBankRepository.exportBank();
+   const record=await qwBankRepository.getTask('legacy500-500');
+   const backup=await qwBankRepository._meta('legacyBackup');
+   await qwBankRepository.close();
+   await qwBankOpen();
+   return {total:(await qwBankRepository.getStatistics()).count,retainedRaw:localStorage.getItem(QW_BANK_KEY)===raw,
+    verifiedBackup:backup.raw===raw,ids:new Set(found.items.map(e=>e.id)).size,
+    numbers:new Set(found.items.map(e=>e.bankNumber)).size,
+    last:{id:record?.id,number:record?.bankNumber,answer:record?.task.answer,comment:record?.task.comment}};
+  });
+  assert.equal(bulk.total,500);
+  assert.equal(bulk.ids,500);assert.equal(bulk.numbers,500);
+  assert.ok(bulk.retainedRaw&&bulk.verifiedBackup);
+  assert.deepEqual(bulk.last,{id:'legacy500-500',number:20500,answer:'Ответ 499',
+   comment:'### Решение для задачи 499\\nФормула сохраняется'});
+  await fiveHundredContext.close();
   // Two windows may open the same unconverted localStorage bank at once.
   // Exactly one IndexedDB write transaction must migrate the shared source.
   const parallelContext=await browser.newContext({offline:true});
@@ -147,7 +182,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task166');
   assert.deepEqual(afterParallel.items.map(e=>e.id).sort(),['sim1','sim2']);
   await parallelContext.close();
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
-  const report={status:'PASS',environment:'Chromium offline file HTML',migration:{count:32,backup:true},
+  const report={status:'PASS',environment:'Chromium offline file HTML',migration:{count:32,backup:true,largeLegacyCount:500,largeLegacyVerified:true},
    pagination:30,roundtrip:true,revisionConflicts:true,importCollisions:true,deletedPersisted:true,
    closeReopen:true,parallelMigration:true,corruptMigrationBlocked:true,errors,external};
   fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
