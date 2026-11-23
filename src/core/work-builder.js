@@ -322,11 +322,11 @@ function qwBankInsertMarkup(input,kind){
  input.dispatchEvent(new Event('input',{bubbles:true}));
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
-function qwBankEdit(id,draft=null,returnFilters={}){
+async function qwBankEdit(id,draft=null,returnFilters={}){
  const creating=id===null;
  let stored;
  if(!creating){
-  try{stored=qwBankRead().find(x=>x.id===id);}catch(error){status(error.message,true);return;}
+  try{await qwBankOpen();stored=await qwBankRepository.getTask(id);}catch(error){status(error.message,true);return;}
   if(!stored){status('Задание больше не найдено в банке',true);return;}
  }
  draft??=creating
@@ -442,25 +442,19 @@ function qwBankEdit(id,draft=null,returnFilters={}){
  const back=()=>{d.close();qwBank(returnFilters);};
  d.querySelector('[data-qw-close]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-back"]').onclick=back;
- d.querySelector('[data-qw-action="bank-edit-save"]').onclick=()=>{
+ d.querySelector('[data-qw-action="bank-edit-save"]').onclick=async()=>{
   try{
+   await qwBankOpen();
    collect();if(!task.prompt.trim())throw Error('Условие задания не может быть пустым');
    if(draft.year&&!/^(19|20)\d{2}$/.test(draft.year))throw Error('Введите год из четырёх цифр');
    if(draft.slot&&!/^([1-9]|[1-3]\d|40)$/.test(draft.slot))throw Error('Номер задания: от 1 до 40');
    const candidate=qwBankNormalize({...draft,id:creating?draft.id:id,task});
-   const all=qwBankRead();
-   if(creating){
-    if(all.length>=500)throw Error('Локальный банк содержит 500 заданий. Экспортируйте QWBANK перед расширением.');
-    candidate.bankNumber=qwBankAllocateNumber(all);
-    all.push(candidate);
-   }else{
-    const index=all.findIndex(x=>x.id===id);
-    if(index<0)throw Error('Запись удалена из банка в другом окне');
-    all[index]=candidate;
-   }
-   localStorage.setItem(QW_BANK_KEY,JSON.stringify(all));
-   d.close();qwBank({...returnFilters,__view:candidate.id});
-   status(creating?'Задание добавлено в банк':'Задание сохранено в банке');
+   const saved=creating?
+    await qwBankRepository.createTask(candidate):
+    await qwBankRepository.updateTask(id,candidate,stored.revision);
+   await qwBankSnapshotSmall();
+   d.close();qwBank({...returnFilters,__view:saved.id});
+   status(creating?'Задание добавлено в IndexedDB':'Изменения сохранены в IndexedDB');
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
