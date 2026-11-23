@@ -34,6 +34,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task162-lau
     assert.equal(await p.locator('#qo-work-workspace').isVisible(),true,'constructor workspace opens');
     await p.locator('[data-action="route"][data-target="home"]').first().click();
     await p.locator('[data-action="launcher-bank"]').click();
+    await p.locator('#qw-dialog .qw-bank-filter-panel').waitFor({state:'visible'});
     assert.equal(await p.locator('#qw-dialog .qw-bank-filter-panel').count(),1,'bank opens from launcher');
     assert.equal(await p.locator('#qw-bank-search').count(),1);
     await p.screenshot({path:path.join(out,'bank-entry.png'),fullPage:true});
