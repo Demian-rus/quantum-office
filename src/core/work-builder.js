@@ -542,7 +542,7 @@ function qwBank(previousFilters={}){
   const answer=entry.task.answer?.trim()?qwRichMarkdownHTML(entry.task.answer):'<p>Ответ не указан.</p>';
   const details=entry.task.comment?.trim()?qwRichMarkdownHTML(entry.task.comment):'<p>Решение ещё не записано.</p>';
   const criteria=entry.task.criteria?.trim()?qwRichMarkdownHTML(entry.task.criteria):'<p>Критерии ещё не указаны.</p>';
-  const solutionTitle=/^\s*#{1,4}\s*Решение\b/i.test(entry.task.comment||'')?'':'<h3>Решение</h3>';
+  const solutionTitle=/(^|\n)\s*#{1,4}\s*Решение(?=\s|$)/i.test(entry.task.comment||'')?'':'<h3>Решение</h3>';
   host.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
    '<strong>№ '+number+'</strong><span>'+qwEsc(subject+' · '+designation)+'</span>'+
    (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+
