@@ -160,6 +160,31 @@ body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self
 body[data-qw-format="booklet"] .qw-booklet-bank-id{font:600 8.5pt/1.2 var(--qw-print-family);color:#333;white-space:nowrap;margin-right:1.5mm}
 
 
+/* TASK165: author text formatting is shared by bank preview and printed PDF.
+   Compact plain-text exercises do not get these rules. */
+.qw-task-text.qw-print-rich {min-width:0;line-height:1.36}
+.qw-print-rich p{margin:0 0 1.25mm;orphans:2;widows:2}
+.qw-print-rich p:last-child{margin-bottom:0}
+.qw-print-rich :is(h3,h4,h5){font:700 1em/1.25 var(--qw-print-family);margin:2mm 0 .8mm;break-after:avoid}
+.qw-print-rich :is(h3,h4,h5):first-child{margin-top:0}
+.qw-print-rich :is(ul,ol){padding-left:5mm;margin:1mm 0 1.7mm;line-height:1.3}
+.qw-print-rich li{padding-left:.2mm;margin:.4mm 0}
+.qw-print-rich blockquote{border-left:.55mm solid #8d969d;padding:.7mm 2mm;margin:1.3mm 0 1.7mm;break-inside:avoid}
+.qw-print-rich blockquote p{margin:0}
+.qw-print-rich code{font-family:'Courier New',monospace;font-size:.9em;background:#f2f2f2;overflow-wrap:anywhere}
+.qw-print-rich pre{white-space:pre-wrap;overflow-wrap:anywhere;font:9pt/1.3 'Courier New',monospace;margin:1.2mm 0 2mm;padding:2mm;background:#f5f5f5;break-inside:avoid}
+.qw-print-rich hr{border:0;border-top:.2mm solid #aaa;margin:2mm 0}
+.qw-print-rich .qw-rich-equation{text-align:center;max-width:100%;margin:1.3mm 0;break-inside:avoid}
+.qw-print-rich .qw-rich-equation math{max-width:100%}
+.qw-print-rich .qw-rich-table-scroll{max-width:100%;overflow:visible;margin:1.2mm auto}
+body[data-qw-format="answers"] .qw-print-rich .qw-rich-table-scroll{display:flex;justify-content:center;break-inside:avoid}
+.qw-print-rich table,.qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;break-inside:avoid}
+.qw-print-rich :is(th,td),.qw-task-tables :is(th,td){border:.2mm solid #888;padding:.7mm 1.5mm;text-align:left;vertical-align:middle;overflow-wrap:anywhere}
+.qw-print-rich th,.qw-task-tables th{font-weight:700;background:#f1f1f1}
+.qw-answer-long .qw-print-answer-heading{font:700 1em/1.25 var(--qw-print-family);margin:2.3mm 0 1mm;break-after:avoid}
+.qw-answer-long .qw-print-answer-heading:first-child{margin-top:0}
+body[data-qw-format="compact"] .qw-print-rich p,body[data-qw-format="booklet"] .qw-print-rich p{margin-bottom:.75mm}
+body:is([data-qw-format="compact"],[data-qw-format="booklet"]) .qw-print-rich :is(ul,ol){margin:.5mm 0 .9mm}
 /* TASK154 — one typographic system for all exported document formats. */
 body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
 body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
@@ -247,6 +272,9 @@ async function qwPreparePrintDocument(){
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
  const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide';
+ // display="block" MathML occupies its entire parent box even when the ink is narrow.
+ // Measure the mathematical child, not the full-width display container.
+ const mathInkWidth=math=>((math.getAttribute('display')==='block'?math.firstElementChild:null)||math).getBoundingClientRect().width;
  // Booklet-only MathML typographic correction; QWORK source is unchanged.
  if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
   const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
@@ -268,9 +296,12 @@ async function qwPreparePrintDocument(){
   const text=section.querySelector('.qw-task-text');
   // Move native tables after the complete condition, at any column count.
   const tables=[...text.querySelectorAll('table')];
-  if(tables.length){
+  if(tables.length&&format!=='answers'){
    const group=document.createElement('div');group.className='qw-task-tables';
-   for(const table of tables)group.append(table);
+   for(const table of tables){
+    const richWrapper=table.closest('.qw-rich-table-scroll');
+    group.append(richWrapper||table);
+   }
    text.after(group);
    if(figure)flow.classList.add('qw-figure-below');
   }
@@ -329,7 +360,7 @@ async function qwPreparePrintDocument(){
   if(format==='answers'&&text.classList.contains('qw-answer-columns')&&[...text.querySelectorAll('.qw-answer-item math')].some(m=>m.getBoundingClientRect().width>m.closest('.qw-answer-item').getBoundingClientRect().width))text.style.gridTemplateColumns='1fr';
   if(!modern&&!figure&&!section.querySelector('.qw-solution-preview')&&text.getBoundingClientRect().height<=parseFloat(getComputedStyle(text).lineHeight)*2+1)section.classList.add('qw-compact-task');
   // A wide indivisible expression gets the whole text width, without modifying QWORK.
-  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
+  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
   }
@@ -363,7 +394,7 @@ async function qwPreparePrintDocument(){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
    if(answer)text.append(answer);if(notes)text.append(notes);
   }
-  if([...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
+  if([...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
  const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';

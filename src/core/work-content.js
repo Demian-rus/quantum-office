@@ -97,6 +97,17 @@ function qwRichInline(source){
   return out+qwRichInlineText(text.slice(start));
  }).join('');
 }
+/* TASK165: leave ordinary legacy exercises byte-for-byte on the original PDF
+   text path. Only explicit Markdown syntax opts an individual field in. */
+function qwHasRichSyntax(value){
+ const text=String(value??'');
+ return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$)/m.test(text)||
+  /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])\*[^*\n]+\*|\$[^$\n]{1,600}\$/.test(text)||
+  /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
+}
+function qwPrintFieldHTML(value){
+ return qwHasRichSyntax(value)?qwRichMarkdownHTML(value):qwContentHTML(value);
+}
 function qwRichMarkdownHTML(value){
  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');
  const result=[];
@@ -532,4 +543,4 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
  }).join('')));
 }
-export {qwMath,qwMathML,qwTokens,qwContentHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
+export {qwMath,qwMathML,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
