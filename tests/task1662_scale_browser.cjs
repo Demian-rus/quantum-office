@@ -26,8 +26,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1662');
      return {id:'task1662-'+j,subject:'physics',grade:'11',exam:'ege',
       year:'2018',part:'1',slot:String(j%32+1),topic:'Динамика',task};
     });
-    const outcome=await qwBankRepository.importBank({format:'quantum-work-bank',version:1,items});
-    if(outcome.imported!==500)throw Error('Import partial');
+    const imported=await qwBankRepository.importBank({format:'quantum-work-bank',version:1,items});
+    if(imported.imported!==500)throw Error('Import partial');
     const count=start+500;
     if(!checkpoints.includes(count))continue;
     const t0=performance.now();
