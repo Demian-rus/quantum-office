@@ -18,6 +18,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await p.locator('#qw-dialog [data-bank-view="task164"]').click();
   await p.locator('#qw-dialog [data-bank-edit="task164"]').last().click();
   const editor=p.locator('.qw-bank-edit-dialog');
+  await editor.locator('.qw-bank-rich-editor').first().waitFor({state:'visible'});
   assert.equal(await editor.locator('.qw-bank-rich-editor').count(),3);
   assert.equal(await editor.locator('.qw-bank-edit-preview-side #qw-bank-edit-preview').count(),1,'live task preview appears beside input fields');
   const prompt=editor.locator('[data-bank-task-field="prompt"]');
@@ -44,6 +45,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await editor.locator('[data-bank-preview-toggle="criteria"]').click();
   await editor.locator('[data-qw-action="bank-edit-save"]').click();
   assert.equal(await p.evaluate(()=>qwBankRead().length),1,'existing bank record is updated, not duplicated');
+  await p.waitForFunction(()=>qwBankRead()[0]?.task.comment?.includes('### Обоснование'));
   const saved=await p.evaluate(()=>qwBankRead()[0]);
   assert.equal(saved.bankNumber,1901);assert.match(saved.task.comment,/### Обоснование/);assert.match(saved.task.criteria,/Элемент решения/);
   const catalog=p.locator('#qw-dialog');

@@ -35,7 +35,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
   await page.locator('[data-bank-select="task154-b"]').check();
   assert.match(await page.locator('#qw-bank-selected-count').innerText(),/2/);
   await page.locator('[data-qw-action="bank-assemble"]').click();
-  assert.ok(await page.locator('.qw-print-design-dialog').count());
+  await page.locator('.qw-print-design-dialog').waitFor();
   assert.ok(await page.locator('#qw-title-controls').count());
   const title=page.locator('[data-print-setting="titleText"]');
   assert.equal(await title.inputValue(),'Аналоги ЕГЭ 2018');

@@ -576,3 +576,13 @@
 .qw-bank-edit-side #qw-bank-edit-preview .qw-task-flow figure {max-width:50%}
 @media(max-width:820px){.qw-bank-edit-side{position:static}.qw-bank-edit-preview-side {margin-bottom:12px}}
 @media(max-width:570px){.qw-bank-catalogue .qw-bank-extra-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* TASK166.1 IndexedDB catalogue status: compact, readable, and not a backup claim. */
+.qw-bank-storage-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:7px 12px;margin-bottom:9px;border-radius:6px;background:var(--surface-2,#f1f5f9);font-size:12px;line-height:1.35}
+.qw-bank-storage-bar #qw-bank-storage-count{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.qw-bank-storage-bar #qw-bank-save-status{color:var(--muted,#506070);min-width:0}
+.qw-bank-storage-bar #qw-bank-save-status.qw-error{color:#b91c1c}
+.qw-bank-pages{display:flex;align-items:center;justify-content:center;gap:10px;padding:7px 4px;border-top:1px solid var(--border,#d9e1e7);font-size:12px}
+.qw-bank-pages button{min-width:75px;padding:5px 8px;white-space:nowrap}
+.qw-bank-pages output{min-width:75px;text-align:center;font-variant-numeric:tabular-nums}
+@media (max-width:720px){.qw-bank-storage-bar{align-items:flex-start;flex-direction:column;gap:3px}.qw-bank-pages{gap:4px}}

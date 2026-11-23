@@ -22,7 +22,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task156');
   assert.equal(await app.locator('.qw-bank-catalogue-list [data-bank-edit="task156-one"]').count(),1);
   assert.equal(await app.locator('.qw-bank-catalogue-preview [data-bank-edit="task156-one"]').count(),1,'preview has its own edit action');
   await app.locator('.qw-bank-catalogue-list [data-bank-edit="task156-one"]').click();
-  assert.ok(await app.locator('.qw-bank-edit-dialog').count());
+  await app.locator('.qw-bank-edit-dialog').waitFor();
   await app.locator('[data-bank-task-field="prompt"]').fill('Переработанная авторская задача: рассчитайте ускорение тела массой 2 кг');
   await app.locator('[data-bank-task-field="answer"]').fill('3');
   await app.locator('[data-bank-edit-field="topic"]').fill('Динамика');
