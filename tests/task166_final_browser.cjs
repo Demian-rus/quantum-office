@@ -57,7 +57,8 @@ const out=path.join(root,'evidence/task166');
    const repeatedCollision=await qwBankRepository.importBank({format:'quantum-work-bank',version:1,items:[sameIdDifferent]});
    const all=(await qwBankRepository.exportBank()).items;
    const filtered=await qwBankRepository.listTasks({topic:'Динамика',search:'условия, тема'},{offset:0,limit:30});
-   const changed=all.find(x=>x.task.answer==='18 Н');
+   const importedRecord=all.find(x=>x.task.answer==='18 Н');
+   const changed=await qwBankRepository.getTask(importedRecord.id); // QWBANK export omits internal revision.
    const saved=await qwBankRepository.updateTask(changed.id,{...changed,task:{...changed.task,comment:'Исправленная третья схема и решение'}},changed.revision);
    await qwBankRepository.close();await qwBankRepository.open();
    const reopened=(await qwBankRepository.exportBank()).items;
