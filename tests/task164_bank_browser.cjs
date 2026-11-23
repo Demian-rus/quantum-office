@@ -44,6 +44,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await editor.locator('[data-bank-preview-toggle="criteria"]').click();
   await editor.locator('[data-qw-action="bank-edit-save"]').click();
   assert.equal(await p.evaluate(()=>qwBankRead().length),1,'existing bank record is updated, not duplicated');
+  await p.waitForFunction(()=>qwBankRead()[0]?.task.comment?.includes('### Обоснование'));
   const saved=await p.evaluate(()=>qwBankRead()[0]);
   assert.equal(saved.bankNumber,1901);assert.match(saved.task.comment,/### Обоснование/);assert.match(saved.task.criteria,/Элемент решения/);
   const catalog=p.locator('#qw-dialog');
