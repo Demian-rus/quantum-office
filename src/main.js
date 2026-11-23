@@ -7,7 +7,7 @@ import {addDataRule,deleteDataRule,validationAt} from './core/validation.js';
 import {printSettings,changePrintSettings,selectedPrintArea,planPrint,printHTML} from './core/printing.js';
 import {smartTableRange,createSmartTable,appendSmartTableRow,extendSmartTableAfterEntry,removeSmartTable,cellHyperlink,setHyperlink,removeHyperlink,filterConditionMatches,validFilterRule,newWorkbook,newSheet,currentSheet,duplicateWorksheet,moveWorksheet,reorderWorksheet,getCell,setCell,setTypedCell,setStyle,refsBetween,rectangle,referencedFromOtherSheet,displayedValue,valuesTSV,pasteTSV,importCSV,exportCSV,validateWorkbook,createExample,createScheduleTemplate,createJournalTemplate,createBudgetTemplate,cellName,parseCell,LIMITS,fillSelection,fillTypedSelection,fillTypedAreas,fillAreasDirection,extendFillHandle,resultOf,sortSelectedRows,findCells,findWorkbookCells,planWorkbookReplacement,applyWorkbookReplacement,replaceAllText,clearFormatting,clearCellValues,planAutoSum,filterRange,filterRowVisible,setFreeze,setAutoFilter,setFilterValue,gridGeometry,firstVisibleIndex,columnWidth,rowHeight,setColumnWidth,setRowHeight,DIMENSIONS,rowVisible,columnVisible,setHidden,showAllHidden,mergeAt,mergeCells,unmergeCells,applyBorderPreset,setWholeSheetAlignment,setBulkColumnStyle,setRectangleStyle,getEffectiveStyle,resolveBorderSide,invalidateGridGeometry,FONT_FAMILIES } from './core/workbook.js';
 import {loadWorkspace,saveWorkspace,newWorkspace,encodeBook,decodeBook,encodeWorkspace,decodeWorkspace,STORE_KEY,PREVIOUS_KEY} from './core/store.js';
-import {encodeOfficeBackup,decodeOfficeBackup} from './core/office-backup.js';
+import {encodeOfficeBackup,decodeOfficeBackup,encodeOfficeBackupWithBank,decodeOfficeBackupWithBank,OFFICE_BACKUP_V3} from './core/office-backup.js';
 import {importXLSX,exportXLSX} from './core/xlsx.js';
 import {copyCells,pasteCells,pasteValuesCells,moveCells} from './core/clipboard.js';
 import {changeSheetStructure} from './core/structure.js';
@@ -239,17 +239,21 @@ async function openBookFromDisk(){
  }catch(error){if(error.name!=='AbortError')status(error.message||'Ошибка открытия',true);}
 }
 /* TASK134: full-project, versioned backup. Never say the download is a cloud save. */
-function backup(){
+async function backup(){
  commitEditor();
  if(page==='writer')qoPersistWriter();
  if(page==='slides')qoPersistSlides();
  if(page==='photo')qoPhotoPersist();
  try{
-  const content=encodeOfficeBackup(workspace,qoWriter,qoSlides,qoPhotoState());
-  download('Quantum-Office-полный-архив-'+new Date().toISOString().slice(0,10)+'.qbackup',
+  status('Снимок банка IndexedDB и расчёт SHA-256…');
+  await qwBankOpen();
+  const bank=await qwBankRepository.createVerifiedBackup();
+  status('Проверка архива четырёх редакторов и банка…');
+  const content=await encodeOfficeBackupWithBank(workspace,qoWriter,qoSlides,qoPhotoState(),bank);
+  download('Quantum-Office-все-данные-'+new Date().toISOString().slice(0,10)+'.qbackup',
    content,'application/json;charset=utf-8');
-  status('Архив четырёх редакторов готов. Банк задач IndexedDB НЕ включён: экспортируйте его отдельно в QWBANK.','warning');
- }catch(error){status('Архив не создан: '+(error.message||'ошибка сохранения'),true);}
+  status('Архив с банком SHA-256 подготовлен. Скачивание запрошено; проверьте файл на диске. Восстановление разделяется по хранилищам.','success');
+ }catch(error){status('Полный архив НЕ создан: '+(error.message||'ошибка сохранения')+'. Можно отдельно экспортировать старый .qbackup v2 через функцию encodeOfficeBackup.',true);}
 }
 /* A failed import must never leave half-restored documents or overwritten local drafts. */
 function qoRestoreOfficeBackup(snapshot){
@@ -284,9 +288,27 @@ function qoRestoreOfficeBackup(snapshot){
   throw Error('Восстановление прервано без применения неполного архива: '+error.message);
  }
 }
-async function importFile(file){if(!file)return;const maxSize=file.name.toLowerCase().endsWith('.qbackup')?55_000_000:15_000_000;if(file.size>maxSize){status('Файл слишком большой для этого формата',true);return;}try{
+async function importFile(file){if(!file)return;const maxSize=file.name.toLowerCase().endsWith('.qbackup')?325_000_000:15_000_000;if(file.size>maxSize){status('Файл слишком большой для этого формата',true);return;}try{
  const name=file.name.toLowerCase(),text=name.endsWith('.xlsx')?'':await file.text();
  if(name.endsWith('.qbackup')){
+  let header;try{header=JSON.parse(text);}catch{throw Error('Повреждённый JSON архива Office');}
+  if(header?.format===OFFICE_BACKUP_V3){
+   const checked=await decodeOfficeBackupWithBank(text);
+   const answer=confirm('Архив проверен SHA-256: четыре редактора и банк из '+
+    checked.bankSummary.count+' заданий.\n\n' +
+    'У IndexedDB и черновиков Office нет общей атомарной транзакции. '+
+    'Для безопасности банк извлекается отдельным файлом, а редакторы восстанавливаются отдельно.\n\n'+
+    'Скачать проверенный QWBANK v3 из общего архива?');
+   if(!answer)return;
+   download('QuantumOffice_банк_из_архива_Office.qwbank',
+    JSON.stringify(checked.bank),'application/json;charset=utf-8');
+   status('Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
+   if(confirm('Восстановить ТОЛЬКО четыре редактора сейчас?\n\n'+
+    'Банк IndexedDB пока НЕ изменится. Черновики редакторов будут заменены; '+
+    'при ошибке localStorage их откат ограничен возможностями браузера. '+
+    'Сохраните их отдельно перед подтверждением.'))qoRestoreOfficeBackup(checked.office);
+   return;
+  }
   const restored=decodeOfficeBackup(text);
   const detail=restored.legacy?
    'Этот архив старого формата содержит только книги таблиц.':
@@ -1133,7 +1155,7 @@ function topbar(){
  const brand=`<button class="logo" data-action="route" data-target="home" title="На главную"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 28 28" class="shell-brand"><rect x="3" y="3" width="22" height="22" rx="7" fill="url(#qoBrandUnified)"/><path d="M8.5 8.5h4.5a4 4 0 0 1 0 8H8.5z" fill="#DDF6EA"/><path d="M14 19.7h4.9" stroke="#DDF6EA" stroke-width="2.1" stroke-linecap="round"/><path d="M17.35 16.35a4.2 4.2 0 1 1 0-5.94" stroke="#DDF6EA" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/><defs><linearGradient id="qoBrandUnified" x1="4" y1="4" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#2FB580"/><stop offset="1" stop-color="#156548"/></linearGradient></defs></svg></span><span class="logo-wordmark">QUANTUM <b>OFFICE</b></span></button>`;
  const title=page==='writer'?`<input id="qo-writer-title" class="qo-shell-title-input" aria-label="Название текстового документа" maxlength="120" value="${esc(qoWriter.name)}" title="Переименовать документ">`:page==='slides'?`<input id="qo-slides-title" class="qo-shell-title-input" aria-label="Название презентации" maxlength="120" value="${esc(qoSlides.name)}" title="Переименовать презентацию">`:page==='photo'?`<input id="qs-project-title" class="qo-shell-title-input" aria-label="Название проекта" maxlength="120" value="${esc(qoPhotoFile)}">`:current?`<input id="book-name" aria-label="Название книги" value="${esc(current.name)}" maxlength="200" title="Изменить название книги">`:
   '<span class="qo-shell-placeholder">Quantum Office</span>';
- const actions=`<div class="global-right"><button class="qo-theme-toggle" data-action="theme-toggle" title="Оформление" aria-label="Выбрать тему оформления" aria-haspopup="dialog" aria-expanded="false">${qoHeaderIcon(qoGlobalTheme==='dark'?'sun':'moon')}</button><button class="shell-action" data-action="import" title="Открыть файл"><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('open')}</span><span>Открыть</span></button><button class="shell-action primary" data-action="save" title="Сохранить документ" ${(current||['writer','slides','photo'].includes(page))?'':'disabled'}><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('save')}</span><span>Сохранить</span></button><button class="icon-button" data-action="backup" title="Архив четырёх редакторов без банка заданий — для банка экспортируйте QWBANK" aria-label="Архив редакторов (банк заданий отдельно)">${qoHeaderIcon('backup')}</button></div>`;
+ const actions=`<div class="global-right"><button class="qo-theme-toggle" data-action="theme-toggle" title="Оформление" aria-label="Выбрать тему оформления" aria-haspopup="dialog" aria-expanded="false">${qoHeaderIcon(qoGlobalTheme==='dark'?'sun':'moon')}</button><button class="shell-action" data-action="import" title="Открыть файл"><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('open')}</span><span>Открыть</span></button><button class="shell-action primary" data-action="save" title="Сохранить документ" ${(current||['writer','slides','photo'].includes(page))?'':'disabled'}><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('save')}</span><span>Сохранить</span></button><button class="icon-button" data-action="backup" title="Общий архив v3: четыре редактора и проверенный банк SHA-256. Восстановление отдельно по хранилищам" aria-label="Резервная копия Office и банка">${qoHeaderIcon('backup')}</button></div>`;
  return `<header class="global-bar compact-shell qo-unified-shell">${brand}${tabs}<div class="shell-document"><div class="shell-doc-wrap">${title}<span class="shell-save" id="storage-indicator">● Черновик в браузере</span></div></div>${actions}</header>`;
 }
 function launcherIcon(kind){
@@ -1197,7 +1219,7 @@ function homepage(){
   <div class="launcher-template-actions launcher-template-empty" aria-hidden="true"></div>
  </section></div>
  <div class="launcher-secondary"><button data-action="example">Открыть пример таблицы</button><button data-action="import">Открыть файл XLSX / QBOOK / CSV</button><button data-action="open-disk">Открыть QBOOK с диска</button></div>
- <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Архив редакторов без IndexedDB-банка. Банк заданий экспортируется отдельно в QWBANK">Архив редакторов</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
+ <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Полная резервная копия: редакторы и банк заданий. Для восстановления нужны отдельные подтверждения">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
 }
 // TASK089: First usable offline Writer and Slides workspaces, independently saved.
 const qoDeskRead=(key,otherwise)=>{try{const raw=localStorage.getItem(key);return raw?JSON.parse(raw):otherwise;}catch{return otherwise;}};
