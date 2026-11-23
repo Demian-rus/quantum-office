@@ -174,7 +174,7 @@ async function qwPreview(output='tasks'){
   selected('monochrome',prefs.monochrome===true)+
   '</aside>';
  const answers='<div class="qw-row qw-preview-options">'+
-  ['includeComments','includeCriteria'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'" '+(qwDoc.tasks.some(q=>(k==='includeComments'?q.comment:q.criteria).trim())?'checked':'')+'>'+['Подробные решения','Критерии оценивания'][i]+'</label>').join('')+'</div>';
+  ['includeComments','includeCriteria'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'">'+['Подробные решения','Критерии оценивания'][i]+'</label>').join('')+'</div>';
  const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF',
   '<div class="qw-pdf-controls">'+(key?answers:qwLayoutCards(qwDoc.layout))+'</div>'+
   '<div class="qw-pdf-workspace">'+design+
