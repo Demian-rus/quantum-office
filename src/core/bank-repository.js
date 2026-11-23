@@ -276,7 +276,9 @@ class BankRepository{
      }else next=Math.max(next,bankNumber);
      if(bankNumber>BANK_NUMBER_LIMIT){fail(new BankStorageError('Номера банка закончились','BANK_NUMBERS_EXHAUSTED'));return;}
      used.add(bankNumber);
-     let id=bankIdentity();while(ids.has(id))id=bankIdentity();ids.add(id);
+     let id=e.id;
+     if(ids.has(id)){do{id=bankIdentity();}while(ids.has(id));}
+     ids.add(id);
      store.add({...e,id,bankNumber,revision:1,createdAt:now,updatedAt:now});imported++;
     }
     meta.put({key:'sequence',value:next});
