@@ -545,12 +545,22 @@ async function qwBank(previousFilters={}){
     '<section><h3>Ответ</h3>'+answer+'</section>'+
     '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
  }
- const refresh=()=>{
-  const search=pick('search').toLocaleLowerCase('ru-RU').trim();
+ const refresh=async()=>{
+  const token=++requestSequence;
   const keys=['subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'];
-  const shown=xs.filter(x=>keys.every(key=>{const value=pick(key);return value==='all'||(key==='type'?x.task.type:x[key])===value;})&&
-   [String(x.bankNumber),String(x.bankNumber).padStart(5,'0'),x.task.prompt,x.topic,x.subtopic,x.grade,x.task.answer,x.task.comment,x.task.criteria].some(value=>String(value||'').toLocaleLowerCase('ru-RU').includes(search)));
-  get('count').textContent='Найдено: '+shown.length+' / '+xs.length;
+  const query=Object.fromEntries(keys.map(key=>[key,pick(key)]));
+  query.search=pick('search').toLocaleLowerCase('ru-RU').trim();
+  get('count').textContent='Загрузка…';
+  let result;
+  try{result=await qwBankRepository.listTasks(query,{offset:pageOffset,limit:30});}
+  catch(e){if(token===requestSequence){get('count').textContent='Ошибка чтения';reportStatus(e.message,true);}return;}
+  if(token!==requestSequence||!d.isConnected)return;
+  xs=result.items;
+  get('count').textContent='Найдено: '+result.total+' / '+totalCount;
+  d.querySelector('#qw-bank-page').textContent=result.total?String(pageOffset+1)+'–'+String(pageOffset+xs.length)+' из '+result.total:'0';
+  d.querySelector('[data-bank-page="prev"]').disabled=pageOffset===0;
+  d.querySelector('[data-bank-page="next"]').disabled=!result.hasMore;
+  const shown=xs;
   const advanced=['grade','year','part','slot','difficulty','type','subtopic','origin'].filter(key=>pick(key)!=='all');
   d.querySelector('.qw-bank-extra-filters summary').textContent='Дополнительные фильтры'+(advanced.length?' · применено: '+advanced.length:'');
   const items=shown.map(x=>{
@@ -574,7 +584,12 @@ async function qwBank(previousFilters={}){
    '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
    '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Добавить</button></div>').join(''):'';
   d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено. Создайте задачу кнопкой «+ Новая задача».</p>';
-  if(!shown.some(x=>x.id===activeId))activeId=shown[0]?.id||'';
+  if(!shown.some(x=>x.id===activeId)){
+   const offPage=activeId?await qwBankRepository.getTask(activeId):null;
+   if(token!==requestSequence)return;
+   if(offPage&&!shown.some(x=>x.id===offPage.id))xs=[...shown,offPage];
+   else activeId=shown[0]?.id||'';
+  }
   showPreview();markSelection();
  };
  d.querySelector('[data-qw-action="bank-export"]').onclick=()=>{
@@ -632,7 +647,11 @@ async function qwBank(previousFilters={}){
   d.close();
   if(replace)qwPreview();
  }
- d.querySelector('#qw-bank-filters').addEventListener('input',refresh);
+ d.querySelector('#qw-bank-filters').addEventListener('input',()=>{pageOffset=0;void refresh();});
+ d.querySelectorAll('[data-bank-page]').forEach(button=>button.onclick=()=>{
+  pageOffset=Math.max(0,pageOffset+(button.dataset.bankPage==='next'?30:-30));
+  void refresh();
+ });
  d.addEventListener('change',e=>{
   const checkbox=e.target.closest('[data-bank-select]');
   if(!checkbox)return;
