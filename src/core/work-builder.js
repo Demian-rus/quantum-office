@@ -592,32 +592,35 @@ async function qwBank(previousFilters={}){
   }
   showPreview();markSelection();
  };
- d.querySelector('[data-qw-action="bank-export"]').onclick=()=>{
-  download('QuantumOffice_банк_заданий.qwbank',JSON.stringify({format:'quantum-work-bank',version:1,items:xs},null,2),'application/json');
+ d.querySelector('[data-qw-action="bank-export"]').onclick=async()=>{
+  try{
+   reportStatus('Подготовка экспорта…');
+   const payload=await qwBankRepository.exportBank();
+   download('QuantumOffice_банк_заданий.qwbank',JSON.stringify(payload,null,2),'application/json');
+   reportStatus('QWBANK экспортирован. Это отдельная копия данных.');
+  }catch(e){reportStatus('Экспорт не выполнен: '+e.message,true);status('Банк: '+e.message,true);}
  };
  const fileInput=d.querySelector('#qw-bank-import-file');
  d.querySelector('[data-qw-action="bank-import"]').onclick=()=>fileInput.click();
  fileInput.onchange=async()=>{
   const file=fileInput.files?.[0];fileInput.value='';if(!file)return;
   try{
-   if(file.size>18000000)throw Error('Файл больше 18 МБ');
-   const data=JSON.parse(await file.text());
-   if(data?.format!=='quantum-work-bank'||data.version!==1||!Array.isArray(data.items)||data.items.length>500)throw Error('Неподдерживаемый формат QWBANK');
-   const incoming=data.items.map(qwBankNormalize),seen=new Set(xs.map(signature)),additions=[];
-   const usedNumbers=new Set(xs.map(x=>x.bankNumber));
-   for(const x of incoming){
-    const key=signature(x);if(seen.has(key))continue;seen.add(key);
-    let number=x.bankNumber;
-    if(!number||usedNumbers.has(number))number=qwBankAllocateNumber([...xs,...additions]);
-    usedNumbers.add(number);additions.push({...x,id:qwId(),bankNumber:number});
-   }
-   if(xs.length+additions.length>500)throw Error('Превышен лимит 500 заданий');
-   if(!additions.length){status('Новых заданий нет');return;}
-   const next=[...xs,...additions];localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));
-   xs=next;fillYears();fillCategories();refresh();status('Импортировано: '+additions.length);
-  }catch(error){status('Импорт банка: '+error.message,true);}
+   if(file.size>240_000_000)throw Error('Файл больше 240 МБ — проверьте тип архива');
+   reportStatus('Проверка файла и импорт…');
+   const imported=await qwBankRepository.importBank(JSON.parse(await file.text()));
+   await qwBankSnapshotSmall();
+   const stats=await qwBankRepository.getStatistics();
+   totalCount=stats.count;
+   facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   fillYears();fillCategories();pageOffset=0;await refresh();
+   reportStatus('Сохранено: '+imported.imported+' · пропущено совпадений: '+imported.skipped);
+  }catch(error){
+   reportStatus('Импорт не выполнен: '+error.message,true);
+   status('Импорт банка: '+error.message,true);
+  }
  };
- const entries=()=>[...selected.keys()].map(id=>xs.find(x=>x.id===id)).filter(Boolean);
+ const entries=async()=> (await Promise.all([...selected.keys()].map(id=>qwBankRepository.getTask(id)))).filter(Boolean);
  function addTasks(choices,replace=false){
   if(!choices.length)return;
   if(choices.length+(replace?0:qwDoc.tasks.length)>80){status('В одной работе не более 80 заданий',true);return;}
@@ -675,8 +678,8 @@ async function qwBank(previousFilters={}){
    e.target.setAttribute('aria-pressed',String(on));
    return;
   }
-  if(action==='bank-assemble'){addTasks(entries(),true);return;}
-  if(action==='bank-add-selection'){addTasks(entries(),false);return;}
+  if(action==='bank-assemble'){void entries().then(found=>addTasks(found,true)).catch(error=>status(error.message,true));return;}
+  if(action==='bank-add-selection'){void entries().then(found=>addTasks(found,false)).catch(error=>status(error.message,true));return;}
   const edit=e.target.closest('[data-bank-edit]');
   if(edit){
    const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
@@ -693,9 +696,20 @@ async function qwBank(previousFilters={}){
    else status('Не удалось добавить задание',true);
   }
   if(del&&confirm('Удалить задание из личного банка?')){
-   const next=xs.filter(x=>x.id!==del.dataset.bankDelete);
-   try{localStorage.setItem(QW_BANK_KEY,JSON.stringify(next));xs=next;selected.delete(del.dataset.bankDelete);fillYears();fillCategories();refresh();}
-   catch(error){status('Не удалось изменить банк',true);}
+   const entry=xs.find(x=>x.id===del.dataset.bankDelete);
+   if(!entry)return;
+   void (async()=>{
+    try{
+     await qwBankRepository.deleteTask(entry.id,entry.revision);
+     await qwBankSnapshotSmall();
+     totalCount=(await qwBankRepository.getStatistics()).count;
+     facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+     d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+     selected.delete(entry.id);if(activeId===entry.id)activeId='';
+     fillYears();fillCategories();pageOffset=0;await refresh();
+     reportStatus('Удаление подтверждено базой данных.');
+    }catch(e){reportStatus('Удаление не выполнено: '+e.message,true);status(e.message,true);}
+   })();
   }
  };
  fillYears();fillCategories();
