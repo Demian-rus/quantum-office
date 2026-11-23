@@ -636,7 +636,7 @@ async function qwBank(previousFilters={}){
   showPreview();markSelection();
  };
 
- let backupController=null,restorePlan=null,protectionRequested=false,restoreBusy=false;
+ let backupController=null,restoreController=null,restorePlan=null,protectionRequested=false,restoreBusy=false;
  const backupButton=d.querySelector('[data-qw-action="bank-backup"]');
  const restoreButton=d.querySelector('[data-qw-action="bank-restore"]');
  const cancelBackup=d.querySelector('[data-qw-action="bank-cancel-backup"]');
@@ -648,7 +648,7 @@ async function qwBank(previousFilters={}){
  const acceptLabel=d.querySelector('#qw-bank-restore-accept-label');
  const details=d.querySelector('#qw-bank-restore-detail');
  const warning=d.querySelector('#qw-bank-restore-warning');
- d.addEventListener('close',()=>{backupController?.abort();qwBankRepository.cancelRestore();});
+ d.addEventListener('close',()=>{backupController?.abort();restoreController?.abort();qwBankRepository.cancelRestore();});
  cancelBackup.onclick=()=>{backupController?.abort();};
  async function bankMakeCopy(protect=false){
   if(backupController)throw Error('Операция резервного копирования уже выполняется');
@@ -676,6 +676,7 @@ async function qwBank(previousFilters={}){
   catch(e){reportStatus('Копия не создана: '+e.message,true);}
  };
  function dismissRestore(){
+  if(restoreBusy){restoreController?.abort();reportStatus('Прерывание восстановления…');return;}
   review.hidden=true;restorePlan=null;protectionRequested=false;accept.checked=false;
   qwBankRepository.cancelRestore();
  }
@@ -723,9 +724,10 @@ async function qwBank(previousFilters={}){
    ' существующих заданий на '+plan.count+
    ' из проверенной копии? Отмена после записи невозможна.'))return;
   restoreBusy=true;confirmRestore.disabled=true;restoreButton.disabled=true;
+  restoreController=new AbortController();
   try{
-   reportStatus('Атомарное восстановление IndexedDB. Не закрывайте страницу…');
-   const outcome=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode});
+   reportStatus('Атомарное восстановление IndexedDB. Можно нажать «Отмена», чтобы прервать незавершённую транзакцию.');
+   const outcome=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode,signal:restoreController.signal});
    await qwBankSnapshotSmall();
    totalCount=(await qwBankRepository.getStatistics()).count;
    facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
@@ -735,7 +737,7 @@ async function qwBank(previousFilters={}){
    reportStatus('Восстановлено и повторно проверено: '+outcome.restored+' заданий. Счётчик номеров сохранён.');
   }catch(e){
    reportStatus('Восстановление не подтверждено: '+e.message,true);
-  }finally{restoreBusy=false;restoreButton.disabled=false;if(restorePlan)confirmRestore.disabled=false;}
+  }finally{restoreController=null;restoreBusy=false;restoreButton.disabled=false;if(restorePlan)confirmRestore.disabled=false;}
  };
 
  d.querySelector('[data-qw-action="bank-export"]').onclick=async()=>{
