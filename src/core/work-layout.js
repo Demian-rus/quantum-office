@@ -271,6 +271,9 @@ async function qwPreparePrintDocument(){
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
  const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide';
+ // display="block" MathML occupies its entire parent box even when the ink is narrow.
+ // Measure the mathematical child, not the full-width display container.
+ const mathInkWidth=math=>((math.getAttribute('display')==='block'?math.firstElementChild:null)||math).getBoundingClientRect().width;
  // Booklet-only MathML typographic correction; QWORK source is unchanged.
  if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
   const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
@@ -356,7 +359,7 @@ async function qwPreparePrintDocument(){
   if(format==='answers'&&text.classList.contains('qw-answer-columns')&&[...text.querySelectorAll('.qw-answer-item math')].some(m=>m.getBoundingClientRect().width>m.closest('.qw-answer-item').getBoundingClientRect().width))text.style.gridTemplateColumns='1fr';
   if(!modern&&!figure&&!section.querySelector('.qw-solution-preview')&&text.getBoundingClientRect().height<=parseFloat(getComputedStyle(text).lineHeight)*2+1)section.classList.add('qw-compact-task');
   // A wide indivisible expression gets the whole text width, without modifying QWORK.
-  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
+  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>(modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
   }
@@ -390,7 +393,7 @@ async function qwPreparePrintDocument(){
    const answer=section.querySelector('.qw-answer-preview'),notes=section.querySelector('.qw-teacher-notes');
    if(answer)text.append(answer);if(notes)text.append(notes);
   }
-  if([...text.querySelectorAll('math')].some(m=>m.getBoundingClientRect().width>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
+  if([...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
  const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
