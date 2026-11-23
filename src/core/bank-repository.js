@@ -150,6 +150,10 @@ class BankRepository{
   // The user's old localStorage is deliberately left untouched as a safety copy.
   this.migration=saved;
  }
+ getLegacyRecovery(){
+  try{return this.legacyStorage?.getItem(BANK_LEGACY_KEY)??null;}
+  catch{return null;}
+ }
  async getTask(id){return bankRequest(this._db().transaction('tasks').objectStore('tasks').get(String(id)));}
  async listTasks(filters={},pagination={}){
   const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Number(pagination.limit)||30));
