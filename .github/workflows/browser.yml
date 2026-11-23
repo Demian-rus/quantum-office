@@ -606,6 +606,11 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: node tests/task166_final_browser.cjs
+      # Legacy bank/launcher E2E must stay green after async IndexedDB migration.
+      - run: node tests/task162_launcher_browser.cjs
+      - run: node tests/task163_bank_browser.cjs
+      - run: node tests/task164_bank_browser.cjs
+      - run: node tests/task165_rich_print_browser.cjs
       - run: node tests/task166_browser.cjs
       - run: node tests/task166_scale_browser.cjs
       - uses: actions/upload-artifact@v4
