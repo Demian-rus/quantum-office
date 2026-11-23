@@ -124,10 +124,30 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task166');
   assert.equal(broken.code,'LEGACY_CORRUPT');
   assert.equal(broken.source,'{ incomplete JSON');
   await corruptContext.close();
+  // Two windows may open the same unconverted localStorage bank at once.
+  // Exactly one IndexedDB write transaction must migrate the shared source.
+  const parallelContext=await browser.newContext({offline:true});
+  const a=await parallelContext.newPage(),b=await parallelContext.newPage();
+  await a.goto(url);await a.evaluate(()=>{
+   const make=id=>{
+    const task=qwTask('short');task.prompt='Параллельная миграция '+id;
+    return {id,bankNumber:id==='sim1'?7001:7002,subject:'physics',task};
+   };
+   localStorage.setItem(QW_BANK_KEY,JSON.stringify([make('sim1'),make('sim2')]));
+  });
+  await b.goto(url);
+  const [left,right]=await Promise.all([
+   a.evaluate(async()=>{await qwBankOpen();return (await qwBankRepository.getStatistics()).count;}),
+   b.evaluate(async()=>{await qwBankOpen();return (await qwBankRepository.getStatistics()).count;})
+  ]);
+  assert.deepEqual([left,right],[2,2],'parallel migration must be idempotent');
+  const afterParallel=await b.evaluate(async()=>qwBankRepository.exportBank());
+  assert.deepEqual(afterParallel.items.map(e=>e.id).sort(),['sim1','sim2']);
+  await parallelContext.close();
   assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
   const report={status:'PASS',environment:'Chromium offline file HTML',migration:{count:32,backup:true},
    pagination:30,roundtrip:true,revisionConflicts:true,importCollisions:true,deletedPersisted:true,
-   closeReopen:true,corruptMigrationBlocked:true,errors,external};
+   closeReopen:true,parallelMigration:true,corruptMigrationBlocked:true,errors,external};
   fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
   console.log('PASS TASK166: migration(32), read-only legacy backup, indexed catalogue pagination, revisions, import, restart, corruption');
  }finally{await browser.close();}
