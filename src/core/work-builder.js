@@ -517,13 +517,25 @@ async function qwBank(previousFilters={}){
   '</div></details>'+
   '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div><nav class="qw-bank-pages" aria-label="Страницы банка"><button type="button" data-bank-page="prev" disabled>Назад</button><output id="qw-bank-page"></output><button type="button" data-bank-page="next" disabled>Вперёд</button></nav></section>'+
   '<section class="qw-bank-catalogue-preview" aria-label="Подробный просмотр задания"><div id="qw-bank-preview"></div></section></div>';
- const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
-  qwButton('bank-new','+ Новая задача','class="qw-primary"')+qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
+ const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>'+
+  '<input type="file" id="qw-bank-restore-file" accept=".qwbank,.json,application/json" hidden>',
+  qwButton('bank-new','+ Новая задача','class="qw-primary"')+
+  qwButton('bank-backup','Создать резервную копию')+
+  qwButton('bank-restore','Восстановить из копии')+
+  qwButton('bank-cancel-backup','Отмена','hidden')+
+  qwButton('bank-export','Экспорт QWBANK v1/v2')+qwButton('bank-import','Импорт')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
  d.querySelector('.qw-dialog-body').insertAdjacentHTML('afterbegin',
-  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">IndexedDB · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">Автосохранение и резервная копия — разные действия.</span></div>');
+  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">IndexedDB · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">Банк хранится в профиле браузера. Создайте отдельную копию на диске.</span></div>'+
+  '<section id="qw-bank-restore-review" class="qw-bank-restore-review" hidden aria-label="Проверенная резервная копия">'+
+   '<h3>Проверка резервной копии</h3><p id="qw-bank-restore-detail"></p>'+
+   '<p id="qw-bank-restore-warning"></p>'+
+   '<button type="button" id="qw-bank-backup-current" hidden>Скачать защитную копию текущего банка</button>'+
+   '<label id="qw-bank-restore-accept-label" hidden><input type="checkbox" id="qw-bank-restore-accept"> Подтверждаю замену заданий после сохранения защитной копии</label>'+
+   '<button type="button" id="qw-bank-restore-confirm" class="qw-primary">Восстановить в пустой банк</button>'+
+   '<button type="button" id="qw-bank-restore-dismiss">Отмена</button></section>');
  const get=k=>d.querySelector('#qw-bank-'+k),pick=k=>get(k).value;
  const state=d.querySelector('#qw-bank-save-status');
  const reportStatus=(message,bad=false)=>{state.textContent=message;state.classList.toggle('qw-error',bad);};
@@ -623,6 +635,109 @@ async function qwBank(previousFilters={}){
   }
   showPreview();markSelection();
  };
+
+ let backupController=null,restorePlan=null,protectionRequested=false,restoreBusy=false;
+ const backupButton=d.querySelector('[data-qw-action="bank-backup"]');
+ const restoreButton=d.querySelector('[data-qw-action="bank-restore"]');
+ const cancelBackup=d.querySelector('[data-qw-action="bank-cancel-backup"]');
+ const restoreFile=d.querySelector('#qw-bank-restore-file');
+ const review=d.querySelector('#qw-bank-restore-review');
+ const accept=d.querySelector('#qw-bank-restore-accept');
+ const confirmRestore=d.querySelector('#qw-bank-restore-confirm');
+ const protectButton=d.querySelector('#qw-bank-backup-current');
+ const acceptLabel=d.querySelector('#qw-bank-restore-accept-label');
+ const details=d.querySelector('#qw-bank-restore-detail');
+ const warning=d.querySelector('#qw-bank-restore-warning');
+ d.addEventListener('close',()=>{backupController?.abort();qwBankRepository.cancelRestore();});
+ cancelBackup.onclick=()=>{backupController?.abort();};
+ async function bankMakeCopy(protect=false){
+  if(backupController)throw Error('Операция резервного копирования уже выполняется');
+  const ctrl=new AbortController();backupController=ctrl;
+  backupButton.disabled=true;restoreButton.disabled=true;cancelBackup.hidden=false;
+  try{
+   const archive=await qwBankRepository.createVerifiedBackup({
+    signal:ctrl.signal,onProgress:message=>reportStatus(message)
+   });
+   if(ctrl.signal.aborted)throw Error('Операция отменена');
+   reportStatus('Проверен SHA-256. Подготовка скачивания…');
+   await new Promise(resolve=>setTimeout(resolve,0));
+   const text=JSON.stringify(archive);
+   if(ctrl.signal.aborted)throw Error('Операция отменена');
+   download((protect?'QuantumOffice_банк_защитная_копия_':'QuantumOffice_банк_SHA256_')+
+    new Date().toISOString().slice(0,10)+'.qwbank',text,'application/json;charset=utf-8');
+   reportStatus('Архив проверен SHA-256, скачивание запрошено. Проверьте, что файл появился на диске.');
+   return archive;
+  }finally{
+   backupController=null;backupButton.disabled=false;restoreButton.disabled=false;cancelBackup.hidden=true;
+  }
+ }
+ backupButton.onclick=async()=>{
+  try{await bankMakeCopy();}
+  catch(e){reportStatus('Копия не создана: '+e.message,true);}
+ };
+ function dismissRestore(){
+  review.hidden=true;restorePlan=null;protectionRequested=false;accept.checked=false;
+  qwBankRepository.cancelRestore();
+ }
+ d.querySelector('#qw-bank-restore-dismiss').onclick=dismissRestore;
+ restoreButton.onclick=()=>{dismissRestore();restoreFile.click();};
+ restoreFile.onchange=async()=>{
+  const file=restoreFile.files?.[0];restoreFile.value='';if(!file)return;
+  restoreButton.disabled=true;
+  try{
+   if(file.size>260_000_000)throw Error('Архив слишком большой (максимум 260 МБ)');
+   reportStatus('Чтение файла, проверка структуры и SHA-256…');
+   const inspected=await qwBankRepository.inspectRestore(await file.text());
+   if(!d.isConnected){qwBankRepository.cancelRestore();return;}
+   restorePlan=inspected;protectionRequested=false;accept.checked=false;
+   details.textContent='Создан: '+new Date(inspected.createdAt).toLocaleString('ru-RU')+
+    ' · заданий: '+inspected.count+' · формат v'+inspected.version+
+    ' · SHA-256 проверен · '+Math.ceil(inspected.bytes/1024)+' КБ';
+   const hasOld=inspected.currentCount>0;
+   warning.textContent=hasOld?
+    'В банке уже есть '+inspected.currentCount+' заданий. Замена необратима без отдельной копии. Перед заменой скачайте защитную копию и проверьте её на диске.':
+    'Банк пуст. Записи и постоянные номера будут восстановлены из проверенного архива.';
+   protectButton.hidden=!hasOld;
+   acceptLabel.hidden=!hasOld;
+   confirmRestore.textContent=hasOld?'Заменить существующий банк':'Восстановить в пустой банк';
+   confirmRestore.disabled=hasOld;
+   review.hidden=false;
+   reportStatus('Архив проверен, данные не изменены. Выберите действие.');
+  }catch(e){dismissRestore();reportStatus('Восстановление запрещено: '+e.message,true);}
+  finally{restoreButton.disabled=false;}
+ };
+ protectButton.onclick=async()=>{
+  try{
+   await bankMakeCopy(true);
+   protectionRequested=true;
+   warning.textContent='Защитный файл запрошен на скачивание. Убедитесь, что он сохранён и открывается, прежде чем продолжать.';
+   confirmRestore.disabled=!accept.checked;
+  }catch(e){reportStatus('Не удалось подготовить защитную копию: '+e.message,true);}
+ };
+ accept.onchange=()=>{confirmRestore.disabled=!protectionRequested||!accept.checked;};
+ confirmRestore.onclick=async()=>{
+  if(restoreBusy||!restorePlan)return;
+  const plan=restorePlan,mode=plan.currentCount?'replace':'empty';
+  if(mode==='replace'&&(!protectionRequested||!accept.checked))return;
+  if(mode==='replace'&&!confirm('Заменить '+plan.currentCount+
+   ' существующих заданий на '+plan.count+
+   ' из проверенной копии? Отмена после записи невозможна.'))return;
+  restoreBusy=true;confirmRestore.disabled=true;restoreButton.disabled=true;
+  try{
+   reportStatus('Атомарное восстановление IndexedDB. Не закрывайте страницу…');
+   const outcome=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode});
+   await qwBankSnapshotSmall();
+   totalCount=(await qwBankRepository.getStatistics()).count;
+   facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   fillYears();fillCategories();pageOffset=0;await refresh();
+   dismissRestore();
+   reportStatus('Восстановлено и повторно проверено: '+outcome.restored+' заданий. Счётчик номеров сохранён.');
+  }catch(e){
+   reportStatus('Восстановление не подтверждено: '+e.message,true);
+  }finally{restoreBusy=false;restoreButton.disabled=false;if(restorePlan)confirmRestore.disabled=false;}
+ };
+
  d.querySelector('[data-qw-action="bank-export"]').onclick=async()=>{
   try{
    reportStatus('Подготовка экспорта…');
