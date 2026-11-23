@@ -39,8 +39,23 @@ function bankIdentity(){
  if(typeof crypto!=='undefined'&&typeof crypto.randomUUID==='function')return 'b'+crypto.randomUUID();
  return 'b'+Date.now().toString(36)+Math.random().toString(36).slice(2)+Math.random().toString(36).slice(2);
 }
+function bankCanonicalJSON(value){
+ // Deterministic deep comparison, including answers, solutions, rubrics,
+ // diagrams, graphs and images. Never use a short hash to prove equality.
+ if(Array.isArray(value))return '['+value.map(bankCanonicalJSON).join(',')+']';
+ if(value&&typeof value==='object'){
+  const fields=Object.keys(value).filter(k=>value[k]!==undefined).sort();
+  return '{'+fields.map(k=>JSON.stringify(k)+':'+bankCanonicalJSON(value[k])).join(',')+'}';
+ }
+ return JSON.stringify(value);
+}
 function bankSignature(e){
- return [e.subject,e.grade,e.exam,e.year,e.part,e.slot,e.topic,e.subtopic,e.task?.prompt?.trim().toLocaleLowerCase('ru-RU')].join('|');
+ // IDs and permanent bank numbers are allocation metadata, not task content.
+ // All other portable fields (including the complete validated QWORK task)
+ // must match before an imported entry may be safely skipped.
+ const content=bankPortable(e);
+ delete content.id;delete content.bankNumber;
+ return bankCanonicalJSON(content);
 }
 function bankClone(e){return structuredClone(e);}
 function bankPortable(e){
@@ -57,10 +72,16 @@ function bankSearchMatch(e,filters={}){
   e.topic,e.subtopic,e.grade].some(x=>String(x||'').toLocaleLowerCase('ru-RU').includes(term))))return false;
  return true;
 }
+function bankSafeGlobal(name){
+ // Accessing Window.localStorage or indexedDB can itself throw SecurityError
+ // for an opaque document origin (e.g. Playwright set_content).
+ try{return globalThis[name]??null;}catch{return null;}
+}
 class BankRepository{
- constructor({indexedDB=globalThis.indexedDB,legacyStorage=globalThis.localStorage,
-  normalize=e=>e,dbName=BANK_DB_NAME}={}){
-  this.factory=indexedDB;this.legacyStorage=legacyStorage;this.normalize=normalize;
+ constructor({indexedDB,legacyStorage,normalize=e=>e,dbName=BANK_DB_NAME}={}){
+  this.factory=indexedDB===undefined?bankSafeGlobal('indexedDB'):indexedDB;
+  this.legacyStorage=legacyStorage===undefined?bankSafeGlobal('localStorage'):legacyStorage;
+  this.normalize=normalize;
   this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;
  }
  async open(){
@@ -106,12 +127,46 @@ class BankRepository{
  }
  async _meta(key){return bankRequest(this._db().transaction('meta').objectStore('meta').get(key));}
  async _migrateLegacy(){
-  let raw;
-  try{raw=this.legacyStorage?.getItem(BANK_LEGACY_KEY);}
-  catch(e){throw new BankStorageError('Нельзя прочитать старый банк. Экспортируйте данные до продолжения.', 'LEGACY_READ');}
+  // Always inspect the durable marker BEFORE touching legacy localStorage.
+  // Once migration is confirmed, revoking localStorage must not hide the bank.
   const marker=await this._meta('legacyMigration');
-  if(marker){this.migration=marker;return;}
-  if(raw===null||raw===undefined){this.migration={key:'legacyMigration',state:'none'};return;}
+  if(marker){
+   if(marker.state==='complete'){
+    const backup=await this._meta('legacyBackup');
+    if(!backup||backup.hash!==marker.hash||typeof backup.raw!=='string'||
+     bankHash(backup.raw)!==marker.hash)
+     throw new BankStorageError('Контрольные данные переноса повреждены. Открытие остановлено.','LEGACY_VERIFY');
+   }else if(marker.state!=='none')
+    throw new BankStorageError('Неизвестный статус переноса. Открытие остановлено.','LEGACY_VERIFY');
+   this.migration=marker;return;
+  }
+  let raw;
+  try{
+   if(!this.legacyStorage||typeof this.legacyStorage.getItem!=='function')
+    throw new Error('localStorage недоступен');
+   raw=this.legacyStorage.getItem(BANK_LEGACY_KEY);
+  }catch(e){throw new BankStorageError('Нельзя проверить старый банк. Данные IndexedDB не изменены.','LEGACY_READ');}
+  if(raw===null||raw===undefined){
+   // A genuinely new bank must also receive an atomic initialization marker.
+   // Without it, a valid bank created later would appear "unconfirmed" when
+   // localStorage becomes unavailable, or an orphaned bank could be hidden.
+   this.migration=await bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
+    const meta=tx.objectStore('meta'),tasks=tx.objectStore('tasks');
+    const current=meta.get('legacyMigration');
+    current.onerror=()=>fail(current.error);
+    current.onsuccess=()=>{
+     if(current.result){set(current.result);return;}
+     const count=tasks.count();
+     count.onerror=()=>fail(count.error);
+     count.onsuccess=()=>{
+      if(count.result){fail(new BankStorageError('В базе есть записи без подтверждённой миграции.','LEGACY_CONFLICT'));return;}
+      const initialized={key:'legacyMigration',state:'none',createdAt:new Date().toISOString()};
+      meta.put(initialized);set(initialized);
+     };
+    };
+   });
+   return;
+  }
   let records;
   try{
    const input=JSON.parse(raw);
@@ -272,7 +327,7 @@ class BankRepository{
   const entries=data.items.map(e=>this._clean({...e,id:e.id||bankIdentity()}));
   return bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),meta=tx.objectStore('meta'),signatures=new Set(),used=new Set(),ids=new Set();
-   let high=0,sequence=0,started=false;
+   let high=0,sequence=0;
    const marker=meta.get('sequence');
    marker.onsuccess=()=>{sequence=Number(marker.result?.value)||0;};
    marker.onerror=()=>fail(marker.error);
