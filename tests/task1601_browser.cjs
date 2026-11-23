@@ -162,9 +162,9 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
     if(new Set(numbers).size!==3||new Set(entries.map(x=>x.id)).size!==3)throw Error('duplicate id after merge');
     if(original.bankNumber!==1807||imported.bankNumber===1807||legacy.bankNumber===1807)
      throw Error('collision overwrote local task identity');
-    if(['same-name-remote','legacy-no-number','original-local'].includes(imported.id)||
-     ['same-name-remote','legacy-no-number','original-local'].includes(legacy.id))
-     throw Error('imported source id should be newly allocated');
+    if(imported.id!=='same-name-remote'||legacy.id!=='legacy-no-number'||
+     imported.id===original.id||legacy.id===original.id)
+     throw Error('free imported QWBANK IDs must be preserved without aliasing local records');
     const task=qwTask('short');task.prompt=imported.task.prompt;
     task.source={kind:'bank',id:imported.id,number:imported.bankNumber,slot:imported.slot};
     const q=qwProject();q.tasks=[task];
