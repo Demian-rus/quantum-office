@@ -586,3 +586,13 @@
 .qw-bank-pages button{min-width:75px;padding:5px 8px;white-space:nowrap}
 .qw-bank-pages output{min-width:75px;text-align:center;font-variant-numeric:tabular-nums}
 @media (max-width:720px){.qw-bank-storage-bar{align-items:flex-start;flex-direction:column;gap:3px}.qw-bank-pages{gap:4px}}
+
+/* TASK166.2 — verified backup preview; compact and explicit about data replacement. */
+.qw-bank-restore-review{border:1px solid var(--line,#d6dce7);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--panel,#f8fafc);display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
+.qw-bank-restore-review[hidden],.qw-bank-restore-review [hidden]{display:none!important}
+.qw-bank-restore-review h3{width:100%;margin:0;font-size:14px}
+.qw-bank-restore-review p{width:100%;margin:0;font-size:12px;line-height:1.45}
+.qw-bank-restore-review #qw-bank-restore-warning{font-weight:550}
+.qw-bank-restore-review label{width:100%;font-size:12px}
+.qw-bank-restore-review button{font-size:12px;padding:6px 10px;cursor:pointer}
+.qw-bank-restore-review button:disabled{opacity:.6;cursor:not-allowed}

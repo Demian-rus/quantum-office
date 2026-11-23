@@ -1,3 +1,4 @@
+import {createBankBackupV3,verifyBankBackupV3,bankStableJSON} from './bank-backup.js';
 /* TASK166.1 — one durable bank repository for browser HTML.
    Future native SQLite implements the same asynchronous contract; no mock
    SQLite adapter is shipped with this browser implementation. */
@@ -82,7 +83,7 @@ class BankRepository{
   this.factory=indexedDB===undefined?bankSafeGlobal('indexedDB'):indexedDB;
   this.legacyStorage=legacyStorage===undefined?bankSafeGlobal('localStorage'):legacyStorage;
   this.normalize=normalize;
-  this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;
+  this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;this._restorePlan=null;
  }
  async open(){
   if(this.db)return this;
@@ -368,6 +369,164 @@ class BankRepository{
    };
   });
  }
+
+ /** Consistent bank snapshot, including metadata required to continue numbering.
+  * All reads occur inside one IndexedDB readonly transaction. */
+ async _captureBackupSnapshot(){
+  return bankTransaction(this._db(),['tasks','meta'],'readonly',(tx,set,fail)=>{
+   const records=[],result={records,meta:{sequence:0,legacyMigration:null,legacyBackup:null}};
+   let remaining=4;
+   const finish=()=>{if(!--remaining)set(result);};
+   const meta=tx.objectStore('meta');
+   for(const [key,field] of [['sequence','sequence'],['legacyMigration','legacyMigration'],['legacyBackup','legacyBackup']]){
+    const req=meta.get(key);
+    req.onerror=()=>fail(req.error);
+    req.onsuccess=()=>{
+     result.meta[field]=key==='sequence'?Number(req.result?.value)||0:req.result||null;
+     finish();
+    };
+   }
+   const cur=tx.objectStore('tasks').openCursor();
+   cur.onerror=()=>fail(cur.error);
+   cur.onsuccess=()=>{
+    const c=cur.result;
+    if(!c){finish();return;}
+    records.push(c.value);c.continue();
+   };
+  });
+ }
+ async createVerifiedBackup({signal,onProgress}={}){
+  await this.open();
+  if(signal?.aborted)throw new BankStorageError('Создание копии отменено','BACKUP_CANCELLED');
+  onProgress?.('Чтение согласованного снимка IndexedDB…');
+  const snapshot=await this._captureBackupSnapshot();
+  onProgress?.('Расчёт SHA-256 и проверка архива…');
+  const archive=await createBankBackupV3(snapshot,{signal});
+  onProgress?.('Проверка SHA-256 завершена');
+  return archive;
+ }
+ /** Preview verification never writes to IDB. Replaces a prior uncommitted plan. */
+ async inspectRestore(input,{signal}={}){
+  await this.open();
+  this._restorePlan=null;
+  const checked=await verifyBankBackupV3(input,{signal});
+  // The ordinary data normalizer validates QWORK content but MUST NOT
+  // change what is restored. Persist the original, complete record unchanged.
+  for(const r of checked.archive.records){
+   const clean=this._clean(r);
+   if(bankStableJSON(clean.task)!==bankStableJSON(r.task))
+    throw new BankStorageError('Нормализация меняет исходное содержание задания; восстановление запрещено','RESTORE_CONTENT');
+  }
+  const legacy=checked.archive.meta;
+  if(legacy.legacyMigration?.state==='complete'&&
+    (bankHash(legacy.legacyBackup?.raw||'')!==legacy.legacyBackup?.hash||
+     legacy.legacyMigration.hash!==legacy.legacyBackup.hash))
+   throw new BankStorageError('Исходная копия миграции повреждена','RESTORE_LEGACY');
+  const before=await this._captureBackupSnapshot();
+  const token=bankIdentity();
+  this._restorePlan={token,archive:structuredClone(checked.archive),before};
+  return {token,createdAt:checked.createdAt,count:checked.count,version:checked.version,
+   schema:checked.schema,sequence:checked.sequence,sha256:checked.sha256,
+   bytes:checked.bytes,currentCount:before.records.length,
+   mode:before.records.length?'replace':'empty'};
+ }
+ cancelRestore(){this._restorePlan=null;}
+ /** Single IndexedDB readwrite transaction: compare old complete snapshot,
+  * clear/rebuild tasks, replace numbering and migration metadata, or abort all.
+  * No deletion occurs before input SHA-256/structure/QWORK validation. */
+ async restoreVerifiedBackup({token,mode,signal,_injectAfterWrites}={}){
+  await this.open();
+  const plan=this._restorePlan;
+  if(!plan||plan.token!==token)
+   throw new BankStorageError('Предварительная проверка архива не найдена; проверьте файл заново','RESTORE_NOT_INSPECTED');
+  if(!['empty','replace'].includes(mode))
+   throw new BankStorageError('Укажите способ восстановления','RESTORE_MODE');
+  if(mode==='empty'&&plan.before.records.length)
+   throw new BankStorageError('Банк не пуст. Требуется явное подтверждение замены','RESTORE_NOT_EMPTY');
+  const validated=await verifyBankBackupV3(plan.archive,{signal});
+  if(signal?.aborted)throw new BankStorageError('Восстановление отменено','RESTORE_CANCELLED');
+  const expected=plan.before;
+  const archived=validated.archive;
+  await bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
+   const store=tx.objectStore('tasks'),meta=tx.objectStore('meta');
+   const cancelled=()=>fail(new BankStorageError('Восстановление отменено','RESTORE_CANCELLED'));
+   if(signal){
+    signal.addEventListener('abort',cancelled,{once:true});
+    tx.addEventListener('complete',()=>signal.removeEventListener('abort',cancelled),{once:true});
+    tx.addEventListener('abort',()=>signal.removeEventListener('abort',cancelled),{once:true});
+    if(signal.aborted){cancelled();return;}
+   }
+   // Serialize writer and restore in one transaction; compare every prior row
+   // and metadata against the inspected snapshot to reject changes from tabs.
+   let index=0;
+   const cursor=store.openCursor();
+   cursor.onerror=()=>fail(cursor.error);
+   cursor.onsuccess=()=>{
+    const c=cursor.result;
+    if(c){
+     if(index>=expected.records.length||
+      bankStableJSON(c.value)!==bankStableJSON(expected.records[index++])){
+      fail(new BankStorageError('Банк изменился после проверки архива. Проверьте архив заново.','RESTORE_CONFLICT'));return;
+     }
+     c.continue();return;
+    }
+    if(index!==expected.records.length){
+     fail(new BankStorageError('Количество записей изменилось','RESTORE_CONFLICT'));return;
+    }
+    const values={};
+    const names=['sequence','legacyMigration','legacyBackup'];
+    let left=names.length;
+    for(const key of names){
+     const req=meta.get(key);
+     req.onerror=()=>fail(req.error);
+     req.onsuccess=()=>{
+      values[key]=key==='sequence'?Number(req.result?.value)||0:req.result||null;
+      if(!--left){
+       const current={sequence:values.sequence,legacyMigration:values.legacyMigration,legacyBackup:values.legacyBackup};
+       if(bankStableJSON(current)!==bankStableJSON(expected.meta)){
+        fail(new BankStorageError('Метаданные банка изменились в другом окне','RESTORE_CONFLICT'));return;
+       }
+       try{
+        store.clear();
+        let writes=0;
+        for(const record of archived.records){
+         if(signal?.aborted){cancelled();return;}
+         store.add(record);
+         writes++;
+         if(Number.isInteger(_injectAfterWrites)&&writes===_injectAfterWrites){
+          fail(new BankStorageError('Сбой во время восстановления (тест)','RESTORE_INJECTED'));return;
+         }
+        }
+        meta.put({key:'sequence',value:archived.meta.sequence});
+        const marker=archived.meta.legacyMigration||
+         {key:'legacyMigration',state:'none',createdAt:new Date().toISOString()};
+        meta.put({...marker,key:'legacyMigration'});
+        if(archived.meta.legacyBackup)meta.put({...archived.meta.legacyBackup,key:'legacyBackup'});
+        else meta.delete('legacyBackup');
+        meta.put({key:'lastRestore',at:new Date().toISOString(),count:archived.count,sha256:archived.manifest.sha256});
+        set({count:archived.count,sequence:archived.meta.sequence});
+       }catch(error){fail(error);}
+      }
+     };
+    }
+   };
+  });
+  this.migration=archived.meta.legacyMigration||{state:'none'};
+  this._restorePlan=null;
+  // Post-commit exhaustive check, not a claim of cross-storage atomicity.
+  const after=await this._captureBackupSnapshot();
+  if(after.records.length!==archived.records.length||
+   bankStableJSON(after.records.slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0))!==
+   bankStableJSON(archived.records.slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0))||
+   after.meta.sequence!==archived.meta.sequence||
+   (archived.meta.legacyMigration?
+    bankStableJSON(after.meta.legacyMigration)!==bankStableJSON(archived.meta.legacyMigration):
+    after.meta.legacyMigration?.state!=='none')||
+   bankStableJSON(after.meta.legacyBackup)!==bankStableJSON(archived.meta.legacyBackup||null))
+   throw new BankStorageError('Контроль после записи не совпал. Не считайте восстановление успешным.','RESTORE_VERIFY');
+  return {restored:archived.count,sequence:archived.meta.sequence,verified:true};
+ }
+
  async exportBank(){
   const items=await bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
    const list=[],req=tx.objectStore('tasks').openCursor();
