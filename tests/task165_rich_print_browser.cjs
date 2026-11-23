@@ -56,14 +56,17 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task165-ric
    const a=await rendered(orientation,'answers',{includeComments:true,includeCriteria:true});
    const detail=await a.evaluate(()=>{
     const sections=[...document.querySelectorAll('.qw-print-section')],s=sections.find(x=>x.dataset.task==='5');
-    const table=s?.querySelector('.qw-task-tables table');
+    const table=s?.querySelector('.qw-task-text .qw-rich-table-scroll table');
+    const h=[...s.querySelectorAll('h3,h4,h5')].find(x=>x.textContent.includes('Критерии'));
+    const tb=table?.getBoundingClientRect(),title=h?.getBoundingClientRect(),region=s?.querySelector('.qw-task-text')?.getBoundingClientRect();
     return {rich:!!s?.querySelector('.qw-print-rich'),math:!!s?.querySelector('math'),table:!!table,
      solution:s?.textContent?.includes('Решение'),criteria:s?.textContent?.includes('Критерии оценивания'),
-     tableAfterText:!!table&&table.getBoundingClientRect().top>=s.querySelector('.qw-task-text').getBoundingClientRect().bottom-1,
+     tableAfterCriteria:!!tb&&!!title&&tb.top>=title.bottom-1,
+     tableCentered:!!tb&&!!region&&Math.abs((tb.left+tb.right-region.left-region.right)/2)<4,
      count:window.__qwPrintLayout?.pages?.length||0};
    });
    assert.equal(detail.rich,true);assert.equal(detail.math,true);assert.equal(detail.table,true);
-   assert.equal(detail.solution,true);assert.equal(detail.criteria,true);assert.equal(detail.tableAfterText,true);
+   assert.equal(detail.solution,true);assert.equal(detail.criteria,true);assert.equal(detail.tableAfterCriteria,true);assert.equal(detail.tableCentered,true);
    assert.ok(detail.count>=1);
    await a.screenshot({path:path.join(out,'answers-'+orientation+'.png'),fullPage:true});
    await a.close();
