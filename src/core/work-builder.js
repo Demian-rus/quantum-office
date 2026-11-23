@@ -459,10 +459,16 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
  };
  preview();
 }
-function qwBank(previousFilters={}){
- let xs;try{xs=qwBankRead();}catch(e){status(e.message,true);return;}
+async function qwBank(previousFilters={}){
+ let xs=[],facets,totalCount=0;
+ try{
+  await qwBankOpen();
+  await qwBankSnapshotSmall();
+  const stats=await qwBankRepository.getStatistics();
+  totalCount=stats.count;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+ }catch(e){status('Банк не открыт: '+e.message,true);return;}
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
- let activeId=previousFilters.__view||xs[0]?.id||'';
+ let activeId=previousFilters.__view||'',pageOffset=0,requestSequence=0;
  const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
   '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие, ответ или тема"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
@@ -478,23 +484,27 @@ function qwBank(previousFilters={}){
    '<label>Подтема<select id="qw-bank-subtopic"></select></label>'+
    '<label>Происхождение<select id="qw-bank-origin">'+qwOptions([['all','Все'],['original','Авторская'],['adapted','Аналог'],['generated','С помощью ИИ']],'all')+'</select></label>'+
   '</div></details>'+
-  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div></section>'+
+  '</div><div class="qw-bank-selection-line"><output id="qw-bank-count" role="status"></output><strong id="qw-bank-selected-count">Выбрано: 0</strong></div><div id="qw-bank-list" class="qw-bank-catalogue-list"></div><nav class="qw-bank-pages" aria-label="Страницы банка"><button type="button" data-bank-page="prev" disabled>Назад</button><output id="qw-bank-page"></output><button type="button" data-bank-page="next" disabled>Вперёд</button></nav></section>'+
   '<section class="qw-bank-catalogue-preview" aria-label="Подробный просмотр задания"><div id="qw-bank-preview"></div></section></div>';
  const d=qwDialog('Банк заданий',filters+'<input type="file" id="qw-bank-import-file" accept=".qwbank,application/json" hidden>',
   qwButton('bank-new','+ Новая задача','class="qw-primary"')+qwButton('bank-export','Экспорт')+qwButton('bank-import','Импорт')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
+ d.querySelector('.qw-dialog-body').insertAdjacentHTML('afterbegin',
+  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">IndexedDB · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">Автосохранение и резервная копия — разные действия.</span></div>');
  const get=k=>d.querySelector('#qw-bank-'+k),pick=k=>get(k).value;
+ const state=d.querySelector('#qw-bank-save-status');
+ const reportStatus=(message,bad=false)=>{state.textContent=message;state.classList.toggle('qw-error',bad);};
  function fillYears(){
   const old=pick('year');
-  const years=[...new Set([...xs.map(x=>x.year).filter(Boolean),'2018'])].sort((a,b)=>Number(b)-Number(a));
+  const years=[...new Set([...(facets.year||[]),'2018'])].sort((a,b)=>Number(b)-Number(a));
   get('year').innerHTML=qwOptions([['all','Все годы'],...years.map(v=>[v,v])],years.includes(old)?old:'all');
  }
  function fillCategories(){
   for(const key of ['topic','subtopic']){
    const control=get(key),old=control.value||'all';
-   const names=[...new Set(xs.map(x=>x[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ru'));
+   const names=[...new Set(facets[key]||[])].sort((a,b)=>a.localeCompare(b,'ru'));
    control.innerHTML=qwOptions([['all',key==='topic'?'Все темы':'Все подтемы'],...names.map(name=>[name,name])],names.includes(old)?old:'all');
   }
  }
