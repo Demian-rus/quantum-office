@@ -235,19 +235,10 @@ async function qwPreview(output='tasks'){
  printButton.onclick=()=>qwPrintTextPDF(false,options());
  refresh();
 }
-const QW_BANK_NUMBER_KEY='quantum-office.work-bank.number-sequence.v1';
-function qwBankNumber(value){
- return Number.isInteger(value)&&value>0&&value<=99999?value:0;
-}
-function qwBankAllocateNumber(items=[]){
- const used=new Set(items.map(x=>qwBankNumber(x.bankNumber)).filter(Boolean));
- const last=Number(localStorage.getItem(QW_BANK_NUMBER_KEY))||0;
- let next=Math.max(last,...used,0)+1;
- while(used.has(next)&&next<=99999)next++;
- if(next>99999)throw Error('Диапазон номеров банка исчерпан (99999)');
- localStorage.setItem(QW_BANK_NUMBER_KEY,String(next));
- return next;
-}
+/* TASK166.1: IndexedDB is the only live bank. These short-lived snapshots only
+   support older UI/tests at <=500 items; never act as a persistence backend. */
+let qwBankSnapshot=[];
+function qwBankNumber(value){return Number.isInteger(value)&&value>0&&value<=99999?value:0;}
 function qwBankNormalize(x){
  if(!x||typeof x!=='object'||!x.task)throw Error('Некорректная запись банка');
  const task=qwValidate({...qwProject(),tasks:[x.task]}).tasks[0];
@@ -260,19 +251,13 @@ function qwBankNormalize(x){
   slot:/^([1-9]|[1-3]\d|40)$/.test(String(x.slot??''))?String(x.slot):'',
   difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
-function qwBankRead(){
- const raw=localStorage.getItem(QW_BANK_KEY);if(!raw)return [];
- const xs=JSON.parse(raw);if(!Array.isArray(xs)||xs.length>500)throw Error('Повреждён банк заданий');
- const entries=xs.map(qwBankNormalize),seen=new Set();let changed=false;
- for(const entry of entries){
-  if(!entry.bankNumber||seen.has(entry.bankNumber)){
-   entry.bankNumber=qwBankAllocateNumber(entries);changed=true;
-  }
-  seen.add(entry.bankNumber);
- }
- if(changed)localStorage.setItem(QW_BANK_KEY,JSON.stringify(entries));
- return entries;
+const qwBankRepository=createBankRepository({normalize:qwBankNormalize});
+async function qwBankOpen(){await qwBankRepository.open();return qwBankRepository;}
+async function qwBankSnapshotSmall(){
+ const stats=await qwBankRepository.getStatistics();
+ qwBankSnapshot=stats.count<=500?(await qwBankRepository.exportBank()).items:[];
 }
+function qwBankRead(){return structuredClone(qwBankSnapshot);}
 function qwBankSave(){
  const q=qwCurrent();if(!q)return;
  if(!q.prompt.trim()){status('Заполните условие задания перед сохранением в банк',true);return;}
