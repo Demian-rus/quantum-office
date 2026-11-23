@@ -128,20 +128,35 @@ class BankRepository{
    if(high>BANK_NUMBER_LIMIT)throw new BankStorageError('Исчерпаны номера банка','BANK_NUMBERS_EXHAUSTED');
    r.bankNumber=high;numbers.add(high);
   }
-  const existing=await bankRequest(this._db().transaction('tasks').objectStore('tasks').count());
-  if(existing)throw new BankStorageError('В базе есть задания без отметки о переносе. Автоматическое объединение запрещено.', 'LEGACY_CONFLICT');
   let oldSeq=0;
   try{oldSeq=Number(this.legacyStorage?.getItem(BANK_LEGACY_COUNTER_KEY))||0;}catch{}
   const digest=bankHash(raw),when=new Date().toISOString();
   await bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),meta=tx.objectStore('meta');
-   try{
-    for(const r of records)store.add({...r,createdAt:when,updatedAt:when,revision:1});
-    meta.put({key:'legacyBackup',raw,hash:digest,createdAt:when});
-    meta.put({key:'sequence',value:Math.max(high,Math.min(BANK_NUMBER_LIMIT,oldSeq))});
-    const marker={key:'legacyMigration',state:'complete',count:records.length,hash:digest,createdAt:when};
-    meta.put(marker);set(marker);
-   }catch(e){fail(e);}
+   // The marker and count are rechecked INSIDE the transaction. Two windows
+   // launching migration together therefore cannot half-import the same bank.
+   const current=meta.get('legacyMigration');
+   current.onerror=()=>fail(current.error);
+   current.onsuccess=()=>{
+    if(current.result){
+     if(current.result.hash!==digest||current.result.count!==records.length)
+      fail(new BankStorageError('Два окна обнаружили разные версии старого банка. Перенос остановлен.','LEGACY_CONFLICT'));
+     else set(current.result);
+     return;
+    }
+    const count=store.count();
+    count.onerror=()=>fail(count.error);
+    count.onsuccess=()=>{
+     if(count.result){fail(new BankStorageError('База содержит записи без подтверждённой миграции.','LEGACY_CONFLICT'));return;}
+     try{
+      for(const r of records)store.add({...r,createdAt:when,updatedAt:when,revision:1});
+      meta.put({key:'legacyBackup',raw,hash:digest,createdAt:when});
+      meta.put({key:'sequence',value:Math.max(high,Math.min(BANK_NUMBER_LIMIT,oldSeq))});
+      const marker={key:'legacyMigration',state:'complete',count:records.length,hash:digest,createdAt:when};
+      meta.put(marker);set(marker);
+     }catch(error){fail(error);}
+    };
+   };
   });
   const count=await bankRequest(this._db().transaction('tasks').objectStore('tasks').count());
   const saved=await this._meta('legacyMigration');
