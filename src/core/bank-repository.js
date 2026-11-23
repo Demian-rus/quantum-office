@@ -93,7 +93,12 @@ class BankRepository{
  async _open(){
   if(!this.factory)throw new BankStorageError('IndexedDB недоступна. Банк не будет записан; сохраните QWBANK.', 'IDB_UNAVAILABLE');
   const db=await new Promise((resolve,reject)=>{
-   const request=this.factory.open(this.dbName,BANK_DB_VERSION);
+   let request;
+   try{request=this.factory.open(this.dbName,BANK_DB_VERSION);}
+   catch(error){
+    reject(new BankStorageError('IndexedDB запрещена или недоступна в этом окне. Остальные редакторы работают; для банка откройте файл в обычном профиле браузера.', 'IDB_UNAVAILABLE'));
+    return;
+   }
    request.onupgradeneeded=()=>{
     const db=request.result,tx=request.transaction;
     const tasks=db.objectStoreNames.contains('tasks')?tx.objectStore('tasks'):
