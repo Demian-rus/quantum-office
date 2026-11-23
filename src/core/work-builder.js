@@ -89,7 +89,7 @@ function qwAnswerSections(d,options={}){
   if(q.type==='extended'||q.answer.length>70||q.answer.includes('\n')||details||richAnswer){
    flush();
    const answer=qwPrintFieldHTML(q.answer.trim()||'—');
-   const solutionTitle=/(^|\n)\s*#{1,4}\s*Решение\b/i.test(q.comment)?'':'<h3 class="qw-print-answer-heading">Решение</h3>';
+   const solutionTitle=/(^|\n)\s*#{1,4}\s*Решение(?=\s|$)/i.test(q.comment)?'':'<h3 class="qw-print-answer-heading">Решение</h3>';
    const criteriaTitle=/^\s*#{1,4}\s*[^\n]*критери/i.test(q.criteria)?'':'<h3 class="qw-print-answer-heading">Критерии оценивания</h3>';
    const body=(details?'<h3 class="qw-print-answer-heading">Ответ</h3>':'')+answer+
     (showSolution?solutionTitle+qwPrintFieldHTML(q.comment):'')+
