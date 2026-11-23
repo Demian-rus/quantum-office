@@ -605,6 +605,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium
+      - run: node tests/task166_final_browser.cjs
       - run: node tests/task166_browser.cjs
       - run: node tests/task166_scale_browser.cjs
       - uses: actions/upload-artifact@v4
@@ -620,6 +621,7 @@ jobs:
             scripts/build.mjs
             tests/task166.test.js
             tests/task166_browser.cjs
+            tests/task166_final_browser.cjs
             tests/task166_scale_browser.cjs
             docs/TASK166.md
             docs/PROJECT_CONTEXT.md
