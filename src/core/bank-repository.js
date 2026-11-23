@@ -236,7 +236,10 @@ class BankRepository{
   const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
    (filters.type&&filters.type!=='all'?'type':null);
   return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
-   const store=tx.objectStore('tasks'),source=key?store.index(key):store;
+   // A catalogue without category filters is ordered by permanent numeric
+   // bankNumber, not by lexical UUID/ID. This also keeps the initial preview
+   // consistent with the first displayed numbered task.
+   const store=tx.objectStore('tasks'),source=key?store.index(key):store.index('bankNumber');
    const req=source.openCursor(key?IDBKeyRange.only(filters[key]):null);
    const items=[];let total=0;
    req.onerror=()=>fail(req.error||Error('Ошибка поиска по банку'));
