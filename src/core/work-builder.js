@@ -485,7 +485,19 @@ async function qwBank(previousFilters={}){
   await qwBankSnapshotSmall();
   const stats=await qwBankRepository.getStatistics();
   totalCount=stats.count;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
- }catch(e){status('Банк не открыт: '+e.message,true);return;}
+ }catch(e){
+  status('Банк не открыт: '+e.message,true);
+  const raw=qwBankRepository.getLegacyRecovery();
+  if(raw!==null){
+   const recovery=qwDialog('Ошибка открытия банка',
+    '<p class="qw-error">IndexedDB не подтвердила сохранность данных. Автоматического переключения нет.</p>'+
+    '<p>'+qwEsc(e.message)+'</p><p>Исходный localStorage сохранён без изменений. Скачайте его перед дальнейшими действиями.</p>',
+    qwButton('bank-recover-raw','Скачать старые данные','class="qw-primary"'));
+   recovery.querySelector('[data-qw-action="bank-recover-raw"]').onclick=()=>
+    download('QuantumOffice_старый_банк_восстановление.json',raw,'application/json');
+  }
+  return;
+ }
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
  let activeId=previousFilters.__view||'',pageOffset=0,requestSequence=0;
  const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
