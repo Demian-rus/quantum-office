@@ -273,9 +273,9 @@ function qwBankSave(){
   '<label>Подтема<input id="qw-bank-new-subtopic" maxlength="120" placeholder="Кинематика" value="'+qwEsc(q.subtopic)+'"></label>'+
   '<label>Происхождение<select id="qw-bank-new-origin">'+qwOptions([['original','Авторская задача'],['adapted','Самостоятельный аналог'],['generated','С помощью ИИ']],q.origin)+'</select></label></div>';
  const d=qwDialog('Сохранить задание в банк',fields,qwButton('confirm-bank-save','Добавить','class="qw-primary"'));
- d.querySelector('[data-qw-action="confirm-bank-save"]').onclick=()=>{
+ d.querySelector('[data-qw-action="confirm-bank-save"]').onclick=async()=>{
   try{
-   const xs=qwBankRead();if(xs.length>=500)throw Error('Достигнут лимит 500 заданий. Создайте резервную копию банка.');
+   await qwBankOpen();
    const get=k=>d.querySelector('#qw-bank-new-'+k).value;
    const metadata={subject:get('subject'),grade:get('grade').trim().slice(0,24),exam:get('exam'),
     topic:get('topic').trim().slice(0,120),subtopic:get('subtopic').trim().slice(0,120),origin:get('origin'),
@@ -284,9 +284,9 @@ function qwBankSave(){
    if(metadata.slot&&!/^([1-9]|[1-3]\d|40)$/.test(metadata.slot))throw Error('Номер задания: 1–40');
    const task=structuredClone(q);Object.assign(task,{grade:metadata.grade,exam:metadata.exam,
     topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
-   xs.push(qwBankNormalize({id:qwId(),bankNumber:qwBankAllocateNumber(xs),...metadata,task}));
-   localStorage.setItem(QW_BANK_KEY,JSON.stringify(xs));
-   d.close();status('Задание сохранено в банке');
+   await qwBankRepository.createTask(qwBankNormalize({id:qwId(),bankNumber:0,...metadata,task}));
+   await qwBankSnapshotSmall();
+   d.close();status('Задание сохранено в IndexedDB');
   }catch(e){status('Банк: '+e.message,true);}
  };
 }
