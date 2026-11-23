@@ -201,6 +201,72 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1662');
    catch(e){return e.message;}
   },tampered);
   assert.match(officeErr,/SHA-256/);
+
+  // The production general backup button now bundles real IndexedDB content.
+  // Its verified bank component remains independent on .qbackup v3 restore.
+  await ep.locator('#qw-dialog [data-qw-close]').click();
+  const [officeDownload]=await Promise.all([
+   ep.waitForEvent('download'),
+   ep.locator('.global-right [data-action="backup"]').click()
+  ]);
+  assert.match(officeDownload.suggestedFilename(),/\.qbackup$/);
+  const allOffice=JSON.parse(fs.readFileSync(await officeDownload.path(),'utf8'));
+  assert.equal(allOffice.format,'quantum-office-backup-v3');
+  assert.equal(allOffice.bank.count,8);
+  await ep.evaluate(async()=>{
+   const q=qwTask('short');q.prompt='New task after whole-Office archive';
+   await qwBankRepository.createTask({id:'must-remain',subject:'physics',task:q});
+   qoWriter.name='changed after Office backup';
+  });
+  const [embeddedDownload]=await Promise.all([
+   ep.waitForEvent('download'),
+   ep.evaluate(async archive=>importFile(new File([JSON.stringify(archive)],
+    'all-office.qbackup',{type:'application/json'})),allOffice)
+  ]);
+  assert.match(embeddedDownload.suggestedFilename(),/\.qwbank$/);
+  assert.equal((await ep.evaluate(()=>qwBankRepository.getStatistics())).count,9,
+   'Office v3 import must not silently replace IndexedDB bank');
+  assert.equal(await ep.evaluate(()=>qoWriter.name),allOffice.office.writer.name);
+
+  // Legacy migration provenance must survive a v3 backup and a new origin DB.
+  const legacyCtx=await browser.newContext({offline:true});
+  const legacyPage=await legacyCtx.newPage();listen(legacyPage);await legacyPage.goto(url);
+  const legacyRecover=await legacyPage.evaluate(async()=>{
+   const old=Array.from({length:32},(_,i)=>{
+    const task=qwTask('short');task.prompt='Легаси вопрос '+i;
+    task.answer='Ответ '+i;task.comment='Решение '+i;
+    task.criteria='Критерии '+i;task.image='data:image/png;base64,YWJj';
+    return {id:'legacy-recover-'+i,bankNumber:20001+i,subject:'physics',task};
+   });
+   const raw=JSON.stringify(old);
+   localStorage.setItem(QW_BANK_KEY,raw);
+   await qwBankOpen();
+   const archive=await qwBankRepository.createVerifiedBackup();
+   const target=new BankRepository({dbName:'task1662-legacy-metadata-recovery',
+    legacyStorage:{getItem(){return null;}},normalize:qwBankNormalize});
+   await target.open();
+   const plan=await target.inspectRestore(archive);
+   await target.restoreVerifiedBackup({token:plan.token,mode:'empty'});
+   await target.close();await target.open();
+   const entries=(await target._captureBackupSnapshot());
+   const storedRaw=entries.meta.legacyBackup?.raw;
+   const marker=entries.meta.legacyMigration?.state;
+   const restored=(await target.getTask('legacy-recover-31')).task;
+   await target.close();
+   return {rawUntouched:localStorage.getItem(QW_BANK_KEY)===raw,
+    rawRecovered:storedRaw===raw,marker,count:entries.records.length,
+    lastAnswer:restored.answer,lastComment:restored.comment,lastImage:restored.image,
+    sequence:entries.meta.sequence};
+  });
+  assert.equal(legacyRecover.rawUntouched,true);
+  assert.equal(legacyRecover.rawRecovered,true);
+  assert.equal(legacyRecover.marker,'complete');
+  assert.equal(legacyRecover.count,32);assert.equal(legacyRecover.sequence,20032);
+  assert.equal(legacyRecover.lastAnswer,'Ответ 31');
+  assert.equal(legacyRecover.lastComment,'Решение 31');
+  assert.equal(legacyRecover.lastImage,'data:image/png;base64,YWJj');
+  await legacyCtx.close();
+
   assert.deepEqual(errors,[]);
   const report={status:'PASS',browser:'offline Chromium',
    format:'QWBANK v3 SHA-256',backupCount:8,
@@ -208,6 +274,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1662');
    emptyRestore:inEmpty.result,sequenceAfterRestore:inEmpty.created,
    originalModelPreserved:true,restoreAfterReopen:true,
    uiBackupAndRestore:true,officeV3:true,officeTamperRejected:true,legacyOfficeV2:true,
+   fullOfficeUIRoundtrip:true,officeImportKeptBankSeparate:true,legacyMigrationBackupRecovered:legacyRecover,
    errors};
   fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(report,null,2));
   await ep.screenshot({path:path.join(out,'bank-after-recovery.png')});
