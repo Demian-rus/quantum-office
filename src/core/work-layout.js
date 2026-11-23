@@ -160,6 +160,30 @@ body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self
 body[data-qw-format="booklet"] .qw-booklet-bank-id{font:600 8.5pt/1.2 var(--qw-print-family);color:#333;white-space:nowrap;margin-right:1.5mm}
 
 
+/* TASK165: author text formatting is shared by bank preview and printed PDF.
+   Compact plain-text exercises do not get these rules. */
+.qw-task-text.qw-print-rich {min-width:0;line-height:1.36}
+.qw-print-rich p{margin:0 0 1.25mm;orphans:2;widows:2}
+.qw-print-rich p:last-child{margin-bottom:0}
+.qw-print-rich :is(h3,h4,h5){font:700 1em/1.25 var(--qw-print-family);margin:2mm 0 .8mm;break-after:avoid}
+.qw-print-rich :is(h3,h4,h5):first-child{margin-top:0}
+.qw-print-rich :is(ul,ol){padding-left:5mm;margin:1mm 0 1.7mm;line-height:1.3}
+.qw-print-rich li{padding-left:.2mm;margin:.4mm 0}
+.qw-print-rich blockquote{border-left:.55mm solid #8d969d;padding:.7mm 2mm;margin:1.3mm 0 1.7mm;break-inside:avoid}
+.qw-print-rich blockquote p{margin:0}
+.qw-print-rich code{font-family:'Courier New',monospace;font-size:.9em;background:#f2f2f2;overflow-wrap:anywhere}
+.qw-print-rich pre{white-space:pre-wrap;overflow-wrap:anywhere;font:9pt/1.3 'Courier New',monospace;margin:1.2mm 0 2mm;padding:2mm;background:#f5f5f5;break-inside:avoid}
+.qw-print-rich hr{border:0;border-top:.2mm solid #aaa;margin:2mm 0}
+.qw-print-rich .qw-rich-equation{text-align:center;max-width:100%;margin:1.3mm 0;break-inside:avoid}
+.qw-print-rich .qw-rich-equation math{max-width:100%}
+.qw-print-rich .qw-rich-table-scroll{max-width:100%;overflow:visible;margin:1.2mm auto}
+.qw-print-rich table,.qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;break-inside:avoid}
+.qw-print-rich :is(th,td),.qw-task-tables :is(th,td){border:.2mm solid #888;padding:.7mm 1.5mm;text-align:left;vertical-align:middle;overflow-wrap:anywhere}
+.qw-print-rich th,.qw-task-tables th{font-weight:700;background:#f1f1f1}
+.qw-answer-long .qw-print-answer-heading{font:700 1em/1.25 var(--qw-print-family);margin:2.3mm 0 1mm;break-after:avoid}
+.qw-answer-long .qw-print-answer-heading:first-child{margin-top:0}
+body[data-qw-format="compact"] .qw-print-rich p,body[data-qw-format="booklet"] .qw-print-rich p{margin-bottom:.75mm}
+body:is([data-qw-format="compact"],[data-qw-format="booklet"]) .qw-print-rich :is(ul,ol){margin:.5mm 0 .9mm}
 /* TASK154 — one typographic system for all exported document formats. */
 body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
 body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
@@ -270,7 +294,10 @@ async function qwPreparePrintDocument(){
   const tables=[...text.querySelectorAll('table')];
   if(tables.length){
    const group=document.createElement('div');group.className='qw-task-tables';
-   for(const table of tables)group.append(table);
+   for(const table of tables){
+    const richWrapper=table.closest('.qw-rich-table-scroll');
+    group.append(richWrapper||table);
+   }
    text.after(group);
    if(figure)flow.classList.add('qw-figure-below');
   }
