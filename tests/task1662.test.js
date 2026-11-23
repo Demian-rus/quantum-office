@@ -60,3 +60,12 @@ test('TASK166.2 rejects unsupported archive/schema version and invalid sequence'
  const seq=structuredClone(b);seq.meta.sequence=5;
  await assert.rejects(()=>verifyBankBackupV3(resign(seq)),{code:'BACKUP_SEQUENCE'});
 });
+
+test('TASK166.2 stable ID ordering does not use localeCompare',async()=>{
+  const rows=snapshot();
+  rows.records[0].id='a-lower';
+  rows.records[1].id='Z-upper';
+  const backup=await createBankBackupV3(rows);
+  assert.deepEqual(backup.records.map(row=>row.id),['Z-upper','a-lower']);
+  assert.equal((await verifyBankBackupV3(JSON.stringify(backup))).count,2);
+});

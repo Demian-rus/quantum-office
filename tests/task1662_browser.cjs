@@ -36,6 +36,30 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1662');
   assert.equal(setup.inspected.count,8);assert.equal(setup.inspected.currentCount,8);
   assert.equal(setup.backup.records.length,8);assert.equal(setup.backup.manifest.sha256.length,64);
   assert.ok(setup.backup.records.every(r=>r.task.answer&&r.task.comment&&r.task.criteria&&r.task.diagram?.length&&r.task.image));
+  // IndexedDB key ordering differs from localeCompare for mixed-case IDs.
+  // Postcommit verification must not misreport a completed restore as failure.
+  const mixedOrder=await p.evaluate(async()=>{
+   const options={legacyStorage:{getItem(){return null;}},normalize:qwBankNormalize};
+   const source=new BankRepository({...options,dbName:'task1662-mixedcase-source'});
+   const target=new BankRepository({...options,dbName:'task1662-mixedcase-target'});
+   await source.open();await target.open();
+   try{
+    for(const id of ['a-lower','Z-upper','ё-cyrillic']){
+     const task=qwTask('short');task.prompt='Смешанный ID '+id;task.answer='Ответ '+id;
+     await source.createTask({id,subject:'physics',task});
+    }
+    const archive=await source.createVerifiedBackup();
+    const inspected=await target.inspectRestore(archive);
+    const result=await target.restoreVerifiedBackup({token:inspected.token,mode:'empty'});
+    const after=await target._captureBackupSnapshot();
+    return {verified:result.verified,
+     expected:archive.records.map(r=>r.id).sort(),actual:after.records.map(r=>r.id).sort(),
+     answersCorrect:after.records.every(r=>r.task.answer==='Ответ '+r.id)};
+   }finally{await source.close();await target.close();}
+  });
+  assert.equal(mixedOrder.verified,true);
+  assert.deepEqual(mixedOrder.actual,mixedOrder.expected);
+  assert.equal(mixedOrder.answersCorrect,true);
   const raw=JSON.stringify(setup.backup);
   const negatives=await p.evaluate(async raw=>{
    const payload=JSON.parse(raw),errors={};

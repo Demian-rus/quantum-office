@@ -86,7 +86,7 @@ export async function createBankBackupV3(snapshot,{signal}={}){
  const body={format:BANK_BACKUP_FORMAT,version:BANK_BACKUP_VERSION,schema:1,
   createdAt:new Date().toISOString(),count:snapshot.records.length,
   meta:structuredClone(snapshot.meta),
-  records:structuredClone(snapshot.records).sort((a,b)=>a.id.localeCompare(b.id))};
+  records:structuredClone(snapshot.records).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0)};
  validateBankBackupStructure(body);
  const bytes=archiveBytes(body),sha256=await digestBytes(bytes);
  if(signal?.aborted)throw new BankBackupError('Создание архива отменено','BACKUP_CANCELLED');

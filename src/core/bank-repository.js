@@ -516,7 +516,8 @@ class BankRepository{
   // Post-commit exhaustive check, not a claim of cross-storage atomicity.
   const after=await this._captureBackupSnapshot();
   if(after.records.length!==archived.records.length||
-   bankStableJSON(after.records)!==bankStableJSON(archived.records.slice().sort((a,b)=>a.id.localeCompare(b.id)))||
+   bankStableJSON(after.records.slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0))!==
+   bankStableJSON(archived.records.slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0))||
    after.meta.sequence!==archived.meta.sequence||
    (archived.meta.legacyMigration?
     bankStableJSON(after.meta.legacyMigration)!==bankStableJSON(archived.meta.legacyMigration):
