@@ -11,10 +11,28 @@ $install = Join-Path $env:LOCALAPPDATA 'Quantum Office CI'
 $exe = Join-Path $install 'quantum-office.exe'
 $data = Join-Path $env:APPDATA 'com.quantumoffice.desktop/bank.sqlite3'
 if (Test-Path $data) { throw 'CI bank not empty before installation' }
+# Tauri patches the PE bundle-type marker for NSIS; the standalone release
+# executable is not the identity reference for the installed binary.
+$payloadDir = Join-Path $env:RUNNER_TEMP ('qo-nsis-payload-' + [Guid]::NewGuid().ToString('N'))
+$sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+if (!(Test-Path $sevenZip)) { throw '7-Zip unavailable for independent NSIS payload verification' }
+& $sevenZip x -y "-o$payloadDir" $setup | Out-Host
+if ($LASTEXITCODE -ne 0) { throw 'Cannot extract NSIS payload for identity verification' }
+$payload = @(Get-ChildItem $payloadDir -Recurse -File -Filter 'quantum-office.exe')
+if ($payload.Count -ne 1) { throw "Expected exactly one NSIS quantum-office.exe payload; found $($payload.Count)" }
+$expectedHash = (Get-FileHash $payload[0].FullName -Algorithm SHA256).Hash
+$releaseHash = (Get-FileHash $release -Algorithm SHA256).Hash
+$setupHash = (Get-FileHash $setup -Algorithm SHA256).Hash
+@{setupSha256=$setupHash;payloadSha256=$expectedHash;standaloneSha256=$releaseHash;bundleTypePatch=($expectedHash -ne $releaseHash)} | ConvertTo-Json | Set-Content evidence/native/installer-identity.json
+Remove-Item $payloadDir -Recurse -Force
+$script:installCount = 0
 function Install-Office {
   $p = Start-Process -FilePath $setup -ArgumentList "/S /D=$install" -Wait -PassThru
   if ($p.ExitCode -ne 0 -or !(Test-Path $exe)) { throw "Installer failed: $($p.ExitCode)" }
-  if ((Get-FileHash $exe).Hash -ne (Get-FileHash $release).Hash) { throw 'Installed binary differs from release' }
+  $installedHash = (Get-FileHash $exe -Algorithm SHA256).Hash
+  $script:installCount++
+  @{install=$script:installCount;exitCode=$p.ExitCode;installedSha256=$installedHash;expectedPayloadSha256=$expectedHash;match=($installedHash -eq $expectedHash)} | ConvertTo-Json | Set-Content "evidence/native/install-$script:installCount.json"
+  if ($installedHash -ne $expectedHash) { throw 'Installed binary differs from NSIS payload' }
 }
 function Wait-Office($p) {
   $deadline = (Get-Date).AddSeconds(60)
