@@ -39,6 +39,7 @@ function qwInstallPanels(root,key,toolbar,panels){
 function qwReleaseMode(d){const host=d?.closest('.qw-mode-host');if(!host)return;const body=host.parentElement;if(!body)return;host.remove();body.classList.remove('qw-mode-active');for(const el of body.children){el.inert=false;}if(host.qwReturnScroll!==undefined){const center=body.querySelector('.qw-center');if(center)center.scrollTop=host.qwReturnScroll;}}
 function qwCanNavigate(){const d=document.getElementById('qw-dialog');return !d?.qwCanLeave||d.qwCanLeave();}
 if(typeof window!=='undefined')window.addEventListener('beforeunload',e=>{if(document.getElementById('qw-dialog')?.qwDirty?.()){e.preventDefault();e.returnValue='';}});
+function qwEnsureEducationMode(){if(!document.querySelector('.qo-education-workspace>.qo-education-body'))route('work');return !!document.querySelector('.qo-education-workspace>.qo-education-body');}
 function qwOpenMode(d,mode){
  const body=document.querySelector('.qo-education-workspace>.qo-education-body');if(!body)throw Error('Рабочая область недоступна');
  const host=document.createElement('section');host.className='qw-mode-host';host.dataset.qwMode=mode;host.setAttribute('aria-label',d.querySelector('header strong').textContent);
@@ -207,6 +208,7 @@ function qwPrintTextPDF(teacher=false,options){
 async function qwSaveFile(){try{const data=qwValidate(qwDoc),snapshot=JSON.stringify(qwDoc);const saved=await download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');if(qoNativeDesktop&&!saved)return;if(JSON.stringify(qwDoc)===snapshot){qwExported=snapshot;qwPersist();}if(!qoNativeDesktop)status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
 async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet','worksheet','exam'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);await download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');if(!qoNativeDesktop)status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(output='tasks'){
+ if(!qwEnsureEducationMode())return;
  const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim()||q.comment.trim()||q.criteria.trim());
  const selected=(name,on)=>'<label class="qw-check"><input type="checkbox" data-print-setting="'+name+'" '+(on?'checked':'')+'>'+({
   showTitle:'Добавить заголовок',showMeta:'Предмет и класс',showVariant:'Номер варианта',
@@ -425,6 +427,7 @@ function qwBankInsertMarkup(input,kind){
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 async function qwBankEdit(id,draft=null,returnFilters={}){
+ if(!qwEnsureEducationMode())return;
  const originPage=page,originRevision=qoRouteRevision;
  const active=()=>page===originPage&&qoRouteRevision===originRevision;
  const creating=id===null;
@@ -574,6 +577,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
 }
 let qwBankRequest=0;
 async function qwBank(previousFilters={}){
+ if(!qwEnsureEducationMode())return;
  const bankDocument=qwDoc,bankPage=page,routeRevision=qoRouteRevision,ticket=++qwBankRequest;
  const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoRouteRevision===routeRevision&&ticket===qwBankRequest;
  let xs=[],facets,totalCount=0,assetMigrationError=null,storageInfo=null;
@@ -1154,6 +1158,7 @@ function qwGraphSidebar(tool,coordinateMode){
   '<details class="qw-tool-group qw-template-group" open><summary>Шаблоны</summary><label>Готовый график<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label><div id="qw-graph-mode"></div><button type="button" id="qw-add-point" data-tool="legacyPoint" aria-label="Добавить точку шаблона">'+qwVisualIcon('point')+'<span>Точка шаблона</span></button></details>';
 }
 function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
+ if(!qwEnsureEducationMode())return;
  const q=bankTask||qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,labelSelected='',tool='select',drag=null,history=[],future=[],snapGeometry=true,geometryStep=20,multi=new Set(),polyline=[],constructionReference=-1;
  const linear=o=>o&&['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind);
  const panelButton=(panel,title)=>'<button type="button" data-visual-panel="'+panel+'" aria-controls="qw-visual-'+panel+'" aria-expanded="false">'+title+'</button>';
