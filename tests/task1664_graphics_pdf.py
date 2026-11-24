@@ -101,3 +101,34 @@ for engine in ('browser','windows'):
    math_report.append({'document':name,'operators':operators,'task7Endpoints':png_checks})
 (root/'math-and-author-image-pdf.json').write_text(json.dumps({'status':'PASS','documents':math_report},indent=2),encoding='utf8')
 print('PASS actual PDF math spacing, midline and task 7 head geometry:',[(x['document'],len(x['operators']),len(x['task7Endpoints'])) for x in math_report])
+
+# Independent physical PDF text extraction. Compare glyph bounding rectangles to
+# the actual arrow tips measured from the prepared SVG, not an assumed title size.
+axis_report=[]
+for engine in ('browser','windows'):
+ for orientation in ('portrait','landscape'):
+  for prefix in ('ege2018','graphics'):
+   name=f'{prefix}-{orientation}-{engine}'
+   pdf=root/(name+'.pdf')
+   if engine=='windows' and not pdf.exists(): continue
+   proof=json.loads((root/(name+'-geometry.json')).read_text(encoding='utf8'))
+   with fitz.open(pdf) as doc:
+    checks=[]
+    for a in proof['axisTitles']:
+     page=doc[a['page']]
+     expected=fitz.Rect(a['box'])
+     matches=page.search_for(a['text'])
+     assert matches,(name,'axis label missing from actual PDF',a)
+     distance=lambda r:abs((r.x0+r.x1-expected.x0-expected.x1)/2)+abs((r.y0+r.y1-expected.y0-expected.y1)/2)
+     rect=min(matches,key=distance)
+     tx,ty=a['tip']['x'],a['tip']['y']
+     center=abs((rect.x0+rect.x1)/2-tx) if a['axis']=='y' else abs((rect.y0+rect.y1)/2-ty)
+     gap=ty-rect.y1 if a['axis']=='y' else rect.x0-tx
+     # Physical glyph bounds can differ from SVG line boxes; 0.75 pt is
+     # one pixel at 96dpi. This is independent of the manual-label source-unit gate.
+     assert center<.75 and gap>0 and page.rect.contains(rect) and distance(rect)<1.5,(name,'axis glyph placement',a,rect,center,gap)
+     checks.append({'task':a['task'],'axis':a['axis'],'text':a['text'],'centerDeltaPt':center,'gapPt':gap,'box':list(rect)})
+    assert len(checks)==(20 if prefix=='graphics' else 14),(name,'axis title count',len(checks))
+    axis_report.append({'document':name,'checked':len(checks),'titles':checks})
+(root/'axis-title-pdf.json').write_text(json.dumps({'status':'PASS','documents':axis_report},ensure_ascii=False,indent=2),encoding='utf8')
+print('PASS actual PDF axis title placement:',[(x['document'],x['checked']) for x in axis_report])
