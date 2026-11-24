@@ -23,7 +23,7 @@ function qwQuickButtons(){return '<div class="qw-quick-add" aria-label="Доба
 function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3 data-task-part="'+qwEsc(t.part)+'" data-task-gap="'+i+'">'+qwEsc(t.part||'Без части')+'</h3>':'')+'<div class="qw-nav-row" data-task-row="'+i+'" data-task-id="'+qwEsc(t.id)+'"><button type="button" draggable="true" class="qw-task-drag" data-drag-id="'+qwEsc(t.id)+'" aria-label="Перетащить задание '+(i+1)+'" title="Перетащите для изменения порядка"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4h0m4 0h0M4 10h0m4 0h0M4 16h0m4 0h0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button><button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(t.prompt)+'"><b>'+(i+1)+'</b><span>'+qwEsc(t.prompt||(!t.answerVisible&&t.type==='short'?'Текстовое задание':QW_TYPES[t.type]))+'</span></button></div>').join('');}
 function qwToolbar(){return qoWorkGroup('Работа',qoWorkButton('work-new','Создать работу','new')+qoWorkButton('work-open','Открыть QWORK','folder')+qoWorkButton('work-save','Сохранить QWORK','save'))+qoWorkGroup('Готовый вариант',qoWorkButton('work-preview','Макет и экспорт PDF','file-text')+qoWorkButton('work-pdf','Скачать PDF','download')+qoWorkButton('work-answers','Скачать ответы PDF','file-text'));}
 function qwLayoutSelect(current){
- return '<label class="qw-pdf-format-field" id="qw-pdf-format"><span>Формат PDF</span><select name="qw-pdf-layout">'+qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],['worksheet','Обычная контрольная'],['exam','Экзаменационный вариант']],current)+'</select></label>';
+ return '<label class="qw-pdf-format-field" id="qw-pdf-format"><span>Формат PDF</span><select name="qw-pdf-layout">'+qwFormatOptions(current)+'</select></label>';
 }
 function qwFigureLayoutControls(){
  const figures=qwDoc.tasks.filter(q=>q.figure!=='none'&&(q.figure!=='image'||q.image));
@@ -75,7 +75,7 @@ function qwRefreshLiveGraphText(scope){
 }
 function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
 function qwDialog(title,body,footer='',inline=false){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">'+qoWorkIcon('x')+'</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route(qoBankReturnPage);}else{document.body.append(d);d.showModal();}return d;}
-function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[]),['worksheet','Обычная контрольная работа']],current)+'<option disabled>Вариант ОГЭ / ЕГЭ — отдельный этап</option>';}
+function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],['worksheet','Обычная контрольная работа'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[])],current);}
 function qwPracticeControls(settings={},attribute='data-practice'){
  return '<label>Задач на странице<select '+attribute+'="perPage">'+qwOptions([[1,'Одна'],[2,'Две'],[3,'Три'],[4,'Четыре']],settings.perPage||2)+'</select></label><label>Пространство для решения<select '+attribute+'="grid">'+qwOptions([['none','Без разлиновки'],['fine','Мелкая светлая клетка'],['normal','Обычная клетка']],settings.grid||'fine')+'</select></label>';
 }
@@ -207,7 +207,7 @@ async function qwPreview(output='tasks'){
  let renderRevision=0,typingTimer=0;
  const refresh=()=>{
   const revision=++renderRevision;
-  printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');
+  printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');const effective=d.querySelector('#qw-layout-figure-effective');if(effective)effective.textContent='';
   d.querySelector('#qw-page-count').textContent='Расчёт страниц…';
   const practice=d.querySelector('[data-practice-controls]');if(practice)practice.hidden=qwDoc.layout!=='practice';
 
@@ -238,7 +238,7 @@ async function qwPreview(output='tasks'){
   try{
    const normalized=qwPrintSettings(next);
    qwRemember();
-   if(layout)qwDoc.layout=layout.value;
+   if(layout){qwDoc.layout=layout.value;layout.innerHTML=qwFormatOptions(qwDoc.layout);}
    if(e?.dataset?.practice)qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
    qwDoc.printSettings=normalized;qwPersist();qwRender();refresh();
   }catch(error){d.querySelector('#qw-page-count').textContent=error.message;}
@@ -253,7 +253,8 @@ async function qwPreview(output='tasks'){
   const number=qwDoc.tasks.findIndex(q=>q.id===taskControl.value)+1;
   const figure=preview.contentDocument?.querySelector('.qw-print-section[data-task="'+number+'"] figure');
   const width=figure?.getBoundingClientRect().width;
-  output.textContent=width>0?'На странице: '+(width*25.4/96).toFixed(1)+' мм':'';
+  const task=qwDoc.tasks[number-1],mm=width*25.4/96,requested=task?.figureWidth*25.4/96;
+  output.textContent=width>0?'На странице: '+mm.toFixed(1)+' мм'+(task?.figureWidthMode==='manual'&&Math.abs(mm-requested)>.15?' (ограничение макета или читаемости)':''):'';
  }
  if(taskControl){
   const selectedFigure=()=>qwDoc.tasks.find(q=>q.id===taskControl.value);

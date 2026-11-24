@@ -52,7 +52,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
    await app.locator('[data-qw-close]').click();assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before,'export does not mutate data');
   }
   // Real format/preset controls persist, undo and QWORK corruption is atomic.
-  await app.locator('[data-qw-action="preview"]').click();await app.locator('.qw-layout-card').filter({has:app.locator('[value="practice"]')}).click();await frame();
+  await app.locator('[data-qw-action="preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
   await app.locator('[data-practice="perPage"]').selectOption('2');await app.locator('[data-practice="grid"]').selectOption('none');await frame();assert.equal(await app.evaluate(()=>qwDoc.practice.perPage),2);
   assert.equal(await(await frame()).locator('.qw-practice-space svg').count(),0);
   await app.setViewportSize({width:800,height:900});await app.screenshot({path:path.join(out,'preview-narrow.png')});assert.ok(await app.locator('[data-qw-action="preview-pdf"]').isVisible());await app.locator('[data-qw-close]').click();await app.setViewportSize({width:1440,height:1080});

@@ -400,7 +400,7 @@ async function qwPreparePrintDocument(){
     Math.min(requested, (below?95:60)*MM):
     modern?(below?70:format==='practice'?35:34)*MM:
     below?(requested>=470?160*MM:requested*320/520):38*MM;
-   const fontSizes=modern&&svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim())
+   const fontSizes=(modern||manual)&&svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim())
     .map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0):[];
    const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
    const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
@@ -416,7 +416,7 @@ async function qwPreparePrintDocument(){
    }
    if(modern&&auto&&!wide&&!compactBooklet)wide=w/h>3.2||w*scale>contentWidth*.45;
    if(wide)scale=calculate(true);
-   if(modern&&svg&&fontSizes.length){
+   if((modern||manual)&&svg&&fontSizes.length){
     // Readability can require a wider below-text rendering, never a new
     // geometry in QWORK. The original requested size remains unchanged.
     scale=Math.max(scale,minLabelScale);
