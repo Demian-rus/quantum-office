@@ -17,9 +17,11 @@ jobs:
       - run: npm run build
       - name: Check generated native scripts
         run: |
-          node --check dist-native/app.js
-          node --check dist-native/draft-bootstrap.js
-          node --check dist-native/print.js
+          # WebView2 loads these as classic scripts, not ESM (package.json type=module).
+          for file in dist-native/app.js dist-native/draft-bootstrap.js dist-native/print.js; do
+            node --check --input-type=commonjs < "$file"
+            node -e "new (require('node:vm').Script)(require('node:fs').readFileSync(process.argv[1],'utf8'),{filename:process.argv[1]})" "$file"
+          done
       - run: node -e "const fs=require('fs');if(!fs.readFileSync('dist/index.html','utf8').includes('grid-scroll'))process.exit(1)"
       # Direct HTML download; unlike the ZIP artifact this requires no extraction.
       - uses: actions/upload-artifact@v7
