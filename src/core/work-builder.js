@@ -11,7 +11,7 @@ function qwPersist(){
  if(qwCorrupt)return false;
  try{localStorage.setItem(QW_KEY,JSON.stringify(qwDoc));qwStorageError='';}catch(e){qwStorageError='Черновик не записан. Скачайте QWORK.';}
  if(typeof page!=='undefined')qwFooter(qwActive());
- const el=document.getElementById('qw-save-state');if(el)el.textContent=qwStorageError|| (qwExported===JSON.stringify(qwDoc)?'Экспортирован QWORK':'Черновик на устройстве');return !qwStorageError;
+ const el=document.getElementById('qw-save-state');if(el)el.textContent=qwStorageError|| (qwExported===JSON.stringify(qwDoc)?(qoNativeDesktop?'Экспортирован QWORK':'Скачивание QWORK запрошено'):'Черновик на устройстве');return !qwStorageError;
 }
 function qwChange(fn){qwRemember();fn();qwPersist();qwRender();}
 function qwButton(action,label,extra=''){return '<button type="button" data-qw-action="'+action+'" '+extra+'>'+label+'</button>';}

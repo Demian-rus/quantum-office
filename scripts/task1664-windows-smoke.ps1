@@ -83,7 +83,7 @@ try {
 }
 Wait-PortClosed
 # Per-executable HKLM policy ONLY on isolated CI; never bundled into the app.
-New-Item -Path $policy -Force | Out-Null
+if (!(Test-Path $policy)) { New-Item -Path $policy -Force | Out-Null }
 New-ItemProperty -Path $policy -Name $name -Value '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1' -PropertyType String -Force | Out-Null
 try {
   for ($i=0; $i -lt 2; $i++) {
