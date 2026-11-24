@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
-const source=readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
+const source=readFileSync(new URL('../src/core/workspace-icons.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
 function harness(){
   const doc={name:'Doc',html:'<p>Untouched Writer content</p>'},downloads=[];
   const ctx={qoWriter:doc,qoPersistWriter:()=>{},download:(...x)=>downloads.push(x),

@@ -893,8 +893,8 @@ function qdBuilder(){
         <span class="qd-index">${si+1}</span>
         <label>Название раздела<input data-qd-field="section" data-sid="${qdEsc(s.id)}" maxlength="120" value="${qdEsc(s.title)}"></label>
         <div class="qd-section-actions">
-          <button data-qd-action="section-up" data-sid="${qdEsc(s.id)}" type="button" ${si===0?'disabled':''} title="Раздел выше" aria-label="Раздел выше">↑</button>
-          <button data-qd-action="section-down" data-sid="${qdEsc(s.id)}" type="button" ${si===d.sections.length-1?'disabled':''} title="Раздел ниже" aria-label="Раздел ниже">↓</button>
+          <button data-qd-action="section-up" data-sid="${qdEsc(s.id)}" type="button" ${si===0?'disabled':''} title="Раздел выше" aria-label="Раздел выше">${qoWorkIcon('arrow-up')}</button>
+          <button data-qd-action="section-down" data-sid="${qdEsc(s.id)}" type="button" ${si===d.sections.length-1?'disabled':''} title="Раздел ниже" aria-label="Раздел ниже">${qoWorkIcon('arrow-down')}</button>
           <button data-qd-action="section-collapse" data-sid="${qdEsc(s.id)}" type="button"
      aria-expanded="${!qdCollapsedSections.has(s.id)}">${qdCollapsedSections.has(s.id)?'Развернуть':'Свернуть'}</button>
    <button data-qd-action="duplicate-section" data-sid="${qdEsc(s.id)}" type="button" title="Копировать раздел вместе с заданиями">Копия раздела</button>
@@ -904,7 +904,7 @@ function qdBuilder(){
       <div class="qd-question-list" data-qd-drop-section="${qdEsc(s.id)}">
       ${s.questions.map((q,qi)=>`<article class="qd-card qd-edit-card ${qdCompact&&!qdCardExpanded.has(q.id)?'is-compact':''}" data-qid="${qdEsc(q.id)}" data-section-id="${qdEsc(s.id)}">
         <div class="qd-card-head">
-          <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">⠿</span>
+          <span class="qd-drag-handle" data-qd-drag="${qdEsc(q.id)}" tabindex="0" title="Перетащите карточку" aria-label="Перетащить вопрос">${qoWorkIcon('grip-vertical')}</span>
           <input type="checkbox" class="qd-select-card" data-qd-select data-qid="${qdEsc(q.id)}"
               aria-label="Выбрать вопрос ${qi+1}" ${qdSelected.has(q.id)?'checked':''}>
           <button type="button" class="qd-counter qd-select-question" data-qd-action="editor-select" data-qid="${qdEsc(q.id)}" title="Параметры этого вопроса">Вопрос ${qi+1}</button>
@@ -917,10 +917,10 @@ function qdBuilder(){
             <option value="multiple" ${q.type==='multiple'?'selected':''}>Несколько ответов</option>
             <option value="numeric" ${q.type==='numeric'?'selected':''}>Число</option>
           </select>
-          <button type="button" data-qd-action="question-up" data-qid="${qdEsc(q.id)}" ${qi===0?'disabled':''} aria-label="Поднять вопрос" title="Поднять вопрос">↑</button>
-          <button type="button" data-qd-action="question-down" data-qid="${qdEsc(q.id)}" ${qi===s.questions.length-1?'disabled':''} aria-label="Опустить вопрос" title="Опустить вопрос">↓</button>
+          <button type="button" data-qd-action="question-up" data-qid="${qdEsc(q.id)}" ${qi===0?'disabled':''} aria-label="Поднять вопрос" title="Поднять вопрос">${qoWorkIcon('arrow-up')}</button>
+          <button type="button" data-qd-action="question-down" data-qid="${qdEsc(q.id)}" ${qi===s.questions.length-1?'disabled':''} aria-label="Опустить вопрос" title="Опустить вопрос">${qoWorkIcon('arrow-down')}</button>
           <button type="button" data-qd-action="duplicate-question" data-qid="${qdEsc(q.id)}" title="Создать копию">Копия</button>
-          <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}" title="Удалить вопрос">×</button>
+          <button type="button" data-qd-action="delete-question" data-qid="${qdEsc(q.id)}" data-sid="${qdEsc(s.id)}" title="Удалить вопрос" aria-label="Удалить вопрос">${qoWorkIcon('trash-2')}</button>
         </div>
         <label>Условие<textarea data-qd-field="prompt" data-qid="${qdEsc(q.id)}" maxlength="1600" rows="2" placeholder="Введите вопрос">${qdEsc(q.prompt)}</textarea></label>
         <label>Ответ преподавателя<textarea data-qd-field="answer" data-qid="${qdEsc(q.id)}" maxlength="3500" rows="2" placeholder="Пояснение или решение">${qdEsc(q.answer)}</textarea></label>
@@ -938,7 +938,7 @@ function qdBuilder(){
             <input data-qd-field="choice-text" data-qid="${qdEsc(q.id)}" data-index="${i}" maxlength="240"
               value="${qdEsc(choice.text)}" placeholder="Вариант ${i+1}" aria-label="Текст варианта ${i+1}">
             <button type="button" data-qd-action="remove-choice" data-qid="${qdEsc(q.id)}" data-index="${i}"
-              ${q.choices.length<=2?'disabled':''} aria-label="Удалить вариант ${i+1}">×</button>
+              ${q.choices.length<=2?'disabled':''} aria-label="Удалить вариант ${i+1}">${qoWorkIcon('trash-2')}</button>
           </div>`).join('')}
           <button type="button" data-qd-action="add-choice" data-qid="${qdEsc(q.id)}"
             ${q.choices.length>=6?'disabled':''}>+ Вариант</button>
@@ -1092,9 +1092,9 @@ function qdGuidedQuestions(d,all,s){
     </div>
     ${qdRunQuestion(q,index,d)}
     <div class="qd-guided-nav" role="group" aria-label="Перемещение по вопросам">
-      <button type="button" data-qd-action="nav-prev" ${index===0?'disabled':''}>← Назад</button>
+      <button type="button" data-qd-action="nav-prev" ${index===0?'disabled':''}>${qoWorkIcon('arrow-left')} Назад</button>
       <button type="button" data-qd-action="nav-next" class="qd-primary"
-       ${index===all.length-1?'disabled':''}>Следующий →</button>
+       ${index===all.length-1?'disabled':''}>Следующий ${qoWorkIcon('arrow-right')}</button>
       <button type="button" data-qd-action="nav-unrated"
        ${s.rated===s.total?'disabled':''}>К непроверенному</button>
     </div>
@@ -1793,7 +1793,7 @@ function qdLibraryPreviewMarkup(d=qdDoc()){
   return '<section class="qd-panel qd-library-preview" aria-label="Предпросмотр шаблона">'+
     '<div class="qd-library-preview-head"><div><p class="qd-eyebrow">ПРЕДПРОСМОТР ШАБЛОНА</p>'+
     '<h2>'+qdEsc(model.title)+'</h2><p>'+qdEsc(model.description)+'</p></div>'+
-    '<button type="button" data-qd-action="library-preview-close" aria-label="Закрыть предпросмотр">× Закрыть</button></div>'+
+    '<button type="button" data-qd-action="library-preview-close" aria-label="Закрыть предпросмотр">'+qoWorkIcon('x')+' Закрыть</button></div>'+
     '<div class="qd-library-preview-options"><strong>'+numSelected+' из '+questions.length+' выбрано</strong>'+
     '<button type="button" data-qd-action="library-preview-all">Выбрать все</button>'+
     '<button type="button" data-qd-action="library-preview-none">Снять выделение</button></div>'+

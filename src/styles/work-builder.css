@@ -615,3 +615,13 @@
 .qw-bank-catalogue-results>.qw-bank-pages {flex:0 0 auto}
 .qw-bank-assemble-dialog>.qw-dialog-body:has(>.qw-bank-restore-review:not([hidden])) {overflow-y:auto}
 .qw-bank-assemble-dialog>.qw-dialog-body:has(>.qw-bank-restore-review:not([hidden]))>.qw-bank-catalogue {min-height:180px}
+
+/* TASK167.2: compact format and selected-figure settings. */
+.qw-pdf-format-field{display:flex;align-items:center;gap:8px;max-width:100%;font-size:12px;font-weight:600}
+.qw-pdf-format-field select{min-width:0;max-width:100%;padding:5px 8px;color:var(--qo-text);background:var(--qo-surface);border:1px solid var(--qo-border);border-radius:4px}
+.qw-figure-layout{display:flex;flex-direction:column;gap:6px;min-width:0;grid-column:1/-1}
+.qw-figure-layout button{align-self:flex-start}
+.qw-frame button>.qo-work-icon,.qw-dialog button>.qo-work-icon{width:16px;height:16px;display:inline-block;vertical-align:middle;flex:none}
+
+.qw-figure-layout output{font-size:11px;color:var(--qo-muted);min-height:16px}
+:is([data-qd-action],.qd-drag-handle,[data-qd-media-dismiss],[data-draw-close])>.qo-work-icon{width:16px;height:16px;display:inline-block;vertical-align:middle;flex:none}

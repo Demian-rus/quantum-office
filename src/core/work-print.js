@@ -45,8 +45,8 @@ async function qwRenderPages(project,teacher=false,options={answers:true,criteri
  }
  newPage();if(d.topic){flow(d.topic,null,11,true);y+=6;}/* Online-first work: no mandatory personal-data fields in published PDF. */if(d.instructions){flow(d.instructions,null,10);y+=12;}
  let part='';for(let i=0;i<d.tasks.length;i++){
-  activeTask=0;const q=d.tasks[i];if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));const image=q.figure!=='none'?await qwFigureImage(q):null;let position=q.position,imageW=Math.min(q.figureWidth,position==='below'?W-2*M:184);
-  if(image&&position!=='below'&&qwTokens(q.prompt).some(t=>t.t==='math'&&qwMathBox(ctx,t.ast,11).w>W-2*M-imageW-12)){position='below';imageW=Math.min(q.figureWidth,W-2*M);}
+  activeTask=0;const q=d.tasks[i];if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));const image=q.figure!=='none'?await qwFigureImage(q):null;let position=q.position,requested=q.figureWidth*(q.figureWidthMode==='manual'?0.75:1),imageW=Math.min(requested,position==='below'?W-2*M:184);if(q.figureWidthMode==='manual'&&requested>184){position='below';imageW=Math.min(requested,W-2*M);}
+  if(image&&position!=='below'&&qwTokens(q.prompt).some(t=>t.t==='math'&&qwMathBox(ctx,t.ast,11).w>W-2*M-imageW-12)){position='below';imageW=Math.min(requested,W-2*M);}
   let imageH=image?imageW*image.height/image.width:0;const maxH=position==='below'?300:108;if(imageH>maxH){imageW*=maxH/imageH;imageH=maxH;}if(q.pageBreak&&i>0)newPage();ensure(20+Math.max(22,imageH)+(q.answerVisible?20:0));if(q.part&&q.part!==part){flow(q.part,null,12,true);y+=7;part=q.part;}
   const heading='Задание '+(i+1),headingWidth=textWidth(heading,10,true)+12;
   const inlineTokens=qwTokens(q.prompt),inline=!image&&!q.solutionVisible&&!q.prompt.includes('\n')&&inlineTokens.reduce((sum,t)=>sum+(t.t==='math'?qwMathBox(ctx,t.ast,11).w:t.t==='blank'?t.size*6:textWidth(t.v||'',11)),0)<W-2*M-headingWidth;

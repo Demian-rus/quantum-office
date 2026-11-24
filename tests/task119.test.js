@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
 
 const catalog=readFileSync(new URL('../src/core/diagnostic-presets.js',import.meta.url),'utf8');
-const engine=readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
+const engine=readFileSync(new URL('../src/core/workspace-icons.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
 function harness(){
  const writer={html:'<p>Preserve Writer</p>'},saved=new Map();
  const vm={qoWriter:writer,qoPersistWriter:()=>{},download:()=>{},safeFile:x=>x,confirm:()=>true,

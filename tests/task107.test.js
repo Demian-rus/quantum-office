@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
-const src=readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
+const src=readFileSync(new URL('../src/core/workspace-icons.js',import.meta.url),'utf8')+'\n'+readFileSync(new URL('../src/core/diagnostics.js',import.meta.url),'utf8');
 function harness(){
   const saved=new Map(),writer={name:'Текст',html:'<p>Original Writer</p>'};
   const vm={qoWriter:writer,qoPersistWriter:()=>{},download:()=>{},safeFile:x=>x,status:()=>{},confirm:()=>true,console,
