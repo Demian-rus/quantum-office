@@ -12,6 +12,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
  const dl=async(fn,name)=>{const event=p.waitForEvent('download');await fn();const d=await event,target=path.join(out,name||d.suggestedFilename());await d.saveAs(target);assert.ok(fs.statSync(target).size>50);return target;};
  const shot=async name=>{await p.locator('#toast.active').waitFor({state:'hidden'});await p.screenshot({path:path.join(out,name+'.png')});};
  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await open();
+ await p.evaluate(()=>{route('diagnostics');route('work');});
  const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));assert.equal(await p.evaluate(()=>qwDoc.tasks.length),0);
  await action('settings').click();await p.locator('[data-meta="layout"]').selectOption('worksheet');await p.locator('[data-meta="title"]').fill('Физика и математика TASK144');await p.locator('[data-meta="topic"]').fill('Тренировочная работа');await p.locator('[data-qw-action="meta-apply"]').click();
  await add('short','Вычислите выражение. ');await action('math').click();await p.locator('#qw-formula-source').fill('\\frac{\\alpha x^{2}}{\\sqrt{y_{1}}}');await p.locator('[data-qw-action="formula-insert"]').click();await action('blank').click();await action('symbols').click();await p.locator('[data-symbol="Δ"]').click();

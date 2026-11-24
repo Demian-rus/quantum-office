@@ -60,3 +60,8 @@
 .qo-education-body {display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
 .qo-education-body>.qo-editor-scroll {flex:1;min-width:0;min-height:0}
 .qo-education-workspace .qo-work-ribbon>.qo-work-panel {display:flex;flex-wrap:nowrap;overflow-x:auto}
+
+.qo-education-launcher .launcher-art .qo-top-icon {stroke-width:1.5;color:var(--qo-accent)}
+.qo-education-workspace[data-workspace="diagnostics"] .qo-office-toolbar,
+.qo-education-workspace[data-workspace="work"] .qo-office-toolbar {flex:none}
+.qo-education-workspace .qo-work-panel>* {flex-shrink:0}

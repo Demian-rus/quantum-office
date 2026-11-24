@@ -66,7 +66,7 @@ function qwRefreshLiveGraphText(scope){
  for(const svg of scope.querySelectorAll('svg:has(.qw-axis-title[data-axis-tip-x])'))if(svg.getCTM())qwAlignSVGText(svg);
 }
 function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
-function qwDialog(title,body,footer='',inline=false){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route('work');}else{document.body.append(d);d.showModal();}return d;}
+function qwDialog(title,body,footer='',inline=false){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route(qoBankReturnPage);}else{document.body.append(d);d.showModal();}return d;}
 function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[]),['worksheet','Обычная контрольная работа']],current)+'<option disabled>Вариант ОГЭ / ЕГЭ — отдельный этап</option>';}
 function qwPracticeControls(settings={},attribute='data-practice'){
  return '<label>Задач на странице<select '+attribute+'="perPage">'+qwOptions([[1,'Одна'],[2,'Две'],[3,'Три'],[4,'Четыре']],settings.perPage||2)+'</select></label><label>Пространство для решения<select '+attribute+'="grid">'+qwOptions([['none','Без разлиновки'],['fine','Мелкая светлая клетка'],['normal','Обычная клетка']],settings.grid||'fine')+'</select></label>';
@@ -401,7 +401,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
    '<section class="qw-bank-edit-main"><h3>Содержание</h3>'+taskFields+'</section>'+
    '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'<div class="qw-bank-edit-preview-side"><h3>Предпросмотр задачи</h3><div id="qw-bank-edit-preview" class="qw-selected-preview" aria-label="Предпросмотр задания"></div></div></aside>'+
   '</div><p id="qw-bank-edit-error" role="alert" class="qw-error" hidden></p>',
-  qwButton('bank-edit-back','В банк')+qwButton('bank-edit-save','Сохранить изменения','class="qw-primary"'));
+  qwButton('bank-edit-back','В банк')+qwButton('bank-edit-save','Сохранить изменения','class="qw-primary"'),originPage==='bank');
  d.classList.add('qw-bank-edit-dialog');
  const error=d.querySelector('#qw-bank-edit-error');
  function showError(message){error.hidden=!message;error.textContent=message||'';}
@@ -456,9 +456,10 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
   const kind=button.dataset.bankVisual;
   if(kind==='image'){d.querySelector('#qw-bank-edit-image').click();return;}
   qwVisualEditor(kind,task,(updatedKind,validated)=>{
+   if(!active())return;
    task[updatedKind]=validated;task.figure=updatedKind;
    qwBankEdit(id,draft,returnFilters);
-  },()=>qwBankEdit(id,draft,returnFilters));
+  },()=>{if(active())qwBankEdit(id,draft,returnFilters);});
  });
  d.querySelector('#qw-bank-edit-image').onchange=async(event)=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -473,11 +474,14 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
  };
  const back=()=>{d.close();if(active())void qwBank(returnFilters);};
  d.addEventListener('cancel',event=>{event.preventDefault();back();});
+ d.addEventListener('keydown',event=>{if(originPage==='bank'&&event.key==='Escape'){event.preventDefault();back();}});
  d.querySelector('[data-qw-close]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-back"]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-save"]').onclick=async()=>{
+  if(!active()||!d.isConnected)return;
   try{
    await qwBankOpen();
+   if(!active()||!d.isConnected)return;
    collect();if(!task.prompt.trim())throw Error('Условие задания не может быть пустым');
    if(draft.year&&!/^(19|20)\d{2}$/.test(draft.year))throw Error('Введите год из четырёх цифр');
    if(draft.slot&&!/^([1-9]|[1-3]\d|40)$/.test(draft.slot))throw Error('Номер задания: от 1 до 40');
