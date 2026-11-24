@@ -1,5 +1,10 @@
 # Quantum Office — roadmap and acceptance gates
 
+## Актуальная дорожная карта — 24.11.2026
+TASK166.1–166.4 merged; Windows x64 native CI main PASS, владелец положительно проверил график с таблицами. PR #158 Lecture Lab — отдельная экспериментальная ветка, изолированный CI PASS, не интегрирована.
+Текущий приоритет: исправить прыжки шапки, выделить образовательные маршруты, локальные иконки, компактные PDF-настройки и ручной размер иллюстрации, использовать всё пространство окна. Далее общий научный редактор, интеграция лекций, расширенная модель задач, каталог и решения, демонстрации и авторский банк. Отдельно — подписанное версионирование и обновления.
+Подробный план, ограничения, UX-01–03 и критерии: [docs/EDUCATION_ROADMAP.md](docs/EDUCATION_ROADMAP.md). Нумерация после TASK166.4 предварительная. Исторические разделы ниже не отражают актуальную готовность; приоритет Windows, macOS не является текущим обязательством.
+
 **IMPORTANT:** read [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) first for current owner decisions, UI direction, limitations, and handoff. The historical checkboxes below are not an authoritative live status page.
 
 ## Product architecture (fixed decision)
