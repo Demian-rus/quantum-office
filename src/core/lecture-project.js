@@ -42,14 +42,17 @@ function ql2Svg(raw,progressOverride){
  const arrow=(x,y,x2,y2,c,w)=>{const d=Math.hypot(x2-x,y2-y);if(!d)return '';const ux=(x2-x)/d,uy=(y2-y)/d,h=Math.min(12,d*.4),bx=x2-h*ux,by=y2-h*uy;return line(x,y,bx,by,c,w)+'<path d="M '+x2+' '+y2+' L '+(bx-uy*h*.45)+' '+(by+ux*h*.45)+' L '+(bx+uy*h*.45)+' '+(by-ux*h*.45)+' Z" fill="'+c+'"/>';};
  if(v.kind==='diagram'){
   for(const s of v.shapes){
+   a+='<g data-shape="'+s.id+'">';
    if(s.kind==='rect')a+='<rect x="'+s.x+'" y="'+s.y+'" width="'+s.w+'" height="'+s.h+'" rx="5" fill="'+s.color+'"/>';
    if(s.kind==='circle')a+='<circle cx="'+s.x+'" cy="'+s.y+'" r="'+s.r+'" fill="'+s.color+'"/>';
    if(s.kind==='line')a+=(s.arrow?arrow:line)(s.x,s.y,s.x2,s.y2,s.color,s.width);
    if(s.kind==='text')a+=text(s.x,s.y,s.text,s.size,s.align,s.color);
+   a+='</g>';
   }
  }else{
   const L=78,R=615,T=52,B=320,m=v.demo.kind==='decay'?6:8,p=progressOverride??v.progress;
   ql2Num(p,0,1);
+  a+=text(360,24,v.title,20,'middle');
   for(let k=0;k<=4;k++){const y=B-k*(B-T)/4;a+=line(L,y,R,y,C.pale,1)+text(L-10,y+5,k*25,13,'end');}
   for(let k=0;k<=m;k++){const x=L+k*(R-L)/m;a+=line(x,T,x,B,C.pale,1)+text(x,B+22,k,13,'middle');}
   a+=arrow(L,B,L,T-13,C.ink,2)+arrow(L,B,R+15,B,C.ink,2);

@@ -16,6 +16,7 @@ const browser=await chromium.launch({headless:true});try{
  assert.ok(await intro.locator('svg text').allTextContents().then(x=>x.includes('Исправленная подпись')));
  const [svg]=await Promise.all([page.waitForEvent('download'),decay.getByRole('button',{name:'SVG',exact:true}).click()]);assert.match(await readFile(await svg.path(),'utf8'),/Периоды/);
  const [png]=await Promise.all([page.waitForEvent('download'),decay.getByRole('button',{name:'PNG',exact:true}).click()]);const p=await readFile(await png.path());assert.equal(p.readUInt32BE(16),1440);assert.equal(p.readUInt32BE(20),800);
+ const [clip]=await Promise.all([page.waitForEvent('download',{timeout:30000}),decay.getByRole('button',{name:'Скачать WebM (6 с)'}).click()]);const clipBytes=await readFile(await clip.path());assert.ok(clipBytes.length>1000);assert.equal(clipBytes.subarray(0,4).toString('hex'),'1a45dfa3');
  const [file]=await Promise.all([page.waitForEvent('download'),page.locator('#save').click()]);const saved=JSON.parse(await readFile(await file.path(),'utf8'));assert.equal(saved.version,2);assert.equal(saved.scenes.find(s=>s.id==='decay').visuals[0].xLabel,'Периоды');
  page.on('dialog',d=>d.accept());await page.locator('#load').setInputFiles({name:'test.qlecture',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(saved))});await page.waitForFunction(()=>document.querySelector('#status').textContent==='Проект открыт.');
  assert.deepEqual(errors,[]);console.log('Lecture lab browser smoke PASS');
