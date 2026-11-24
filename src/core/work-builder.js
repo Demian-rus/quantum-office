@@ -252,7 +252,8 @@ function qwBankNormalize(x){
   slot:/^([1-9]|[1-3]\d|40)$/.test(String(x.slot??''))?String(x.slot):'',
   difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
-const qwBankRepository=createBankRepository({normalize:qwBankNormalize});
+const qwBankRepository=createOfficeBankRepository({normalize:qwBankNormalize});
+const qwBankStorageName=qoNativeDesktop?'SQLite':'IndexedDB';
 async function qwBankOpen(){await qwBankRepository.open({onProgress:count=>status('Перенос изображений банка: '+count+' заданий…')});return qwBankRepository;}
 async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
@@ -305,7 +306,7 @@ function qwBankSave(){
     topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
    await qwBankRepository.createTask(qwBankNormalize({id:qwId(),bankNumber:0,...metadata,task}));
    await qwBankSnapshotSmall();
-   d.close();status('Задание сохранено в IndexedDB');
+   d.close();status('Задание сохранено в '+qwBankStorageName);
   }catch(e){status('Банк: '+e.message,true);}
  };
 }
@@ -473,7 +474,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
     await qwBankRepository.updateTask(id,candidate,stored.revision);
    await qwBankSnapshotSmall();
    d.close();qwBank({...returnFilters,__view:saved.id});
-   status(creating?'Задание добавлено в IndexedDB':'Изменения сохранены в IndexedDB');
+   status(creating?'Задание добавлено в '+qwBankStorageName:'Изменения сохранены в '+qwBankStorageName);
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
@@ -481,12 +482,12 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
 async function qwBank(previousFilters={}){
  const bankDocument=qwDoc,bankPage=page,bankTab=qoWorkspaceTab.writer;
  const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoWorkspaceTab.writer===bankTab;
- let xs=[],facets,totalCount=0,assetMigrationError=null;
+ let xs=[],facets,totalCount=0,assetMigrationError=null,storageInfo=null;
  try{
   await qwBankOpen();
   await qwBankSnapshotSmall();
   const stats=await qwBankRepository.getStatistics();
-  totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+  storageInfo=stats;totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
  }catch(e){
   status('Банк не открыт: '+e.message,true);
   const raw=qwBankRepository.getLegacyRecovery();
@@ -531,7 +532,7 @@ async function qwBank(previousFilters={}){
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
  d.querySelector('.qw-dialog-body').insertAdjacentHTML('afterbegin',
-  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">IndexedDB · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">Банк хранится в профиле браузера. Создайте отдельную копию на диске.</span></div>'+
+  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">'+qwBankStorageName+' · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">'+(qoNativeDesktop?'Локальная база Windows':'Банк хранится в профиле браузера')+'. Создайте отдельную копию на диске.</span></div>'+(qoNativeDesktop?'<div class="qw-bank-storage-bar"><small>'+qwEsc(storageInfo.path)+' · '+Math.ceil(storageInfo.estimatedBytes/1024)+' КБ</small><button type="button" id="qw-native-folder">Открыть папку данных</button><button type="button" id="qw-native-snapshot">Снимок SQLite</button></div>':'')+
   '<section id="qw-bank-restore-review" class="qw-bank-restore-review" hidden aria-label="Проверенная резервная копия">'+
    '<h3>Проверка резервной копии</h3><p id="qw-bank-restore-detail"></p>'+
    '<p id="qw-bank-restore-warning"></p>'+
@@ -541,6 +542,7 @@ async function qwBank(previousFilters={}){
    '<button type="button" id="qw-bank-restore-dismiss">Отмена</button></section>');
  const get=k=>d.querySelector('#qw-bank-'+k),pick=k=>get(k).value;
  const state=d.querySelector('#qw-bank-save-status');
+ if(qoNativeDesktop){d.querySelector('#qw-native-folder').onclick=()=>qwBankRepository.openDataFolder().catch(e=>status(e.message,true));d.querySelector('#qw-native-snapshot').onclick=()=>qwBankRepository.nativeSnapshot().then(x=>status('Снимок SQLite: '+x.path)).catch(e=>status(e.message,true));}
  const reportStatus=(message,bad=false)=>{state.textContent=message;state.classList.toggle('qw-error',bad);};
  if(assetMigrationError)reportStatus('Перенос изображений не завершён: '+assetMigrationError,true);
  let previewSequence=0;
@@ -675,9 +677,10 @@ async function qwBank(previousFilters={}){
    await new Promise(resolve=>setTimeout(resolve,0));
    const text=JSON.stringify(archive);
    if(ctrl.signal.aborted)throw Error('Операция отменена');
-   download((protect?'QuantumOffice_банк_защитная_копия_':'QuantumOffice_банк_SHA256_')+
+   const saved=await download((protect?'QuantumOffice_банк_защитная_копия_':'QuantumOffice_банк_SHA256_')+
     new Date().toISOString().slice(0,10)+'.qwbank',text,'application/json;charset=utf-8');
-   reportStatus('Архив проверен SHA-256, скачивание запрошено. Проверьте, что файл появился на диске.');
+   if(qoNativeDesktop&&saved!==true)throw Error('Файл не сохранён');
+   reportStatus(qoNativeDesktop?'Архив проверен SHA-256 и сохранён.':'Архив проверен SHA-256, скачивание запрошено. Проверьте, что файл появился на диске.');
    return archive;
   }finally{
    backupController=null;backupButton.disabled=false;restoreButton.disabled=false;cancelBackup.hidden=true;
@@ -738,12 +741,12 @@ async function qwBank(previousFilters={}){
   restoreBusy=true;confirmRestore.disabled=true;restoreButton.disabled=true;
   restoreController=new AbortController();
   try{
-   reportStatus('Атомарное восстановление IndexedDB. Можно нажать «Отмена», чтобы прервать незавершённую транзакцию.');
+   reportStatus('Атомарное восстановление '+qwBankStorageName+'. Можно нажать «Отмена», чтобы прервать незавершённую транзакцию.');
    const outcome=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode,signal:restoreController.signal});
    await qwBankSnapshotSmall();
    totalCount=(await qwBankRepository.getStatistics()).count;
    facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
    fillYears();fillCategories();pageOffset=0;await refresh();
    dismissRestore();
    reportStatus('Восстановлено и повторно проверено: '+outcome.restored+' заданий. Счётчик номеров сохранён.');
@@ -780,7 +783,7 @@ async function qwBank(previousFilters={}){
    const stats=await qwBankRepository.getStatistics();
    totalCount=stats.count;
    facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
    fillYears();fillCategories();pageOffset=0;await refresh();
    reportStatus('Сохранено: '+imported.imported+' · пропущено совпадений: '+imported.skipped);
   }catch(error){
@@ -903,7 +906,7 @@ async function qwBank(previousFilters={}){
      await qwBankSnapshotSmall();
      totalCount=(await qwBankRepository.getStatistics()).count;
      facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-     d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+     d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
      selected.delete(entry.id);if(activeId===entry.id)activeId='';
      fillYears();fillCategories();pageOffset=0;await refresh();
      reportStatus('Удаление подтверждено базой данных.');

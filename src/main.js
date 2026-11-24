@@ -193,7 +193,7 @@ function renameBookInline(id,button){
  input.focus();input.select();
 }
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
-function download(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
+function download(name,text,mime){const blob=new Blob([text],{type:mime});if(qoNativeDesktop)return qoNativeSave(name,blob).then(saved=>{status(saved?'Файл сохранён':'Сохранение отменено',!saved);return saved;}).catch(e=>{status('Файл не сохранён: '+e.message,true);return false;});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
 async function saveBook(asNew=false){
  commitEditor();const b=book();if(!b)return;
  const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
