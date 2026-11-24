@@ -168,6 +168,7 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
    let bad:i64=c.query_row("SELECT count(*) FROM pragma_foreign_key_check",[],|r|r.get(0))?;ensure!(bad==0,"ASSET_MISSING: invalid links");
    let(num,bytes):(i64,i64)=c.query_row("SELECT count(*),coalesce(sum(size),0) FROM assets",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
    let refs:i64=c.query_row("SELECT count(*) FROM task_assets",[],|r|r.get(0))?;
+   if p["clean"]==true{let mut stmt=c.prepare("SELECT key,mime,sha256,size,bytes FROM assets")?;let mut q=stmt.query([])?;while let Some(row)=q.next()?{cancel(f)?;let key:String=row.get(0)?;let mime:String=row.get(1)?;let hash:String=row.get(2)?;let size:i64=row.get(3)?;let bytes:Vec<u8>=row.get(4)?;ensure!(key==format!("{}:{}",mime,hash)&&size==bytes.len() as i64&&sha(&bytes)==hash,"ASSET_CHECKSUM: cleanup blocked");}}
    let (orphans,orphan_bytes):(i64,i64)=c.query_row("SELECT count(*),coalesce(sum(size),0) FROM assets a WHERE NOT EXISTS(SELECT 1 FROM task_assets t WHERE t.asset_key=a.key)",[],|r|Ok((r.get(0)?,r.get(1)?)))?;
    let deleted=if p["clean"]==true{c.execute("DELETE FROM assets WHERE NOT EXISTS(SELECT 1 FROM task_assets WHERE asset_key=assets.key)",[])?}else{0};
    json!({"count":num,"bytes":bytes,"references":refs,"orphans":orphans,"orphanBytes":orphan_bytes,"deleted":deleted,"inline":0})
@@ -201,4 +202,26 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   run(&p,"delete",&json!({"id":"a","revision":1}),&f)?;assert_eq!(run(&p,"diagnostics",&json!({"clean":true}),&f)?["deleted"],0);
   run(&p,"delete",&json!({"id":"b","revision":1}),&f)?;assert_eq!(run(&p,"diagnostics",&json!({"clean":true}),&f)?["deleted"],1);Ok(())
  }
+ #[test]fn concurrent_writers_and_stale_restore()->Result<()>{
+  let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let f=AtomicBool::new(false);run(&p,"open",&json!({}),&f)?;
+  let mut handles=vec![];for i in 0..8{let q=p.clone();handles.push(std::thread::spawn(move||run(&q,"create",&json!({"record":record(&format!("c{i}")),"now":"2026-11-24"}),&AtomicBool::new(false))));}
+  let mut nums=vec![];for h in handles{nums.push(h.join().expect("writer panic")?["bankNumber"].as_i64().unwrap());}nums.sort();assert_eq!(nums,(1..=8).collect::<Vec<_>>());
+  let snap=run(&p,"snapshot",&json!({}),&f)?;let body=json!({"format":"quantum-work-bank-backup","version":3,"schema":1,"count":8,"records":snap["records"],"meta":snap["meta"]}).to_string();
+  run(&p,"create",&json!({"record":record("new"),"now":"2026-11-24"}),&f)?;
+  let before=run(&p,"snapshot",&json!({}),&f)?;assert!(run(&p,"restore",&json!({"canonical":body,"sha256":sha(body.as_bytes()),"generation":snap["generation"],"mode":"replace"}),&f).is_err());
+  assert_eq!(before,run(&p,"snapshot",&json!({}),&f)?);
+  let mut invalid:Value=serde_json::from_str(&body)?;invalid["records"][7]["bankNumber"]=invalid["records"][0]["bankNumber"].clone();let invalid=invalid.to_string();
+  assert!(run(&p,"restore",&json!({"canonical":invalid,"sha256":sha(invalid.as_bytes()),"generation":before["generation"],"mode":"replace"}),&f).is_err());
+  assert_eq!(before,run(&p,"snapshot",&json!({}),&f)?);
+  f.store(true,Ordering::SeqCst);assert!(run(&p,"delete",&json!({"id":"new"}),&f).is_err());f.store(false,Ordering::SeqCst);
+  assert_eq!(before,run(&p,"snapshot",&json!({}),&f)?);Ok(())
+ }
+ #[test]fn unknown_schema_and_disk_full_preserve_data()->Result<()>{
+  let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let f=AtomicBool::new(false);run(&p,"open",&json!({}),&f)?;
+  let mut c=open(&p,false)?;let before=count(&c)?;let pages:i64=c.pragma_query_value(None,"page_count",|r|r.get(0))?;c.pragma_update(None,"max_page_count",pages)?;
+  {let tx=c.transaction_with_behavior(TransactionBehavior::Immediate)?;let error=tx.execute("INSERT INTO meta(key,value) VALUES('huge',json_quote(hex(zeroblob(8000000))))",[]);assert!(error.is_err());}
+  assert_eq!(count(&c)?,before);assert_eq!(c.query_row("SELECT count(*) FROM meta WHERE key='huge'",[],|r|r.get::<_,i64>(0))?,0);
+  c.pragma_update(None,"user_version",99)?;drop(c);assert!(open(&p,true).is_err());let c=Connection::open(&p)?;assert_eq!(c.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0))?,99);Ok(())
+ }
+
 }
