@@ -424,6 +424,41 @@ button {
   border: 1px solid var(--qo-danger);
 }
 
+/* TASK167.1: native draft notices share the toast stack and never size #app. */
+#qo-native-notifications {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: min(410px, calc(100vw - 48px));
+  display: grid;
+  gap: 8px;
+  z-index: 3500;
+  pointer-events: none;
+}
+#qo-native-notifications > .toast {
+  position: static;
+  max-width: none;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#qo-native-notifications > [hidden],
+#qo-native-notifications > #toast:not(.active),
+#qo-native-notifications button[hidden] { display: none; }
+#qo-native-draft-notice { pointer-events: auto; max-height: 40vh; overflow: auto; }
+#qo-native-draft-notice button {
+  display: block;
+  margin-top: 8px;
+  padding: 6px 9px;
+  max-width: 100%;
+  font: inherit;
+  border: 1px solid var(--qo-border-strong);
+  border-radius: var(--qo-radius);
+  background: var(--qo-surface);
+  color: var(--qo-text);
+  cursor: pointer;
+}
+#qo-native-draft-notice button:focus-visible { outline: 2px solid var(--qo-focus); outline-offset: 2px; }
+
 @media (max-width:1100px) {
 .home-main {
   padding: 35px;
@@ -1428,3 +1463,12 @@ body.is-fill-dragging * {
   outline: 2px solid var(--qo-accent);
   outline-offset: 2px;
 }
+
+/* TASK167.1: education launcher groups. */
+.office-launcher .qo-launcher-heading {width:min(1280px,100%);margin:18px 0 10px;font-size:17px;color:var(--qo-text);font-weight:650;text-align:left}
+.office-launcher .qo-education-launcher {grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
+.office-launcher .qo-education-launcher .launcher-tile {min-height:175px;padding:16px 12px;gap:5px}
+.office-launcher .qo-education-launcher .launcher-art,.office-launcher .qo-education-launcher .launcher-art svg {width:54px;height:54px;margin:0}
+.office-launcher .qo-education-launcher .launcher-name {font-size:17px}
+@media(max-width:1050px){.office-launcher .qo-education-launcher{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:460px){.office-launcher .qo-education-launcher{grid-template-columns:1fr}}

@@ -17,7 +17,7 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   const action=k=>p.locator('[data-qw-action="'+k+'"]'),stage=p.locator('#qw-visual-stage svg');
   await p.goto(pathToFileURL(html).href);
   await p.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);
-  await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.locator(before?'[data-editor="writer"][data-tab="work"]':'.global-bar [data-target="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   if(width<1200)await action('left').click();
   if(await p.locator('[data-qw-action="quick-add"]').count()){await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();}else{await p.locator('#qw-add-type').selectOption(kind);await p.locator('.qw-left [data-qw-action="add"]').click();}

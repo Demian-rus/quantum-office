@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1663');
  const p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(String(e)));p.on('dialog',d=>d.accept());
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
-  await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const fixtures=await p.evaluate(async()=>{
    await qwBankOpen();
    const canvas=document.createElement('canvas');canvas.width=32;canvas.height=24;

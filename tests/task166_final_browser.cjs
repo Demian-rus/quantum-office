@@ -15,7 +15,7 @@ const out=path.join(root,'evidence/task166');
   opaque.on('console',m=>{if(m.type()==='error')consoleErrors.push(m.text());});
   await opaque.setContent(fs.readFileSync(path.join(root,'dist/index.html'),'utf8'),{waitUntil:'load'});
   const tiles=await opaque.locator('.launcher-tile').count();
-  assert.equal(tiles,4,'shared Office launcher must initialize even when localStorage and IndexedDB are blocked');
+  assert.equal(tiles,7,'shared Office launcher must initialize even when localStorage and IndexedDB are blocked');
   assert.ok((await opaque.locator('#app').innerText()).length>120);
   const blocked=await opaque.evaluate(async()=>{
    try{await qwBankOpen();return 'bad-success';}catch(e){return e.code;}

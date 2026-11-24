@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  const errors=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept('A'));
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
-  await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await p.locator('#qw-prompt').fill('TASK148: физические и математические иллюстрации');
   await p.locator('[data-qw-action="diagram"]').click();

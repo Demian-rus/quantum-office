@@ -7,7 +7,7 @@ const {pathToFileURL}=require('node:url');
  const page=await browser.newPage({viewport:{width:1300,height:920},acceptDownloads:true});
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
- const open=async()=>{await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ const open=async()=>{await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="diagnostics"]').click();
  if(await page.locator('[data-qd-pane="author-tools"]').count())await page.locator('[data-qd-pane="author-tools"]>summary').click();};
  await open();
  // TASK141 starts empty; explicitly create the blank card used by this audit fixture.

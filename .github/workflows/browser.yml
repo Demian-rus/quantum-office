@@ -798,3 +798,30 @@ jobs:
             tests/task144_browser.cjs
             docs/TASK166.3.md
           if-no-files-found: warn
+
+  task1671-education-workspaces:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            sleep 5
+          done
+          exit 1
+      - run: node tests/task1671_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1671-education-workspaces
+          path: |
+            evidence/task1671/
+            Quantum-Office.html
+          if-no-files-found: warn

@@ -17,7 +17,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task152');
  try{
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="diagram"]').click();
   await page.locator('#qw-prompt').fill('Постройте схему: эллипс, правильный многоугольник и зависимые геометрические построения.');
   await action('diagram').click();await page.locator('#qw-snap-geometry').uncheck();

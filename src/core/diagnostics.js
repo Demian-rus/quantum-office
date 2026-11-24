@@ -2226,15 +2226,7 @@ function qdRefresh(){
   if(typeof qdDeskDecorate==='function')qdDeskDecorate();
 }
 
-function qoDiagnosticVisibility(){
-  const active=qoWorkspaceTab.writer==='diagnostic',work=qoWorkspaceTab.writer==='work';
-  document.getElementById('qo-writer-edit-scroll')?.toggleAttribute('hidden',active||work);
-  document.getElementById('qo-diag-workspace')?.toggleAttribute('hidden',!active);
-  document.getElementById('qo-work-workspace')?.toggleAttribute('hidden',!work);
-  if(typeof qwFooter==='function')qwFooter(work);
-  if(work&&typeof qwRender==='function')qwRender();
-  if(active)qdRefresh();
-}
+function qoDiagnosticVisibility(){if(page==='diagnostics')qdRefresh();}
 function qoDiagnosticMount(){
   const initial=qdWorkingDoc();
   if(initial.title==='Диагностика знаний'&&!initial.history.length&&!initial.students.length&&initial.sections.length===1&&initial.sections[0].questions.length===1&&!initial.sections[0].questions[0].prompt&&!initial.sections[0].questions[0].answer)qdBlank(initial);

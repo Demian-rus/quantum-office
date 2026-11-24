@@ -7,7 +7,7 @@ const seed=require('./task142_fixture.cjs');
  try{
  const page=await browser.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  const action=n=>page.locator('[data-qd-action="'+n+'"]');const mode=n=>page.locator('[data-qd-action="mode"][data-mode="'+n+'"]').first();
- await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="diagnostics"]').click();
  // Actual empty start and keyboard authoring, not a pre-filled sample.
  await action('blank').first().click();await page.keyboard.press('Control+Enter');assert.equal(await page.locator('.qd-edit-card').count(),1);
  await page.locator('[data-qd-field="title"]').fill('Создано с нуля TASK142');await page.locator('[data-qd-field="prompt"]').fill('Почему нагреваются тела?');
@@ -39,7 +39,7 @@ const seed=require('./task142_fixture.cjs');
  assert.equal(await page.evaluate(id=>qdDoc().session.scores[id],firstId),1.5);assert.match(await page.locator('.qd-guided-measures').innerText(),/1.5/);
  await action('nav-next').click();await page.locator('[data-qd-field="numeric-response"]').fill('84');await action('auto-check').click();await action('nav-next').click();
  if(!(await page.locator('.qd-run-setup').evaluate(el=>el.open)))await page.locator('.qd-run-setup>summary').click();await action('run-checkpoint').click();
- await page.reload();await page.evaluate(()=>{route('writer');qoWorkspaceTab.writer='diagnostic';render();});
+ await page.reload();await page.evaluate(()=>{route('diagnostics');});
  assert.equal(await page.evaluate(id=>qdDoc().session.comments[id],firstId),'Верное объяснение, нужен пример.');assert.equal(await page.evaluate(()=>qdDisplay().activeId),thirdId);
  await mode('builder').click();await page.locator('[data-qd-field="prompt"][data-qid="'+firstId+'"]').fill('Изменённый черновик, снимок неизменен');await mode('run').click();assert.match(await page.evaluate(()=>qdDoc().sections[0].questions[0].prompt),/металлическая/);
  await page.locator('[data-qd-field="text-response"]').fill('Сравнить передачу энергии в одинаковых условиях.');await page.locator('[data-qd-field="score"]').fill('3');await page.locator('[data-qd-field="comment"]').click();
@@ -61,7 +61,7 @@ const seed=require('./task142_fixture.cjs');
  await page.setViewportSize({width:1440,height:1000});await mode('builder').click();await page.locator('.qd-outline-question').first().click();await page.evaluate(async()=>{qoThemePreference='dark';qoApplyAppearance();await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));});
  const colors=await page.locator('[data-qd-action="blank"]').evaluate(el=>{const c=getComputedStyle(el);return {background:c.backgroundColor,surface:c.getPropertyValue('--qo-surface')};});assert.notEqual(colors.background,'rgb(255, 255, 255)','dark controls must finish transitioning before capture');await page.screenshot({path:path.join(out,'after_dark.png')});
  // Unrecognized or corrupted binaries must never overwrite the current Writer document.
- await page.evaluate(()=>{qoWorkspaceTab.writer='home';render();});const before=await page.evaluate(()=>qoWriter.html);
+ await page.evaluate(()=>{route('writer');});const before=await page.evaluate(()=>qoWriter.html);
  for(const name of ['unknown.bin','archive.txt','broken.docx']){
   await page.locator('#qo-writer-file').setInputFiles({name,mimeType:'application/octet-stream',buffer:Buffer.from('PK\x03\x04\x00broken')});await page.waitForFunction(()=>document.querySelector('#toast')?.classList.contains('bad'));assert.equal(await page.evaluate(()=>qoWriter.html),before);
  }

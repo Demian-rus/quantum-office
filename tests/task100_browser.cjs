@@ -12,7 +12,7 @@ const {pathToFileURL}=require('node:url');
   page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+  await page.locator('.global-bar [data-target="diagnostics"]').click();
   await page.locator('[data-qd-action="sample"]').click();
   assert.equal(await page.locator('.qd-edit-card').count(),8);
 
@@ -61,7 +61,7 @@ const {pathToFileURL}=require('node:url');
   assert.match(await page.locator('.qd-profile-insight').textContent(),/1/);
   await page.reload();
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+  await page.locator('.global-bar [data-target="diagnostics"]').click();
   assert.equal(await page.evaluate(()=>qdDoc().students.length),1);
   assert.equal(await page.evaluate(()=>qdDoc().history.length),1);
   assert.equal(await page.locator('.qd-card[data-qid]').count(),9);

@@ -1,7 +1,7 @@
 name: Windows desktop SQLite
 on:
   push:
-    branches: [main, 'feat/task166-4-windows-sqlite']
+    branches: [main, 'feat/task166-4-windows-sqlite', 'feat/task167-1-education-workspaces']
   pull_request:
     branches: [main]
   workflow_dispatch:

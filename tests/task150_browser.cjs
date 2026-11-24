@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
  fs.mkdirSync(out,{recursive:true});const {task149PrintSamples}=await import('./fixtures/task149_4_samples.js'),{task149CompactSamples}=await import('./fixtures/task149_3_samples.js');
  const compact=task149PrintSamples()[0].project,worksheet=task149CompactSamples()[0].project;
  const browser=await chromium.launch({headless:true}),app=await browser.newPage({acceptDownloads:true}),errors=[];app.on('pageerror',e=>errors.push(e.message));
- await app.goto(pathToFileURL(process.env.QW_TASK150_HTML||path.join(root,'Quantum-Office.html')).href);await app.evaluate(()=>route('writer'));await app.locator('[data-editor="writer"][data-tab="work"]').click();
+ await app.goto(pathToFileURL(process.env.QW_TASK150_HTML||path.join(root,'Quantum-Office.html')).href);await app.evaluate(()=>route('writer'));await app.locator(before?'[data-editor="writer"][data-tab="work"]':'.global-bar [data-target="work"]').click();
  const reports=[];
  async function render(name,d,options={}){
   const generated=await app.evaluate(({d,options})=>{const before=JSON.stringify(d),html=qwPrintDocumentHTML(d,false,options);return{html,unchanged:JSON.stringify(d)===before};},{d,options}),html=generated.html;assert.ok(generated.unchanged,'export must preserve the actual input document');

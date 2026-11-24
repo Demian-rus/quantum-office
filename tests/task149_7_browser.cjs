@@ -12,7 +12,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149.7')
  const selected=()=>stage.locator('.qw-visual-selected[data-qw-object]').evaluateAll(es=>es.map(e=>+e.dataset.qwObject));
  const geometry=()=>stage.locator('[data-qw-extended]').evaluateAll(es=>es.map(e=>Object.fromEntries(['x1','y1','x2','y2'].map(k=>[k,+e.getAttribute(k)]))));
  try{
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   for(const kind of ['ray','infiniteLine']){
    await p.locator('[data-action="work-new"]').click();await p.locator('[data-qw-action="quick-add"][data-type="diagram"]').click();await action('diagram').click();await p.locator('#qw-snap-geometry').uncheck();
    await tool(kind);await drag(160,120,260,120);await tool('select');

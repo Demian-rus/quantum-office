@@ -24,39 +24,39 @@
  height:74px;padding-top:1px;padding-bottom:0;
 }
 /* Preserve two-row tile groups, scaled to a standard 78px ribbon. */
-.qo-document-workspace:has([data-panel-tab="diagnostic"].active) .qo-work-ribbon{
+.qo-document-workspace:has([data-education-ribbon="diagnostics"].active) .qo-work-ribbon{
  height:78px;min-height:78px;max-height:78px;
 }
-.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"]{
+.qo-document-workspace [data-education-ribbon="diagnostics"]{
  height:78px;min-height:78px;max-height:78px;padding:2px 10px 1px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-tile-group{
  height:74px;padding:0 10px;gap:0;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-group-body{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-tile-group .qo-work-group-body{
  height:59px;min-height:59px;max-height:59px;
  grid-template-columns:repeat(2,minmax(126px,145px));
  grid-template-rows:repeat(2,28px);gap:3px 5px;align-content:center;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-tile-group .qo-work-btn{
  height:28px;min-height:28px;max-height:28px;padding:3px 8px;font-size:11px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-btn span{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-tile-group .qo-work-btn span{
  font-size:11px;line-height:1.15;white-space:nowrap;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-tile-group .qo-work-icon{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-tile-group .qo-work-icon{
  width:16px;height:16px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-guide-group{
  height:74px;padding:0 12px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-guide-group .qo-work-group-body{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-guide-group .qo-work-group-body{
  min-height:57px;height:57px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-diag-ribbon-guide{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-diag-ribbon-guide{
  padding:2px 3px;gap:3px;font-size:11px;
 }
-.qo-document-workspace [data-panel-tab="diagnostic"] .qo-work-group-caption{
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-work-group-caption{
  height:12px;line-height:12px;
 }
 /* Constructor buttons share one bottom baseline with the template select. */

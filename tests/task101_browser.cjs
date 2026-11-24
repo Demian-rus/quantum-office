@@ -8,7 +8,7 @@ const {pathToFileURL}=require('node:url');
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const page=await browser.newPage({viewport:{width:1280,height:950},acceptDownloads:true});
  const errors=[];page.on('pageerror',err=>errors.push(err.message));page.on('dialog',d=>d.accept());
- const open=async()=>{await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();};
+ const open=async()=>{await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="diagnostics"]').click();};
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await open();
  await page.locator('[data-qd-action="sample"]').click();

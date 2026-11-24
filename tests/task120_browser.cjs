@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('#qd-template-pick').selectOption('physics8');
  await page.locator('[data-qd-action="use-template"]').click();
  assert.equal(await page.locator('.qd-builder-actionbar').count(),1);
@@ -68,7 +68,7 @@ const {pathToFileURL}=require('node:url');
  }
  await page.reload();
  await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  assert.equal(await page.evaluate(()=>qdBankRead().length),1);
  assert.equal(await page.evaluate(()=>qdLibraryRead().length),1);
  assert.deepEqual(errors,[]);

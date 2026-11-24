@@ -43,7 +43,6 @@ function qoWriterNavigationHTML(){
 function qoWriterNavEditor(){return document.getElementById('qo-writer-page');}
 function qoWriterNavToggle(open,mode=qoWriterNavMode){
  if(page!=='writer')return;
- if(qoWorkspaceTab.writer==='diagnostic')qoWorkSwitchTab('writer','home');
  qoWriterNavVisible=!!open;
  if(['outline','find','replace'].includes(mode))qoWriterNavMode=mode;
  const panel=document.getElementById('qo-writer-navigation');

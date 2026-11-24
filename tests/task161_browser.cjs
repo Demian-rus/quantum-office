@@ -20,7 +20,7 @@ const obj=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
  try{
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="diagram"]').click();
   await page.locator('#qw-prompt').fill('Исследуйте электрическую цепь.');
   await page.locator('[data-qw-action="diagram"]').click();

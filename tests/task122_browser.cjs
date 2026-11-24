@@ -35,12 +35,12 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  await page.locator('[data-hub-action="open-diagnostic"]').click();
  const selection=await page.evaluate(()=>({selected:qdDoc().session.student,
    profiles:qdDoc().students.length,sheets:workspace.books[0].sheets.length,
-   mode:qdMode,tab:qoWorkspaceTab.writer}));
+   mode:qdMode,tab:page}));
  assert.equal(selection.selected,'Тестовый ученик 2');
  assert.equal(selection.profiles,1);
  assert.equal(selection.sheets,1);
  assert.equal(selection.mode,'run');
- assert.equal(selection.tab,'diagnostic');
+ assert.equal(selection.tab,'diagnostics');
  assert.equal(await page.locator('.qo-hub-roster').count(),1);
  // Save a score, then return to the same workbook row and find global history.
  await page.evaluate(()=>{
@@ -65,7 +65,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  const download=await csvDownload;assert.match(download.suggestedFilename(),/\.csv$/);
  // A new diagnosis contributes to the same central journal, without any new sheet.
  await page.evaluate(()=>{
-   qoWorkspaceTab.writer='diagnostic';route('writer');qdMode='run';
+   route('diagnostics');qdMode='run';
    const d=qdDoc(),student=qdAddStudent(d,'Тестовый ученик 2');
    d.session.studentId=student.id;d.session.student=student.name;
    d.title='Вторая диагностика';
@@ -89,6 +89,12 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  await page.reload();await page.evaluate(()=>route('sheet'));
  assert.equal(await page.evaluate(()=>qoHubRoster().length),11,'source remains connected after reload');
  assert.equal(await page.evaluate(()=>qoHubResults().length),2,'global journal remains after reload');
+ await page.evaluate(()=>route('writer'));
+ assert.equal(await page.locator('.qo-hub-roster,#qo-diag-root').count(),0,'Writer must not mount the roster');
+ await page.evaluate(()=>route('diagnostics'));
+ assert.equal(await page.locator('.qo-hub-roster').count(),1,'roster must be restored in diagnostics after reload and Writer navigation');
+ assert.equal(await page.evaluate(()=>qdDoc().session.student),'Тестовый ученик 12','selected student persists after reload');
+ await page.evaluate(()=>route('sheet'));
  for(const width of [1600,1100,650,390]){
    await page.setViewportSize({width,height:850});
    await page.evaluate(()=>{qoHubOpen=true;qoHubDecorate();});
