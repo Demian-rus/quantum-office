@@ -32,5 +32,4 @@ async fn bank_command(app:AppHandle,requests:State<'_,Requests>,operation:String
 }
 fn main(){tauri::Builder::default().manage(Requests::default())
  .invoke_handler(tauri::generate_handler![bank_command,bank_cancel,open_data_folder,save_export])
- .setup(|app|{let file=app.path().app_data_dir()?.join("bank.sqlite3");tauri::async_runtime::spawn_blocking(move||{let _=bank::run(&file,"open",&serde_json::json!({}),&AtomicBool::new(false));});Ok(())})
  .run(tauri::generate_context!()).expect("Quantum Office desktop startup failed");}

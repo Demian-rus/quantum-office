@@ -21,3 +21,7 @@ writeFileSync(resolve(root,'dist/components.html'),catalog);
 
 // Same source bundle; native marker makes unavailable IPC fail closed. External script is CSP-compatible.
 mkdirSync(resolve(root,'dist-native'),{recursive:true});writeFileSync(resolve(root,'dist-native/index.html'),html.replace('<meta name="quantum-office-build"','<meta name="quantum-office-native" content="true"><meta name="quantum-office-build"').replace(/<script>[\s\S]*<\/script><\/body>/,'<script src="app.js"></script></body>'));writeFileSync(resolve(root,'dist-native/app.js'),js);
+
+// Standalone print layout executes from a local trusted script in native WebView2.
+const printSource=read('src/core/work-layout.js').replace(/^import .*?;\r?\n/gm,'').replace(/^export \{[^\n]*\};?\r?\n/gm,'');
+writeFileSync(resolve(root,'dist-native/print.js'),printSource+'\nwindow.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});');

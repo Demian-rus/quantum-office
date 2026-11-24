@@ -8,6 +8,16 @@ on:
 permissions:
   contents: read
 jobs:
+  resolve-lock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Resolve candidate lock and emit reproducible bytes
+        working-directory: src-tauri
+        run: |
+          cargo generate-lockfile
+          python -c 'import base64,pathlib,hashlib; b=pathlib.Path("Cargo.lock").read_bytes(); s=base64.b64encode(b).decode(); print("QO_LOCK_SHA",hashlib.sha256(b).hexdigest()); [print("QO_LOCK_B64 "+s[i:i+3000]) for i in range(0,len(s),3000)]'
   windows-x64:
     runs-on: windows-2025
     timeout-minutes: 60

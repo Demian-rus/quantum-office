@@ -19,11 +19,11 @@ class SQLiteBankRepository{
  async close(){if(this._opening)await this._opening;this.db=null;this._restorePlan=null;}
  async _run(operation,payload={},signal){await this.open();return this._call(operation,payload,signal);}
  getLegacyRecovery(){return null;}
- async _clean(input){
+ async _clean(input,validateAssets=true){
   const normalized=this.normalize(structuredClone(input));
   if(!normalized||!normalized.task||typeof normalized.task.prompt!=='string'||typeof normalized.id!=='string'||!normalized.id.trim()||normalized.id.length>80)throw new BankStorageError('Некорректная запись','INVALID_RECORD');
   const record=bankPortable(normalized);record.type=record.task.type;
-  await bankAssetPrepareMany([record]);return record;
+  if(validateAssets)await bankAssetPrepareMany([record]);return record;
  }
  async getTask(id){return (await this._run('get',{id:String(id)}))??undefined;}
  async snapshotMetadata(){return this._run('metadata');}
@@ -36,7 +36,8 @@ class SQLiteBankRepository{
   const data=typeof file==='string'?JSON.parse(file):file;
   if(!data||data.format!=='quantum-work-bank'||!Array.isArray(data.items)||![1,2].includes(data.version)||data.items.length>(data.version===1?500:20000))throw new BankStorageError('Требуется QWBANK v1/v2','BAD_IMPORT');
   if(data.version===2&&(data.count!==data.items.length||data.checksum!==bankHash(JSON.stringify(data.items))))throw new BankStorageError('Контрольная сумма не совпадает','BAD_CHECKSUM');
-  const records=[];for(const e of data.items){if(signal?.aborted)throw new BankStorageError('Импорт отменён','CANCELLED');records.push(await this._clean({...e,id:e.id||bankIdentity()}));}
+  const records=[];for(const e of data.items){if(signal?.aborted)throw new BankStorageError('Импорт отменён','CANCELLED');records.push(await this._clean({...e,id:e.id||bankIdentity()},false));}
+  await bankAssetPrepareMany(records);
   return this._run('import',{records,now:new Date().toISOString()},signal);
  }
  async _captureBackupSnapshot(){const {records,meta}=await this._run('snapshot');return {records,meta};}

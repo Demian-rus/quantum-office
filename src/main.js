@@ -3588,3 +3588,4 @@ window.addEventListener('beforeunload',()=>{if(editing)commitEditor();});
 qoWriterNavigationInstall();
 render();
 qoMiniSheetInstall();
+if(qoNativeDesktop)void qwBankOpen().catch(error=>status('Банк SQLite: '+error.message,true));
