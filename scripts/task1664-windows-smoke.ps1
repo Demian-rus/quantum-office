@@ -144,17 +144,8 @@ try {
   Start-Sleep -Seconds 3
   # The Portable has already passed full draft/SQLite comparison over the
   # temporary CI-only CDP connection; ordinary launch must expose actual UI.
-  Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
-  $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
-  $deadline = (Get-Date).AddSeconds(25)
-  $visible = $false
-  do {
-    $elements = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
-    foreach ($element in $elements) { if ($element.Current.Name -like '*TASK1664 Sheets*') { $visible=$true; break } }
-    if (!$visible) { Start-Sleep -Milliseconds 500 }
-  } until ($visible -or (Get-Date) -gt $deadline)
-  @{sheetTitleAccessible=$visible;scope='real Windows accessibility tree, no CDP'} | ConvertTo-Json | Set-Content evidence/native/portable-uia.json
-  if (!$visible) { throw 'Portable existing workbook not visible in Windows accessibility tree' }
+  & powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File scripts/task1664-portable-uia.ps1 -ProcessId $p.Id -Report (Join-Path (Get-Location) 'evidence/native/portable-uia.json')
+  if ($LASTEXITCODE -ne 0) { throw 'Portable existing workbook not visible in Windows accessibility tree' }
   Save-Diagnostics 'portable-no-policy'
   if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Unexpected debug listener in portable release' }
   if (!$p.CloseMainWindow() -or !$p.WaitForExit(15000)) { throw 'Portable close failed' }

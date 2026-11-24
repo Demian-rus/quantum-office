@@ -278,7 +278,7 @@ function qoRestoreOfficeBackup(snapshot){
   workspace.active=workspace.books[0]?.id??null;
   storeWarning=false;qoPhotoDraftSaved=true;qoWriterSavedLocal=true;qoSlidesSavedLocal=true;
   render();
-  status('Все четыре раздела восстановлены из резервного архива.','success');
+  status(qoNativeDesktop?'Разделы восстановлены в памяти; дождитесь подтверждения записи черновиков.':'Все четыре раздела восстановлены из резервного архива.',qoNativeDesktop?'warning':'success');
  }catch(error){
   for(const [key,value] of previous)try{
    if(value===null)localStorage.removeItem(key);

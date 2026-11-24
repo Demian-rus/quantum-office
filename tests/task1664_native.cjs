@@ -80,7 +80,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository.db===true,{},{timeout:60000});
  const migration=await page.evaluate(async raw=>{
   const disk=(await __TAURI__.core.invoke('draft_load'))[QW_KEY];
-  if(localStorage.getItem(QW_KEY)!==raw||disk?.value!==raw||qwDoc.title!=='TASK1664 legacy draft'||qwDoc.tasks[0]?.prompt!=='Legacy migration question')throw Error('Legacy migration not exact');
+  if(localStorage.getItem(QW_KEY)!==raw||disk?.value!==raw||disk.legacySha256!==disk.sha256||qwDoc.title!=='TASK1664 legacy draft'||qwDoc.tasks[0]?.prompt!=='Legacy migration question')throw Error('Legacy migration not exact');
   qwDoc=qwProject();qwDoc.layout='compact';if(!qwPersist())throw Error('Reset disposable fixture failed');await qoDraftStorage.flush();
   if(localStorage.getItem(QW_KEY)!==raw)throw Error('Legacy source overwritten');
   return {status:'PASS',sourceRetained:true,migrationRevision:disk.revision,migrationSha256:disk.sha256};
@@ -177,7 +177,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,3);assert.equal(before.live.imagePresent,true);assert.equal(before.diskMatches,true);assert.ok(before.rawBytes>5*1024*1024,'large QWORK exceeds 5 MiB');assert.equal(before.pending,false);assert.equal(before.legacyRawPresent,true);
  const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));
  // Stage a real final edit without waiting for the debounce. OS close must flush it.
- const pending=await page.evaluate(()=>{qwDoc.instructions='TASK1664 final edit before ordinary close';if(!qwPersist())throw Error('Pending draft not queued');return {queued:qoDraftStorage.pending};});
+ const pending=await page.evaluate(async()=>{qwDoc.instructions='TASK1664 final edit before ordinary close';if(!qwPersist())throw Error('Pending draft not queued');const queued=qoDraftStorage.pending;const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(qoDraftStorage.getItem(QW_KEY)))),b=>b.toString(16).padStart(2,'0')).join('');return {queued,sha256:hash};});
  assert.equal(pending.queued,true);
  fs.writeFileSync(path.join(out,'draft-close-pending.json'),JSON.stringify(pending,null,2));
  }else if(['ordinary','reinstall','portable'].includes(stage)){
@@ -188,7 +188,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
  for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];
  for(const name of Object.keys(oldEditors.rows))if(name!=='qwork')checks['hash_'+name]=editors.rows[name].sha256===oldEditors.rows[name].sha256;
- if(stage==='ordinary'){assert.notEqual(draft.rawSha256,before.rawSha256,'final edit must change raw hash');fs.writeFileSync(path.join(out,'draft-after-ordinary.json'),JSON.stringify(draft,null,2));}
+ if(stage==='ordinary'){const pending=JSON.parse(fs.readFileSync(path.join(out,'draft-close-pending.json'),'utf8'));checks.finalRawHash=draft.rawSha256===pending.sha256;assert.notEqual(draft.rawSha256,before.rawSha256,'final edit must change raw hash');fs.writeFileSync(path.join(out,'draft-after-ordinary.json'),JSON.stringify(draft,null,2));}
  else {const ordinary=JSON.parse(fs.readFileSync(path.join(out,'draft-after-ordinary.json'),'utf8'));checks.rawHash=draft.rawSha256===ordinary.rawSha256;checks.liveHash=draft.liveSha256===ordinary.liveSha256;}
  // Legacy marker is diagnostic only: SQLite is now authoritative. If present,
  // the original legacy document must remain byte-identical, never overwritten.
