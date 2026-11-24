@@ -8,8 +8,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Check desktop source and runtime scripts
+        run: |
+          for file in tests/task1664*.cjs tests/task1664*.js src/core/native-drafts-bootstrap.js scripts/build.mjs; do
+            node --check "$file"
+          done
       - run: npm test
       - run: npm run build
+      - name: Check generated native scripts
+        run: |
+          node --check dist-native/app.js
+          node --check dist-native/draft-bootstrap.js
+          node --check dist-native/print.js
       - run: node -e "const fs=require('fs');if(!fs.readFileSync('dist/index.html','utf8').includes('grid-scroll'))process.exit(1)"
       # Direct HTML download; unlike the ZIP artifact this requires no extraction.
       - uses: actions/upload-artifact@v7
