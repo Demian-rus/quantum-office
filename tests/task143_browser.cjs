@@ -29,12 +29,12 @@ const seed=require('./task142_fixture.cjs');
  // Same synthetic diagnosis as baseline: bounded center and pinned independent rails.
  await seed(p);await mode('builder');await p.locator('.qd-outline-question').first().click();
  const geometry=async()=>p.evaluate(()=>{const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,right:b.right,bottom:b.bottom};};return {width:innerWidth,left:r('.qd-topic-navigator'),main:r('.qd-workbench-main'),right:r('.qd-side-insights'),head:r('.qd-top')};});
- const before=await geometry();assert.ok(before.left.right<before.main.x&&before.main.right<before.right.x);assert.ok(before.main.width>=800&&before.main.width<=960);
+ const before=await geometry();assert.ok(before.left.right<=before.main.x+1&&before.main.right<=before.right.x+1,'pinned rails must not overlap center');assert.ok(before.main.width>=800);assert.ok(Math.abs(before.main.width-(before.right.x-before.left.right))<=2,'center fills remaining space');
  await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop+=300);const after=await geometry();assert.equal(after.left.y,before.left.y);assert.equal(after.right.y,before.right.y);assert.equal(after.head.y,before.head.y,'central tools stay available during editing');
  const scrollBefore=await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop);await p.locator('#qd-question-properties [data-qd-field="points"]').fill('3');await p.locator('#qd-question-properties [data-qd-field="points"]').dispatchEvent('change');assert.equal(await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop),scrollBefore,'property edit preserves center scroll');
  await action('panels').click();assert.ok((await geometry()).main.width>before.main.width+100);await action('panels').click();
  await p.locator('.qd-outline-question').first().click();await snapshot('after_builder');
- await p.setViewportSize({width:1920,height:1000});assert.ok((await geometry()).main.width<=960);await p.setViewportSize({width:1440,height:1000});
+ await p.setViewportSize({width:1920,height:1000});const wide=await geometry();assert.ok(wide.main.width>before.main.width+400&&Math.abs(wide.main.width-(wide.right.x-wide.left.right))<=2,'wide display must use remaining area without overlap');await p.setViewportSize({width:1440,height:1000});
  await mode('library');await p.locator('#qd-library-search').fill('');await p.locator('#qd-library-source').selectOption('all');await snapshot('after_library');
  // Conduct remains an independent snapshot; scoring does not consume the next click.
  await mode('run');await p.locator('.qd-session-drawer>summary').click();await p.locator('[data-qd-field="student"]').fill('Синтетический ученик TASK143');await action('remember-student').click();
@@ -57,6 +57,6 @@ const seed=require('./task142_fixture.cjs');
   const m=await p.evaluate(()=>({scroll:document.documentElement.scrollWidth,viewport:innerWidth,escaped:[...document.querySelectorAll('#qo-diag-root textarea,#qo-diag-root input,#qo-diag-root select,#qo-diag-root .qd-card,#qo-diag-root .qd-library-card')].filter(e=>e.getClientRects().length).filter(e=>{const b=e.getBoundingClientRect();return b.left<0||b.right>innerWidth+2;}).length}));assert.ok(m.scroll<=width+2);assert.equal(m.escaped,0,view+' controls outside '+width);metrics.push({view,width,...m});
  }
  await p.setViewportSize({width:1440,height:1000});await mode('builder');await p.locator('.qd-outline-question').first().click();await p.evaluate(async()=>{qoThemePreference='dark';qoApplyAppearance();await new Promise(requestAnimationFrame);await Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>{})));});await snapshot('after_dark');
- assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({status:'PASS',metrics,jsErrors:errors},null,2));console.log('PASS TASK143: three pinned zones, bounded center, scroll/focus, clean copy, authoring/save/copy, library filters, isolated conduct/reload and 9 responsive layouts');
+ assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'result.json'),JSON.stringify({status:'PASS',metrics,jsErrors:errors},null,2));console.log('PASS TASK143: three pinned zones, full remaining center, scroll/focus, clean copy, authoring/save/copy, library filters, isolated conduct/reload and 9 responsive layouts');
  }finally{await b.close();}
 })().catch(e=>{console.error(e.stack);process.exit(1)});

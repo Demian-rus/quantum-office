@@ -7,7 +7,7 @@ const KEY='quantum-office.work-builder.v1',WRITER='quantum-office-writer-v1';
 async function harness({legacy={},initial={},write,afterWrite,saveExport,waitForBoot=true}={}){
  const rows=structuredClone(initial),calls=[],nodes=new Map(),events={};let loaded=false,closed=false;
  const app={inert:false,textContent:''};nodes.set('app',app);
- const node=()=>({id:'',hidden:false,textContent:'',children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){nodes.delete(this.id);}});
+ const node=()=>({id:'',hidden:false,disabled:false,textContent:'',children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){nodes.delete(this.id);}});
  const register=n=>{nodes.set(n.id,n);for(const child of n.children||[])register(child);};
  const context=vm.createContext({TextEncoder,btoa,setTimeout,clearTimeout,document:{getElementById:id=>nodes.get(id),createElement:node,body:{prepend:register,append:()=>{loaded=true;}}},localStorage:{getItem:key=>legacy[key]??null},__TAURI__:{event:{listen:async(name,fn)=>{events[name]=fn;}},core:{invoke:async(command,args)=>{
   calls.push({command,args});
