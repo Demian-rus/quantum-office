@@ -33,6 +33,7 @@ const {pathToFileURL}=require('node:url');
   }
   await page.evaluate(()=>route('diagnostics'));
   assert.ok(await page.locator('#qo-diag-root').isVisible(),'standalone diagnostics');
+  assert.equal(await height('.qo-work-ribbon'),78,'diagnostics preserves the common 78px tool area without Writer tabs');
   const bottoms=await page.evaluate(()=>{
    return [...document.querySelector('.qd-builder-tools').children]
     .filter(e=>e.tagName==='BUTTON'||e.tagName==='LABEL')

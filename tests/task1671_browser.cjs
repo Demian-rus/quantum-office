@@ -19,7 +19,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
   assert.equal(await p.locator('.qo-education-launcher .launcher-tile').count(),3);
   await p.screenshot({path:path.join(out,'home.png'),fullPage:true});
   await route('diagnostics');
-  await p.evaluate(()=>{const d=qdWorkingDoc();d.title='TASK167.1 saved diagnosis';d.sections=qdDefault().sections;d.sections[0].questions[0].prompt='Diagnostic transfer';qdStore();qdRefresh();});
+  await p.evaluate(()=>{const d=qdWorkingDoc();d.title='TASK167.1 saved diagnosis';d.sections=qdNormalize(qdDefault()).sections;d.sections[0].questions[0].prompt='Diagnostic transfer';qdStore();qdRefresh();});
   const diagnosis=await p.evaluate(()=>JSON.stringify(qdWorkingDoc()));
   await route('writer');assert.equal(await p.locator('#qo-diag-root,#qo-work-root,#qo-bank-root').count(),0);
   assert.equal(await p.locator('[data-editor="writer"][data-tab="diagnostic"],[data-editor="writer"][data-tab="work"]').count(),0);
@@ -62,6 +62,11 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
   await route('writer');assert.match(await p.locator('#qo-writer-page').innerText(),/Independent Writer/);
   await route('diagnostics');assert.equal(await p.evaluate(()=>JSON.stringify(qdWorkingDoc())),diagnosis);
   await route('bank');await ready();await p.locator('[data-bank-view="task1671-bank"]').waitFor();
+  const backupEvent=p.waitForEvent('download');await p.locator('.global-bar [data-action="backup"]').click();
+  const backupFile=await backupEvent;assert.match(backupFile.suggestedFilename(),/\.qbackup$/);
+  const backupPath=path.join(out,'route-backup.qbackup');await backupFile.saveAs(backupPath);
+  const checked=await p.evaluate(async text=>{await decodeOfficeBackupWithBank(text);return true;},fs.readFileSync(backupPath,'utf8'));
+  assert.equal(checked,true,'common verified backup works from bank route');
   for(const [width,height] of [[1920,1080],[1440,900],[1024,768]])for(const theme of ['light','dark']){
    await p.setViewportSize({width,height});await p.evaluate(t=>{qoThemePreference=t;qoApplyAppearance();},theme);
    for(const target of ['home','writer','diagnostics','work','bank']){

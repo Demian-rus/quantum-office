@@ -65,3 +65,6 @@
 .qo-education-workspace[data-workspace="diagnostics"] .qo-office-toolbar,
 .qo-education-workspace[data-workspace="work"] .qo-office-toolbar {flex:none}
 .qo-education-workspace .qo-work-panel>* {flex-shrink:0}
+
+.qo-education-workspace[data-workspace="diagnostics"]>.qo-office-toolbar,
+.qo-education-workspace[data-workspace="work"]>.qo-office-toolbar{box-sizing:border-box;height:78px;min-height:78px;max-height:78px}

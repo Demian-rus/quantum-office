@@ -85,7 +85,7 @@
  #qo-diag-root.qd-layout143 .qd-chat-head .qd-question p{font-size:15px;line-height:1.6}
 }
 /* No flex filler after removing the redundant ribbon guide. */
-.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group:last-child{flex:0 0 auto;min-width:0;justify-content:space-between}
+.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-work-group:last-child{flex:0 0 auto;min-width:0;justify-content:space-between}
 #qo-diag-root.qd-layout143 .qd-template-library{gap:10px}
 #qo-diag-root.qd-layout143 .qd-library-save{gap:8px}
 #qo-diag-root.qd-layout143 .qd-library-save-form{margin-top:0}

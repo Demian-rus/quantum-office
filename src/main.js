@@ -1219,7 +1219,7 @@ function homepage(){
   <div class="launcher-template-actions"><button data-action="templates" data-kind="slides">Шаблоны презентаций <span>→</span></button></div>
  </section>
  <section class="launcher-editor" aria-label="Фото">
-  <button class="launcher-tile photo" data-action="route" data-target="photo" aria-label="Фото — Quantum Studio"><span class="launcher-art">${qoHeaderIcon('photo')}</span><span class="launcher-name">Фото</span><span class="launcher-description">Изображения, рисование и коррекция</span><span class="launcher-state available">Базовый редактор</span></button>
+  <button class="launcher-tile photo" data-action="route" data-target="photo" aria-label="Фото — Quantum Studio"><span class="launcher-art">${qoHeaderIcon('photo')}</span><span class="launcher-name">Quantum Studio</span><span class="launcher-description">Изображения, рисование и коррекция</span><span class="launcher-state available">Базовый редактор</span></button>
   <div class="launcher-insets">
    <button class="launcher-inset" data-action="route" data-target="photo"><span class="launcher-inset-art">${qoHeaderIcon('photo')}</span><span>Рисование</span></button>
    <button class="launcher-inset" data-action="launcher-photo-open"><span class="launcher-inset-art">${qoHeaderIcon('photo')}</span><span>Открыть фото</span></button>
@@ -3101,7 +3101,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(t.startsWith('writer-')){qoReplaceWriter(qoNewWriter());if(t==='writer-lesson')qoWriter.html='<h1>Конспект занятия</h1><h2>Цель занятия</h2><p>Описание цели.</p><h2>Материалы</h2><ul><li>Материал 1</li></ul><h2>Ход занятия</h2><p>План работы.</p>';if(t==='writer-letter')qoWriter.html='<p>Дата</p><h2>Тема письма</h2><p>Уважаемые коллеги!</p><p>Текст письма.</p><p>С уважением,</p>';page='writer';render();qoPersistWriter();break;}
  if(t.startsWith('slides-')){qoSlides=qoNewSlides();if(t==='slides-lesson'){qoSlides.name='Учебная презентация';qoSlides.slides.push(qoNewSlide(2));}if(t==='slides-report')qoSlides.name='Доклад';page='slides';render();qoPersistSlides();break;}
  createBook(t==='new'?false:t);break;}case 'select-row':{if(headerIgnoreClick?.axis==='row'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{if(headerIgnoreClick?.axis==='col'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
- case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById('qo-writer-file')?.click();break;}if(page==='diagnostics'){document.getElementById('qo-diag-file')?.click();break;}if(page==='work'){document.getElementById('qw-file')?.click();break;}if(page==='bank'){document.getElementById('qw-bank-import-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){qoWriterExport('qdoc');break;}if(page==='diagnostics'){qdExport();break;}if(page==='work'){qwSaveFile();break;}if(page==='bank'){document.querySelector('[data-qw-action="bank-export"]')?.click();break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
+ case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById('qo-writer-file')?.click();break;}if(page==='diagnostics'){document.getElementById('qo-diag-file')?.click();break;}if(page==='work'){document.getElementById('qw-file')?.click();break;}if(page==='bank'){document.getElementById('qw-bank-import-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){qoWriterExport('qdoc');break;}if(page==='diagnostics'){qdExport();break;}if(page==='work'){qwSaveFile();break;}if(page==='bank'){(document.querySelector('[data-qw-action="bank-edit-save"]')||document.querySelector('[data-qw-action="bank-export"]'))?.click();break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());await download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');if(!qoNativeDesktop)status('Скачивание XLSX запрошено: диаграммы, проверки данных, условное форматирование, области и параметры печати включены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){await download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');if(!qoNativeDesktop)status('Скачивание CSV запрошено (текущий лист).');}break;
  case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
@@ -3620,6 +3620,26 @@ window.addEventListener('keydown',e=>{if(page!=='sheet'||!sheet())return;
  const steps={ArrowUp:[-1,0],ArrowDown:[1,0],ArrowLeft:[0,-1],ArrowRight:[0,1],Tab:[0,e.shiftKey?-1:1],Enter:[e.shiftKey?-1:1,0]};
  if(steps[e.key]){e.preventDefault();moveSelection(...steps[e.key],e.shiftKey&&e.key.startsWith('Arrow'));return;}
  if(e.key.length===1&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();editCell(e.key);}
+});
+// Education shortcuts must never invoke a command of another editor.
+window.addEventListener('keydown',e=>{
+ if(e.defaultPrevented||e.isComposing||!(e.ctrlKey||e.metaKey)||e.altKey||!['diagnostics','work','bank'].includes(page))return;
+ const modal=document.querySelector('dialog[open]:not(.qw-bank-inline)');
+ if(modal)return;
+ const key=e.code==='KeyO'?'o':e.code==='KeyS'?'s':e.code==='KeyP'?'p':e.key.toLowerCase();
+ if(key==='o'){if(document.querySelector('.qw-bank-edit-dialog[open]'))return;e.preventDefault();document.querySelector('.global-bar [data-action="import"]')?.click();}
+ else if(key==='s'){e.preventDefault();document.querySelector('.global-bar [data-action="save"]')?.click();}
+ else if(key==='p'){
+  e.preventDefault();
+  if(page==='work'){qwPreview();return;}
+  if(page==='diagnostics'){
+   const variant=document.querySelector('[data-qd-action="variant-print"][data-variant-kind="student"]');
+   if(variant&&!variant.disabled&&variant.getClientRects().length)variant.click();
+   else status('Откройте параметры вариантов или отчёт диагностики для печати.');
+   return;
+  }
+  status('Для печати выберите задания и соберите вариант в конструкторе.');
+ }
 });
 window.addEventListener('beforeunload',()=>{if(editing)commitEditor();});
 qoWriterNavigationInstall();
