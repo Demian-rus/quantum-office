@@ -4,7 +4,7 @@
  const keys=["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2"],allowed=new Set(keys),limit=64*1024*1024;
  const invoke=(command,args={})=>globalThis.__TAURI__.core.invoke(command,args);
  const errText=e=>typeof e==='string'?e:e?.message||String(e);
- const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map();let running=null,timer=null,error='',closing=false,ready=false;
+ const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map();let running=null,timer=null,error='',closing=false,ready=false,bootTask;
  const notify=()=>{
   const problem=error||[...rejected.values()][0]||'';
   const state=problem?'Ошибка записи черновиков: '+problem:dirty.size||running?'Черновики: запись не подтверждена…':'Черновики: запись подтверждена';
@@ -38,9 +38,12 @@
       if(!loaded||!batch.every(item=>loaded[item.key]?.revision===item.revision+1&&loaded[item.key].value===item.value))throw e;
       reply=loaded;
      }
+     // Validate the whole batch before advancing any local revisions.
      for(const item of batch){
-      const ack=reply[item.key];if(!Number.isInteger(ack?.revision)||ack.revision!==item.revision+1)throw Error('Некорректное подтверждение записи');
-      records.get(item.key).revision=ack.revision;migration.delete(item.key);
+      const ack=reply?.[item.key];if(!Number.isInteger(ack?.revision)||ack.revision!==item.revision+1)throw Error('Некорректное подтверждение записи');
+     }
+     for(const item of batch){
+      records.get(item.key).revision=reply[item.key].revision;migration.delete(item.key);
       if(dirty.get(item.key)===item.value)dirty.delete(item.key);
      }
      error='';
@@ -62,9 +65,11 @@
   if(closing)return;closing=true;
   const app=document.getElementById('app');
   try{
-   globalThis.qoFlushForClose?.();
    if(app)app.inert=true;
-   if(ready){await flush();if(qoDraftStorage.error)throw Error(qoDraftStorage.error);}
+   // Do not destroy the WebView while startup is loading or migrating drafts.
+   // A failed boot never starts editable documents; its legacy sources remain intact.
+   await bootTask;
+   if(ready){globalThis.qoFlushForClose?.();await flush();if(qoDraftStorage.error)throw Error(qoDraftStorage.error);}
    await invoke('draft_close');
   }catch(e){error=errText(e);notify();if(app)app.inert=false;closing=false;}
  }
@@ -83,5 +88,5 @@
   ready=true;notify();
   const script=document.createElement('script');script.src='./app.js';script.onerror=()=>{error='Не удалось загрузить интерфейс';notify();};document.body.append(script);
  }
- boot().catch(e=>{error=errText(e);notify();const app=document.getElementById('app');if(app)app.textContent='Не удалось открыть нативные черновики. Исходные файлы не изменены. Закройте приложение и сохраните копию каталога данных. '+error;});
+ bootTask=boot().catch(e=>{error=errText(e);notify();const app=document.getElementById('app');if(app)app.textContent='Не удалось открыть нативные черновики. Исходные файлы не изменены. Закройте приложение и сохраните копию каталога данных. '+error;});
 })();
