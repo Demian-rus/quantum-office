@@ -21,12 +21,22 @@ async function makeTechnicalFixture(page){
   d.tasks[9].graph.elements=[{kind:'arrow',x:1,y:7,x2:3,y2:8,label:'',style:{stroke:'#2563eb',width:3}},{kind:'arrow',x:8,y:2,x2:5,y2:1,label:'',style:{stroke:'#2563eb',width:4}}];
   const plain=qwTask('short');plain.prompt='Обычный текст: h=6,6·10⁻³⁴ Дж·с; c=3·10⁸ м/с; e=1,6·10⁻¹⁹ Кл. A→B→C→D→A. x≤−2; a+b; 2×3; a−b; 6÷2. 12,5 °C.';plain.answerVisible=false;
   const rich=qwTask('short');rich.prompt='**Markdown:** h=2; x≥−3; A→B. Формула: \\(x = -2\\). Код: '+String.fromCharCode(96)+'a=2'+String.fromCharCode(96)+'.';rich.answerVisible=false;
-  d.tasks.push(plain,rich);d.tasks[4].pageBreak=true;return qwValidate(d);
+  d.tasks.push(plain,rich);
+  const axes=(prompt,config,coords,width)=>{
+   const q=graph(prompt,coords);q.graph={...q.graph,...config,points:coords.map(([x,y])=>({x,y,label:''}))};q.figureWidth=width;return q;
+  };
+  d.tasks.push(
+   axes('Оси в первом квадранте, длинные физические подписи.',{xlabel:'Время наблюдения t, с',ylabel:'Скорость vₓ, м/с'},[[0,1],[3,4],[9,6]],180),
+   axes('Оси пересекаются внутри сетки, индексы и единицы.',{xmin:-5,xmax:5,ymin:-5,ymax:5,coordinateMode:'math',xlabel:'Координата x₀, м',ylabel:'Ускорение aᵧ, м/с²'},[[-4,-2],[0,1],[4,3]],300),
+   axes('Положительное время, отрицательная проекция скорости.',{xmin:0,xmax:10,ymin:-6,ymax:6,coordinateMode:'positiveX',xlabel:'t, мс',ylabel:'Проекция скорости vₓ, м/с'},[[0,2],[3,5],[8,-4]],470),
+   axes('Оси на краях диапазона, длинные единицы.',{xmin:2,xmax:12,ymin:2,ymax:12,coordinateMode:'custom',xlabel:'Перемещение Δx, см',ylabel:'Температура T₀, °C'},[[2,3],[5,6],[10,11]],240)
+  );
+  d.tasks[4].pageBreak=true;return qwValidate(d);
  });
 }
 function inspectGraphics(){
  const physical=[...document.querySelectorAll('.qw-print-sheet')];const pages=physical.length?physical:[...document.querySelectorAll('.qw-print-page')];
- const arrows=[],labels=[],operators=[],errors=[];
+ const arrows=[],labels=[],operators=[],axisTitles=[],errors=[];
  const xy=s=>s.trim().split(/[ ,]+/).map(Number);
  const pt=(e,p)=>{const m=e.getScreenCTM(),page=e.closest('.qw-print-sheet')||e.closest('.qw-print-page'),b=page.getBoundingClientRect();return {x:(m.a*p[0]+m.c*p[1]+m.e-b.left)*.75,y:(m.b*p[0]+m.d*p[1]+m.f-b.top)*.75};};
  for(const section of document.querySelectorAll('.qw-print-section')){
@@ -40,6 +50,17 @@ function inspectGraphics(){
    for(const sign of [-1,1])if(projection(base[0]-sign*vy/L*sw/2,base[1]+sign*vx/L*sw/2)>.01)errors.push('shaft cap beyond tip task '+task);
    arrows.push({task,page:index,tip:pt(e,tip),base:pt(e,base),color:getComputedStyle(e).fill});
   }
+  for(const e of section.querySelectorAll('.qw-axis-title[data-axis-tip-x]')){
+   const svg=e.closest('svg'),axis=e.dataset.axis,head=svg.querySelector('[data-qw-axis-head="'+axis+'"]');
+   const tip=xy(head.getAttribute('d').match(/^M([^L]+)/)[1]);
+   const getBox=node=>{const b=node.getBBox(),m=svg.getCTM().inverse().multiply(node.getCTM()),ps=[[b.x,b.y],[b.x+b.width,b.y],[b.x+b.width,b.y+b.height],[b.x,b.y+b.height]].map(([x,y])=>({x:m.a*x+m.c*y+m.e,y:m.b*x+m.d*y+m.f}));return {left:Math.min(...ps.map(p=>p.x)),top:Math.min(...ps.map(p=>p.y)),right:Math.max(...ps.map(p=>p.x)),bottom:Math.max(...ps.map(p=>p.y))};};
+   const b=getBox(e),vb=svg.viewBox.baseVal;
+   const centerDelta=axis==='y'?(b.left+b.right)/2-tip[0]:(b.top+b.bottom)/2-tip[1],gap=axis==='y'?tip[1]-b.bottom:b.left-tip[0];
+   const collisions=[...svg.querySelectorAll('.qw-axis-number')].filter(n=>{const q=getBox(n);return Math.min(q.right,b.right)-Math.max(q.left,b.left)>.01&&Math.min(q.bottom,b.bottom)-Math.max(q.top,b.top)>.01;}).map(n=>n.textContent);
+   const outside=b.left<vb.x-.05||b.top<vb.y-.05||b.right>vb.x+vb.width+.05||b.bottom>vb.y+vb.height+.05;
+   const scaled=pt(svg,[b.left,b.top]),scaledEnd=pt(svg,[b.right,b.bottom]);
+   axisTitles.push({task,page:index,axis,text:e.textContent,centerDelta,gap,outside,collisions,compressed:e.hasAttribute('textLength')||e.hasAttribute('lengthAdjust'),box:[scaled.x,scaled.y,scaledEnd.x,scaledEnd.y],tip:pt(svg,tip),viewBox:[vb.x,vb.y,vb.width,vb.height]});
+  }
   for(const e of section.querySelectorAll('[data-qw-label^="g:p:"]')){
    const b=e.getBBox(),m=e.getCTM(),svg=e.closest('svg'),inv=svg.getCTM().inverse(),T=inv.multiply(m),center={x:T.a*(b.x+b.width/2)+T.c*(b.y+b.height/2)+T.e,y:T.b*(b.x+b.width/2)+T.d*(b.y+b.height/2)+T.f},anchor={x:Number(e.dataset.labelWorldX),y:Number(e.dataset.labelWorldY)};
    labels.push({task,text:e.textContent,dx:center.x-anchor.x,dy:center.y-anchor.y,mode:e.dataset.labelMode,storedDx:Number(e.dataset.labelOffsetX),storedDy:Number(e.dataset.labelOffsetY),conflict:e.dataset.labelConflict,closed:!!e.dataset.labelContour});
@@ -51,10 +72,36 @@ function inspectGraphics(){
    }
   }
  }
- return {arrows,labels,operators,errors};
+ return {arrows,labels,operators,axisTitles,errors};
+}
+function checkAxisTitles(proof){
+ assert.ok(proof.axisTitles.length>=2,'no editable axis titles checked');
+ for(const a of proof.axisTitles){
+  assert.ok(Math.abs(a.centerDelta)<.2&&Math.abs(a.gap-6)<.2&&!a.outside&&!a.compressed&&!a.collisions.length,'axis title alignment/visibility '+JSON.stringify(a));
+ }
+}
+async function checkAxisSurfaces(page,fixture,out){
+ // Use the production interactive renderer and the same task-preview markup
+ // used by both bank viewers. No bank/draft writes during this geometry test.
+ const fs=require('node:fs'),path=require('node:path');
+ await page.evaluate(fixture=>{
+  const host=document.createElement('div');host.id='task1664-axis-surface-proof';host.style.cssText='position:fixed;left:-18000px;top:0;background:white;pointer-events:none;visibility:hidden';
+  const wrapper=document.createElement('div');wrapper.className='qw-print-page';host.append(wrapper);
+  for(const q of fixture.tasks.slice(12))for(const width of [220,500])for(const mode of ['editor','bank']){
+   const section=document.createElement('section');section.className='qw-print-section';section.dataset.task=String(wrapper.children.length+1);section.style.width=width+'px';
+   section.innerHTML=mode==='editor'?qwGraphSVG(q.graph,true):qwTaskPreview(q,0,'worksheet',false,null,true);
+   for(const svg of section.querySelectorAll('svg')){svg.style.width='100%';svg.style.height='auto';}
+   wrapper.append(section);
+  }
+  document.body.append(host);qwRefreshLiveGraphText(host);
+ },fixture);
+ try{
+  const proof=await page.evaluate(inspectGraphics);fs.writeFileSync(path.join(out,'axis-live-surfaces.json'),JSON.stringify(proof.axisTitles,null,2));
+  assert.equal(proof.axisTitles.length,32);checkAxisTitles(proof);
+ }finally{await page.evaluate(()=>document.getElementById('task1664-axis-surface-proof')?.remove());}
 }
 function checkGraphics(proof,prefix){
- assert.deepEqual(proof.errors,[]);
+ assert.deepEqual(proof.errors,[]);checkAxisTitles(proof);
  if(prefix==='ege2018'){
   const labels=proof.labels.filter(x=>x.task===11);
   for(const [letter,x,y] of [['A',-1,-1],['B',1,-1],['C',1,1],['D',-1,1]]){
@@ -64,7 +111,7 @@ function checkGraphics(proof,prefix){
   assert.equal(proof.operators.filter(x=>x.task===32&&x.text==='=').length,3);
  }
  if(prefix==='graphics'){
-  assert.ok(proof.arrows.length>=15);assert.ok(proof.operators.length>=12);
+  assert.equal(proof.axisTitles.length,20);assert.ok(proof.arrows.length>=15);assert.ok(proof.operators.length>=12);
   for(const [letter,x,y] of [['A',-1,-1],['B',1,-1],['C',1,1],['D',-1,1]]){
    const l=proof.labels.find(l=>l.task===5&&l.text===letter);assert.ok(l&&l.dx*x>0&&l.dy*y>0);
   }
@@ -73,4 +120,4 @@ function checkGraphics(proof,prefix){
  }
  assert.ok(proof.operators.every(x=>x.left===x.right));
 }
-module.exports={makeTechnicalFixture,inspectGraphics,checkGraphics};
+module.exports={makeTechnicalFixture,inspectGraphics,checkGraphics,checkAxisSurfaces};

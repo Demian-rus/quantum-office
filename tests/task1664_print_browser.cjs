@@ -1,7 +1,7 @@
 /* Same fixture and strict visual gate as installed WebView2. */
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path'),{pathToFileURL}=require('node:url'),assert=require('node:assert/strict');
 const {makePrintFixture,printMetrics,checkPrint}=require('./task1664_visual.cjs');
-const {makeTechnicalFixture,inspectGraphics,checkGraphics}=require('./task1664_graphics.cjs');
+const {makeTechnicalFixture,inspectGraphics,checkGraphics,checkAxisSurfaces}=require('./task1664_graphics.cjs');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence','task1664-print');
 (async()=>{
  fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({headless:true});
@@ -9,6 +9,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence','task1664-
   const app=await browser.newPage();await app.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   const fixtures=[['print',await makePrintFixture(app)],['ege2018',JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','QuantumOffice_EGE2018_32.qwork'),'utf8'))],['graphics',await makeTechnicalFixture(app)]];
   for(const [prefix,fixture] of fixtures)fs.writeFileSync(path.join(out,prefix+'.qwork'),JSON.stringify(fixture,null,2));
+  await checkAxisSurfaces(app,fixtures[2][1],out);
   const report=[];
   for(const [prefix,fixture] of fixtures)for(const orientation of ['portrait','landscape']){
    const project=structuredClone(fixture);project.printSettings.orientation=orientation;
