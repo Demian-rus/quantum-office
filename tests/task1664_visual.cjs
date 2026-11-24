@@ -129,14 +129,14 @@ async function comparePrint(page,out,fixture=null,prefix='print'){
    try{
     await p.setContent(referenceHtml);await p.evaluate(()=>window.qwPrintReady);
     const b=await p.evaluate(printMetrics);checkPrint(b,orientation,fixture);
-    if(prefix!=='print'){const proof=await p.evaluate(inspectGraphics);checkGraphics(proof,prefix);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-browser-geometry.json'),JSON.stringify(proof,null,2));}
+    if(prefix!=='print'){const proof=await p.evaluate(inspectGraphics);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-browser-geometry.json'),JSON.stringify(proof,null,2));checkGraphics(proof,prefix);}
     await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,prefix+'-'+orientation+'-browser.pdf'),preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false});
     await p.screenshot({path:path.join(out,prefix+'-'+orientation+'-browser.png'),fullPage:true});
     await page.evaluate(({html,id})=>{const f=document.createElement('iframe');f.id=id;f.style.cssText='position:fixed;inset:0;width:100%;height:100%;background:white;z-index:999999';f.srcdoc=html;document.body.append(f);},{html:nativeHtml,id});
     const handle=await page.waitForSelector('#'+id),frame=await handle.contentFrame();
     await frame.waitForFunction(()=>!!window.qwPrintReady,{},{timeout:30000});await frame.evaluate(()=>window.qwPrintReady);
     const n=await frame.evaluate(printMetrics);checkPrint(n,orientation,fixture);
-    if(prefix!=='print'){const proof=await frame.evaluate(inspectGraphics);checkGraphics(proof,prefix);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-windows-geometry.json'),JSON.stringify(proof,null,2));}
+    if(prefix!=='print'){const proof=await frame.evaluate(inspectGraphics);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-windows-geometry.json'),JSON.stringify(proof,null,2));checkGraphics(proof,prefix);}
     assert.deepEqual(n.taskIds,b.taskIds);assert.equal(n.sheets.length,b.sheets.length);assert.deepEqual(n.report.pages.map(x=>x.tasks.map(t=>t.task)),b.report.pages.map(x=>x.tasks.map(t=>t.task)));
     await page.screenshot({path:path.join(out,prefix+'-'+orientation+'-windows-preview.png')});
     // Print the same prepared, already measured srcdoc using the actual release

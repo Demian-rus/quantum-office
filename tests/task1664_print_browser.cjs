@@ -17,7 +17,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence','task1664-
     const html=await app.evaluate(project=>qwPrintDocumentHTML(project,false,{format:'booklet'}),project);
     await p.setContent(html);await p.evaluate(()=>window.qwPrintReady);
     const metrics=await p.evaluate(printMetrics);checkPrint(metrics,orientation,fixture);
-    if(prefix!=='print'){const proof=await p.evaluate(inspectGraphics);checkGraphics(proof,prefix);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-browser-geometry.json'),JSON.stringify(proof,null,2));}
+    if(prefix!=='print'){const proof=await p.evaluate(inspectGraphics);fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-browser-geometry.json'),JSON.stringify(proof,null,2));checkGraphics(proof,prefix);}
     if(prefix==='print'){
      const proof=await p.evaluate(()=>{const t=document.querySelector('[data-task="5"] .qw-task-text'),g=t.querySelector('.qw-task-tables');return {before:g.previousElementSibling?.textContent||'',after:g.nextElementSibling?.textContent||'',side:document.querySelector('[data-task="6"] figure')?.dataset.printPosition,below:document.querySelector('[data-task="9"] figure')?.dataset.printPosition};});
      assert.match(proof.before,/Измерения/);assert.match(proof.after,/Используя таблицу/);assert.equal(proof.side,'right');assert.equal(proof.below,'below');

@@ -42,7 +42,7 @@ function inspectGraphics(){
   }
   for(const e of section.querySelectorAll('[data-qw-label^="g:p:"]')){
    const b=e.getBBox(),m=e.getCTM(),svg=e.closest('svg'),inv=svg.getCTM().inverse(),T=inv.multiply(m),center={x:T.a*(b.x+b.width/2)+T.c*(b.y+b.height/2)+T.e,y:T.b*(b.x+b.width/2)+T.d*(b.y+b.height/2)+T.f},anchor={x:Number(e.dataset.labelWorldX),y:Number(e.dataset.labelWorldY)};
-   labels.push({task,text:e.textContent,dx:center.x-anchor.x,dy:center.y-anchor.y,mode:e.dataset.labelMode,conflict:e.dataset.labelConflict,closed:!!e.dataset.labelContour});
+   labels.push({task,text:e.textContent,dx:center.x-anchor.x,dy:center.y-anchor.y,mode:e.dataset.labelMode,storedDx:Number(e.dataset.labelOffsetX),storedDy:Number(e.dataset.labelOffsetY),conflict:e.dataset.labelConflict,closed:!!e.dataset.labelContour});
   }
   for(const math of section.querySelectorAll('math')){
    for(const op of math.querySelectorAll('mo[lspace="0.28em"]')){
@@ -69,7 +69,7 @@ function checkGraphics(proof,prefix){
    const l=proof.labels.find(l=>l.task===5&&l.text===letter);assert.ok(l&&l.dx*x>0&&l.dy*y>0);
   }
   assert.ok(proof.labels.filter(l=>[5,6,7,8].includes(l.task)).every(l=>l.conflict==='false'),JSON.stringify(proof.labels));
-  const manual=proof.labels.find(l=>l.task===9&&l.text==='A');assert.equal(manual.mode,'manual');assert.ok(Math.abs(manual.dx-18)<.05&&Math.abs(manual.dy+22)<.05);
+  const manual=proof.labels.find(l=>l.task===9&&l.text==='A');assert.equal(manual.mode,'manual');assert.ok(Math.abs(manual.storedDx-18)<.05&&Math.abs(manual.storedDy+22)<.05,'saved manual offset changed');assert.ok(Math.abs(manual.dx-18)<.5&&Math.abs(manual.dy+22)<.5,'actual print glyph center differs by more than half a source SVG unit '+JSON.stringify(manual));
  }
  assert.ok(proof.operators.every(x=>x.left===x.right));
 }
