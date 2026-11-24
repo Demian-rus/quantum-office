@@ -78,7 +78,7 @@ pub fn write(path:&Path,changes:&Value)->Result<Value>{
    tx.execute("INSERT INTO legacy_sources(key,value,sha256) VALUES(?1,?2,?3)",params![key,value,digest])?;
   }
   tx.execute("INSERT INTO drafts(key,revision,value,sha256) VALUES(?1,?2,?3,?4) ON CONFLICT(key) DO UPDATE SET revision=excluded.revision,value=excluded.value,sha256=excluded.sha256",params![key,next,value,digest])?;
-  result.insert(key,json!({"revision":next,"sha256":digest}));
+  result.insert(key.to_owned(),json!({"revision":next,"sha256":digest}));
  }
  let bytes:i64=tx.query_row("SELECT coalesce(sum(length(CAST(value AS BLOB))),0) FROM drafts",[],|r|r.get(0))?;
  ensure!(bytes<=TOTAL as i64,"DRAFT_LIMIT: total");tx.commit()?;
