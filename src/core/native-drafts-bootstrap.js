@@ -68,7 +68,7 @@
    if(app)app.inert=true;
    // Do not destroy the WebView while startup is loading or migrating drafts.
    // A failed boot never starts editable documents; its legacy sources remain intact.
-   await bootTask;
+   if(!ready)await bootTask;
    if(ready){globalThis.qoFlushForClose?.();await flush();if(qoDraftStorage.error)throw Error(qoDraftStorage.error);}
    await invoke('draft_close');
   }catch(e){error=errText(e);notify();if(app)app.inert=false;closing=false;}
