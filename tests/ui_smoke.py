@@ -12,7 +12,8 @@ def run():
         page.on('pageerror',lambda e:errors.append(str(e)))
         page.set_content(Path(__file__).parents[1].joinpath("dist/index.html").read_text(),wait_until="load")
         assert not errors, 'Uncaught initialization errors: '+repr(errors)
-        assert page.locator('.launcher-tile').count()==4, 'Launcher did not initialize; collected page errors: '+repr(errors)
+        assert page.locator('.launcher-editor .launcher-tile').count()==4, 'Office launcher must contain all four editors; page errors: '+repr(errors)
+        assert page.locator('.qo-education-launcher .launcher-tile').count()==3, 'Education launcher must contain all three tools; page errors: '+repr(errors)
         assert page.get_by_text('Ваш офис.').count()==0
         page.screenshot(path=str(Path(__file__).parent/'home.png'),full_page=True)
         page.get_by_role('button',name='Открыть пример таблицы').click()
