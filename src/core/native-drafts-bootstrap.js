@@ -4,19 +4,20 @@
  const keys=["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2"],allowed=new Set(keys),limit=64*1024*1024;
  const invoke=(command,args={})=>globalThis.__TAURI__.core.invoke(command,args);
  const errText=e=>typeof e==='string'?e:e?.message||String(e);
- const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map();let running=null,timer=null,error='',closing=false,ready=false,bootTask;
+ const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map(),rejectedValues=new Map();let running=null,timer=null,error='',closing=false,ready=false,bootTask;
  const notify=()=>{
   const problem=error||[...rejected.values()][0]||'';
-  const state=problem?'Ошибка записи черновиков: '+problem:dirty.size||running?'Черновики: запись не подтверждена…':'Черновики: запись подтверждена';
+  const state=problem?'Ошибка записи черновиков: '+problem+'. Сохраните документ отдельным файлом или аварийную копию перед закрытием.':dirty.size||running?'Черновики: запись не подтверждена…':'Черновики: запись подтверждена';
   const banner=document.getElementById('qo-native-draft-status');
   if(banner){banner.textContent=state;banner.hidden=!problem&&!dirty.size&&!running;}
+  const recovery=document.getElementById('qo-native-draft-recovery');if(recovery)recovery.hidden=!(ready&&problem&&(dirty.size||rejectedValues.size));
   globalThis.qoDraftStatus=()=>state;
   globalThis.qoDraftStatusChanged?.();
  };
  const check=key=>{key=String(key);if(!allowed.has(key))throw Error('Недопустимый ключ черновика: '+key);return key;};
  function change(key,value,fromLegacy=false){
-  key=check(key);if(value!==null){value=String(value);if(new TextEncoder().encode(value).length>limit){const message='Черновик больше 64 МБ; сохраните отдельный файл';rejected.set(key,message);notify();throw Error(message);}}
-  rejected.delete(key);if(fromLegacy)migration.add(key);
+  key=check(key);if(value!==null){value=String(value);if(new TextEncoder().encode(value).length>limit){const message='Черновик больше 64 МБ; сохраните отдельный файл';rejected.set(key,message);rejectedValues.set(key,value);notify();throw Error(message);}}
+  rejected.delete(key);rejectedValues.delete(key);if(fromLegacy)migration.add(key);
   const existing=records.get(key);
   if(existing?.value===value){notify();return;}
   records.set(key,{revision:existing?.revision??0,value});dirty.set(key,value);
@@ -73,10 +74,38 @@
    await invoke('draft_close');
   }catch(e){error=errText(e);notify();if(app)app.inert=false;closing=false;}
  }
+ // No revision is rebased automatically. A user can rescue exact unconfirmed
+ // values via the existing user-selected native save dialog, then reopen the
+ // latest durable version. Cancellation or failed export keeps the window open.
+ function recoveryValues(){
+  return [...new Map([...dirty,...rejectedValues])].map(([key,value])=>({key,revision:records.get(key)?.revision??0,value}));
+ }
+ async function recoverAndClose(){
+  if(closing||!ready)return;closing=true;
+  const app=document.getElementById('app'),button=document.getElementById('qo-native-draft-recovery');
+  if(app)app.inert=true;if(button)button.disabled=true;
+  try{
+   globalThis.qoFlushForClose?.();
+   clearTimeout(timer);timer=null;
+   if(running)await running.catch(()=>{});
+   const entries=recoveryValues();
+   if(!entries.length){await invoke('draft_close');return;}
+   const snapshot=JSON.stringify({format:'quantum-office-draft-recovery',version:1,createdAt:new Date().toISOString(),entries});
+   const bytes=new TextEncoder().encode(snapshot);
+   if(bytes.length>300000000)throw Error('Аварийная копия слишком велика; сохраните отдельные документы через редакторы');
+   let binary='';for(let offset=0;offset<bytes.length;offset+=16384)binary+=String.fromCharCode(...bytes.subarray(offset,offset+16384));
+   const saved=await invoke('save_export',{name:'Quantum-Office-draft-recovery.json',data:btoa(binary)});
+   if(saved!==true)return;
+   if(JSON.stringify(recoveryValues())!==JSON.stringify(entries))throw Error('Черновики изменились во время экспорта. Сохраните новую копию');
+   await invoke('draft_close');
+  }catch(e){error=errText(e);}
+  finally{closing=false;if(app)app.inert=false;if(button)button.disabled=false;notify();}
+ }
  async function boot(){
   const app=document.getElementById('app');
   const banner=document.createElement('div');banner.id='qo-native-draft-status';banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');document.body.prepend(banner);
   banner.textContent='Открытие нативных черновиков…';
+  const recovery=document.createElement('button');recovery.id='qo-native-draft-recovery';recovery.type='button';recovery.textContent='Сохранить аварийную копию и закрыть';recovery.hidden=true;recovery.onclick=()=>void recoverAndClose();document.body.prepend(recovery);
   await globalThis.__TAURI__.event.listen('qo-draft-close',()=>void onClose());
   const loaded=await invoke('draft_load');
   for(const key of keys){
