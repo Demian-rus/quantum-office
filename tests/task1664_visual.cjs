@@ -57,6 +57,12 @@ async function compareSheet(page,stage,out,resize){
    }finally{await p.close();}
   };
   await capture('initial');
+  // Exercise actual scroll events and virtualized rows, then restore the exact original position.
+  const scrolled=await page.evaluate(async()=>{const e=document.querySelector('#grid-scroll');e.scrollTo(180,280);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));const cell=document.querySelector('#grid-canvas [data-ref="C14"]');return {x:e.scrollLeft,y:e.scrollTop,cell:cell?.getBoundingClientRect().toJSON()};});
+  assert.ok(scrolled.x>100&&scrolled.y>200&&scrolled.cell?.width>50&&scrolled.cell?.height>10,'virtual cells after scroll');
+  await page.screenshot({path:path.join(out,'sheets-'+stage+'-scrolled-windows.png')});
+  await page.evaluate(async()=>{document.querySelector('#grid-scroll').scrollTo(0,0);await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});
+  await capture('scroll-restored');
   if(resize){await resizeNative(page,1000,740);await capture('smaller');await resizeNative(page,1400,900);await capture('larger');}
   fs.writeFileSync(path.join(out,'sheets-'+stage+'-visual.json'),JSON.stringify({status:'PASS',reports},null,2));
  }finally{await browser.close();await page.evaluate(()=>route('home'));}
@@ -82,7 +88,7 @@ function checkPrint(m,orientation){
  assert.deepEqual(m.bounds,[]);assert.deepEqual(m.overlap,[]);assert.ok(m.sheets.length>=2,'need multiple physical pages');
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');
-  if(orientation==='landscape'&&i<m.sheets.length-1)assert.equal(s.columns,2);
+  if(i<m.sheets.length-1)assert.equal(s.columns,2);
   assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(17, 17, 17)');assert.equal(s.brandSize,'20px');
   assert.ok(s.brandRight>=0&&s.brandRight<4&&s.brandBottom>=0&&s.brandBottom<4,'brand not bottom right');
  }

@@ -17,7 +17,7 @@ for orientation in ("portrait", "landscape"):
                 assert abs(pdf.rect.width - expected[0]) < 2 and abs(pdf.rect.height - expected[1]) < 2, (orientation, pdf.rect)
                 text = " ".join(pdf.get_text().split())
                 assert text and "tauri.localhost" not in text and "Quantum Office — Тексты" not in text
-                assert "Квант Икс" in text, (orientation, index, "missing branding")
+                assert text.count("Квант Икс") == 1, (orientation, index, "missing or repeated branding")
             # Render both actual PDFs to identical resolution. Allow minor engine
             # antialiasing differences, but not missing layout, graphics or text.
             def render(page):

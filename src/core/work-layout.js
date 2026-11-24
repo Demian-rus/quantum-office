@@ -260,6 +260,19 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-sha
 }
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{right:0;top:0}
 
+/* Portrait booklet is also a two-column physical A4 sheet. */
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet{position:relative;display:flex;flex-direction:row;align-items:stretch;width:210mm;height:297mm;margin:0;padding:0;break-after:page;page-break-after:always;background:#fff}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet:last-child{break-after:auto;page-break-after:auto}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page{flex:0 0 105mm;width:105mm;height:297mm;padding:12mm 3mm 15mm 10mm;margin:0;break-after:auto;page-break-after:auto;box-shadow:none}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page+.qw-print-page{padding:12mm 10mm 15mm 3mm}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-page-content{width:92mm;height:270mm}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-first-sheet .qw-page-content{padding-top:var(--qw-shared-heading-clearance,0px)}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-shared-sheet-header{position:absolute;z-index:2;box-sizing:border-box;left:10mm;right:10mm;top:6mm;width:auto;margin:0;text-align:center;pointer-events:none}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-shared-sheet-header .qw-print-title{margin:0 0 1.5mm;line-height:1.15}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-page .qw-page-footer{left:10mm;right:3mm;bottom:6mm}
+body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-page+.qw-print-page .qw-page-footer{left:3mm;right:10mm}
+@media screen{body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
+@media print{body[data-qw-orientation="portrait"][data-qw-format="booklet"] .qw-print-sheet{margin:0;box-shadow:none}}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -274,7 +287,7 @@ async function qwPreparePrintDocument(){
  await Promise.all([...document.images].map(img=>img.decode()));
  const host=document.querySelector('.qw-print-document'),source=host.querySelector('.qw-print-source');
  const header=source.querySelector('.qw-print-header'),originals=[...source.querySelectorAll(':scope>.qw-print-section')];
- const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide';
+ const MM=96/25.4,pages=[],fragments=[],format=document.body.dataset.qwFormat||'worksheet',modern=['compact','practice','answers','booklet'].includes(format),landscape=document.body.dataset.qwOrientation==='landscape',spread=landscape&&document.body.dataset.qwLandscapeLayout!=='wide'||!landscape&&format==='booklet';
  // display="block" MathML occupies its entire parent box even when the ink is narrow.
  // Measure the mathematical child, not the full-width display container.
  const mathInkWidth=math=>((math.getAttribute('display')==='block'?math.firstElementChild:null)||math).getBoundingClientRect().width;
@@ -286,7 +299,7 @@ async function qwPreparePrintDocument(){
   script.replaceWith(padded);padded.append(script);
  }
  // Figure geometry follows the actual A4 printable width, not a portrait-only ruler.
- source.style.width=spread?'130.5mm':landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
+ source.style.width=spread?(landscape?'130.5mm':'92mm'):landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'184mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
   // Attribute colours keep monochrome diagrams vector; CSS filters rasterise in Chromium.
   if(document.body.dataset.qwMonochrome==='true')for(const e of section.querySelectorAll('svg [stroke],svg [fill]'))for(const key of ['stroke','fill']){
