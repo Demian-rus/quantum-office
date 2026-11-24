@@ -359,7 +359,14 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: python -m pip install pymupdf==1.26.6 pillow
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: d0f1b3c6ec98b88aa73d784f5f5859be8059a338
@@ -417,7 +424,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task152_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -436,7 +450,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task153_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -457,7 +478,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task1531_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -478,7 +506,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task154_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -499,7 +534,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task155_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -520,7 +562,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task156_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -541,7 +590,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task158_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -562,7 +618,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task1601_browser.cjs
       - run: node tests/task1664_print_browser.cjs
       - uses: actions/upload-artifact@v4
@@ -590,7 +653,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task161_browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
@@ -611,7 +681,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task166_final_browser.cjs
       # Legacy bank/launcher E2E must stay green after async IndexedDB migration.
       - run: node tests/task162_launcher_browser.cjs
@@ -649,7 +726,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - run: node tests/task1662_browser.cjs
       - run: node tests/task1662_scale_browser.cjs
       - uses: actions/upload-artifact@v4
@@ -680,7 +764,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            echo "Chromium dependency install attempt $attempt failed"
+            sleep 5
+          done
+          exit 1
       - uses: actions/checkout@v4
         with:
           ref: ab2064c8e874708385525d7505e14c0780645988

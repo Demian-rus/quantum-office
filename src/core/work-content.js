@@ -2,7 +2,7 @@
 import {qwGraphGridStep,qwEvaluateCurve,qwGeometryVertices,qwValidateStyle,qwResolveDiagram,QW_PLOT,qwPlotXY} from './work-model.js';
 import {qwArcPoints,qwLinearSegments,qwExtendedSegment} from './work-geometry.js';
 import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape,qwArrowSVG} from './work-physics.js';
-import {qwLabelSVG,qwPlaceSVGLabels} from './work-labels.js';
+import {qwLabelSVG,qwPlaceSVGLabels,qwClosedContour,qwContourOutward} from './work-labels.js';
 const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',iota:'ι',kappa:'κ',nu:'ν',xi:'ξ',tau:'τ',upsilon:'υ',chi:'χ',psi:'ψ',Gamma:'Γ',Theta:'Θ',Lambda:'Λ',Pi:'Π',Sigma:'Σ',Phi:'Φ',Psi:'Ψ',Delta:'Δ',theta:'θ',lambda:'λ',mu:'μ',pi:'π',rho:'ρ',sigma:'σ',phi:'φ',omega:'ω',Omega:'Ω',cdot:'·',times:'×',pm:'±',le:'≤',ge:'≥',neq:'≠',infty:'∞'};
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function qwMath(source){
@@ -49,12 +49,36 @@ function qwMathML(n,upright=false,unary=false){
  const value=n.v==='-'?'−':n.v;
  if(upright)return tag('mtext',qwEsc(value));
  if(value==='°'||/^[()[\]{},.]$/.test(value)||unary)return '<mo lspace="0" rspace="0">'+qwEsc(value)+'</mo>';
- if(/[=+−\-×÷·±<>≤≥≠]/.test(value))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(value)+'</mo>';
+ if(/[=+−\-×÷·±<>≤≥≠→←↔]/.test(value))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(value)+'</mo>';
  if(/^\s+$/.test(value))return '<mspace width="0.18em"/>';
  return tag(/[0-9]/.test(value)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(value)?'mi':'mo',qwEsc(value));
 }
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
-function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
+// Only standalone, unambiguous numeric and single-symbol mathematical
+// expressions are typeset. Original user text and code/URL tokens stay intact.
+function qwPlainMathHTML(value){
+ const text=String(value??'');
+ const operand='(?:[A-Za-zα-ωΑ-Ω][₀-₉ₐ-ₜ⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*|[+\\-−]?\\d+(?:[.,]\\d+)?(?:[·×]10[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)?[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]*)';
+ const pattern=new RegExp('(?<![\\p{L}\\p{N}_./:@-])(?:'+operand+')(?:[ \\t]*[=<>≤≥≠+−×÷±→←↔][ \\t]*'+operand+')+(?![\\p{L}\\p{N}_./:@-])','gu');
+ const split=new RegExp('^('+operand+')([ \\t]*)([=<>≤≥≠+−×÷±→←↔])([ \\t]*)','u');
+ const atom=v=>/^[A-Za-zα-ωΑ-Ω]/u.test(v)?'<mi mathvariant="normal">'+qwEsc(v)+'</mi>':'<mtext>'+qwEsc(v)+'</mtext>';
+ const render=chunk=>{
+  let out='',last=0,m;pattern.lastIndex=0;
+  while((m=pattern.exec(chunk))){
+   let expr=m[0],parts='',step;
+   while((step=split.exec(expr))){
+    parts+=atom(step[1])+'<mo lspace="0.28em" rspace="0.28em">'+qwEsc(step[3])+'</mo>';
+    expr=expr.slice(step[0].length);
+   }
+   if(!parts)continue;
+   out+=qwEsc(chunk.slice(last,m.index))+'<math class="qw-plain-math" xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(m[0])+'"><mrow>'+parts+atom(expr)+'</mrow></math>';
+   last=pattern.lastIndex;
+  }
+  return out+qwEsc(chunk.slice(last));
+ };
+ return text.split(/(\b(?:https?:\/\/|www\.)[^\s]+|\x60[^\x60]*\x60)/gi).map((s,i)=>i%2?qwEsc(s):render(s)).join('');
+}
+function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwPlainMathHTML(t.v).replace(/\n/g,'<br>')).join('');}
 /* TASK164: safe, bounded Markdown-style rendering for the PERSONAL bank preview.
    No HTML passthrough, remote markup, script, or raw CSS. The PDF engine and
    existing qwContentHTML contract remain unchanged. */
@@ -64,7 +88,7 @@ function qwRichInlineText(input,depth=0){
  const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_)/g;
  let html='',pos=0,m;
  while((m=pattern.exec(source))){
-  html+=qwEsc(source.slice(pos,m.index));
+  html+=qwPlainMathHTML(source.slice(pos,m.index));
   if(m[2]!==undefined||m[3]!==undefined)html+='<strong>'+qwRichInlineText(m[2]??m[3],depth+1)+'</strong>';
   else if(m[4]!==undefined)html+='<del>'+qwEsc(m[4])+'</del>';
   else if(m[5]!==undefined)html+='<code>'+qwEsc(m[5])+'</code>';
@@ -72,7 +96,7 @@ function qwRichInlineText(input,depth=0){
   else html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
   pos=pattern.lastIndex;
  }
- return html+qwEsc(source.slice(pos));
+ return html+qwPlainMathHTML(source.slice(pos));
 }
 function qwRichMath(value,display=false){
  try{
@@ -283,6 +307,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
  ps.forEach((p,i)=>{
   parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:3.5)+'" fill="'+(g.points[i].style?.stroke||'#142b42')+'"/></g>');
  });
+ const contour=g.connected&&g.curveFamily==='points'&&!g.smooth?qwClosedContour(ps):null;
  ps.forEach((p,i)=>{
   const label=g.points[i].label;if(!label)return;
   const w=Math.max(12,Array.from(label).length*10),h=20;
@@ -302,8 +327,12 @@ function qwGraphSVG(g,interactive=false,typography={}){
   }
   if(!best)return;
   best={...best,x:Math.max(b.left,Math.min(best.x,b.right-w)),y:Math.max(b.top,Math.min(best.y,b.bottom-h))};
+  const outward=contour?qwContourOutward(contour,i%contour.length):null;
+  if(outward&&g.points[i].labelPosition?.mode!=='manual'){
+   const gap=10;best={x:p.x+(outward.x<-.1?-w-gap:outward.x>.1?gap:-w/2),y:p.y+(outward.y<-.1?-h-gap/2:outward.y>.1?gap:-h/2),w,h};
+  }
   occupied.push(best);
-  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#142b42')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true}));
+  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#142b42')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
  });
  parts.push(qwGraphElementsSVG(g,interactive));
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
