@@ -161,13 +161,16 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
   route('writer');
   const title=document.getElementById('qo-writer-title');title.value='TASK1664 Writer';
   document.getElementById('qo-writer-page').innerHTML='<h1>Newton</h1><p>Force equals mass times acceleration.</p>';qoPersistWriter();
-  const q=qdWorkingDoc();q.title='TASK1664 Diagnostics';q.sections[0].questions[0].prompt='What is acceleration?';q.sections[0].questions[0].answer='Change of velocity per time';
+  // The diagnostic workspace intentionally starts with zero sections (qdBlank on mount).
+  // Create an actual section/question before attaching media; never assume a default card exists.
+  const q=qdWorkingDoc();q.title='TASK1664 Diagnostics';q.sections=qdDefault().sections;
+  const question=q.sections[0].questions[0];question.prompt='What is acceleration?';question.answer='Change of velocity per time';
   // Persist actual distinct diagnostic media, not merely document references.
   for(const [index,kind] of ['prompt','answer'].entries()){
    const url=qwDoc.tasks[index].image,[header,encoded]=url.split(',');
    const blob=new Blob([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],{type:header.slice(5).split(';')[0]});
    const id=qdMediaNewId();await qdMediaPut({id,blob,createdAt:Date.now()});
-   q.sections[0].questions[0][qdMediaKey(kind)]={id,caption:'TASK1664 '+kind,display:'medium'};
+   question[qdMediaKey(kind)]={id,caption:'TASK1664 '+kind,display:'medium'};
   }
   qdStore();
   route('home');createBook();book().name='TASK1664 Sheets';setCell(sheet(),'A1','12');setCell(sheet(),'B1','30');setCell(sheet(),'C1','=A1+B1');persist();route('home');
