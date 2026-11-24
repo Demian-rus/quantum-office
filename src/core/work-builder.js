@@ -37,8 +37,11 @@ function qwInstallPanels(root,key,toolbar,panels){
 // An internal mode occupies the same shell body; no modal top layer, no second route.
 // Keep the underlying document DOM mounted (including scroll and selection).
 function qwReleaseMode(d){const host=d?.closest('.qw-mode-host');if(!host)return;const body=host.parentElement;if(!body)return;host.remove();body.classList.remove('qw-mode-active');for(const el of body.children){el.inert=false;}if(host.qwReturnScroll!==undefined){const center=body.querySelector('.qw-center');if(center)center.scrollTop=host.qwReturnScroll;}}
-function qwCanNavigate(){const d=document.getElementById('qw-dialog');return !d?.qwCanLeave||d.qwCanLeave();}
-if(typeof window!=='undefined')window.addEventListener('beforeunload',e=>{if(document.getElementById('qw-dialog')?.qwDirty?.()){e.preventDefault();e.returnValue='';}});
+// Local child cancellation and global abandonment are different decisions.
+function qwActiveEditorDirty(){const d=document.getElementById('qw-dialog');return !!(d?.qwDirty?.()||d?.qwParentDirty?.());}
+function qwCanNavigate(){const d=document.getElementById('qw-dialog');if(d?.qwParentDirty?.())return confirm('Отменить несохранённые изменения задания и рисунка?');return !d?.qwCanLeave||d.qwCanLeave();}
+globalThis.qoCanCloseEditors=qwCanNavigate;
+if(typeof window!=='undefined')window.addEventListener('beforeunload',e=>{if(!globalThis.__TAURI__&&qwActiveEditorDirty()){e.preventDefault();e.returnValue='';}});
 function qwEnsureEducationMode(){if(!document.querySelector('.qo-education-workspace>.qo-education-body'))route('work');return !!document.querySelector('.qo-education-workspace>.qo-education-body');}
 function qwOpenMode(d,mode){
  const body=document.querySelector('.qo-education-workspace>.qo-education-body');if(!body)throw Error('Рабочая область недоступна');
@@ -426,14 +429,14 @@ function qwBankInsertMarkup(input,kind){
  input.dispatchEvent(new Event('input',{bubbles:true}));
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
-async function qwBankEdit(id,draft=null,returnFilters={}){
+async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
  if(!qwEnsureEducationMode())return;
  const originPage=page,originRevision=qoRouteRevision;
  const active=()=>page===originPage&&qoRouteRevision===originRevision;
  const creating=id===null;
  let stored;
  if(!creating){
-  try{await qwBankOpen();stored=await qwBankRepository.getTask(id);}catch(error){status(error.message,true);return;}
+  try{if(transaction)stored=transaction.stored;else{await qwBankOpen();stored=await qwBankRepository.getTask(id);}}catch(error){status(error.message,true);return;}
   if(!active())return;
   if(!stored){status('Задание больше не найдено в банке',true);return;}
  }
@@ -535,8 +538,8 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
   qwVisualEditor(kind,task,(updatedKind,validated)=>{
    if(!active())return;
    task[updatedKind]=validated;task.figure=updatedKind;
-   qwBankEdit(id,draft,returnFilters);
-  },()=>{if(active())qwBankEdit(id,draft,returnFilters);});
+   qwBankEdit(id,draft,returnFilters,transaction);
+  },()=>{if(active())qwBankEdit(id,draft,returnFilters,transaction);},()=>JSON.stringify(draft)!==transaction.initialDraft);
  });
  d.querySelector('#qw-bank-edit-image').onchange=async(event)=>{
   const file=event.target.files?.[0];event.target.value='';if(!file)return;
@@ -549,7 +552,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
    await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
   }catch(e){showError(e.message);}
  };
- collect();const initialDraft=JSON.stringify(draft);d.qwDirty=()=>{collect();return JSON.stringify(draft)!==initialDraft;};d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения задания?');
+ collect();transaction??={initialDraft:JSON.stringify(draft),stored};d.qwDirty=()=>{collect();return JSON.stringify(draft)!==transaction.initialDraft;};d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения задания?');
  const back=()=>{if(!d.qwCanLeave())return;d.close();if(active())void qwBank(returnFilters);};
  d.addEventListener('cancel',event=>{event.preventDefault();back();});
  d.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();back();}});
@@ -1157,7 +1160,7 @@ function qwGraphSidebar(tool,coordinateMode){
   '<details class="qw-tool-group qw-coordinate-group" open><summary>Координатная система</summary><label>Режим осей<select id="qw-coordinate-mode" aria-label="Координатная система" title="Координатная система">'+qwOptions([['first','Первая четверть'],['positiveX','X ≥ 0, Y ±'],['math','X ±, Y ±'],['custom','Свой диапазон']],coordinateMode||'first')+'</select></label><p class="qw-muted" id="qw-coordinate-hint"></p></details>'+
   '<details class="qw-tool-group qw-template-group" open><summary>Шаблоны</summary><label>Готовый график<select id="qw-graph-preset">'+qwOptions([['custom','Свой график'],['v','v(t)'],['x','x(t)'],['a','a(t)'],['p','p(V)'],['i','I(U)'],['parabola','Парабола'],['sin','Синус'],['cos','Косинус']],'custom')+'</select></label><div id="qw-graph-mode"></div><button type="button" id="qw-add-point" data-tool="legacyPoint" aria-label="Добавить точку шаблона">'+qwVisualIcon('point')+'<span>Точка шаблона</span></button></details>';
 }
-function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
+function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null,parentDirty=null){
  if(!qwEnsureEducationMode())return;
  const q=bankTask||qwCurrent();if(!q)return;let value=structuredClone(kind==='graph'?q.graph:q.diagram),selected=-1,labelSelected='',tool='select',drag=null,history=[],future=[],snapGeometry=true,geometryStep=20,multi=new Set(),polyline=[],constructionReference=-1;
  const linear=o=>o&&['line','dashed','arrow','dimension','doubleArrow','ray','infiniteLine'].includes(o.kind);
@@ -1172,7 +1175,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   '<span id="qw-visual-state" role="status"></span>'+qwButton('visual-cancel','Отменить редактирование')+qwButton('visual-apply','Применить','class="qw-primary"'),'visual');
  d.classList.add('qw-visual-dialog','qw-visual-'+kind);d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
  qwInstallPanels(d.querySelector('.qw-visual-body'),'visual',d.querySelector('header'),{left:['.qw-visual-tools','Инструменты'],right:['.qw-visual-inspector','Свойства']});
- let visualCommitted=false;const initialVisual=JSON.stringify(value);d.qwDirty=()=>!visualCommitted&&(JSON.stringify(value)!==initialVisual||polyline.length>0||!!drag);d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения рисунка?');
+ let visualCommitted=false;const initialVisual=JSON.stringify(value);d.qwDirty=()=>!visualCommitted&&(JSON.stringify(value)!==initialVisual||polyline.length>0||!!drag);d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения рисунка?');d.qwParentDirty=parentDirty;
  d.querySelector('[data-qw-action="visual-cancel"]').onclick=()=>{if(d.qwCanLeave())d.close();};
  if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');

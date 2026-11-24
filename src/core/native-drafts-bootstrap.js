@@ -68,9 +68,16 @@
   get pending(){return dirty.size>0||!!running;},
   get error(){return error||[...rejected.values()][0]||'';},
  };
+ // A declined editor exit is not a failed durable write. Do not modify
+ // storage state, remove the editor, or disable the window before asking.
+ function editorAllowsClose(){
+  try{return globalThis.qoCanCloseEditors?.()!==false;}
+  catch(e){console.error('Editor close guard failed:',e);return false;}
+ }
  async function onClose(){
   if(closing)return;closing=true;
   const app=document.getElementById('app');
+  if(ready&&!editorAllowsClose()){closing=false;return;}
   try{
    if(app)app.inert=true;
    // Do not destroy the WebView while startup is loading or migrating drafts.
@@ -89,6 +96,7 @@
  async function recoverAndClose(){
   if(closing||!ready)return;closing=true;
   const app=document.getElementById('app'),button=document.getElementById('qo-native-draft-recovery');
+  if(!editorAllowsClose()){closing=false;return;}
   if(app)app.inert=true;if(button)button.disabled=true;
   try{
    globalThis.qoFlushForClose?.();

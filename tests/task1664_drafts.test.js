@@ -115,3 +115,23 @@ test('native draft notifications are quiet during pending and ACK, persistent on
  assert.equal(notice.hidden,true);assert.equal(recovery.hidden,true);assert.equal(retry.hidden,true);
  assert.equal(h.rows[KEY].value,'changed');assert.equal(h.context.qoDraftStatusSummary(),'Черновик сохранён');
 });
+
+test('native editor decline does not flush, destroy, change the working copy or report a storage error',async()=>{
+ const h=await harness();let allow=false,asked=0,flushed=0;
+ h.context.qoCanCloseEditors=()=>{asked++;return allow;};
+ h.context.qoFlushForClose=()=>{flushed++;h.context.qoDraftStorage.setItem(KEY,'confirmed durable edit');};
+ h.events['qo-draft-close']();
+ assert.equal(asked,1);assert.equal(flushed,0);assert.equal(h.app.inert,false);assert.equal(h.closed(),false);assert.equal(h.context.qoDraftStorage.error,'');
+ allow=true;h.events['qo-draft-close']();await until(h.closed);
+ assert.equal(asked,2);assert.equal(flushed,1);assert.equal(h.rows[KEY].value,'confirmed durable edit');
+});
+test('recovery and close checks editor guard before exporting, cancel retains real error and pending data',async()=>{
+ let allow=false,exported=0;
+ const h=await harness({write:()=>{throw Error('real disk failure');},saveExport:()=>{exported++;return true;}});
+ h.context.qoDraftStorage.setItem(KEY,'exact recovery data');await assert.rejects(h.context.qoDraftStorage.flush(),/real disk failure/);
+ h.context.qoCanCloseEditors=()=>allow;
+ const button=h.nodes.get('qo-native-draft-recovery');button.onclick();
+ assert.equal(exported,0);assert.equal(h.closed(),false);assert.equal(h.app.inert,false);assert.equal(button.disabled,false);assert.equal(h.context.qoDraftStorage.error,'real disk failure');assert.equal(h.context.qoDraftStorage.getItem(KEY),'exact recovery data');
+ allow=true;button.onclick();await until(h.closed);assert.equal(exported,1);
+ const copy=JSON.parse(Buffer.from(h.calls.find(c=>c.command==='save_export').args.data,'base64').toString('utf8'));assert.equal(copy.entries[0].value,'exact recovery data');
+});
