@@ -918,3 +918,7 @@ Undo/Redo и native Undo текста сохранены. DnD проверен �
 пути — `docs/TASK149.6.md`, `evidence/task149.6/result.json`.
 Реальный OS DPI, другие браузеры, полный исторический/удалённый CI, установщики,
 физическая печать и ручной системный PDF-диалог не проверялись. ОГЭ/ЕГЭ — позже.
+
+
+## TASK167.3 — workspace UX candidate
+TASK167.1/#159 and TASK167.2/#160 accepted; main 7be748bb. TASK167.3 internal modes preserve current document and reuse shell, print and scientific renderers. Separate profile-only dock preference key; no SQLite/QWORK/QWBANK changes. Pending browser/Windows acceptance. No integration of PR #158, no release before architect.

@@ -115,3 +115,6 @@ One issue → one measurable change → tests and independent evidence. Do not d
 
 - Done in alpha: in-app color palettes (preset + custom), distinct toolbar icon paths, side-specific border menu, actual merged-cell model/display, `.qbook` and partial XLSX merged-cell/border roundtrip, safe rejection of overlapping/data-losing merges.
 - NEXT: improved merge-aware keyboard selection, clipboard/paste/fill behavior, structural edits around merged regions, full number/date styles, broad OOXML fidelity, performance profiling, robust native desktop saving/reopening and signed updates. No full Excel compatibility claim yet.
+
+
+TASK167.1 and TASK167.2 accepted (PR #159/#160). TASK167.3 workspace UX candidate in feat/task167-3-workspace-ux; acceptance and release pending architect. TASK168 not started.

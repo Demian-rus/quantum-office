@@ -53,3 +53,7 @@ Independent education routes and full-window bank catalogue, no Writer panels. E
 | Отдельный инфраструктурный трек | Версионирование релизов, подписанные обновления, резервная копия и проверка миграции; ручное обновление до внедрения updater |
 
 Не начинать весь список одним PR. Порядок и границы уточнять по реальному коду и обратной связи. Сохранять ранее принятые требования к PDF, нумерации, формулам, графикам и схемам; не возвращать лишние подсказки и декоративные элементы. Приёмка каждого продуктового PR по фактическому HEAD, тестам и реальным сборкам.
+
+
+## TASK167 status (2026-11-24)
+TASK167.1 accepted via PR #159; TASK167.2 accepted via PR #160 at 6e14050a1b3e680fa55c1d75eac17b5454d5dcd1, merged main 7be748bb. TASK167.3 candidate: shell-owned internal work modes and persistent view-only dock settings, pending review. No lectures/TASK168 work.
