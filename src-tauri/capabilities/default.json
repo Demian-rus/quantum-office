@@ -1,0 +1,10 @@
+{
+  "identifier": "main-local",
+  "description": "Local main window only",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}
