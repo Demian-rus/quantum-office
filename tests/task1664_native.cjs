@@ -307,12 +307,12 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  // TASK167.3: verify actual Windows CloseRequested leaves a dirty child intact.
  const decision={accept:false,count:0};const onDialog=dialog=>{decision.count++;return decision.accept?dialog.accept():dialog.dismiss();};page.on('dialog',onDialog);
  const requestClose=()=>{const r=require('node:child_process').spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"(Get-Process -Id "+Number(process.env.QO_NATIVE_PID)+").CloseMainWindow()"],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/True/i);};
+ const declineClose=async()=>{decision.accept=false;const count=decision.count,dialog=page.waitForEvent('dialog',{timeout:15000});requestClose();await dialog;await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);assert.equal(decision.count,count+1,'actual CloseRequested must ask before discarding');};
  await page.evaluate(()=>{route('work');qwSelected=qwDoc.tasks[0].id;qwRender();qwVisualEditor('graph');});
  if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
  await page.locator('#qw-graph-preset').selectOption('v');
  assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));const originalGraph=await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph));
- requestClose();await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);
- assert.equal(decision.count,1,'actual CloseRequested must ask before discarding');assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph)),originalGraph);
+ await declineClose();assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph)),originalGraph);
  await page.screenshot({path:path.join(out,'native-close-declined-graph.png')});
  // A second edit and undo prove the editor still works after decline.
  await page.locator('#qw-graph-preset').selectOption('x');await page.locator('#qw-visual-undo').click();
@@ -323,23 +323,24 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.evaluate(()=>route('work'));await page.evaluate(()=>{qwSelected=qwDoc.tasks[0].id;qwVisualEditor('diagram');});
  if(!await page.locator('#qw-diagram-preset').isVisible())await page.locator('[data-visual-panel="properties"]').click();
  await page.locator('#qw-diagram-preset').selectOption('surface');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
- decision.accept=false;const previousCount=decision.count;requestClose();await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);assert.equal(decision.count,previousCount+1);
+ await declineClose();
  await page.screenshot({path:path.join(out,'native-close-declined-diagram.png')});
  decision.accept=true;await page.locator('[data-qw-action="visual-cancel"]').click();await page.locator('#qw-dialog').waitFor({state:'detached'});
  // Native close with an unchanged child and dirty parent must also ask.
- await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-native-lifecycle"]').click();await page.locator('[data-bank-edit="task1673-native-lifecycle"]').click();await page.locator('[data-bank-task-field="prompt"]').fill('Native unsaved parent');await page.locator('[data-bank-visual="graph"]').click();await page.locator('#qw-visual-stage').waitFor();
- decision.accept=false;const bankCount=decision.count;requestClose();await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);assert.equal(decision.count,bankCount+1);await page.screenshot({path:path.join(out,'native-close-declined-bank.png')});
+ await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-native-lifecycle"]').click();await page.locator('.qw-bank-preview-actions [data-bank-edit="task1673-native-lifecycle"]').click();await page.locator('[data-bank-task-field="prompt"]').fill('Native unsaved parent');await page.locator('[data-bank-visual="graph"]').click();await page.locator('#qw-visual-stage').waitFor();
+ await declineClose();await page.screenshot({path:path.join(out,'native-close-declined-bank.png')});
  assert.equal(await page.evaluate(async()=>(await qwBankRepository.getTask('task1673-native-lifecycle')).task.prompt),'TASK167.3 explicitly saved bank condition');
  await page.locator('[data-qw-action="visual-cancel"]').click();assert.equal(await page.locator('[data-bank-task-field="prompt"]').inputValue(),'Native unsaved parent');
  decision.accept=true;await page.locator('[data-qw-action="bank-edit-back"]').click();await page.locator('[data-bank-view="task1673-native-lifecycle"]').waitFor();await page.evaluate(()=>route('work'));
  fs.writeFileSync(path.join(out,'native-editor-close.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,graph:true,diagram:true,bank:true,bankLifecycle},null,2));
+ // Prepare the local graphic before staging the final durable edit.
+ await page.evaluate(()=>qwVisualEditor('graph'));if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
+ await page.locator('#qw-graph-preset').selectOption('v');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
  const pending=await page.evaluate(async()=>{qwDoc.instructions='TASK1664 final edit before ordinary close';if(!qwPersist())throw Error('Pending draft not queued');const queued=qoDraftStorage.pending;const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(qoDraftStorage.getItem(QW_KEY)))),b=>b.toString(16).padStart(2,'0')).join('');return {queued,sha256:hash};});
  assert.equal(pending.queued,true);
  fs.writeFileSync(path.join(out,'draft-close-pending.json'),JSON.stringify(pending,null,2));
- // Confirm a real close while a local graphic is dirty. Existing restart
- // checks verify that the durable pending QWORK was flushed, not the child.
- await page.evaluate(()=>qwVisualEditor('graph'));if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
- await page.locator('#qw-graph-preset').selectOption('v');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
+ // Confirm a real close while a local graphic is dirty. The PowerShell
+ // parent waits for actual process exit; restart checks verify the durable hash.
  decision.accept=true;const closingDialog=page.waitForEvent('dialog',{timeout:15000});requestClose();await closingDialog;
  fs.writeFileSync(path.join(out,'native-editor-close-confirmed.json'),JSON.stringify({status:'confirmation received',actualCloseRequested:true},null,2));
  }else if(['ordinary','reinstall','portable'].includes(stage)){

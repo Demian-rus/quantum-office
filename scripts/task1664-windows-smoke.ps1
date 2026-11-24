@@ -118,7 +118,11 @@ try {
       node tests/task1664_native.cjs $stage
       if ($LASTEXITCODE -ne 0) { $failures += $stage; if ($i -eq 0) { throw 'Initial native WebView integration failed' } }
       elseif ($i -eq 3 -and $failures.Count -eq 0) { node tests/task1664_scale.cjs; if ($LASTEXITCODE -ne 0) { $failures += 'scale' } }
-      if (!$p.CloseMainWindow()) { throw 'Window close failed' }
+      if ($i -eq 0) {
+        if (!(Test-Path evidence/native/native-editor-close-confirmed.json)) { throw 'Missing native editor close confirmation' }
+      } else {
+        if (!$p.CloseMainWindow()) { throw 'Window close failed' }
+      }
       if (!$p.WaitForExit(15000)) { throw 'Clean close timed out' }
       if ($p.ExitCode -ne 0) { throw "Unexpected exit $($p.ExitCode)" }
     } finally {
