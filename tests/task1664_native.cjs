@@ -154,9 +154,9 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  let session;
  try{
   await page.evaluate(layout=>{
-   qwPreview();const alternate=[...document.querySelectorAll('[name="qw-pdf-layout"]')].find(x=>x.value!==layout&&!x.disabled);
+   qwPreview();const select=document.querySelector('select[name="qw-pdf-layout"]'),alternate=[...select.options].find(x=>x.value!==layout&&!x.disabled);
    if(!alternate)throw Error('Missing actual layout control');
-   alternate.click();if(qwDoc.layout!==alternate.value)throw Error('Layout did not change');
+   select.value=alternate.value;select.dispatchEvent(new Event('change',{bubbles:true}));if(qwDoc.layout!==alternate.value)throw Error('Layout did not change');
    if(!qoDraftStorage.pending||!document.getElementById('qo-native-draft-notice').hidden)throw Error('Layout change not quiet');
   },oldLayout);
   assert.deepEqual(await measure(),base,'pending moves workspace');

@@ -383,17 +383,20 @@ async function qwPreparePrintDocument(){
    else {const img=figure.querySelector('img');w=img.naturalWidth;h=img.naturalHeight;}
    let wide=flow.classList.contains('qw-figure-below');
    const requested=Number(figure.dataset.requestedWidth)||220;
+   const manual=figure.dataset.widthMode==='manual';
    const graph=figure.dataset.figureKind==='graph',auto=flow.classList.contains('qw-figure-auto');
    const available=flow.getBoundingClientRect().width;
    // Booklet uses requested width as a ceiling, with proportionate automatic
    // limits. Never enlarge an ordinary graph to a fixed 85 mm below the text.
    const compactBooklet=format==='booklet';
-   const widthLimit=below=>compactBooklet?
+   const widthLimit=below=>manual?
+    Math.max(1,Math.min(requested,below?available-2*MM:modern?available-Math.max(38*MM,available*.48)-3*MM:65*MM)):
+    compactBooklet?
     Math.min(requested,available*(below?1:(graph?.45:.35))-(below?1*MM:0)):
     modern?(below?Math.min(available-2*MM,graph?Math.max(requested,85*MM):requested):
     (format==='practice'?55:graph?55:40)*MM):
     below?(requested>=470?180*MM:Math.min(requested,180*MM)):Math.min(requested,65*MM);
-   const heightLimit=below=>compactBooklet?
+   const heightLimit=below=>manual?(below?160:60)*MM:compactBooklet?
     Math.min(requested, (below?95:60)*MM):
     modern?(below?70:format==='practice'?35:34)*MM:
     below?(requested>=470?160*MM:requested*320/520):38*MM;
@@ -402,7 +405,8 @@ async function qwPreparePrintDocument(){
    const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
    const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
    let scale=calculate(wide);
-   if(modern&&graph&&!wide&&!compactBooklet&&svg)scale=48*MM/369;
+   if(!manual&&modern&&graph&&!wide&&!compactBooklet&&svg)scale=48*MM/369;
+   if(manual&&!wide&&(requested>widthLimit(false)||scale<minLabelScale))wide=true;
    if(compactBooklet&&!wide){
     const minimumText=Math.max(38*MM,available*.48);
     const sideWidth=w*scale;
