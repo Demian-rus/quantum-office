@@ -1396,7 +1396,7 @@ Object.assign(QO_WORKSPACE_ICONS,{
  'check':'<path d="m4 12 5 5L20 6"/>',
  'x':'<path d="m6 6 12 12M6 18 18 6"/>'
 });
-Object.assign(QO_WORKSPACE_ICONS,{'arrow-up':'<path d="M12 19V5m-6 6 6-6 6 6"/>','arrow-down':'<path d="M12 5v14m-6-6 6 6 6-6"/>','trash-2':'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>'});
+Object.assign(QO_WORKSPACE_ICONS,{'arrow-left':'<path d="M19 12H5m6-6-6 6 6 6"/>','arrow-right':'<path d="M5 12h14m-6-6 6 6-6 6"/>','grip-vertical':'<path d="M9 5h0m6 0h0M9 12h0m6 0h0M9 19h0m6 0h0" stroke-width="3"/>','arrow-up':'<path d="M12 19V5m-6 6 6-6 6 6"/>','arrow-down':'<path d="M12 5v14m-6-6 6 6 6-6"/>','trash-2':'<path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7m4-7v7"/>'});
 function qoWorkIcon(name){const path=QO_WORKSPACE_ICONS[name]||((typeof QO_LUCIDE!=='undefined')?QO_LUCIDE[name]:null)||QO_WORKSPACE_ICONS.type;
  return `<svg class="qo-work-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
 }

@@ -32,7 +32,7 @@ function qwFigureLayoutControls(){
  return '<section class="qw-figure-layout"><h3>Иллюстрация</h3><label class="qw-pdf-field"><span>Задание</span><select id="qw-layout-figure-task">'+qwOptions(figures.map(q=>[q.id,'№ '+(qwDoc.tasks.indexOf(q)+1)+' — '+({graph:'График',diagram:'Схема',image:'Изображение'}[q.figure])]),q.id)+'</select></label>'+
  '<label class="qw-pdf-field"><span>Размер</span><select id="qw-layout-figure-mode">'+qwOptions([['auto','Автоматически'],['manual','Вручную']],manual?'manual':'auto')+'</select></label>'+
  '<label class="qw-pdf-field"><span>Ширина, мм</span><input id="qw-layout-figure-width" type="number" min="31.75" max="124.35" step="any" value="'+(q.figureWidth*25.4/96).toFixed(2)+'" '+(manual?'':'disabled')+'></label>'+
- '<button type="button" id="qw-layout-figure-reset" '+(manual?'':'disabled')+'>Автоматический размер</button></section>';
+ '<button type="button" id="qw-layout-figure-reset" '+(manual?'':'disabled')+'>Автоматический размер</button><output id="qw-layout-figure-effective" aria-live="polite"></output></section>';
 }
 function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false){
  const visual=q.figure==='graph'?qwGraphSVG(q.graph,false,printing?{axisFont:22,titleFont:24}:{}):q.figure==='diagram'?qwDiagramSVG(q.diagram):q.figure==='image'&&q.image?'<img alt="Иллюстрация задания" src="'+q.image+'">':'';
@@ -220,6 +220,7 @@ async function qwPreview(output='tasks'){
    preview.dataset.ready=String(revision);d.querySelector('#qw-pages').setAttribute('aria-busy','false');
    printButton.disabled=!!win.__qwPrintError;
    d.querySelector('#qw-page-count').textContent=win.__qwPrintError?'Ошибка: '+win.__qwPrintError:win.__qwPrintLayout.layout==='spread'?'Листов A4: '+win.__qwPrintLayout.sheets+' · полос: '+win.__qwPrintLayout.pages.length:'Страниц: '+win.__qwPrintLayout.pages.length;
+   updateEffectiveWidth();
    const n=win.document.querySelectorAll('[data-label-conflict="true"]').length,w=d.querySelector('#qw-label-warnings');
    w.hidden=!n;w.textContent=n?'Пересечение подписей на рисунке: '+n:'';
   };
@@ -247,11 +248,18 @@ async function qwPreview(output='tasks'){
   if(e.matches('[data-print-setting="titleText"]'))e.addEventListener('input',()=>{clearTimeout(typingTimer);typingTimer=setTimeout(()=>commit(e),280);});
  });
  const taskControl=d.querySelector('#qw-layout-figure-task'),modeControl=d.querySelector('#qw-layout-figure-mode'),widthControl=d.querySelector('#qw-layout-figure-width'),resetControl=d.querySelector('#qw-layout-figure-reset');
+ function updateEffectiveWidth(){
+  const output=d.querySelector('#qw-layout-figure-effective');if(!output||!taskControl)return;
+  const number=qwDoc.tasks.findIndex(q=>q.id===taskControl.value)+1;
+  const figure=preview.contentDocument?.querySelector('.qw-print-section[data-task="'+number+'"] figure');
+  const width=figure?.getBoundingClientRect().width;
+  output.textContent=width>0?'На странице: '+(width*25.4/96).toFixed(1)+' мм':'';
+ }
  if(taskControl){
   const selectedFigure=()=>qwDoc.tasks.find(q=>q.id===taskControl.value);
   const syncFigure=()=>{const q=selectedFigure();if(!q)return;const manual=q.figureWidthMode==='manual';modeControl.value=manual?'manual':'auto';widthControl.value=(q.figureWidth*25.4/96).toFixed(2);widthControl.disabled=resetControl.disabled=!manual;};
   const changeFigure=(mode,width)=>{const q=selectedFigure();if(!q)return;const next={...q};if(!qwSetFigureWidth(next,mode,width)){syncFigure();return;}qwRemember();q.figureWidth=next.figureWidth;if(next.figureWidthMode)q.figureWidthMode=next.figureWidthMode;else delete q.figureWidthMode;qwPersist();qwRender();syncFigure();refresh();};
-  taskControl.addEventListener('change',()=>{qwSelected=taskControl.value;qwRender();syncFigure();});
+  taskControl.addEventListener('change',()=>{qwSelected=taskControl.value;qwRender();syncFigure();updateEffectiveWidth();});
   modeControl.addEventListener('change',()=>changeFigure(modeControl.value,selectedFigure()?.figureWidth));
   widthControl.addEventListener('change',()=>{const raw=widthControl.value;changeFigure('manual',raw.trim()===''?NaN:Number(raw)*96/25.4);});
   resetControl.addEventListener('click',()=>changeFigure('auto'));
@@ -1162,7 +1170,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   const o=objectAt(selected),paint=o?.style||{};
   const graphElement=kind==='graph'&&selected>=value.points.length;
   const defaultStroke=kind==='graph'?(graphElement?'#186ba3':'#142b42'):'#162735';
-  return '<section class="qw-object-style"><h2>Оформление'+(multi.size>1?' · '+multi.size+' объектов':'')+'</h2>'+[['stroke','Цвет линии / контура',defaultStroke],['fill','Цвет заливки','#ffffff'],['text','Цвет подписи',kind==='graph'?(paint.stroke||defaultStroke):'#162735']].filter(([key])=>key!=='fill'||kind==='diagram'&&selectedIndices().some(i=>['rect','circle','ellipse','regularPolygon','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(objectAt(i)?.kind))).map(([key,title,fallback])=>'<div class="qw-paint-row"><label>'+title+'<input type="color" data-style="'+key+'" value="'+(paint[key]&&paint[key]!=='none'?paint[key]:fallback)+'"></label><div class="qw-palette">'+['#162735','#dc2626','#16a34a','#2563eb','#9333ea','#ea580c'].map(color=>'<button type="button" data-style-key="'+key+'" data-style-color="'+color+'" style="--qw-swatch:'+color+'" aria-label="'+title+' '+color+'" title="'+title+' '+color+'"></button>').join('')+(key==='fill'?'<button type="button" data-style-key="fill" data-style-color="none" aria-label="Без заливки" title="Без заливки">×</button>':'')+'</div></div>').join('')+'<label>Толщина линии<input data-style="width" type="number" min="0.5" max="12" step="0.5" value="'+(paint.width||(graphElement?2.5:2))+'"></label></section>';
+  return '<section class="qw-object-style"><h2>Оформление'+(multi.size>1?' · '+multi.size+' объектов':'')+'</h2>'+[['stroke','Цвет линии / контура',defaultStroke],['fill','Цвет заливки','#ffffff'],['text','Цвет подписи',kind==='graph'?(paint.stroke||defaultStroke):'#162735']].filter(([key])=>key!=='fill'||kind==='diagram'&&selectedIndices().some(i=>['rect','circle','ellipse','regularPolygon','triangle','rightTriangle','quadrilateral','block','incline','pulley','movablePulley'].includes(objectAt(i)?.kind))).map(([key,title,fallback])=>'<div class="qw-paint-row"><label>'+title+'<input type="color" data-style="'+key+'" value="'+(paint[key]&&paint[key]!=='none'?paint[key]:fallback)+'"></label><div class="qw-palette">'+['#162735','#dc2626','#16a34a','#2563eb','#9333ea','#ea580c'].map(color=>'<button type="button" data-style-key="'+key+'" data-style-color="'+color+'" style="--qw-swatch:'+color+'" aria-label="'+title+' '+color+'" title="'+title+' '+color+'"></button>').join('')+(key==='fill'?'<button type="button" data-style-key="fill" data-style-color="none" aria-label="Без заливки" title="Без заливки">'+qoWorkIcon('x')+'</button>':'')+'</div></div>').join('')+'<label>Толщина линии<input data-style="width" type="number" min="0.5" max="12" step="0.5" value="'+(paint.width||(graphElement?2.5:2))+'"></label></section>';
  }
  function rotationPanel(){
   const o=value[selected];if(!o||multi.size!==1||['point','ray','infiniteLine'].includes(o.kind))return '';

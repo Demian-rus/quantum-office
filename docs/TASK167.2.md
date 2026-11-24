@@ -5,3 +5,5 @@ Base 0a69f6616e5443c2ca86f446400360dd10a1b383. Draft, not accepted. Legacy autom
 Tests: model roundtrip, independent widths, invalid input, reset, unchanged geometry. Browser/native and final CI evidence pending. No acceptance claimed.
 
 Baseline Verify passed; Chromium dependency install failure and Pages configuration error separately observed. Windows was in progress at initial check.
+
+Second candidate revision adds diagnostic/media SVG actions, actual effective width output, browser offline tests with a bank-sourced raster and graph/circuit, two physical PDF orientations and comparison with preview, QWORK and reload, theme/viewport snapshots. Native WebView2 test drives the real select and width inputs, checks original bank record and verifies persisted manual width after close/reinstall/Portable. Test execution on final HEAD is required; no results claimed yet.

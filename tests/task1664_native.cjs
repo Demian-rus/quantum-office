@@ -201,6 +201,19 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.screenshot({path:path.join(out,'native-workspace.png')});
  await page.evaluate(()=>route('bank'));await page.locator('#qo-bank-root .qw-bank-filter-panel').waitFor();await page.screenshot({path:path.join(out,'native-bank.png')});
  await page.evaluate(()=>route('work'));
+ // TASK167.2: exercise actual layout controls on the bank image, then retain the local width for restart stages.
+ const originalBankFigure=await page.evaluate(async()=>JSON.stringify((await qwBankRepository.getTask('native-0')).task));
+ await page.evaluate(()=>qwPreview());
+ await page.locator('#qw-layout-figure-mode').selectOption('manual');
+ await page.locator('#qw-layout-figure-width').fill('62');
+ await page.locator('#qw-layout-figure-width').press('Tab');
+ await page.waitForFunction(()=>qwDoc.tasks[0].figureWidthMode==='manual'&&Math.abs(qwDoc.tasks[0].figureWidth*25.4/96-62)<.02);
+ await page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return f?.dataset.ready===f?.contentDocument?.documentElement.dataset.qwRender&&!f?.contentWindow?.__qwPrintError&&!!f?.contentWindow?.__qwPrintLayout;});
+ await page.screenshot({path:path.join(out,'native-manual-figure.png')});
+ assert.equal(await page.evaluate(async()=>JSON.stringify((await qwBankRepository.getTask('native-0')).task)),originalBankFigure,'local layout must not alter bank');
+ const manualFigure=await page.evaluate(async()=>{await qoDraftStorage.flush();return {id:qwDoc.tasks[0].id,width:qwDoc.tasks[0].figureWidth,mode:qwDoc.tasks[0].figureWidthMode};});
+ fs.writeFileSync(path.join(out,'native-manual-figure.json'),JSON.stringify(manualFigure,null,2));
+ await page.locator('[data-qw-close]').click();
  // Controlled response tests for save acknowledgement in actual WebView2.
  // SQLite IPC above remains real; this test only controls the save dialog result.
  const ack=await page.evaluate(async()=>{
@@ -285,6 +298,8 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const draft=await inspectDraft(page);recordDraft(stage,draft);
  const before=JSON.parse(fs.readFileSync(path.join(out,'draft-before-close.json'),'utf8'));
  const checks={rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:JSON.stringify(draft.live.images)===JSON.stringify(before.live.images),diskMatches:draft.diskMatches===true,storageError:!draft.storageError,notCorrupt:!draft.corrupt,noPending:!draft.pending&&!draft.nativeError,finalEdit:await page.evaluate(()=>qwDoc.instructions==='TASK1664 final edit before ordinary close')};
+ const manualFigure=JSON.parse(fs.readFileSync(path.join(out,'native-manual-figure.json'),'utf8'));
+ checks.manualFigure=await page.evaluate(expected=>{const q=qwDoc.tasks.find(t=>t.id===expected.id);return q?.figureWidth===expected.width&&q.figureWidthMode===expected.mode;},manualFigure);
  const editors=await inspectEditors(page);recordDraft('editors-'+stage,editors);
  const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
  for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];

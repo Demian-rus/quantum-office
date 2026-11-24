@@ -622,3 +622,6 @@
 .qw-figure-layout{display:flex;flex-direction:column;gap:6px;min-width:0;grid-column:1/-1}
 .qw-figure-layout button{align-self:flex-start}
 .qw-frame button>.qo-work-icon,.qw-dialog button>.qo-work-icon{width:16px;height:16px;display:inline-block;vertical-align:middle;flex:none}
+
+.qw-figure-layout output{font-size:11px;color:var(--qo-muted);min-height:16px}
+:is([data-qd-action],.qd-drag-handle,[data-qd-media-dismiss],[data-draw-close])>.qo-work-icon{width:16px;height:16px;display:inline-block;vertical-align:middle;flex:none}

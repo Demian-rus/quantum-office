@@ -251,7 +251,7 @@ function qdMediaView(id){
     if(!url){status('Изображение недоступно. Импортируйте .qdiagx или .qtplx.',true);return;}
     const dialog=document.createElement('dialog');dialog.className='qd-media-dialog';
     dialog.innerHTML='<div class="qd-media-viewer"><div class="qd-media-viewer-head"><strong>Просмотр иллюстрации</strong>'+
-      '<button type="button" data-qd-media-dismiss>Закрыть ×</button></div>'+
+      '<button type="button" data-qd-media-dismiss>Закрыть '+qoWorkIcon('x')+'</button></div>'+
       '<img alt="Увеличенная иллюстрация" src="'+url+'"></div>';
     document.body.append(dialog);dialog.addEventListener('close',()=>dialog.remove());
     dialog.addEventListener('click',event=>{if(event.target===dialog||event.target.closest('[data-qd-media-dismiss]'))dialog.close();});
@@ -263,7 +263,7 @@ function qdMediaDraw(qid,kind){
   const existing=qdMediaSafe(q[qdMediaKey(kind)]);
   const dialog=document.createElement('dialog');dialog.className='qd-media-dialog qd-media-draw-dialog';
   dialog.innerHTML='<div class="qd-media-draw-panel"><header><div><strong>Редактор иллюстрации</strong>'+
-    '<p>'+qdMediaLabel(kind)+' · карандаш и ластик</p></div><button type="button" data-draw-close>Закрыть ×</button></header>'+
+    '<p>'+qdMediaLabel(kind)+' · карандаш и ластик</p></div><button type="button" data-draw-close>Закрыть '+qoWorkIcon('x')+'</button></header>'+
     '<div class="qd-media-draw-tools" role="toolbar" aria-label="Рисование">'+
     '<button type="button" data-draw-tool="pen" class="active">Карандаш</button>'+
     '<button type="button" data-draw-tool="eraser">Ластик</button>'+
