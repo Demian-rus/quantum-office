@@ -7,7 +7,7 @@ from PIL import Image, ImageChops, ImageStat
 
 root = Path(sys.argv[1])
 report = []
-for prefix, orientation in ((p, o) for p in ("print", "ege2018") for o in ("portrait", "landscape")):
+for prefix, orientation in ((p, o) for p in ("print", "ege2018", "graphics") for o in ("portrait", "landscape")):
     expected = (595.28, 841.89) if orientation == "portrait" else (841.89, 595.28)
     with fitz.open(root / f"{prefix}-{orientation}-browser.pdf") as browser, fitz.open(root / f"{prefix}-{orientation}-windows.pdf") as native:
         assert len(browser) == len(native) >= 2, (orientation, len(browser), len(native))

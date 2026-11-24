@@ -3,6 +3,7 @@ const {chromium}=require('playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 const out=path.join(__dirname,'..','evidence','native');
 const visual=require('./task1664_visual.cjs');
+const {makeTechnicalFixture}=require('./task1664_graphics.cjs');
 async function inspectDraft(page){
  return page.evaluate(async()=>{
   const hashBytes=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',v)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -189,6 +190,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await visual.compareSheet(page,stage,out,true);
  await visual.comparePrint(page,out);
  await visual.comparePrint(page,out,JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','QuantumOffice_EGE2018_32.qwork'),'utf8')),'ege2018');
+ await visual.comparePrint(page,out,await makeTechnicalFixture(page),'graphics');
  await page.evaluate(()=>qoDraftStorage.flush());
  const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,3);assert.equal(before.live.imagePresent,true);assert.equal(before.diskMatches,true);assert.ok(before.rawBytes>5*1024*1024,'large QWORK exceeds 5 MiB');assert.equal(before.pending,false);assert.equal(before.legacyRawPresent,true);
  const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));

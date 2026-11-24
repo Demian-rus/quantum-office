@@ -70,6 +70,8 @@ jobs:
           ./scripts/task1664-windows-smoke.ps1
           python tests/task1664_pdf_compare.py evidence/native
           if ($LASTEXITCODE -ne 0) { throw 'PDF visual comparison failed' }
+          python tests/task1664_graphics_pdf.py evidence/native
+          if ($LASTEXITCODE -ne 0) { throw 'PDF visual comparison failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

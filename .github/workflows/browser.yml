@@ -628,6 +628,8 @@ jobs:
           exit 1
       - run: node tests/task1601_browser.cjs
       - run: node tests/task1664_print_browser.cjs
+      - run: python -m pip install pymupdf==1.26.6 pillow
+      - run: python tests/task1664_graphics_pdf.py evidence/task1664-print
       - uses: actions/upload-artifact@v4
         if: always()
         with:
