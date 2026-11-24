@@ -219,10 +219,10 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  fs.writeFileSync(path.join(out,'native-manual-figure.json'),JSON.stringify(manualFigure,null,2));
  await page.locator('[data-qw-close]').click();
  // TASK167.3: real installed WebView2 preference and shell mode acceptance.
- await page.evaluate(()=>qwPreview());await page.locator('[data-qw-dock-toggle="left"]').click();
+ await page.evaluate(()=>qwPreview());await page.locator('#qw-dialog [data-qw-dock-toggle="left"]').click();
  assert.equal(await page.locator('.qw-pdf-design').isVisible(),false);
- await page.locator('[data-qw-dock-toggle="left"]').click();
- await page.locator('[data-qw-dock-resize="left"]').focus();await page.keyboard.press('Shift+ArrowRight');
+ await page.locator('#qw-dialog [data-qw-dock-toggle="left"]').click();
+ await page.locator('#qw-dialog [data-qw-dock-resize="left"]').focus();await page.keyboard.press('Shift+ArrowRight');
  const dock=await page.evaluate(()=>qwPanelPreference('pdf'));assert.ok(dock.left>254&&!dock.hideLeft);
  fs.writeFileSync(path.join(out,'native-dock-pref.json'),JSON.stringify(dock,null,2));
  await page.screenshot({path:path.join(out,'native-dock-layout.png')});

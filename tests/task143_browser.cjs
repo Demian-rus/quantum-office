@@ -29,6 +29,7 @@ const seed=require('./task142_fixture.cjs');
  // Same synthetic diagnosis as baseline: bounded center and pinned independent rails.
  await seed(p);await mode('builder');await p.locator('.qd-outline-question').first().click();
  const geometry=async()=>p.evaluate(()=>{const r=s=>{const b=document.querySelector(s).getBoundingClientRect();return {x:b.x,y:b.y,width:b.width,right:b.right,bottom:b.bottom};};return {width:innerWidth,left:r('.qd-topic-navigator'),main:r('.qd-workbench-main'),right:r('.qd-side-insights'),head:r('.qd-top')};});
+ await require('./task1673_diagnostic_geometry.cjs').checkDiagnosticDocks(p);
  const before=await geometry();assert.ok(before.left.right<=before.main.x+1&&before.main.right<=before.right.x+1,'pinned rails must not overlap center');assert.ok(before.main.width>=800);assert.ok(Math.abs(before.main.width-(before.right.x-before.left.right))<=2,'center fills remaining space');
  await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop+=300);const after=await geometry();assert.equal(after.left.y,before.left.y);assert.equal(after.right.y,before.right.y);assert.equal(after.head.y,before.head.y,'central tools stay available during editing');
  const scrollBefore=await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop);await p.locator('#qd-question-properties [data-qd-field="points"]').fill('3');await p.locator('#qd-question-properties [data-qd-field="points"]').dispatchEvent('change');assert.equal(await p.locator('.qd-workbench-main').evaluate(el=>el.scrollTop),scrollBefore,'property edit preserves center scroll');
