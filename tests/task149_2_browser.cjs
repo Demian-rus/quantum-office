@@ -23,11 +23,11 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await tool('polyline');for(const a of [[100,110],[180,70],[230,150]])await click(...a);await p.keyboard.press('Escape');
   assert.equal(await stage.locator('[data-qw-object]').count(),0,'Escape cancels unfinished polyline');assert.equal(await p.locator('#qw-visual-undo').isDisabled(),true);
   await tool('polyline');for(const a of [[100,110],[180,70],[230,150]])await click(...a);await p.locator('#qw-finish-polyline').click();
-  assert.equal(await stage.locator('polyline').count(),1);const points=await stage.locator('polyline').getAttribute('points');
-  await tool('polyline');await click(50,50);await click(80,60);await p.keyboard.press('Enter');assert.equal(await stage.locator('polyline').count(),2,'Enter commits a polyline');
-  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline').count(),1);await p.locator('[data-object-select="0"]').click();
-  await tool('select');await drag(180,70,195,90);assert.notEqual(await stage.locator('polyline').getAttribute('points'),points,'pointer moves one vertex');
-  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline').getAttribute('points'),points);
+  assert.equal(await stage.locator('polyline:not([data-qw-arrow-shaft])').count(),1);const points=await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points');
+  await tool('polyline');await click(50,50);await click(80,60);await p.keyboard.press('Enter');assert.equal(await stage.locator('polyline:not([data-qw-arrow-shaft])').count(),2,'Enter commits a polyline');
+  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline:not([data-qw-arrow-shaft])').count(),1);await p.locator('[data-object-select="0"]').click();
+  await tool('select');await drag(180,70,195,90);assert.notEqual(await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points'),points,'pointer moves one vertex');
+  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points'),points);
   await p.locator('[data-object-select="0"]').click();await p.locator('[data-style-key="stroke"][data-style-color="#dc2626"]').click();await change('[data-style="width"]',4);
   await change('#qw-object-label','Ломаная с тремя вершинами и индивидуальным цветом');
   await tool('arc');await drag(350,90,400,90);await tool('select');await click(325,115);
@@ -48,8 +48,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
    await p.keyboard.press('Control+z');assert.equal(await shape.evaluate(e=>e.innerHTML+e.getAttribute('transform')),before,'individual move undo '+i);
   }
   await tool('select');await p.locator('#qw-visual-stage').focus();await p.keyboard.press('Control+a');assert.equal(await stage.locator('.qw-visual-selected').count(),4);
-  const original=await stage.locator('polyline').getAttribute('points');await drag(140,90,150,100);assert.notEqual(await stage.locator('polyline').getAttribute('points'),original,'group pointer movement');
-  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline').getAttribute('points'),original);
+  const original=await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points');await drag(140,90,150,100);assert.notEqual(await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points'),original,'group pointer movement');
+  await p.keyboard.press('Control+z');assert.equal(await stage.locator('polyline:not([data-qw-arrow-shaft])').getAttribute('points'),original);
   await p.locator('#qw-visual-stage').focus();await p.keyboard.press('Control+a');await p.keyboard.press('Delete');assert.equal(await stage.locator('[data-qw-object]').count(),0);
   await p.keyboard.press('Control+z');assert.equal(await stage.locator('[data-qw-object]').count(),4,'group delete is one undo');
   await p.screenshot({path:path.join(out,'editor-new-tools.png')});await action('visual-apply').click();
