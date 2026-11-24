@@ -84,7 +84,16 @@ function bankAssetWriteSet(tx,assets,fail){
    const req=store.get(a.key);req.onerror=()=>fail(req.error);
    req.onsuccess=()=>{try{
     if(req.result){bankAssetValidate(req.result,a);if(!bankAssetSameBytes(req.result.bytes,a.bytes))throw new BankAssetError('Несовпадение двоичных данных SHA-256','ASSET_COLLISION');}
-    else store.add(a);
+    else{
+     const put=store.add(a);put.onerror=()=>fail(put.error);
+     put.onsuccess=()=>{try{
+      const check=store.get(a.key);check.onerror=()=>fail(check.error);
+      check.onsuccess=()=>{try{
+       bankAssetValidate(check.result,a);
+       if(!bankAssetSameBytes(check.result.bytes,a.bytes))throw new BankAssetError('Не удалось подтвердить запись изображения','ASSET_WRITE_VERIFY');
+      }catch(e){fail(e);}};
+     }catch(e){fail(e);}};
+    }
    }catch(e){fail(e);}};
   }
  }catch(e){fail(e);}

@@ -286,8 +286,11 @@ class BankRepository{
      if(c){
       const r=c.value;
       if(r.task?.image)throw new BankAssetError('Остались неперенесённые изображения','ASSET_MIGRATION');
-      if(r.imageAsset){bankAssetCollect(tx,[r],assets=>{bankAssetValidate(assets.get(r.imageAsset.key),r.imageAsset);c.continue();},fail,known);}
-      else c.continue();return;
+      if(r.imageAsset){
+       const ref=r.imageAsset,prior=known.get(ref.key);
+       if(prior){if(prior.mime!==ref.mime||prior.size!==ref.size||prior.sha256!==ref.sha256)throw new BankAssetError('Несогласованные ссылки','ASSET_CORRUPT');c.continue();}
+       else bankAssetCollect(tx,[r],assets=>{bankAssetValidate(assets.get(ref.key),ref);known.set(ref.key,{mime:ref.mime,size:ref.size,sha256:ref.sha256});c.continue();},fail);
+      }else c.continue();return;
      }
      tx.objectStore('meta').put({key:'assetMigration',state:'complete'});
     }catch(e){fail(e);}};
@@ -646,7 +649,7 @@ class BankRepository{
    req.onsuccess=()=>{try{
     const c=req.result;
     if(c){const r=c.value;if(r.task?.image)report.inline++;
-     if(r.imageAsset){const ref=r.imageAsset;if(typeof ref.key!=='string')throw new BankAssetError('Повреждена ссылка','ASSET_REFERENCE');
+     if(r.imageAsset){const ref=r.imageAsset;if(r.task?.image||typeof ref.key!=='string')throw new BankAssetError('Повреждена ссылка','ASSET_REFERENCE');
       const prior=refs.get(ref.key);
       if(prior&&(prior.mime!==ref.mime||prior.size!==ref.size||prior.sha256!==ref.sha256))throw new BankAssetError('Несогласованные ссылки','ASSET_CORRUPT');
       refs.set(ref.key,ref);report.references++;}

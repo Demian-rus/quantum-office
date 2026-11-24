@@ -661,3 +661,38 @@ jobs:
             tests/task1662_scale_browser.cjs
             docs/TASK166.2.md
           if-no-files-found: warn
+
+  task1663-bank-assets:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/checkout@v4
+        with:
+          ref: ab2064c8e874708385525d7505e14c0780645988
+          path: task1662-baseline
+      - run: node scripts/build.mjs
+        working-directory: task1662-baseline
+      - run: node tests/task1663_browser.cjs
+      - run: node tests/task1663_scale_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1663-bank-assets-proof
+          path: |
+            evidence/task1663/
+            Quantum-Office.html
+            src/core/bank-assets.js
+            src/core/bank-repository.js
+            src/core/bank-backup.js
+            src/core/work-builder.js
+            tests/task1663*
+            docs/TASK166.3.md
+          if-no-files-found: warn
