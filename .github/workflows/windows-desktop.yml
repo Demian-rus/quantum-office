@@ -8,16 +8,6 @@ on:
 permissions:
   contents: read
 jobs:
-  resolve-lock:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Resolve candidate lock and emit reproducible bytes
-        working-directory: src-tauri
-        run: |
-          cargo generate-lockfile
-          python -c 'import base64,pathlib,hashlib; b=pathlib.Path("Cargo.lock").read_bytes(); s=base64.b64encode(b).decode(); print("QO_LOCK_SHA",hashlib.sha256(b).hexdigest()); [print("QO_LOCK_B64 "+s[i:i+3000]) for i in range(0,len(s),3000)]'
   windows-x64:
     runs-on: windows-2025
     timeout-minutes: 60
@@ -32,9 +22,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
-      - name: Generate candidate dependency lock
+      - name: Verify committed dependency lock
         working-directory: src-tauri
-        run: cargo generate-lockfile
+        run: cargo metadata --locked --format-version 1 --no-deps
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-cargo-lock
@@ -51,6 +41,7 @@ jobs:
         run: |
           $exe = Resolve-Path "src-tauri/target/x86_64-pc-windows-msvc/release/quantum-office.exe"
           $data = Join-Path $env:APPDATA "com.quantumoffice.desktop/bank.sqlite3"
+          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1"
           for ($i=0; $i -lt 2; $i++) {
             $p = Start-Process -FilePath $exe -PassThru
             try {
@@ -59,6 +50,8 @@ jobs:
               if ($p.HasExited -or $p.MainWindowHandle -eq 0 -or !(Test-Path $data)) { throw "Desktop launch or database creation failed" }
               $header = [IO.File]::ReadAllBytes($data)
               if ([Text.Encoding]::ASCII.GetString($header,0,15) -ne "SQLite format 3") { throw "Not SQLite" }
+              if ($i -eq 0) { node tests/task1664_native.cjs first } else { node tests/task1664_native.cjs second }
+              if ($LASTEXITCODE -ne 0) { throw "Native WebView integration failed" }
               if (!$p.CloseMainWindow()) { throw "Window close failed" }
               if (!$p.WaitForExit(15000)) { throw "Clean close timed out" }
             } finally { if (!$p.HasExited) { Stop-Process -Id $p.Id -Force } }

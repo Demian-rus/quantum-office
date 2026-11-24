@@ -198,10 +198,10 @@ async function saveBook(asNew=false){
  commitEditor();const b=book();if(!b)return;
  const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
  if(savingBooks.has(id)){status('Сохранение этой книги уже выполняется',true);return;}
- if(typeof window.showSaveFilePicker!=='function'){
+ if(qoNativeDesktop||typeof window.showSaveFilePicker!=='function'){
   if(directFiles.has(id)){status('Прямое сохранение недоступно; связанный файл не изменён',true);return;}
-  download(filename,serialized,'application/json');
-  status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
+  await download(filename,serialized,'application/json');
+  if(!qoNativeDesktop)status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
  }
  savingBooks.add(id);
  try{
@@ -250,9 +250,10 @@ async function backup(){
   const bank=await qwBankRepository.createVerifiedBackup();
   status('Проверка архива четырёх редакторов и банка…');
   const content=await encodeOfficeBackupWithBank(workspace,qoWriter,qoSlides,qoPhotoState(),bank);
-  download('Quantum-Office-все-данные-'+new Date().toISOString().slice(0,10)+'.qbackup',
+  const saved=await download('Quantum-Office-все-данные-'+new Date().toISOString().slice(0,10)+'.qbackup',
    content,'application/json;charset=utf-8');
-  status('Архив с банком SHA-256 подготовлен. Скачивание запрошено; проверьте файл на диске. Восстановление разделяется по хранилищам.','success');
+  if(qoNativeDesktop&&!saved)return;
+  if(!qoNativeDesktop)status('Архив с банком SHA-256 подготовлен. Скачивание запрошено; проверьте файл на диске. Восстановление разделяется по хранилищам.','success');
  }catch(error){status('Полный архив НЕ создан: '+(error.message||'ошибка сохранения')+'. Можно отдельно экспортировать старый .qbackup v2 через функцию encodeOfficeBackup.',true);}
 }
 /* A failed import must never leave half-restored documents or overwritten local drafts. */
@@ -300,8 +301,9 @@ async function importFile(file){if(!file)return;const maxSize=file.name.toLowerC
     'Для безопасности банк извлекается отдельным файлом, а редакторы восстанавливаются отдельно.\n\n'+
     'Скачать проверенный QWBANK v3 из общего архива?');
    if(!answer)return;
-   download('QuantumOffice_банк_из_архива_Office.qwbank',
+   const saved=await download('QuantumOffice_банк_из_архива_Office.qwbank',
     JSON.stringify(checked.bank),'application/json;charset=utf-8');
+   if(qoNativeDesktop&&!saved)return;
    status('Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
    if(confirm('Восстановить ТОЛЬКО четыре редактора сейчас?\n\n'+
     'Банк IndexedDB пока НЕ изменится. Черновики редакторов будут заменены; '+
@@ -1545,8 +1547,8 @@ async function qoWriterExportDocx(){
  try{
   qoPersistWriter();
   const blob=await qoDocxExport(qoSafeRich(qoWriter.html),qoWriterLayout(),qoWriter.name);
-  download(`${safeFile(qoWriter.name)}.docx`,blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
+  await download(`${safeFile(qoWriter.name)}.docx`,blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  if(!qoNativeDesktop)status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
  }catch(error){status('Не удалось создать DOCX: '+error.message,true);}
 }
 function qoWriterExport(format){
@@ -3067,8 +3069,8 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(t.startsWith('slides-')){qoSlides=qoNewSlides();if(t==='slides-lesson'){qoSlides.name='Учебная презентация';qoSlides.slides.push(qoNewSlide(2));}if(t==='slides-report')qoSlides.name='Доклад';page='slides';render();qoPersistSlides();break;}
  createBook(t==='new'?false:t);break;}case 'select-row':{if(headerIgnoreClick?.axis==='row'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{if(headerIgnoreClick?.axis==='col'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById(qoWorkspaceTab.writer==='work'?'qw-file':'qo-writer-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){if(qoWorkspaceTab.writer==='work')qwSaveFile();else qoWriterExport('qdoc');break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
- case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
- case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());await download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');if(!qoNativeDesktop)status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
+ case 'csv':if(sheet()){await download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');if(!qoNativeDesktop)status('CSV скачан (текущий лист)');}break;
  case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
  case 'size-context-mode':if(sizeContext)openSizeContext(target.dataset.kind,parseCell(activeCell)?.[target.dataset.kind==='col'?'col':'row']??sizeContext.index,sizeContext.x,sizeContext.y);break;
  case 'size-context-apply':applyContextSize();break;

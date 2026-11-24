@@ -13,3 +13,7 @@ Native bounded IPC command set, no arbitrary SQL or shell interface. Folder open
 
 ## CI and limitations
 Windows x64 workflow runs JS build/tests, real SQLite Rust tests, installer build and EXE launch/restart. Cargo lock generation preliminary, not reproducible until committed. GUI PDF/print, DPI, native save cancellation across all editor callers, cross-version archive and scale comparisons, large image test and full fault coverage remain acceptance gates. Do not represent candidate as ready. Pages baseline fails at actions/configure-pages: enable Pages with GitHub Actions as source in settings; no workflow disabled.
+
+## Dependency resolution and native runtime acceptance
+
+Cargo.lock is committed from the CI resolver (SHA-256 861988c4c4bc25c09cfe3d4fec1e18dbfd737f4fd575724f56fd898b89fece63). Build/test use --locked. The Windows smoke also connects to the actual release WebView2 using a loopback debugging switch set only by CI, verifies bidirectional verified archive transfer with large PNG/JPEG/WebP, CAS, metadata paging, native snapshots, UI bank insertion, PDF byte generation and both print layouts, then checks persistence after process restart. No production debugging listener is enabled. This test is an acceptance gate, not a claimed result before successful execution.
