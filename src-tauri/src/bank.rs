@@ -123,8 +123,9 @@ fn alloc(r:&mut Value,n:i64,rev:i64,created:&str,now:&str){r["bankNumber"]=json!
 fn backup(c:&Connection,path:&Path,protect:bool)->Result<PathBuf>{
  let dir=path.parent().context("data path")?.join("snapshots");fs::create_dir_all(&dir)?;
  let dest=dir.join(format!("{}-{}.sqlite3",if protect{"protect"}else{"bank"},uuid::Uuid::new_v4()));
- let result=(||->Result<()>{c.execute("VACUUM INTO ?1",[dest.to_str().context("backup path")?])?;let check=Connection::open_with_flags(&dest,OpenFlags::SQLITE_OPEN_READ_ONLY)?;let integrity:String=check.query_row("PRAGMA quick_check",[],|r|r.get(0))?;ensure!(integrity=="ok","BACKUP_INVALID: native snapshot");fs::OpenOptions::new().write(true).open(&dest)?.sync_all()?;Ok(())})();
- if let Err(e)=result{let _=fs::remove_file(&dest);return Err(e);}
+ let pending=tempfile::Builder::new().prefix(".snapshot-").suffix(".partial").tempfile_in(&dir)?.into_temp_path();
+ let result=(||->Result<()>{c.execute("VACUUM INTO ?1",[pending.to_str().context("backup path")?])?;let check=Connection::open_with_flags(&pending,OpenFlags::SQLITE_OPEN_READ_ONLY)?;let integrity:String=check.query_row("PRAGMA quick_check",[],|r|r.get(0))?;ensure!(integrity=="ok","BACKUP_INVALID: native snapshot");drop(check);fs::OpenOptions::new().write(true).open(&pending)?.sync_all()?;Ok(())})();
+ result?;pending.persist_noclobber(&dest)?;
  // Never prune a recovery snapshot from another process. Explicit offline retention only.
  Ok(dest)
 }
@@ -133,12 +134,12 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
  let mut conn=open(path,op=="open")?;
  if op=="open"{return Ok(json!({"storage":"SQLite"}));}
  if op=="native_backup"{return Ok(json!({"path":backup(&conn,path,false)?}));}
- let protective=if op=="restore"&&p["mode"]=="replace"{Some(backup(&conn,path,true)?)}else{None};
+ let protective=if op=="restore"&&p["mode"]=="replace"{ensure!(gen(&conn)?==n(p,"generation")?,"RESTORE_CONFLICT: Банк изменился");Some(backup(&conn,path,true)?)}else{None};
  let writable=matches!(op,"create"|"update"|"delete"|"import"|"restore")||(op=="diagnostics"&&p["clean"]==true);
  let tx=conn.transaction_with_behavior(if writable{TransactionBehavior::Immediate}else{TransactionBehavior::Deferred})?;let c=&*tx;
  let result=match op{
   "state"=>json!({"generation":gen(c)?,"count":count(c)?}),
-  "statistics"=>{let bytes=fs::metadata(path)?.len()+fs::metadata(format!("{}-wal",path.display())).map(|m|m.len()).unwrap_or(0);json!({"count":count(c)?,"storage":"SQLite","path":path,"estimatedBytes":bytes,"migration":"none","assetMigrationError":null,"lastBackupAt":null})},
+  "statistics"=>{let pages:i64=c.pragma_query_value(None,"page_count",|r|r.get(0))?;let free:i64=c.pragma_query_value(None,"freelist_count",|r|r.get(0))?;let page_size:i64=c.pragma_query_value(None,"page_size",|r|r.get(0))?;let bytes=fs::metadata(path)?.len()+fs::metadata(format!("{}-wal",path.display())).map(|m|m.len()).unwrap_or(0);json!({"count":count(c)?,"storage":"SQLite","path":path,"estimatedBytes":bytes,"usedPageBytes":(pages-free)*page_size,"freePageBytes":free*page_size,"migration":"none","assetMigrationError":null,"lastBackupAt":null})},
   "snapshot"=>snapshot(c,f)?,
   "metadata"=>{ensure!(count(c)?<=500,"LIMIT: metadata");json!(rows(c,"SELECT body FROM tasks ORDER BY number",&[],false,f)?)},
   "get"=>get(c,s(p,"id")?,true)?.unwrap_or(Value::Null),

@@ -16,31 +16,61 @@ function Install-Office {
   if ($p.ExitCode -ne 0 -or !(Test-Path $exe)) { throw "Installer failed: $($p.ExitCode)" }
   if ((Get-FileHash $exe).Hash -ne (Get-FileHash $release).Hash) { throw 'Installed binary differs from release' }
 }
+function Wait-Office($p) {
+  $deadline = (Get-Date).AddSeconds(60)
+  do { Start-Sleep -Milliseconds 500; $p.Refresh() } until ($p.HasExited -or (($p.MainWindowHandle -ne 0) -and (Test-Path $data)) -or (Get-Date) -gt $deadline)
+  if ($p.HasExited -or $p.MainWindowHandle -eq 0 -or !(Test-Path $data)) { throw 'Desktop launch/database creation failed' }
+  $header = [IO.File]::ReadAllBytes($data)
+  if ([Text.Encoding]::ASCII.GetString($header,0,15) -ne 'SQLite format 3') { throw 'Not SQLite' }
+}
+function Wait-PortClosed {
+  $deadline = (Get-Date).AddSeconds(30)
+  while ((Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
+  if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Previous WebView2 CDP port still open' }
+}
 function Save-Diagnostics($stage) {
   $procs = Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe' OR Name='quantum-office.exe'" | Select-Object Name,ProcessId,ParentProcessId,ExecutablePath,CommandLine
   $ports = Get-NetTCPConnection -LocalPort 9222 -ErrorAction SilentlyContinue | Select-Object LocalAddress,State,OwningProcess
   @{stage=$stage; processes=@($procs); ports=@($ports)} | ConvertTo-Json -Depth 5 | Set-Content "evidence/native/process-$stage.json"
+  if (@($ports | Where-Object { $_.State -eq 'Listen' -and $_.LocalAddress -notin @('127.0.0.1','::1') }).Count -gt 0) { throw 'Unexpected non-loopback CDP listener' }
   $procs | Format-Table Name,ProcessId,ParentProcessId,ExecutablePath | Out-String | Write-Host
   $ports | Format-Table | Out-String | Write-Host
 }
 $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 $versions = Get-ChildItem "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Name
 @{administrator=$admin; runtimeFolders=@($versions); commit=$env:GITHUB_SHA; policy=$policy; exe=$exe} | ConvertTo-Json | Set-Content evidence/native/runner.json
-# No application config change: documented per-executable machine policy on disposable CI.
+# Reproduce original environment-only attempt with the same release executable.
+Install-Office
+Wait-PortClosed
+$env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1'
+$p = Start-Process -FilePath $exe -PassThru
+try {
+  Wait-Office $p
+  Start-Sleep -Seconds 5
+  Save-Diagnostics 'env-only'
+  try {
+    $probe = Invoke-RestMethod -Uri 'http://127.0.0.1:9222/json/version' -TimeoutSec 3
+    @{reachable=$true; version=$probe} | ConvertTo-Json -Depth 5 | Set-Content evidence/native/env-only.json
+  } catch {
+    @{reachable=$false; error=$_.Exception.Message} | ConvertTo-Json | Set-Content evidence/native/env-only.json
+  }
+  if (!$p.CloseMainWindow() -or !$p.WaitForExit(15000)) { throw 'Baseline process did not close' }
+} finally {
+  if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
+  Remove-Item Env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS -ErrorAction SilentlyContinue
+}
+Wait-PortClosed
+# Per-executable HKLM policy ONLY on isolated CI; never bundled into the app.
 New-Item -Path $policy -Force | Out-Null
 New-ItemProperty -Path $policy -Name $name -Value '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1' -PropertyType String -Force | Out-Null
 try {
-  Install-Office
   for ($i=0; $i -lt 2; $i++) {
     if ($i -eq 1) { Install-Office }
     $stage = @('first','second')[$i]
     $p = Start-Process -FilePath $exe -PassThru
     try {
-      $deadline = (Get-Date).AddSeconds(60)
-      do { Start-Sleep -Milliseconds 500; $p.Refresh() } until ($p.HasExited -or (($p.MainWindowHandle -ne 0) -and (Test-Path $data)) -or (Get-Date) -gt $deadline)
-      if ($p.HasExited -or $p.MainWindowHandle -eq 0 -or !(Test-Path $data)) { throw 'Desktop launch/database creation failed' }
-      $header = [IO.File]::ReadAllBytes($data)
-      if ([Text.Encoding]::ASCII.GetString($header,0,15) -ne 'SQLite format 3') { throw 'Not SQLite' }
+      Wait-Office $p
+      $env:QO_NATIVE_PID = [string]$p.Id
       Save-Diagnostics $stage
       node tests/task1664_native.cjs $stage
       if ($LASTEXITCODE -ne 0) { throw 'Native WebView integration failed' }
@@ -52,12 +82,21 @@ try {
       Save-Diagnostics "$stage-final"
       if (!$p.HasExited) { Stop-Process -Id $p.Id -Force }
     }
-    # Avoid reusing the earlier browser process or its CDP port.
-    $deadline = (Get-Date).AddSeconds(30)
-    while ((Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
-    if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Previous WebView2 CDP port still open' }
+    Wait-PortClosed
   }
   @{status='PASS'; launchCount=2; installed=$exe; reinstall=$true; database=$data; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/launch.json
 } finally {
   Remove-ItemProperty -Path $policy -Name $name -ErrorAction Stop
 }
+
+# Verify the actual portable copy launches after removing the CI debug policy.
+Wait-PortClosed
+$p = Start-Process -FilePath (Resolve-Path 'portable/quantum-office.exe') -PassThru
+try {
+  Wait-Office $p
+  Start-Sleep -Seconds 3
+  Save-Diagnostics 'portable-no-policy'
+  if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Unexpected debug listener in portable release' }
+  if (!$p.CloseMainWindow() -or !$p.WaitForExit(15000)) { throw 'Portable close failed' }
+  @{status='PASS'; executable='portable/quantum-office.exe'; noCdpListener=$true; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/portable-launch.json
+} finally { if (!$p.HasExited) { Stop-Process -Id $p.Id -Force } }

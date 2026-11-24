@@ -16,11 +16,12 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
    const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d');
    function img(i){for(let j=0;j<16;j++){ctx.fillStyle='rgb('+((i*7+j*41)&255)+','+((i*13+j*53)&255)+','+((i*19+j*67)&255)+')';ctx.fillRect(j%4*16,Math.floor(j/4)*16,16,16);}ctx.fillStyle='rgb('+(i&255)+','+((i>>8)&255)+','+((i>>16)&255)+')';ctx.fillRect(0,0,8,8);return canvas.toDataURL('image/png');}
    const repeat=img(0),items=Array.from({length:count},(_,i)=>{const task=qwTask('short');task.id='q'+i;task.prompt='Benchmark '+i;task.answer='Answer '+i;task.comment='Solution '+i;task.image=scenario==='text'?'':scenario==='repeated'?repeat:scenario==='distinct'?img(i):i%2?repeat:i%4===0?img(i):'';task.figure=task.image?'image':'none';return {id:'b'+String(i).padStart(5,'0'),subject:'physics',topic:i%2?'Odd':'Even',task};});
-   await source.close();const opened=await timed(()=>source.open());
+   await source.close();await source.open();
    const empty=await createBankBackupV3({records:[],meta:{sequence:0,legacyMigration:null,legacyBackup:null}});
    const clear=async()=>{const plan=await source.inspectRestore(JSON.stringify(empty));if(plan.currentCount)await source.restoreVerifiedBackup({token:plan.token,mode:'replace'});};
    await clear();
    const imp=await timed(()=>source.importBank({format:'quantum-work-bank',version:2,items,count,checksum:bankHash(JSON.stringify(items))}));check(imp.value.imported===count,'import count');
+   await source.close();const opened=await timed(()=>source.open());
    const page=await timed(()=>source.listTasks({},{limit:30,includeImages:false}));
    const search=await timed(()=>source.listTasks({search:'Benchmark'},{limit:30,includeImages:false}));
    const filter=await timed(()=>source.listTasks({topic:'Odd'},{limit:30,includeImages:false}));
@@ -32,7 +33,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
    await clear();const inspect=await timed(()=>source.inspectRestore(text));const restore=await timed(()=>source.restoreVerifiedBackup({token:inspect.value.token,mode:'empty'}));
    const last=await source.getTask(id);check(restore.value.verified&&last.task.image===edit.value.task.image&&last.task.answer==='edited'&&last.bankNumber===edit.value.bankNumber,'restore verification');
    await source.close();if(storage==='IndexedDB')await new Promise((resolve,reject)=>{let q=indexedDB.deleteDatabase(name);q.onsuccess=resolve;q.onerror=()=>reject(q.error);q.onblocked=()=>reject(Error('delete blocked'));});
-   return {count,scenario,storage,openMs:opened.ms,importMs:imp.ms,pageMs:page.ms,searchMs:search.ms,filterMs:filter.ms,taskMs:one.ms,saveMs:edit.ms,exportMs:exp.ms,backupMs:backup.ms,inspectMs:inspect.ms,restoreMs:restore.ms,archiveBytes:new TextEncoder().encode(text).length,assetBytes:diagnostics.bytes,uniqueAssets:diagnostics.count,storageBytes:stats.estimatedBytes};
+   return {count,scenario,storage,openMs:opened.ms,importMs:imp.ms,pageMs:page.ms,searchMs:search.ms,filterMs:filter.ms,taskMs:one.ms,saveMs:edit.ms,exportMs:exp.ms,backupMs:backup.ms,inspectMs:inspect.ms,restoreMs:restore.ms,archiveBytes:new TextEncoder().encode(text).length,assetBytes:diagnostics.bytes,uniqueAssets:diagnostics.count,storageBytes:stats.estimatedBytes,storageMeasure:storage==='SQLite'?'database file + WAL, includes free pages':'whole WebView2 origin estimate',sqliteUsedPageBytes:stats.usedPageBytes??null,sqliteFreePageBytes:stats.freePageBytes??null};
   },{count,scenario,storage});
   results.push(result);console.log('TASK1664_SCALE '+JSON.stringify(result));save('RUNNING');
  }

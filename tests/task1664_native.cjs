@@ -5,7 +5,8 @@ const out=path.join(__dirname,'..','evidence','native');
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable Windows CI only');
  const {page}=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);
- const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const errors=[],messages=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(['error','warning'].includes(m.type()))messages.push({type:m.type(),text:m.text()});});
+ process.on('exit',()=>fs.writeFileSync(path.join(out,'console-'+process.argv[2]+'.json'),JSON.stringify({errors,messages},null,2)));
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository instanceof SQLiteBankRepository&&qwBankRepository.db===true,{},{timeout:60000});
  const stage=process.argv[2];
  if(stage==='first'){
@@ -42,9 +43,28 @@ const out=path.join(__dirname,'..','evidence','native');
  fs.writeFileSync(path.join(out,'native-first.json'),JSON.stringify(result,null,2));
  const routes=await page.evaluate(()=>{const result=[];for(const target of ['home','sheet','writer','slides','photo']){route(target);if(!document.querySelector('#app')?.innerText.trim())throw Error('Empty route '+target);result.push({target,visible:true});}route('home');return result;});
  fs.writeFileSync(path.join(out,'native-routes.json'),JSON.stringify(routes,null,2));
- await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="work"]').click();
+ await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('#qo-diag-workspace').waitFor({state:'visible'});await page.screenshot({path:path.join(out,'native-diagnostics.png')});
+ await page.locator('[data-editor="writer"][data-tab="work"]').click();
  await page.evaluate(()=>qwBank({__view:'native-0'}));await page.locator('[data-bank-add="native-0"]').click();
  await page.waitForFunction(()=>qwDoc.tasks.length===1&&!!qwDoc.tasks[0].image);
+ // Controlled response tests for save acknowledgement in actual WebView2.
+ // SQLite IPC above remains real; this test only controls the save dialog result.
+ const ack=await page.evaluate(async()=>{
+  const original=qoNativeSave,previous=qwExported;
+  const check=(v,m)=>{if(!v)throw Error(m);};
+  try{
+   let release;qoNativeSave=()=>new Promise(resolve=>{release=resolve;});
+   const pending=qwSaveFile();await new Promise(r=>setTimeout(r,20));check(qwExported===previous,'marked saved before native result');
+   release(false);await pending;check(qwExported===previous,'cancel marked saved');
+   qoNativeSave=async()=>{throw Error('simulated write denied');};await qwSaveFile();check(qwExported===previous,'failure marked saved');
+   qoNativeSave=async()=>true;await qwSaveFile();check(qwExported===JSON.stringify(qwDoc),'confirmed write not marked');
+   return {status:'PASS',scope:'frontend response contract; not an OS dialog or physical write',pending:true,cancel:true,failure:true,success:true};
+  }finally{qoNativeSave=original;qwExported=previous;qwPersist();}
+ });
+ fs.writeFileSync(path.join(out,'native-save-ack.json'),JSON.stringify(ack,null,2));
+ await page.evaluate(()=>{qwDoc.title='TASK166.4 persisted draft';if(!qwPersist())throw Error('Draft write failed');});
+
  const print=await page.evaluate(async()=>{
   const bytes=await qwPDFBytes({...qwDoc,layout:'worksheet'},false);
   if(String.fromCharCode(...bytes.slice(0,5))!=='%PDF-')throw Error('PDF signature');
@@ -54,7 +74,8 @@ const out=path.join(__dirname,'..','evidence','native');
    iframe.srcdoc=qwPrintDocumentHTML({...qwDoc,layout:'booklet',printSettings:{...qwDoc.printSettings,orientation}},false);
    const start=performance.now();while(!iframe.contentWindow.qwPrintReady){if(performance.now()-start>30000)throw Error('Native print script did not execute');await new Promise(r=>setTimeout(r,50));}
    await iframe.contentWindow.qwPrintReady;if(iframe.contentWindow.__qwPrintError||!iframe.contentDocument.body.dataset.qwLayoutReady)throw Error('Native print layout failed');
-   frames.push({orientation,ready:true,images:iframe.contentDocument.querySelectorAll('img').length});iframe.remove();
+   if(iframe.contentDocument.body.dataset.qwOrientation!==orientation)throw Error('Print orientation mismatch');
+   frames.push({orientation,ready:true,images:iframe.contentDocument.querySelectorAll('img').length,report:iframe.contentWindow.__qwPrintLayout});iframe.remove();
   }
   return {pdfBytes:bytes.length,frames};
  });
@@ -62,7 +83,7 @@ const out=path.join(__dirname,'..','evidence','native');
  }else if(stage==='second'){
  const result=await page.evaluate(async()=>{
   const r=await qwBankRepository.getTask('native-0');if(r?.task.answer!=='edited'||!r.task.image||r.revision!==2)throw Error('SQLite restart mismatch');
-  if(!localStorage.getItem('task1664-ci-restart'))throw Error('Local draft storage restart mismatch');
+  if(!localStorage.getItem('task1664-ci-restart')||qwDoc.title!=='TASK166.4 persisted draft'||qwDoc.tasks.length!==1||!qwDoc.tasks[0].image)throw Error('Real QWORK draft restart mismatch');
   return {status:'PASS',number:r.bankNumber,revision:r.revision,stats:await qwBankRepository.getStatistics()};
  });
  fs.writeFileSync(path.join(out,'native-restart.json'),JSON.stringify(result,null,2));
