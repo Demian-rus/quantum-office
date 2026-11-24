@@ -2,6 +2,23 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 const out=path.join(__dirname,'..','evidence','native');
+async function inspectDraft(page){
+ return page.evaluate(async()=>{
+  const digest=async v=>v===null||v===undefined?null:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,'0')).join('');
+  const image=async q=>({title:q?.title??null,count:q?.tasks?.length??null,imagePresent:!!q?.tasks?.[0]?.image,imageSha256:await digest(q?.tasks?.[0]?.image)});
+  const result={origin:location.origin,marker:false,rawPresent:false,rawBytes:null,rawSha256:null,parse:null,validate:null,storageError:qwStorageError,corrupt:!!qwCorrupt,live:await image(qwDoc)};
+  try{
+   result.marker=!!localStorage.getItem('task1664-ci-restart');
+   const raw=localStorage.getItem(QW_KEY);result.rawPresent=raw!==null;
+   if(raw!==null){result.rawBytes=new TextEncoder().encode(raw).length;result.rawSha256=await digest(raw);
+    let parsed;try{parsed=JSON.parse(raw);result.parse={ok:true,...await image(parsed)};}catch(e){result.parse={ok:false,error:e.message};}
+    if(result.parse.ok)try{result.validate={ok:true,...await image(qwValidate(parsed))};}catch(e){result.validate={ok:false,error:e.message};}
+   }
+  }catch(e){result.readError=e.message;}
+  return result;
+ });
+}
+function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable Windows CI only');
  const {page}=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);
@@ -80,13 +97,19 @@ const out=path.join(__dirname,'..','evidence','native');
   return {pdfBytes:bytes.length,frames};
  });
  fs.writeFileSync(path.join(out,'native-print.json'),JSON.stringify(print,null,2));await page.screenshot({path:path.join(out,'native-window.png')});
- }else if(stage==='second'){
+ const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,1);assert.equal(before.live.imagePresent,true);
+ }else if(['ordinary','reinstall','portable'].includes(stage)){
+ const draft=await inspectDraft(page);recordDraft(stage,draft);
+ const before=JSON.parse(fs.readFileSync(path.join(out,'draft-before-close.json'),'utf8'));
+ const checks={marker:draft.marker,rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:draft.live.imageSha256===before.live.imageSha256,rawHash:draft.rawSha256===before.rawSha256,storageError:!draft.storageError,notCorrupt:!draft.corrupt};
+ fs.writeFileSync(path.join(out,'draft-checks-'+stage+'.json'),JSON.stringify(checks,null,2));
  const result=await page.evaluate(async()=>{
   const r=await qwBankRepository.getTask('native-0');if(r?.task.answer!=='edited'||!r.task.image||r.revision!==2)throw Error('SQLite restart mismatch');
-  if(!localStorage.getItem('task1664-ci-restart')||qwDoc.title!=='TASK166.4 persisted draft'||qwDoc.tasks.length!==1||!qwDoc.tasks[0].image)throw Error('Real QWORK draft restart mismatch');
+
   return {status:'PASS',number:r.bankNumber,revision:r.revision,stats:await qwBankRepository.getStatistics()};
  });
- fs.writeFileSync(path.join(out,'native-restart.json'),JSON.stringify(result,null,2));
+ fs.writeFileSync(path.join(out,'native-restart-'+stage+'.json'),JSON.stringify(result,null,2));
+ assert.ok(Object.values(checks).every(Boolean),'Real QWORK draft restart mismatch: '+JSON.stringify(checks));
  }else throw Error('Unknown stage');
  assert.deepEqual(errors,[]);console.log('TASK1664_NATIVE '+stage+' PASS');process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1);});

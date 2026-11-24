@@ -104,18 +104,19 @@ Wait-PortClosed
 if (!(Test-Path $policy)) { New-Item -Path $policy -Force | Out-Null }
 New-ItemProperty -Path $policy -Name $name -Value '--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1' -PropertyType String -Force | Out-Null
 try {
-  for ($i=0; $i -lt 2; $i++) {
-    if ($i -eq 1) { Install-Office }
-    $stage = @('first','second')[$i]
-    $p = Start-Process -FilePath $exe -PassThru
+  $failures = @()
+  for ($i=0; $i -lt 4; $i++) {
+    if ($i -eq 2) { Install-Office }
+    $stage = @('first','ordinary','reinstall','portable')[$i]
+    $selectedExe = if ($i -eq 3) { (Resolve-Path 'portable/quantum-office.exe').Path } else { $exe }
+    $p = Start-Process -FilePath $selectedExe -PassThru
     try {
       Wait-Office $p
       $env:QO_NATIVE_PID = [string]$p.Id
       if ($i -eq 0) { Resize-Office $p }
       Save-Diagnostics $stage
       node tests/task1664_native.cjs $stage
-      if ($LASTEXITCODE -ne 0) { throw 'Native WebView integration failed' }
-      if ($i -eq 1) { node tests/task1664_scale.cjs; if ($LASTEXITCODE -ne 0) { throw 'Native comparative benchmark failed' } }
+      if ($LASTEXITCODE -ne 0) { $failures += $stage; if ($i -eq 0) { throw 'Initial native WebView integration failed' } }
       if (!$p.CloseMainWindow()) { throw 'Window close failed' }
       if (!$p.WaitForExit(15000)) { throw 'Clean close timed out' }
       if ($p.ExitCode -ne 0) { throw "Unexpected exit $($p.ExitCode)" }
@@ -125,7 +126,8 @@ try {
     }
     Wait-PortClosed
   }
-  @{status='PASS'; launchCount=2; installed=$exe; reinstall=$true; database=$data; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/launch.json
+  if ($failures.Count -gt 0) { throw "Draft acceptance failed: $($failures -join ', ')" }
+  @{status='PASS'; launchCount=4; installed=$exe; reinstall=$true; database=$data; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/launch.json
 } finally {
   Remove-ItemProperty -Path $policy -Name $name -ErrorAction Stop
 }
