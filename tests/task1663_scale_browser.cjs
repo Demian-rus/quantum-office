@@ -17,8 +17,14 @@ const base=process.env.QW_TASK1662_HTML||path.join(root,'task1662-baseline','Qua
       const options={normalize:qwBankNormalize,legacyStorage:{getItem(){return null;}}},name='bench-'+scenario+'-'+count;
       const source=new BankRepository({...options,dbName:name}),target=new BankRepository({...options,dbName:name+'-restore'});
       const ms=x=>Math.round(x*10)/10,timed=async fn=>{const t=performance.now(),value=await fn();return {value,ms:ms(performance.now()-t)};};
-      const canvas=document.createElement('canvas');canvas.width=canvas.height=16;const ctx=canvas.getContext('2d');
-      function img(i){ctx.fillStyle='rgb('+(i&255)+','+((i>>8)&255)+','+((i>>16)&255)+')';ctx.fillRect(0,0,16,16);return canvas.toDataURL('image/png');}
+      const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const ctx=canvas.getContext('2d');
+      function img(i){
+       // A structured 64x64 raster, with 16 colour bands and an encoded ID.
+       // Kept below QWBANK v3's memory budget at 10k distinct files.
+       for(let j=0;j<16;j++){ctx.fillStyle='rgb('+((i*7+j*41)&255)+','+((i*13+j*53)&255)+','+((i*19+j*67)&255)+')';ctx.fillRect(j%4*16,Math.floor(j/4)*16,16,16);}
+       ctx.fillStyle='rgb('+(i&255)+','+((i>>8)&255)+','+((i>>16)&255)+')';ctx.fillRect(0,0,8,8);
+       return canvas.toDataURL('image/png');
+      }
       const repeat=img(0),items=Array.from({length:count},(_,i)=>{
        const task=qwTask('short');task.id='q'+i;task.prompt='Benchmark '+i;task.answer='Answer '+i;task.comment='Solution '+i;
        task.image=scenario==='text'?'':scenario==='repeated'?repeat:scenario==='distinct'?img(i):i%2?repeat:i%4===0?img(i):'';

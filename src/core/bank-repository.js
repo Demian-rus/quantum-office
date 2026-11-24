@@ -28,7 +28,7 @@ function bankTransaction(db,names,mode,work){
   tx.onabort=()=>reject(manualError||tx.error||new BankStorageError('Транзакция банка отменена'));
   tx.onerror=()=>{}; // onabort reports the transaction's final error
   const set=value=>{response=value;};
-  const fail=error=>{manualError=error;try{tx.abort();}catch{}};
+  const fail=error=>{if(!manualError)manualError=error;try{tx.abort();}catch{}};
   try{work(tx,set,fail);}catch(error){fail(error);}
  });
 }

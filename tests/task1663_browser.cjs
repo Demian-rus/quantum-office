@@ -61,7 +61,8 @@ const out=path.join(root,'evidence/task1663');
    const origAdd=IDBObjectStore.prototype.add;
    let quota=false;IDBObjectStore.prototype.add=function(v){if(this.name==='assets')throw new DOMException('injected quota','QuotaExceededError');return origAdd.call(this,v);};
    try{await b.createTask(task('quota-failed',imageC));}catch(e){quota=e.name==='QuotaExceededError';}finally{IDBObjectStore.prototype.add=origAdd;}
-   check(quota&&bankStableJSON(await b._captureBackupSnapshot())===original,'quota rollback changed source');
+   check(bankStableJSON(await b._captureBackupSnapshot())===original,'quota rollback changed source');
+   check(quota,'original quota error must survive abort of pending requests');
    let invalid=false,mime=false;
    try{await b.createTask(task('bad','data:image/png;base64,A'));}catch(e){invalid=true;}
    try{await b.createTask(task('bad-mime','data:image/svg+xml;base64,YQ=='));}catch(e){mime=true;}
@@ -92,7 +93,8 @@ const out=path.join(root,'evidence/task1663');
    const beforeCancel=bankStableJSON(await b._captureBackupSnapshot()),ctrl=new AbortController();
    IDBObjectStore.prototype.add=function(v){if(this.name==='tasks'){ctrl.abort();}return origAdd.call(this,v);};
    let cancelled=false;try{await b.importBank({format:'quantum-work-bank',version:1,items:[task('cancelled',imageA)]},{signal:ctrl.signal});}catch(e){cancelled=e.code==='ASSET_CANCELLED';}finally{IDBObjectStore.prototype.add=origAdd;}
-   check(cancelled&&bankStableJSON(await b._captureBackupSnapshot())===beforeCancel,'cancelled import changed bank');
+   check(bankStableJSON(await b._captureBackupSnapshot())===beforeCancel,'cancelled import changed bank');
+   check(cancelled,'cancelled import lost the original failure reason');
    const archive=await b.createVerifiedBackup();
    check((await verifyBankBackupV3(archive)).count===4&&archive.records.every(r=>r.task.image&&!r.imageAsset),'portable archive leaked internal references');
    const target=new BankRepository({...options,dbName:'asset-restore'});await target.open();
