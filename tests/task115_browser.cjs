@@ -9,7 +9,7 @@ const {pathToFileURL}=require('node:url');
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('[data-qd-action="sample"]').click();
  await page.evaluate(()=>{
    const d=qdDoc(),make=(id,studentId,date,percent,topicPct,total)=>({
@@ -57,7 +57,7 @@ const {pathToFileURL}=require('node:url');
  await page.locator('[data-qd-field="history-filter"]').selectOption('');
  assert.equal(await page.locator('#qd-group-journal').count(),1);
  await page.reload();await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('[data-qd-action="mode"][data-mode="run"]').first().click();
  await page.locator('[data-qd-action="view"][data-view="list"]').click();
  assert.equal(await page.locator('#qd-group-journal tbody tr').count(),3,'saved group data survives reload');

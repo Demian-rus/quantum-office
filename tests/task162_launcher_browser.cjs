@@ -23,8 +23,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task162-lau
     assert.ok(tr.x>=mr.x-1&&tr.x+tr.width<=mr.x+mr.width+1,'template link stays within own editor column');
     if(i<3)assert.equal(await templates.locator('button').count(),1);
    }
-   assert.equal(await p.locator('.launcher-inset[data-action="launcher-work"]').count(),1);
-   assert.equal(await p.locator('.launcher-inset[data-action="launcher-bank"]').count(),1);
+   assert.equal(await p.locator('.qo-education-launcher [data-action="launcher-work"]').count(),1);
+   assert.equal(await p.locator('.qo-education-launcher [data-action="launcher-bank"]').count(),1);
    await p.screenshot({path:path.join(out,'launcher-'+width+'.png'),fullPage:true});
    if(width===1600){
     const boxes=await editors.locator('.launcher-tile').all();

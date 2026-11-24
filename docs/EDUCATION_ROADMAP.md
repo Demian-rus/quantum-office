@@ -1,6 +1,9 @@
 # Quantum Office — актуальный план образовательных модулей и UX
 Дата: 24.11.2026. Источник: обратная связь владельца после проверки локальной версии и параллельный отчёт по лекциям. Продуктовая база `79471a8536f3fb1fd3b60b37733e6f864bc194ba`. Это документация требований и плана, не реализация.
 
+## TASK167.1 — candidate PR #159
+Independent education routes and full-window bank catalogue, no Writer panels. Existing QDOC/draft compatibility is retained; legacy diagnostic import requires consent. Fixed native notification stack preserves ACK and recovery. Runtime acceptance pending. Future «Учебные материалы» is still only a plan: theory/scenario views of one editable document, catalogue and scientific objects. PR #158 untouched.
+
 ## 1. Подтверждённое состояние
 - TASK166.1 IndexedDB, TASK166.2 проверяемые архивы, TASK166.3 бинарные ресурсы и TASK166.4 Windows SQLite объединены через PR #154–157. Windows main run [45388274907](https://github.com/Demian-rus/quantum-office/actions/runs/45388274907): PASS, 623 JS, 10 Rust, first/ordinary/reinstall/portable PASS, 24 сравнительных измерения (1k/5k/10k × text/repeated/distinct/mixed × SQLite/IndexedDB). Verify и Chromium main PASS в runs 45388274731 / 45388274692. Автоматический updater и подписанный стабильный релиз не объявлены готовыми. Реальные системные диалоги, физическая печать, DPI и пользовательские сценарии проверять отдельно.
 - Владелец локально открыл график с таблицами, отметил, что всё работает, удобно и понятно. Не обобщать этот отзыв на все функции.

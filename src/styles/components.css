@@ -1463,3 +1463,12 @@ body.is-fill-dragging * {
   outline: 2px solid var(--qo-accent);
   outline-offset: 2px;
 }
+
+/* TASK167.1: education launcher groups. */
+.office-launcher .qo-launcher-heading {width:min(1280px,100%);margin:18px 0 10px;font-size:17px;color:var(--qo-text);font-weight:650;text-align:left}
+.office-launcher .qo-education-launcher {grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px}
+.office-launcher .qo-education-launcher .launcher-tile {min-height:175px;padding:16px 12px;gap:5px}
+.office-launcher .qo-education-launcher .launcher-art,.office-launcher .qo-education-launcher .launcher-art svg {width:54px;height:54px;margin:0}
+.office-launcher .qo-education-launcher .launcher-name {font-size:17px}
+@media(max-width:1050px){.office-launcher .qo-education-launcher{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:460px){.office-launcher .qo-education-launcher{grid-template-columns:1fr}}

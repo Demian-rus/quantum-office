@@ -372,7 +372,7 @@ function qoHubChoose(id,openInWriter=false){
  d.session.student=profile.name;d.session.studentId=profile.id;
  qdStudentFilter=profile.id;
  qdStore();
- if(openInWriter){qoWorkspaceTab.writer='diagnostic';qdMode='run';qoWriter.diagnosticMode='run';route('writer');}
+ if(openInWriter){qdMode='run';qoWriter.diagnosticMode='run';route('diagnostics');}
  else {qdRefresh();}
  status('Выбран ученик из таблицы: '+student.name);
 }

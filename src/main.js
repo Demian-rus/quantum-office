@@ -45,6 +45,7 @@ let workspace;try{workspace=loadWorkspace();}catch{workspace=newWorkspace();}
 // Session-local only: never stored in user books, autosave, or Undo snapshots.
 const recalculator=createWorkbookRecalculator();
 let templateKind='sheet';
+let qoRouteRevision=0;
 let page='home', activeRibbon='home', activeCell='A1', rangeEnd='A1', editing=null,mouseSelecting=false;
 let pendingColorSelection=null, activePalette=null, borderMenuOpen=false;
 const FONT_TOP=['Arial','Calibri','Segoe UI','Times New Roman','Verdana'];
@@ -104,6 +105,9 @@ let qoWriterSavedLocal=true,qoSlidesSavedLocal=true;
 function updateSaveIndicator(){
  const n=document.querySelector('#storage-indicator');if(!n)return;
  if(typeof qoNativeDesktop!=='undefined'&&qoNativeDesktop&&globalThis.qoDraftStatus){n.textContent=(globalThis.qoDraftStatusSummary?.()||globalThis.qoDraftStatus());n.title='Нативная запись подтверждается после транзакции SQLite';return;}
+ if(page==='diagnostics'){n.textContent=qoWriterSavedLocal?'Черновик диагностики':'Диагностика не записана';return;}
+ if(page==='work'){n.textContent=qwStorageError?'Работа не записана':'Черновик работы';return;}
+ if(page==='bank'){n.textContent='Локальный банк заданий';return;}
  if(page==='writer'){
   n.textContent=qoWriterSavedLocal?'● Черновик текста в браузере':'⚠ Текст не записан в браузер';
   n.title='Локальная копия не заменяет файл QDOC или общую резервную копию';
@@ -168,7 +172,7 @@ function replaceBook(fromHistory,toHistory,verb){
 function syncHistoryButtons(){const id=book()?.id;for(const [action,stack] of [['undo',undoStacks],['redo',redoStacks]]){for(const el of document.querySelectorAll('.ribbon [data-action="'+action+'"]')){const available=!!id&&(stack.get(id)?.length||0)>0;el.disabled=!available;el.setAttribute('aria-disabled',String(!available));}}}
 function undo(){return replaceBook(undoStacks,redoStacks,'undo');}
 function redo(){return replaceBook(redoStacks,undoStacks,'redo');}
-function route(target){qoPhotoStopPicker(false);if(page==='photo')qoPhotoCancelCrop(false);if(page==='writer')qoPersistWriter();if(page==='slides')qoPersistSlides();commitEditor();if(target==='home'){page='home';render();return;}if(target==='sheet'){page='sheet';if(!book()){if(!workspace.books.length){createBook();return;}workspace.active=workspace.books[0].id;}render();return;}page=target;render();}
+function route(target){if(target!==page){qoRouteRevision++;document.getElementById('qw-dialog')?.remove();}qoPhotoStopPicker(false);if(page==='photo')qoPhotoCancelCrop(false);if(page==='writer')qoPersistWriter();if(page==='slides')qoPersistSlides();commitEditor();if(target==='home'){page='home';render();return;}if(target==='sheet'){page='sheet';if(!book()){if(!workspace.books.length){createBook();return;}workspace.active=workspace.books[0].id;}render();return;}page=target;render();}
 function createBook(example=false){const b=example==='schedule'?createScheduleTemplate():example==='journal'?createJournalTemplate():example==='budget'?createBudgetTemplate():example?createExample():newWorkbook();workspace.books.unshift(b);workspace.active=b.id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
 function openBook(id){const b=workspace.books.find(x=>x.id===id);if(!b)return;commitEditor();workspace.active=id;page='sheet';activeCell=rangeEnd='A1';scrollLeft=scrollTop=0;persist();render();}
 function removeBook(id){const b=workspace.books.find(x=>x.id===id);if(!b||!confirm(`Удалить «${b.name}» из рабочего пространства? Скачанные файлы не будут удалены.`))return;directFiles.delete(id);dirtyFiles.delete(id);workspace.books=workspace.books.filter(x=>x.id!==id);workspace.active=workspace.books[0]?.id||null;if(!workspace.books.length)page='home';persist();render();}
@@ -1153,12 +1157,12 @@ function qoHeaderIcon(kind){
  return '<svg class="qo-top-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+body+'</svg>';
 }
 function topbar(){
- const tabs=`<nav class="modules" aria-label="Разделы приложения"><button class="module ${page==='home'?'active':''}" data-action="route" data-target="home" aria-label="Обзор" title="Обзор">Обзор</button><button class="module ${page==='sheet'?'active':''}" data-action="route" data-target="sheet" aria-label="Таблицы" title="Таблицы">${qoHeaderIcon('sheet')}<span>Таблицы</span></button><button class="module ${page==='writer'?'active':''}" data-action="route" data-target="writer" aria-label="Тексты" title="Тексты">${qoHeaderIcon('writer')}<span>Тексты</span></button><button class="module ${page==='slides'?'active':''}" data-action="route" data-target="slides" aria-label="Презентации" title="Презентации">${qoHeaderIcon('slides')}<span>Презентации</span></button><button class="module ${page==='photo'?'active':''}" data-action="route" data-target="photo" aria-label="Фото — Quantum Studio" title="Фото — Quantum Studio">${qoHeaderIcon('photo')}<span>Фото</span></button></nav>`;
+ const tabs=`<nav class="modules" aria-label="Разделы приложения"><button class="module ${page==='home'?'active':''}" data-action="route" data-target="home" aria-label="Обзор" title="Обзор">Обзор</button><button class="module ${page==='sheet'?'active':''}" data-action="route" data-target="sheet" aria-label="Таблицы" title="Таблицы">${qoHeaderIcon('sheet')}<span>Таблицы</span></button><button class="module ${page==='writer'?'active':''}" data-action="route" data-target="writer" aria-label="Тексты" title="Тексты">${qoHeaderIcon('writer')}<span>Тексты</span></button><button class="module ${page==='slides'?'active':''}" data-action="route" data-target="slides" aria-label="Презентации" title="Презентации">${qoHeaderIcon('slides')}<span>Презентации</span></button><button class="module ${page==='photo'?'active':''}" data-action="route" data-target="photo" aria-label="Фото — Quantum Studio" title="Фото — Quantum Studio">${qoHeaderIcon('photo')}<span>Фото</span></button>${[['diagnostics','Диагностики','writer'],['work','Конструктор заданий','slides'],['bank','Банк заданий','sheet']].map(([id,name,ico])=>`<button class="module qo-education-module ${page===id?'active':''}" data-action="route" data-target="${id}" aria-label="${name}" title="${name}">${qoHeaderIcon(ico)}<span>${name}</span></button>`).join('')}</nav>`;
  const current=book();
  const brand=`<button class="logo" data-action="route" data-target="home" title="На главную"><span class="logo-mark" aria-hidden="true"><svg viewBox="0 0 28 28" class="shell-brand"><rect x="3" y="3" width="22" height="22" rx="7" fill="url(#qoBrandUnified)"/><path d="M8.5 8.5h4.5a4 4 0 0 1 0 8H8.5z" fill="#DDF6EA"/><path d="M14 19.7h4.9" stroke="#DDF6EA" stroke-width="2.1" stroke-linecap="round"/><path d="M17.35 16.35a4.2 4.2 0 1 1 0-5.94" stroke="#DDF6EA" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round" fill="none"/><defs><linearGradient id="qoBrandUnified" x1="4" y1="4" x2="24" y2="24" gradientUnits="userSpaceOnUse"><stop stop-color="#2FB580"/><stop offset="1" stop-color="#156548"/></linearGradient></defs></svg></span><span class="logo-wordmark">QUANTUM <b>OFFICE</b></span></button>`;
- const title=page==='writer'?`<input id="qo-writer-title" class="qo-shell-title-input" aria-label="Название текстового документа" maxlength="120" value="${esc(qoWriter.name)}" title="Переименовать документ">`:page==='slides'?`<input id="qo-slides-title" class="qo-shell-title-input" aria-label="Название презентации" maxlength="120" value="${esc(qoSlides.name)}" title="Переименовать презентацию">`:page==='photo'?`<input id="qs-project-title" class="qo-shell-title-input" aria-label="Название проекта" maxlength="120" value="${esc(qoPhotoFile)}">`:current?`<input id="book-name" aria-label="Название книги" value="${esc(current.name)}" maxlength="200" title="Изменить название книги">`:
+ const title=page==='writer'?`<input id="qo-writer-title" class="qo-shell-title-input" aria-label="Название текстового документа" maxlength="120" value="${esc(qoWriter.name)}" title="Переименовать документ">`:page==='slides'?`<input id="qo-slides-title" class="qo-shell-title-input" aria-label="Название презентации" maxlength="120" value="${esc(qoSlides.name)}" title="Переименовать презентацию">`:page==='photo'?`<input id="qs-project-title" class="qo-shell-title-input" aria-label="Название проекта" maxlength="120" value="${esc(qoPhotoFile)}">`:['diagnostics','work','bank'].includes(page)?`<span class="qo-shell-placeholder">${esc(page==='diagnostics'?'Диагностики':page==='work'?qwDoc.title:'Банк заданий')}</span>`:current?`<input id="book-name" aria-label="Название книги" value="${esc(current.name)}" maxlength="200" title="Изменить название книги">`:
   '<span class="qo-shell-placeholder">Quantum Office</span>';
- const actions=`<div class="global-right"><button class="qo-theme-toggle" data-action="theme-toggle" title="Оформление" aria-label="Выбрать тему оформления" aria-haspopup="dialog" aria-expanded="false">${qoHeaderIcon(qoGlobalTheme==='dark'?'sun':'moon')}</button><button class="shell-action" data-action="import" title="Открыть файл"><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('open')}</span><span>Открыть</span></button><button class="shell-action primary" data-action="save" title="Сохранить документ" ${(current||['writer','slides','photo'].includes(page))?'':'disabled'}><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('save')}</span><span>Сохранить</span></button><button class="icon-button" data-action="backup" title="Общий архив v3: четыре редактора и проверенный банк SHA-256. Восстановление отдельно по хранилищам" aria-label="Резервная копия Office и банка">${qoHeaderIcon('backup')}</button></div>`;
+ const actions=`<div class="global-right"><button class="qo-theme-toggle" data-action="theme-toggle" title="Оформление" aria-label="Выбрать тему оформления" aria-haspopup="dialog" aria-expanded="false">${qoHeaderIcon(qoGlobalTheme==='dark'?'sun':'moon')}</button><button class="shell-action" data-action="import" title="Открыть файл"><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('open')}</span><span>Открыть</span></button><button class="shell-action primary" data-action="save" title="Сохранить документ" ${(page==='sheet'&&current||['writer','slides','photo','diagnostics','work','bank'].includes(page))?'':'disabled'}><span class="shell-btn-icon" aria-hidden="true">${qoHeaderIcon('save')}</span><span>Сохранить</span></button><button class="icon-button" data-action="backup" title="Общий архив v3: четыре редактора и проверенный банк SHA-256. Восстановление отдельно по хранилищам" aria-label="Резервная копия Office и банка">${qoHeaderIcon('backup')}</button></div>`;
  return `<header class="global-bar compact-shell qo-unified-shell">${brand}${tabs}<div class="shell-document"><div class="shell-doc-wrap">${title}<span class="shell-save" id="storage-indicator">● Черновик в браузере</span></div></div>${actions}</header>`;
 }
 function launcherIcon(kind){
@@ -1188,7 +1192,7 @@ function templatesPage(){
 }
 function homepage(){
  const cards=workspace.books.map(b=>`<article class="file-card"><button class="file-open" data-action="open" data-id="${esc(b.id)}"><span class="file-emoji" aria-hidden="true">▦</span><span class="file-card-name">${esc(b.name)}</span><small>${b.sheets.length} ${b.sheets.length===1?'лист':'листов'} · ${niceDate(b.updated)}</small></button><div class="file-card-actions"><button data-action="rename-book" data-id="${esc(b.id)}" aria-label="Переименовать книгу ${esc(b.name)}">Переименовать</button><button data-action="clone" data-id="${esc(b.id)}">Дублировать</button><button data-action="delete" data-id="${esc(b.id)}">Удалить</button></div></article>`).join('');
- return `<main class="home-main office-launcher"><div class="launcher-tools" aria-label="Редакторы и быстрые инструменты">
+ return `<main class="home-main office-launcher"><h2 class="qo-launcher-heading">Офисные редакторы</h2><div class="launcher-tools" aria-label="Офисные редакторы">
  <section class="launcher-editor" aria-label="Таблицы">
   <button class="launcher-tile sheets" data-action="new"><span class="launcher-art">${launcherIcon('sheet')}</span><span class="launcher-name">Таблицы</span><span class="launcher-description">Данные, расчёты и расписания</span><span class="launcher-state available">Доступен</span></button>
   <div class="launcher-insets">
@@ -1200,8 +1204,8 @@ function homepage(){
  <section class="launcher-editor" aria-label="Тексты">
   <button class="launcher-tile writer" data-action="route" data-target="writer" aria-label="Тексты"><span class="launcher-art">${launcherIcon('writer')}</span><span class="launcher-name">Тексты</span><span class="launcher-description">Документы и оформление</span><span class="launcher-state available">Первая версия</span></button>
   <div class="launcher-insets">
-   <button class="launcher-inset" data-action="launcher-work"><span class="launcher-inset-art">${qoHeaderIcon('writer')}</span><span>Конструктор</span></button>
-   <button class="launcher-inset" data-action="launcher-bank"><span class="launcher-inset-art">${qoHeaderIcon('sheet')}</span><span>Банк заданий</span></button>
+   <button class="launcher-inset" data-action="template-create" data-template="writer-blank"><span class="launcher-inset-art">${qoHeaderIcon('writer')}</span><span>Новый</span></button>
+   <button class="launcher-inset" data-action="launcher-writer-open"><span class="launcher-inset-art">${qoHeaderIcon('open')}</span><span>Открыть</span></button>
   </div>
   <div class="launcher-template-actions"><button data-action="templates" data-kind="writer">Шаблоны текстов <span>→</span></button></div>
  </section>
@@ -1221,6 +1225,8 @@ function homepage(){
   </div>
   <div class="launcher-template-actions launcher-template-empty" aria-hidden="true"></div>
  </section></div>
+ <h2 class="qo-launcher-heading">Образовательные инструменты</h2><div class="launcher-tools qo-education-launcher" aria-label="Образовательные инструменты">
+ ${[['diagnostics','Диагностики','Диагностика знаний и занятия','writer','route'],['work','Конструктор заданий','Работы, варианты и PDF','slides','launcher-work'],['bank','Банк заданий','Каталог и подбор заданий','sheet','launcher-bank']].map(([id,name,description,ico,action])=>`<button class="launcher-tile ${ico==='sheet'?'sheets':ico}" data-action="${action}" data-target="${id}"><span class="launcher-art">${launcherIcon(ico)}</span><span class="launcher-name">${name}</span><span class="launcher-description">${description}</span></button>`).join('')}</div>
  <div class="launcher-secondary"><button data-action="example">Открыть пример таблицы</button><button data-action="import">Открыть файл XLSX / QBOOK / CSV</button><button data-action="open-disk">Открыть QBOOK с диска</button></div>
  <div class="launcher-files"><div class="launcher-files-top"><span>Недавние файлы</span><button data-action="backup" title="Полная резервная копия: редакторы и банк заданий. Для восстановления нужны отдельные подтверждения">Резервная копия</button></div><div class="files-grid">${cards||'<div class="empty-files"><span>◇</span><strong>Нет сохранённых черновиков</strong><p>Создайте таблицу или начните с шаблона расписания.</p></div>'}</div></div><div class="launcher-note">Черновики хранятся в браузере. Для надёжного хранения сохраняйте .qbook на диск.</div></main>`;
 }
@@ -1403,7 +1409,7 @@ function qoWorkSwitchTab(kind,tab){
  qoWorkspaceTab[kind]=tab;
  document.querySelectorAll(`[data-editor-panel="${kind}"]`).forEach(el=>{const on=el.dataset.panelTab===tab;el.hidden=!on;el.classList.toggle('active',on);});
  document.querySelectorAll(`.qo-work-tabs [data-editor="${kind}"]`).forEach(el=>{const on=el.dataset.tab===tab;el.classList.toggle('active',on);el.setAttribute('aria-selected',String(on));});
- if(kind==='writer')qoDiagnosticVisibility();
+
 }
 function qoWriterStats(){const doc=document.getElementById('qo-writer-page'),out=document.getElementById('qo-writer-stats');if(!doc||!out)return;const value=doc.innerText.trim(),words=(value.match(/\S+/g)||[]).length,paragraphs=value.split(/\n+/).filter(Boolean).length;out.textContent=`Слов: ${words} · Знаков: ${value.length} · Абзацев: ${paragraphs} · Чтение: ~${Math.max(1,Math.ceil(words/180))} мин`;}
 function qoWriterPage(){
@@ -1453,6 +1459,26 @@ function qoWriterPage(){
  <button type="button" data-action="writer-para-reset" title="Сбросить отступы и интервалы выбранных абзацев" aria-label="Сбросить настройки абзаца">${qoWorkIcon('undo')}</button>
  </div>`,'qo-writer-para-group');
  const runningHeads=qoWorkGroup('Колонтитулы',`<div class="qo-work-stack qo-writer-running-head"><div class="qo-work-inline"><label class="qo-work-field"><span>Верхний</span><input id="qo-writer-header" type="text" maxlength="120" aria-label="Текст верхнего колонтитула" placeholder="Текст сверху" value="${esc(f.header)}"></label><label class="qo-work-field"><span>Нижний</span><input id="qo-writer-footer" type="text" maxlength="120" aria-label="Текст нижнего колонтитула" placeholder="Текст снизу" value="${esc(f.footer)}"></label></div><label class="qo-writer-page-numbers"><input id="qo-writer-page-number" type="checkbox" ${f.pageNumber?'checked':''}> Номера страниц при печати</label></div>`,'qo-writer-running-head');
+ const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
+ const navigator=qoWriterNavigationTools();
+ const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-docx','Word DOCX','file-text')+qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
+ return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
+ <div class="qo-office-toolbar">
+ ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл']])}
+ <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
+ ${qoWorkPanel('writer','home',main+extra+paragraphs)}
+ ${qoWorkPanel('writer','insert',insert+tocTools+tabtools+imagetools)}
+ ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
+ ${qoWorkPanel('writer','view',navigator)}
+ ${qoWorkPanel('writer','file',files+exporttools)}
+ </div></div>
+ <div class="qo-writer-body">${qoWriterNavigationHTML()}
+ <section id="qo-writer-edit-scroll" class="qo-editor-scroll"><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
+ </div>
+ <input type="file" id="qo-writer-file" accept=".qdoc,.docx,.txt,.html,text/plain,text/html,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+ <footer class="qo-editor-foot qo-office-footer"><span id="qo-writer-layout-info">${f.paper} · ${f.orientation==='landscape'?'альбомная':'книжная'} · поля ${f.margin} мм</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / DOCX / HTML / TXT</span></footer></main>`;
+}
+function qoEducationPage(kind){
  const diagTile=(action,label,icon)=>qoWorkButton(action,label,icon,'','qo-diag-tile');
  const diagnosticFiles=qoWorkGroup('Диагностика',
    diagTile('writer-diag-new','Новая','new')+
@@ -1462,26 +1488,20 @@ function qoWriterPage(){
  const diagnosticTemplates=qoWorkGroup('Коллекция',
    diagTile('writer-diag-templates-import','Загрузить QTPL','folder')+
    diagTile('writer-diag-templates-export','Скачать QTPL','copy'),'qo-diag-tile-group');
- const files=qoWorkGroup('Документ',qoWorkButton('writer-new','Создать','new')+qoWorkButton('writer-import','Открыть','folder')+qoWorkButton('writer-export-qdoc','Сохранить QDOC','save','','qo-accent-tool'));
- const navigator=qoWriterNavigationTools();
- const exporttools=qoWorkGroup('Экспорт и печать',qoWorkButton('writer-export-docx','Word DOCX','file-text')+qoWorkButton('writer-export-html','HTML','file-text')+qoWorkButton('writer-export-txt','TXT','file-text')+qoWorkButton('writer-print','Печать / PDF','printer'));
- return `<main class="qo-document-workspace" aria-label="Текстовый редактор">
- <div class="qo-office-toolbar">
- ${qoWorkTabBar('writer',[['home','Главная'],['insert','Вставка'],['layout','Макет'],['view','Вид'],['file','Файл'],['diagnostic','Диагностика'],['work','Конструктор работ']])}
- <div class="qo-work-ribbon" role="toolbar" aria-label="Инструменты текстового редактора">
- ${qoWorkPanel('writer','home',main+extra+paragraphs)}
- ${qoWorkPanel('writer','insert',insert+tocTools+tabtools+imagetools)}
- ${qoWorkPanel('writer','layout',layout+runningHeads+paragraphMetrics+qoWorkGroup('Структура документа',qoWorkButton('writer-break','Разрыв страницы','break')))}
- ${qoWorkPanel('writer','view',navigator)}
- ${qoWorkPanel('writer','file',files+exporttools)}
- ${qoWorkPanel('writer','diagnostic',diagnosticFiles+diagnosticTemplates)}
- ${qoWorkPanel('writer','work',qwToolbar())}
- </div></div>
- <div class="qo-writer-body">${qoWriterNavigationHTML()}
- <section id="qo-writer-edit-scroll" class="qo-editor-scroll" ${['diagnostic','work'].includes(qoWorkspaceTab.writer)?'hidden':''}><div class="qo-writer-pagewrap">${qoWriterPagePreviewHTML(f)}<article id="qo-writer-page" class="qo-paper" style="${qoWriterCSS()}" contenteditable="true" role="textbox" aria-label="Текст документа" aria-multiline="true" spellcheck="true">${qoSafeRich(qoWriter.html)}</article></div></section>
- <section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll" ${qoWorkspaceTab.writer==='diagnostic'?'':'hidden'}><div id="qo-diag-root"></div></section><section id="qo-work-workspace" class="qo-editor-scroll" ${qoWorkspaceTab.writer==='work'?'':'hidden'}><div id="qo-work-root"></div></section></div>
- <input type="file" id="qo-writer-file" accept=".qdoc,.docx,.txt,.html,text/plain,text/html,application/json,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden><input type="file" id="qo-writer-image-file" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
- <footer class="qo-editor-foot qo-office-footer"><span id="qo-writer-layout-info">${f.paper} · ${f.orientation==='landscape'?'альбомная':'книжная'} · поля ${f.margin} мм</span><span id="qo-writer-stats">Слов: — · Знаков: —</span><span>QDOC / DOCX / HTML / TXT</span></footer></main>`;
+
+ const toolbar=kind==='diagnostics'?diagnosticFiles+diagnosticTemplates:kind==='work'?qwToolbar()+qoWorkGroup('Банк заданий',qoWorkButton('route-bank','Открыть банк','folder')):'';
+ const content=kind==='diagnostics'?'<section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll"><div id="qo-diag-root"></div></section>':kind==='work'?'<section id="qo-work-workspace" class="qo-editor-scroll"><div id="qo-work-root"></div></section>':'<section id="qo-bank-root" class="qo-editor-scroll" aria-label="Каталог задач"></section>';
+ const label={diagnostics:'Диагностики',work:'Конструктор заданий',bank:'Банк заданий'}[kind];
+ return '<main class="qo-document-workspace qo-education-workspace" data-workspace="'+kind+'" aria-label="'+label+'">'+
+ (toolbar?'<div class="qo-office-toolbar"><div class="qo-work-ribbon" role="toolbar" aria-label="'+label+'"><div class="qo-work-panel active">'+toolbar+'</div></div></div>':'')+
+ '<div class="qo-education-body">'+content+'</div>'+
+ (kind==='work'?'<footer class="qo-editor-foot qo-office-footer"><span>A4 · PDF</span><span></span><span>QWORK / PDF</span></footer>':'')+'</main>';
+}
+// Keep the diagnostic payload in the backwards-compatible draft envelope.
+function qoReplaceWriter(next){
+ const diagnostic=qdWorkingDoc(),mode=qoWriter.diagnosticMode;
+ next.diagnostic=diagnostic;next.diagnosticMode=mode;
+ qoWriter=next;qdVerified.add(qoWriter);
 }
 function qoWriterRememberSelection(){
  const sel=window.getSelection(),node=sel?.anchorNode,editor=document.getElementById('qo-writer-page');
@@ -2653,12 +2673,15 @@ function render(){
  if(previousGrid&&previousGrid.dataset.sheetId===sheet()?.id){
   scrollLeft=previousGrid.scrollLeft;scrollTop=previousGrid.scrollTop;
  }
- app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():page==='writer'?qoWriterPage():page==='slides'?qoSlidesPage():page==='photo'?qoPhotoPage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
+ app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():page==='writer'?qoWriterPage():['diagnostics','work','bank'].includes(page)?qoEducationPage(page):page==='slides'?qoSlidesPage():page==='photo'?qoPhotoPage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
  globalThis.qoDraftAttachToast?.(app.querySelector('#toast'));
  // Keep the filter dialog inside the scrollable worksheet frame, below the ribbon.
- if(page==='writer'){qoWriterStats();qoWriterNavRefresh();qoDiagnosticMount();qwRender();}
+ if(page==='writer'){qoWriterStats();qoWriterNavRefresh();}
+ if(page==='diagnostics')qoDiagnosticMount();
+ if(page==='work')qwRender();
+ if(page==='bank')void qwBank();
  if(page==='photo'){qoPhotoRender();const stage=document.getElementById('qs-stage');if(stage&&stageScroll){stage.scrollLeft=stageScroll[0];stage.scrollTop=stageScroll[1];}}
- document.title='Quantum Office — '+({writer:'Тексты',slides:'Презентации',photo:'Фото',sheet:'Таблицы',home:'Обзор',templates:'Шаблоны'}[page]||'Офис');
+ document.title='Quantum Office — '+({writer:'Тексты',slides:'Презентации',photo:'Фото',sheet:'Таблицы',home:'Обзор',templates:'Шаблоны',diagnostics:'Диагностики',work:'Конструктор заданий',bank:'Банк заданий'}[page]||'Офис');
  const filterDialog=app.querySelector('.qo-filter-popup'),frame=app.querySelector('#grid-frame');
  if(filterDialog&&frame)frame.append(filterDialog);
  if(page==='sheet'&&book()){const view=document.getElementById('grid-scroll');view.dataset.sheetId=sheet().id;
@@ -2963,10 +2986,11 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(action==='workspace-tab'){qoWorkSwitchTab(target.dataset.editor,target.dataset.tab);return;}
  if(action==='theme-toggle'){qoToggleTheme();return;}
  if(action==='launcher-work'||action==='launcher-bank'){
-  route('writer');qoWorkSwitchTab('writer','work');
-  if(action==='launcher-bank')qwBank();
+  route(action==='launcher-bank'?'bank':'work');
   return;
  }
+ if(action==='launcher-writer-open'){route('writer');document.getElementById('qo-writer-file')?.click();return;}
+ if(action==='route-bank'){route('bank');return;}
  if(action==='launcher-photo-open'){route('photo');document.getElementById('qo-photo-file')?.click();return;}
 
  if(action.startsWith('photo-')){
@@ -2999,6 +3023,7 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   if(action==='photo-export-project'){qoPhotoExportProject();return;}
   return;
  }
+ if(action.startsWith('writer-')&&!action.startsWith('writer-diag-')&&page!=='writer')return;
  if(action==='writer-indent-less'){qoWriterParagraphIndent(-5);return;}
  if(action==='writer-indent-more'){qoWriterParagraphIndent(5);return;}
  if(action==='writer-para-reset'){qoWriterParagraphApply('reset');return;}
@@ -3013,12 +3038,11 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
   qoWriterFocusSelection();document.execCommand('createLink',false,safe);qoPersistWriter();return;
  }
  if(action.startsWith('writer-diag-')){
-   qdRibbonAction(action);return;
+   if(page==='diagnostics')qdRibbonAction(action);return;
  }
  if(action==='writer-new'){
-  if(!qdConfirmReplace())return;
   if(!confirm('Создать новый текстовый документ? Текущий документ можно скачать в HTML.'))return;
-  qoWriter=qoNewWriter();render();qoPersistWriter();return;
+  qoReplaceWriter(qoNewWriter());render();qoPersistWriter();return;
  }
  if(action==='writer-import'){document.getElementById('qo-writer-file')?.click();return;}
  if(action==='writer-export-docx'){qoWriterExportDocx();return;}
@@ -3072,10 +3096,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(action==='link-open'){e.stopPropagation();return;}
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':{
  const t=target.dataset.template;
- if(t.startsWith('writer-')){qoWriter=qoNewWriter();if(t==='writer-lesson')qoWriter.html='<h1>Конспект занятия</h1><h2>Цель занятия</h2><p>Описание цели.</p><h2>Материалы</h2><ul><li>Материал 1</li></ul><h2>Ход занятия</h2><p>План работы.</p>';if(t==='writer-letter')qoWriter.html='<p>Дата</p><h2>Тема письма</h2><p>Уважаемые коллеги!</p><p>Текст письма.</p><p>С уважением,</p>';page='writer';render();qoPersistWriter();break;}
+ if(t.startsWith('writer-')){qoReplaceWriter(qoNewWriter());if(t==='writer-lesson')qoWriter.html='<h1>Конспект занятия</h1><h2>Цель занятия</h2><p>Описание цели.</p><h2>Материалы</h2><ul><li>Материал 1</li></ul><h2>Ход занятия</h2><p>План работы.</p>';if(t==='writer-letter')qoWriter.html='<p>Дата</p><h2>Тема письма</h2><p>Уважаемые коллеги!</p><p>Текст письма.</p><p>С уважением,</p>';page='writer';render();qoPersistWriter();break;}
  if(t.startsWith('slides-')){qoSlides=qoNewSlides();if(t==='slides-lesson'){qoSlides.name='Учебная презентация';qoSlides.slides.push(qoNewSlide(2));}if(t==='slides-report')qoSlides.name='Доклад';page='slides';render();qoPersistSlides();break;}
  createBook(t==='new'?false:t);break;}case 'select-row':{if(headerIgnoreClick?.axis==='row'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{if(headerIgnoreClick?.axis==='col'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
- case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById(qoWorkspaceTab.writer==='work'?'qw-file':'qo-writer-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){if(qoWorkspaceTab.writer==='work')qwSaveFile();else qoWriterExport('qdoc');break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
+ case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById('qo-writer-file')?.click();break;}if(page==='diagnostics'){document.getElementById('qo-diag-file')?.click();break;}if(page==='work'){document.getElementById('qw-file')?.click();break;}if(page==='bank'){document.getElementById('qw-bank-import-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){qoWriterExport('qdoc');break;}if(page==='diagnostics'){qdExport();break;}if(page==='work'){qwSaveFile();break;}if(page==='bank'){document.querySelector('[data-qw-action="bank-export"]')?.click();break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
  case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());await download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');if(!qoNativeDesktop)status('Скачивание XLSX запрошено: диаграммы, проверки данных, условное форматирование, области и параметры печати включены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
  case 'csv':if(sheet()){await download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');if(!qoNativeDesktop)status('Скачивание CSV запрошено (текущий лист).');}break;
  case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
@@ -3320,15 +3344,17 @@ app.addEventListener('change',async e=>{const t=e.target;
   try{
    if(docx){
     const incoming=await qoDocxImport(file);
-    qoWriter={name:incoming.name,html:qoSafeRich(incoming.html),layout:{...qoWriterDefaults(),...incoming.layout},updated:Date.now()};
+    qoReplaceWriter({name:incoming.name,html:qoSafeRich(incoming.html),layout:{...qoWriterDefaults(),...incoming.layout},updated:Date.now()});
 
    }else{
     const raw=await file.text();
     if(raw.startsWith('PK')||raw.includes('\u0000'))throw Error('Двоичный файл нельзя открыть как текст');
     if(kind.endsWith('.qdoc')){
      const doc=JSON.parse(raw);if(doc.format!=='quantum-writer'||typeof doc.html!=='string'||doc.html.length>2400000)throw Error('Недопустимый QDOC');
-     qoWriter={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode,updated:Date.now()};
-    }else qoWriter={name:file.name.replace(/\.[^.]+$/,''),html:/\.html?$/.test(kind)?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()};
+     const next={name:(doc.name||file.name).slice(0,120),html:qoSafeRich(doc.html),layout:doc.layout,updated:Date.now()};
+     if(doc.diagnostic&&confirm('В QDOC есть диагностика. Заменить текущую диагностику содержимым файла?'))qoWriter={...next,diagnostic:doc.diagnostic,diagnosticMode:doc.diagnosticMode};
+     else qoReplaceWriter(next);
+    }else qoReplaceWriter({name:file.name.replace(/\.[^.]+$/,''),html:/\.html?$/.test(kind)?qoSafeRich(raw):'<p>'+esc(raw).replace(/\n/g,'<br>')+'</p>',layout:qoWriterDefaults(),updated:Date.now()});
    }
    qoWriter.layout=qoWriterLayout();qoWriterSelectionRange=null;qoWriterImageSelect(null);render();qoPersistWriter();
    if(docx)status('DOCX импортирован. Базовое форматирование сохранено; сложная вёрстка Word может отличаться.');

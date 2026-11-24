@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   const open=async()=>{
     await page.evaluate(()=>route('writer'));
-    await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+    await page.locator('.global-bar [data-target="diagnostics"]').click();
   };
   await open();
   await page.locator('[data-qd-action="sample"]').click();

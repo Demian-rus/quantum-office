@@ -9,7 +9,7 @@ const seed=require('./task142_fixture.cjs');
  const p=await b.newPage({viewport:{width:1440,height:1000},acceptDownloads:true});const errors=[],metrics=[];p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
  const action=a=>p.locator('[data-qd-action="'+a+'"]');const mode=async v=>p.locator('[data-qd-action="mode"][data-mode="'+v+'"]').first().click();
  const snapshot=async name=>{await p.locator('#toast.active').waitFor({state:'hidden'});await p.screenshot({path:path.join(out,name+'.png')});};
- await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>{route('writer');qoWorkspaceTab.writer='diagnostic';render();});
+ await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>{route('diagnostics');});
  assert.equal(await p.locator('.qd-eyebrow,.qo-diag-guide-group').count(),0,'obsolete copy removed from DOM');
  assert.equal(await p.locator('.qd-top p').count(),0);assert.equal(await p.locator('.qd-workbench-main .qd-top [data-qd-action="mode"]').count(),3);
  // Empty authoring, navigation, real inspector controls, save/reopen and copy.
@@ -40,7 +40,7 @@ const seed=require('./task142_fixture.cjs');
  await mode('run');await p.locator('.qd-session-drawer>summary').click();await p.locator('[data-qd-field="student"]').fill('Синтетический ученик TASK143');await action('remember-student').click();
  await p.locator('[data-qd-field="text-response"]').fill('Энергия передаётся вдоль ложки.');await p.locator('[data-qd-field="score"]').fill('1.5');await p.locator('[data-qd-field="comment"]').click();assert.equal(await p.evaluate(()=>document.activeElement.dataset.qdField),'comment');await p.keyboard.type('Нужно уточнение');
  await p.evaluate(()=>qdScrollToQuestion());await snapshot('after_run');await action('save-result').first().click();assert.equal(await p.evaluate(()=>qdWorkingDoc().history.length),1);
- await p.reload();await p.evaluate(()=>{route('writer');qoWorkspaceTab.writer='diagnostic';render();});assert.equal(await p.evaluate(()=>qdWorkingDoc().history.length),1);
+ await p.reload();await p.evaluate(()=>{route('diagnostics');});assert.equal(await p.evaluate(()=>qdWorkingDoc().history.length),1);
  await mode('builder');await p.locator('[data-qd-field="prompt"]').first().fill('Изменён только черновик');await mode('run');assert.match(await p.evaluate(()=>qdDoc().sections[0].questions[0].prompt),/металлическая/);
  // Desktop + tablet + phone, every mode. Both drawers remain reachable on small screens.
  for(const width of [1440,768,390])for(const view of ['builder','library','run']){

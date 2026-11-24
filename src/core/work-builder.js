@@ -5,7 +5,7 @@ let qwDoc=qwProject(),qwSelected='',qwLeft=false,qwRight=false,qwStorageError=''
 qwDoc.layout='compact';
 try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.parse(raw));}catch(e){qwCorrupt=raw;qwStorageError='Не удалось открыть черновик. Скачайте исходные данные.';}}catch(e){qwStorageError='Хранилище недоступно. Сохраняйте QWORK.';}
 function qwCurrent(){return qwDoc.tasks.find(q=>q.id===qwSelected)||null;}
-function qwActive(){return typeof page!=='undefined'&&page==='writer'&&qoWorkspaceTab.writer==='work';}
+function qwActive(){return typeof page!=='undefined'&&page==='work';}
 function qwRemember(){const value=JSON.stringify(qwDoc);if(qwUndo.at(-1)!==value)qwUndo.push(value);qwUndo=qwUndo.slice(-20);qwRedo=[];}
 function qwPersist(){
  if(qwCorrupt)return false;
@@ -66,7 +66,7 @@ function qwRefreshLiveGraphText(scope){
  for(const svg of scope.querySelectorAll('svg:has(.qw-axis-title[data-axis-tip-x])'))if(svg.getCTM())qwAlignSVGText(svg);
 }
 function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
-function qwDialog(title,body,footer=''){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();document.body.append(d);d.showModal();return d;}
+function qwDialog(title,body,footer='',inline=false){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route('work');}else{document.body.append(d);d.showModal();}return d;}
 function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[]),['worksheet','Обычная контрольная работа']],current)+'<option disabled>Вариант ОГЭ / ЕГЭ — отдельный этап</option>';}
 function qwPracticeControls(settings={},attribute='data-practice'){
  return '<label>Задач на странице<select '+attribute+'="perPage">'+qwOptions([[1,'Одна'],[2,'Две'],[3,'Три'],[4,'Четыре']],settings.perPage||2)+'</select></label><label>Пространство для решения<select '+attribute+'="grid">'+qwOptions([['none','Без разлиновки'],['fine','Мелкая светлая клетка'],['normal','Обычная клетка']],settings.grid||'fine')+'</select></label>';
@@ -351,10 +351,13 @@ function qwBankInsertMarkup(input,kind){
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 async function qwBankEdit(id,draft=null,returnFilters={}){
+ const originPage=page,originRevision=qoRouteRevision;
+ const active=()=>page===originPage&&qoRouteRevision===originRevision;
  const creating=id===null;
  let stored;
  if(!creating){
   try{await qwBankOpen();stored=await qwBankRepository.getTask(id);}catch(error){status(error.message,true);return;}
+  if(!active())return;
   if(!stored){status('Задание больше не найдено в банке',true);return;}
  }
  draft??=creating
@@ -468,7 +471,8 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
    await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
   }catch(e){showError(e.message);}
  };
- const back=()=>{d.close();qwBank(returnFilters);};
+ const back=()=>{d.close();if(active())void qwBank(returnFilters);};
+ d.addEventListener('cancel',event=>{event.preventDefault();back();});
  d.querySelector('[data-qw-close]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-back"]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-save"]').onclick=async()=>{
@@ -482,15 +486,17 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
     await qwBankRepository.createTask(candidate):
     await qwBankRepository.updateTask(id,candidate,stored.revision);
    await qwBankSnapshotSmall();
+   if(!active()||!d.isConnected)return;
    d.close();qwBank({...returnFilters,__view:saved.id});
    status(creating?'Задание добавлено в '+qwBankStorageName:'Изменения сохранены в '+qwBankStorageName);
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
 }
+let qwBankRequest=0;
 async function qwBank(previousFilters={}){
- const bankDocument=qwDoc,bankPage=page,bankTab=qoWorkspaceTab.writer;
- const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoWorkspaceTab.writer===bankTab;
+ const bankDocument=qwDoc,bankPage=page,routeRevision=qoRouteRevision,ticket=++qwBankRequest;
+ const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoRouteRevision===routeRevision&&ticket===qwBankRequest;
  let xs=[],facets,totalCount=0,assetMigrationError=null,storageInfo=null;
  try{
   await qwBankOpen();
@@ -498,6 +504,7 @@ async function qwBank(previousFilters={}){
   const stats=await qwBankRepository.getStatistics();
   storageInfo=stats;totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
  }catch(e){
+  if(!sameWorkspace())return;
   status('Банк не открыт: '+e.message,true);
   const raw=qwBankRepository.getLegacyRecovery();
   if(raw!==null){
@@ -538,7 +545,7 @@ async function qwBank(previousFilters={}){
   qwButton('bank-cancel-backup','Отмена','hidden')+
   qwButton('bank-export','Экспорт QWBANK v1/v2')+qwButton('bank-import','Импорт')+qwButton('bank-clean-assets','Очистить вложения')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
-  qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
+  qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'),bankPage==='bank');
  d.classList.add('qw-bank-assemble-dialog');
  d.querySelector('.qw-dialog-body').insertAdjacentHTML('afterbegin',
   '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">'+qwBankStorageName+' · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">'+(qoNativeDesktop?'Локальная база Windows':'Банк хранится в профиле браузера')+'. Создайте отдельную копию на диске.</span></div>'+(qoNativeDesktop?'<div class="qw-bank-storage-bar"><small>'+qwEsc(storageInfo.path)+' · '+Math.ceil(storageInfo.estimatedBytes/1024)+' КБ</small><button type="button" id="qw-native-folder">Открыть папку данных</button><button type="button" id="qw-native-snapshot">Снимок SQLite</button></div>':'')+
@@ -859,6 +866,7 @@ async function qwBank(previousFilters={}){
    qwSelected=copies[0].id;
   });
   d.close();
+  if(bankPage==='bank')route('work');
   if(replace)qwPreview();
  }
  d.querySelector('#qw-bank-filters').addEventListener('input',()=>{pageOffset=0;void refresh();});
@@ -905,7 +913,7 @@ async function qwBank(previousFilters={}){
    const own=null;
    const item=add.dataset.diagBank?diagnostic.find(x=>x.id===add.dataset.diagBank):null;
    const task=own||(item?qwFromDiagnostic(item.question||item):null);
-   if(task&&qwDoc.tasks.length<80){qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}
+   if(task&&qwDoc.tasks.length<80){qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();if(bankPage==='bank')route('work');}
    else status('Не удалось добавить задание',true);
   }
   if(del&&confirm('Удалить задание из личного банка?')){
@@ -1601,7 +1609,7 @@ if(typeof document!=='undefined'){
   if(k==='type'){if(q.type==='choice')q.choices??=qwTask('choice').choices;if(['extended','combined'].includes(q.type))q.solutionVisible=true;if(q.type==='graph')q.figure='graph';if(q.type==='diagram')q.figure='diagram';}
   qwPersist();if(t.tagName==='SELECT'||t.type==='checkbox')qwRender();else qwPreviewSelected();
  });
- window.addEventListener('keydown',e=>{if(!qwActive())return;if((e.ctrlKey||e.metaKey)&&!document.querySelector('dialog[open]')&&(e.code==='KeyZ'||e.key.toLowerCase()==='z')&&!e.target.closest('textarea,input,[contenteditable="true"]')){e.preventDefault();e.stopImmediatePropagation();qwAction(e.shiftKey?'redo':'undo');return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();e.stopImmediatePropagation();qwSaveFile();}if(e.key==='Escape'&&!document.querySelector('dialog[open]')){qwLeft=qwRight=false;qwRender();}},true);
+ window.addEventListener('keydown',e=>{if(page==='bank'&&(e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&!document.querySelector('dialog.qw-bank-edit-dialog[open]')){e.preventDefault();e.stopImmediatePropagation();document.querySelector('[data-qw-action="bank-export"]')?.click();return;}if(!qwActive())return;if((e.ctrlKey||e.metaKey)&&!document.querySelector('dialog[open]')&&(e.code==='KeyZ'||e.key.toLowerCase()==='z')&&!e.target.closest('textarea,input,[contenteditable="true"]')){e.preventDefault();e.stopImmediatePropagation();qwAction(e.shiftKey?'redo':'undo');return;}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'&&!document.querySelector('dialog[open]')){e.preventDefault();e.stopImmediatePropagation();qwSaveFile();}if(e.key==='Escape'&&!document.querySelector('dialog[open]')){qwLeft=qwRight=false;qwRender();}},true);
 }
 
 function qwFooter(active){

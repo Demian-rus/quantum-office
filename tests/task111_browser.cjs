@@ -11,7 +11,7 @@ const {pathToFileURL}=require('node:url');
   page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+  await page.locator('.global-bar [data-target="diagnostics"]').click();
  if(await page.locator('[data-qd-pane="author-tools"]').count())await page.locator('[data-qd-pane="author-tools"]>summary').click();
   await page.locator('[data-qd-action="sample"]').click();
   const before=await page.evaluate(()=>JSON.stringify(qdDoc()));

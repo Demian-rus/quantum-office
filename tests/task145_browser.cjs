@@ -11,7 +11,7 @@ const {pathToFileURL}=require('node:url');
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.locator('.global-bar [data-target="work"]').click();
   const action=k=>page.locator('[data-qw-action="'+k+'"]');
   const add=async(type,prompt)=>{
    await page.locator('[data-qw-action="quick-add"][data-type="'+type+'"]').click();

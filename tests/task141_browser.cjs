@@ -10,7 +10,7 @@ const PNG=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAwAAAAMCAIAAADZF8uwAAAAF0lEQVR4n
  let promptAnswer='Тепловые явления — копия';page.on('dialog',d=>d.accept(d.type()==='prompt'?promptAnswer:undefined));
  const action=name=>page.locator('[data-qd-action="'+(name==='library-edit-content'?'library-open':name)+'"]');
  const mode=name=>page.locator('[data-qd-action="mode"][data-mode="'+name+'"]').first();
- async function open(){await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();}
+ async function open(){await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="diagnostics"]').click();}
  async function download(actionFn,name){const event=page.waitForEvent('download');await actionFn();const file=await event;const target=path.join(out,name||file.suggestedFilename());await file.saveAs(target);assert.ok(fs.statSync(target).size>20);return target;}
  async function layout(width){
   await page.setViewportSize({width,height:950});

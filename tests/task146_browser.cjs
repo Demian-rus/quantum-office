@@ -9,7 +9,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   const page=await browser.newPage({viewport:{width:1440,height:720},acceptDownloads:true});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
-  await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="work"]').click();
   const action=k=>page.locator('[data-qw-action="'+k+'"]');
   await page.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await page.locator('#qw-prompt').fill('В треугольнике ABC определите неизвестную сторону и проведите высоту.');

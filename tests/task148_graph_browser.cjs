@@ -20,7 +20,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   const color=async hex=>p.locator('[data-style-key="stroke"][data-style-color="'+hex+'"]').click();
   const newTask=async(kind,prompt)=>{await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();await p.locator('#qw-prompt').fill(prompt);await action(kind).click();};
   await p.addInitScript(()=>{window.print=()=>{window.top.__qwPrintCalled=true;};});
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   await newTask('diagram','Брусок на наклонной плоскости: поворот и перемещение');
   await p.locator('#qw-snap-geometry').uncheck();await tool('incline');await drag(80,90,426.41,290);
@@ -86,7 +86,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await p.locator('#qw-file').setInputFiles(badFile);await p.waitForFunction(()=>document.body.textContent.includes('Не удалось открыть QWORK'));assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected,'bad style import is atomic');
   assert.deepEqual(await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())})),untouched);
   await p.reload();assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected,'reopen persisted QWORK');
-  await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   // Use the actual exported document for both PDF paths, with no test-generated illustration model.
   const raster=await p.evaluate(async()=>Array.from(await qwPDFBytes({...qwDoc,layout:'worksheet'},false)));fs.writeFileSync(path.join(out,'task148-raster.pdf'),Buffer.from(raster));
   await action('preview').click();await p.frameLocator('#qw-print-preview-frame').locator('.qw-paper-task').first().waitFor();
@@ -98,7 +98,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   const matrix=[];
   for(const [width,height,scale] of [[1366,768,1],[1440,900,1],[1920,1080,1],[2560,1440,1],[1093,614,1.25],[1280,720,1.5]])for(const theme of ['light','dark']){
    const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:scale});const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('[data-editor="writer"][data-tab="work"]').click();
+   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('.global-bar [data-target="work"]').click();
    await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===4);
    for(const [index,kind] of [[0,'diagram'],[3,'graph']]){
     if(width<1200)await page.locator('[data-qw-action="left"]').click();await page.locator('.qw-nav-task').nth(index).click();await page.locator('[data-qw-action="'+kind+'"]').click();

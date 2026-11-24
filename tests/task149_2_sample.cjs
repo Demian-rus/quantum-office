@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1492_EVIDENCE||pa
  p.on('pageerror',e=>errors.push(e.message));
  await p.addInitScript(()=>{window.print=()=>{window.top.__qwPrintCalled=true;};});
  try{
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   await p.evaluate(project=>qwChange(()=>{qwDoc=qwValidate(project);qwSelected=qwDoc.tasks[0].id;}),sample);
   const event=p.waitForEvent('download');await p.locator('[data-qw-action="save"]').click();const file=path.join(out,'Quantum-Office-Sample.qwork');await(await event).saveAs(file);
   assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),sample);

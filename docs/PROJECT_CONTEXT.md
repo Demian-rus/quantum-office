@@ -1,5 +1,8 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## TASK167.1 — candidate (not merged)
+Independent diagnostics/work/bank routes, office and education launcher groups, fixed native draft notices, and legacy diagnostic preservation are under review in PR #159. Do not treat the candidate as accepted until full browser/native CI. PR #158 remains separate. Future «Учебные материалы»: one editable theory/scenario document, catalogue and scientific objects; not implemented here.
+
 ## Актуальная передача контекста — 24.11.2026 (после TASK166.4)
 Этот раздел имеет приоритет над историческими записями ниже, включая старые статусы candidate/Draft/no merge и планы, где SQLite ещё отсутствует. Подробный актуальный план: [EDUCATION_ROADMAP.md](EDUCATION_ROADMAP.md).
 

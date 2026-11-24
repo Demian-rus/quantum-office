@@ -105,6 +105,12 @@ jobs:
       - run: python tests/clipboard_browser.py
       - run: python tests/structure_browser.py
       - run: python tests/launcher_browser.py
+      - run: node tests/task1671_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1671-education-workspaces
+          path: evidence/task1671/
       - run: node tests/task162_launcher_browser.cjs
       - run: node tests/task163_bank_browser.cjs
       - run: node tests/task164_bank_browser.cjs

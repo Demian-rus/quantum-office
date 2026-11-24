@@ -27,7 +27,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1495_EVIDENCE||pa
  async function dragLabel(id,dx,dy){const node=stage().locator('[data-qw-label="'+id+'"]'),b=await node.boundingBox(),s=await stage().boundingBox(),x=b.x+b.width/2,y=b.y+b.height/2;await p.mouse.move(x,y);await p.mouse.down();await p.mouse.move(x+dx*s.width/520,y+dy*s.height/320,{steps:8});await p.mouse.up();}
  async function graphPoints(){return p.evaluate(()=>qwCurrent().graph.points.map(({x,y})=>({x,y})));}
  try{
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   // Control #18 in the actual editor. B's original text coordinates are untouched.
   await open(path.join(root,'evidence/task149.4/Compact-Geometry.qwork'));await p.locator('.qw-nav-task').nth(17).click();await action('graph').click();
   const control=await stage().evaluate(inspectSVG);assert.ok(control.labels.every(l=>!l.lines&&!l.points&&!l.labels.length&&!l.axisText&&!l.outside));

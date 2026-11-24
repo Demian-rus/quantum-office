@@ -9,3 +9,6 @@ Added state/error/retry regression in task1664_drafts.test.js and real native ge
 
 ## Remaining TASK167.1
 Independent education routes and catalogue, clean Writer, launcher groups, route-scoped commands, migration of historical UI tests, native restart and viewport acceptance. Future learning materials: two views of one editable document (theory/scenario), separate catalogue, editable science objects and export to Quantum Board. PR #158 remains an isolated prototype.
+
+## Stage 2: independent education workspaces
+Routes diagnostics/work/bank render their own surface under the common shell. Writer no longer mounts educational panels. Home groups office editors and educational tools; bank has a full-window nonmodal catalogue and retains the existing work-context picker. Bank add captures document, route generation and request ticket; a stale response cannot append after leaving/re-entering a workspace. Existing diagnostic payload remains in the compatible Writer storage envelope; new/plain text documents preserve it; legacy QDOC restoration explicitly asks before replacing it. No storage/schema or PDF changes. Runtime verification pending. Future materials remain theory/scenario views of one document; PR #158 untouched.

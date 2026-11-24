@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149.7')
  await p.addInitScript(()=>{window.print=function(){window.top.__printedHTML=document.documentElement.outerHTML;window.dispatchEvent(new Event('afterprint'));};});
  const action=k=>p.locator('[data-qw-action="'+k+'"]');
  try{
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const files=['User-Workflow','Reorder-Workflow','Construction-Tools','Compact-Geometry-Improved','Practice-One-Per-Page-Three-Tasks','Practice-Multiple-Tasks-Improved','Physics-Graph-Comparison'];
   for(const name of files){
    const file=path.join(root,'evidence/task149.6',name+'.qwork'),source=JSON.parse(fs.readFileSync(file,'utf8'));

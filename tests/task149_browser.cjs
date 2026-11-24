@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  try{
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
-  await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
   await page.locator('[data-qw-action="graph"]').click();
   assert.equal(await page.locator('.qw-drawing-group [data-tool]').count(),9);

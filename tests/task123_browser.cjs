@@ -70,7 +70,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  assert.equal(await page.evaluate(()=>qoHubResults().length),2);
  // The three subjects are rendered consistently in library and bank.
  await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  const choices=await page.locator('#qd-library-subject option').allTextContents();
  assert.deepEqual(choices,['Все предметы','Физика','Математика','Информатика']);

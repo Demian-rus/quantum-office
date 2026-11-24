@@ -14,7 +14,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  const drag=async(x,y,x2,y2)=>{const a=await at(x,y),b=await at(x2,y2);await p.mouse.move(a.x,a.y);await p.mouse.down();await p.mouse.move(b.x,b.y,{steps:6});await p.mouse.up();};
  const change=async(sel,value)=>{await p.locator(sel).fill(String(value));await p.locator(sel).press('Tab');};
  try{
-  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();await p.locator('#qw-prompt').fill('Постройте и отредактируйте геометрическую схему.');await action('diagram').click();
   assert.deepEqual(await p.locator('.qw-tool-group').first().locator('[data-tool]').evaluateAll(es=>es.map(e=>e.dataset.tool)),['select','point','line','dashed','arrow','text']);
@@ -62,7 +62,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await p.reload();assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected,'reload preserves new figures');
   for(const [width,height,dpr] of [[1366,768,1],[1440,900,1],[1920,1080,1],[2560,1440,1],[1093,614,1.25],[1280,720,1.5]])for(const theme of ['light','dark']){
    const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr});const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('[data-editor="writer"][data-tab="work"]').click();await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===1);await page.locator('[data-qw-action="diagram"]').click();
+   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('.global-bar [data-target="work"]').click();await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===1);await page.locator('[data-qw-action="diagram"]').click();
    for(const selected of [false,true]){
     if(selected)await page.locator('[data-object-select="0"]').click();
     const geometry=await page.locator('#qw-visual-properties').evaluate(e=>{

@@ -12,7 +12,7 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
   const p=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true});
   const errors=[];p.on('pageerror',e=>errors.push(e.message));
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
-  await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();
+  await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const action=k=>p.locator('[data-qw-action="'+k+'"]');
   await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
   await p.locator('#qw-prompt').fill('Брусок массой m находится на наклонной плоскости. Найдите работу силы тяжести. \\(A=mgh\\).');

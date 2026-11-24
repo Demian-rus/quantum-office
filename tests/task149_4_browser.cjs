@@ -34,7 +34,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
  }
  async function render(d,format){const p=await browser.newPage();await p.setContent(await app.evaluate(({d,format})=>qwPrintDocumentHTML(d,false,{format}),{d,format}));await ready(p);return p;}
  try{
-  await app.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await app.evaluate(()=>route('writer'));await app.locator('[data-editor="writer"][data-tab="work"]').click();assert.equal(await app.evaluate(()=>qwDoc.layout),'compact');
+  await app.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await app.evaluate(()=>route('writer'));await app.locator('.global-bar [data-target="work"]').click();assert.equal(await app.evaluate(()=>qwDoc.layout),'compact');
   const untouched=await app.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   for(const {name,project} of samples){
    await app.evaluate(d=>qwChange(()=>{qwDoc=qwValidate(d);qwSelected=qwDoc.tasks[0].id;}),project);

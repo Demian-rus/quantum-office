@@ -24,7 +24,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1493_EVIDENCE||pa
   return {layout:window.__qwPrintLayout,sections,clipped,technical:!!document.querySelector('.qw-paper-task>header span'),bodyFontPt:parseFloat(getComputedStyle(document.body).fontSize)*.75};
  });}
  try{
-  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="work"]').click();
+  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="work"]').click();
   const untouched=await page.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   for(const {name,project} of task149CompactSamples()){
    await page.evaluate(d=>qwChange(()=>{qwDoc=qwValidate(d);qwSelected=qwDoc.tasks[0].id;}),project);

@@ -130,9 +130,9 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
   }finally{if(original===null)qoDraftStorage.removeItem(key);else qoDraftStorage.setItem(key,original);await qoDraftStorage.flush();}
  });
  fs.writeFileSync(path.join(out,'native-draft-layout.json'),JSON.stringify(draftLayout,null,2));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('#qo-diag-workspace').waitFor({state:'visible'});await page.screenshot({path:path.join(out,'native-diagnostics.png')});
- await page.locator('[data-editor="writer"][data-tab="work"]').click();
+ await page.locator('.global-bar [data-target="work"]').click();
  await page.evaluate(()=>qwBank({__view:'native-0'}));await page.locator('[data-bank-add="native-0"]').click();
  await page.waitForFunction(()=>qwDoc.tasks.length===1&&!!qwDoc.tasks[0].image);
  // Controlled response tests for save acknowledgement in actual WebView2.

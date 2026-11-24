@@ -10,7 +10,7 @@ const {pathToFileURL}=require('node:url');
  const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await page.evaluate(()=>route('writer'));
- await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ await page.locator('.global-bar [data-target="diagnostics"]').click();
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),14);
  assert.match(await page.locator('.qd-library-total').textContent(),/14 шаблонов/);

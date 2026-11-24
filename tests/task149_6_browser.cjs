@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1496_EVIDENCE||pa
  p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
  await p.addInitScript(()=>{window.print=function(){window.top.__qwPrintedHTML=document.documentElement.outerHTML;window.top.__qwPrinted=(window.top.__qwPrinted||0)+1;window.dispatchEvent(new Event('afterprint'));};});
  const action=a=>p.locator('[data-qw-action="'+a+'"]'),stage=()=>p.locator('#qw-visual-stage svg'),quick=type=>p.locator('[data-qw-action="quick-add"][data-type="'+type+'"]');
- async function start(){await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('[data-editor="writer"][data-tab="work"]').click();}
+ async function start(){await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();}
  async function shot(name){await p.screenshot({path:path.join(out,'ui',name+'.png')});}
  async function open(file){await p.locator('#qw-file').setInputFiles(file);await p.waitForFunction(n=>qwDoc.tasks.length===n,JSON.parse(fs.readFileSync(file,'utf8')).tasks.length);}
  async function save(name){const dl=p.waitForEvent('download');await action('save').click();const file=path.join(out,name+'.qwork');await(await dl).saveAs(file);return file;}
