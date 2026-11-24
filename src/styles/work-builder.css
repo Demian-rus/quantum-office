@@ -606,3 +606,12 @@
 
 #qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:auto}
 #qo-bank-root>.qw-bank-inline>footer {flex:none;flex-wrap:wrap}
+
+/* TASK167.1: bank catalogue consumes only the space remaining below storage controls. */
+.qw-bank-assemble-dialog>.qw-dialog-body {display:flex;flex-direction:column;min-height:0}
+.qw-bank-assemble-dialog>.qw-dialog-body>.qw-bank-storage-bar,
+.qw-bank-assemble-dialog>.qw-dialog-body>.qw-bank-restore-review {flex:0 0 auto}
+.qw-bank-assemble-dialog>.qw-dialog-body>.qw-bank-catalogue {flex:1 1 0;min-height:0;height:auto}
+.qw-bank-catalogue-results>.qw-bank-pages {flex:0 0 auto}
+.qw-bank-assemble-dialog>.qw-dialog-body:has(>.qw-bank-restore-review:not([hidden])) {overflow-y:auto}
+.qw-bank-assemble-dialog>.qw-dialog-body:has(>.qw-bank-restore-review:not([hidden]))>.qw-bank-catalogue {min-height:180px}

@@ -70,7 +70,11 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
   for(const [width,height] of [[1920,1080],[1440,900],[1024,768]])for(const theme of ['light','dark']){
    await p.setViewportSize({width,height});await p.evaluate(t=>{qoThemePreference=t;qoApplyAppearance();},theme);
    for(const target of ['home','writer','diagnostics','work','bank']){
-    await route(target);if(target==='bank')await ready();
+    await route(target);if(target==='bank'){
+     await ready();
+     const pagination=await p.evaluate(()=>{const d=document.querySelector('#qw-dialog'),pages=d.querySelector('.qw-bank-pages').getBoundingClientRect(),footer=d.querySelector('footer').getBoundingClientRect(),body=d.querySelector('.qw-dialog-body').getBoundingClientRect();return {top:pages.top,bottom:pages.bottom,height:pages.height,bodyTop:body.top,bodyBottom:body.bottom,footerTop:footer.top};});
+     assert.ok(pagination.height>0&&pagination.top>=pagination.bodyTop-1&&pagination.bottom<=Math.min(pagination.footerTop,pagination.bodyBottom)+1,'bank pagination clipped '+JSON.stringify({width,height,theme,pagination}));
+    }
     const geometry=await p.evaluate(()=>{const h=document.querySelector('.global-bar').getBoundingClientRect(),main=document.querySelector('#app>main').getBoundingClientRect();return{header:[h.x,h.y,h.width,h.height],main:[main.x,main.y,main.width,main.height],overflow:document.documentElement.scrollWidth>innerWidth};});
     assert.ok(!geometry.overflow,'document overflows '+target+' '+width);assert.ok(geometry.main[2]>0&&geometry.main[3]>0,'empty workspace '+target);
     measurements.push({target,width,height,theme,geometry});
