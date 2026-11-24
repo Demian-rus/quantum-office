@@ -28,6 +28,31 @@ function qwNearestDiagramPort(objects,point,radius=16){
  }
  return best;
 }
+// Shared geometry: logical endpoint is the filled tip; a butt-capped shaft
+// reaches its base, never protruding. Short and two-ended arrows shrink heads.
+function qwArrowGeometry(points,width=2,options={}){
+ const ps=points.filter((p,i)=>!i||Math.hypot(p.x-points[i-1].x,p.y-points[i-1].y)>1e-8);
+ if(ps.length<2)return {shaft:[],heads:[]};
+ const ds=[0];for(let i=1;i<ps.length;i++)ds.push(ds[i-1]+Math.hypot(ps[i].x-ps[i-1].x,ps[i].y-ps[i-1].y));
+ const length=ds.at(-1),start=!!options.start,end=options.end!==false,count=Number(start)+Number(end);
+ const size=Math.min(options.length??Math.max(7,width*4),length/(count||1)*.82);
+ const sample=d=>{let i=1;while(i<ds.length-1&&ds[i]<d)i++;const k=(d-ds[i-1])/(ds[i]-ds[i-1]);return {x:ps[i-1].x+(ps[i].x-ps[i-1].x)*k,y:ps[i-1].y+(ps[i].y-ps[i-1].y)*k};};
+ const lo=start?size:0,hi=end?length-size:length,shaft=[sample(lo),...ps.filter((_,i)=>ds[i]>lo&&ds[i]<hi),sample(hi)],heads=[];
+ const head=(tip,base)=>{
+  const dx=tip.x-base.x,dy=tip.y-base.y,len=Math.hypot(dx,dy);
+  if(len<1e-8)return;
+  const half=Math.min(options.halfWidth??Math.max(width*.85,size*.42),len*.75);
+  heads.push({tip,base,vertices:[tip,{x:base.x-dy/len*half,y:base.y+dx/len*half},{x:base.x+dy/len*half,y:base.y-dx/len*half}]});
+ };
+ if(start)head(ps[0],shaft[0]);if(end)head(ps.at(-1),shaft.at(-1));
+ return {shaft,heads};
+}
+function qwArrowSVG(points,stroke='#162735',width=2,options={}){
+ const {shaft,heads}=qwArrowGeometry(points,width,options),n=v=>Number(v.toFixed(4)),xy=p=>n(p.x)+','+n(p.y);
+ if(!shaft.length)return '';
+ return '<g data-qw-arrow="true"><polyline data-qw-arrow-shaft="true" points="'+shaft.map(xy).join(' ')+'" fill="none" style="fill:none" stroke="'+stroke+'" stroke-width="'+width+'" stroke-linecap="butt" stroke-linejoin="round"/>'+
+ heads.map(h=>'<polygon data-qw-arrow-head="true" data-qw-tip="'+xy(h.tip)+'" data-qw-base="'+xy(h.base)+'" points="'+h.vertices.map(xy).join(' ')+'" fill="'+stroke+'" stroke="none"/>').join('')+'</g>';
+}
 function qwPhysicsShape(o,interactive=false){
  const kind=o.kind;
  if(!QW_ELECTRICS.includes(kind)&&!QW_MECHANICS.includes(kind))return '';
@@ -40,11 +65,7 @@ function qwPhysicsShape(o,interactive=false){
   circle=(px,py,r,fill='white')=>'<circle cx="'+n(px)+'" cy="'+n(py)+'" r="'+n(r)+'" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+width+'"/>',
   rect=(rx,ry,rw,rh,fill='white')=>'<rect x="'+n(rx)+'" y="'+n(ry)+'" width="'+n(Math.max(1,rw))+'" height="'+n(Math.max(1,rh))+'" rx="1" fill="'+fill+'" stroke="'+stroke+'" stroke-width="'+width+'"/>';
  if(['forceVector','velocityVector','accelerationVector'].includes(kind)){
-  const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len,
-   size=Math.min(13,Math.max(6,width*3.2)),ex=o.x2-ux*size,ey=o.y2-uy*size;
-  return line(o.x,o.y,ex,ey)+
-   '<path d="M'+n(o.x2)+' '+n(o.y2)+' L'+n(ex-uy*size*.42)+' '+n(ey+ux*size*.42)+
-   ' L'+n(ex+uy*size*.42)+' '+n(ey-ux*size*.42)+' Z" fill="'+stroke+'"/>'+
+  return qwArrowSVG([{x:o.x,y:o.y},{x:o.x2,y:o.y2}],stroke,width,{length:Math.min(13,Math.max(6,width*3.2))})+
    circle(o.x,o.y,Math.max(2,width*.9),stroke);
  }
  if(kind==='torque'){
@@ -53,11 +74,8 @@ function qwPhysicsShape(o,interactive=false){
    steps=36,ps=Array.from({length:steps+1},(_,i)=>{
     const t=(from+(to-from)*i/steps)*Math.PI/180;
     return {x:cx+r*Math.cos(t),y:cy+r*Math.sin(t)};
-   }),p=ps.at(-1),q=ps.at(-2),d=Math.hypot(p.x-q.x,p.y-q.y)||1,ux=(p.x-q.x)/d,uy=(p.y-q.y)/d,
-   ex=p.x-ux*11,ey=p.y-uy*11;
-  return path('M'+ps.slice(0,-1).map((p,i)=>(i?'L':'')+n(p.x)+' '+n(p.y)).join(' '))+
-   '<path d="M'+n(p.x)+' '+n(p.y)+' L'+n(ex-uy*4.5)+' '+n(ey+ux*4.5)+
-   ' L'+n(ex+uy*4.5)+' '+n(ey-ux*4.5)+' Z" fill="'+stroke+'"/>';
+   });
+  return qwArrowSVG(ps,stroke,width,{length:11,halfWidth:4.5});
  }
  if(kind==='dynamometer'){
   let result=rect(x+w*.24,y+h*.06,w*.52,h*.7);
@@ -87,8 +105,7 @@ function qwPhysicsShape(o,interactive=false){
  let out=line(x,cy,bodyL,cy)+line(bodyR,cy,x+w,cy);
  if(kind==='resistor'||kind==='rheostat'){
   out+=rect(bodyL,cy-h*.23,bw,h*.46);
-  if(kind==='rheostat')out+=line(bodyL+bw*.15,cy+h*.45,bodyR-bw*.07,cy-h*.31)+
-   '<path d="M'+n(bodyR-bw*.07)+' '+n(cy-h*.31)+' l-7 2 3 6 Z" fill="'+stroke+'"/>';
+  if(kind==='rheostat')out+=qwArrowSVG([{x:bodyL+bw*.15,y:cy+h*.45},{x:bodyR-bw*.07,y:cy-h*.31}],stroke,width);
  }else if(kind==='cell'||kind==='battery'){
   out='';
   const count=kind==='cell'?1:3;
@@ -114,4 +131,4 @@ function qwPhysicsShape(o,interactive=false){
  }
  return out;
 }
-export {QW_MECHANICS,QW_ELECTRICS,QW_ELECTRIC_TERMINALS,qwDiagramPorts,qwPhysicsPortPoint,qwNearestDiagramPort,qwPhysicsShape};
+export {QW_MECHANICS,QW_ELECTRICS,QW_ELECTRIC_TERMINALS,qwDiagramPorts,qwPhysicsPortPoint,qwNearestDiagramPort,qwPhysicsShape,qwArrowGeometry,qwArrowSVG};

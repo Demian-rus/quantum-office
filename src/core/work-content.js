@@ -1,7 +1,7 @@
 /* A bounded mathematical syntax shared by MathML preview and PDF canvas layout. */
 import {qwGraphGridStep,qwEvaluateCurve,qwGeometryVertices,qwValidateStyle,qwResolveDiagram,QW_PLOT,qwPlotXY} from './work-model.js';
 import {qwArcPoints,qwLinearSegments,qwExtendedSegment} from './work-geometry.js';
-import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape} from './work-physics.js';
+import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape,qwArrowSVG} from './work-physics.js';
 import {qwLabelSVG,qwPlaceSVGLabels} from './work-labels.js';
 const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',iota:'ι',kappa:'κ',nu:'ν',xi:'ξ',tau:'τ',upsilon:'υ',chi:'χ',psi:'ψ',Gamma:'Γ',Theta:'Θ',Lambda:'Λ',Pi:'Π',Sigma:'Σ',Phi:'Φ',Psi:'Ψ',Delta:'Δ',theta:'θ',lambda:'λ',mu:'μ',pi:'π',rho:'ρ',sigma:'σ',phi:'φ',omega:'ω',Omega:'Ω',cdot:'·',times:'×',pm:'±',le:'≤',ge:'≥',neq:'≠',infty:'∞'};
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -229,9 +229,9 @@ function qwGraphSVG(g,interactive=false,typography={}){
  // Draw arrowheads separately: the visible shaft ends at the head's base,
  // not at the tip (marker-end used to leave a line through the arrowhead).
  const xTip=b.right+16,xBase=xTip-11,yTip=b.top-16,yBase=yTip+11;
- parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="x"'),
+ parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="x"'),
   '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-4.2)+' L'+xBase+' '+(axisY+4.2)+' Z" fill="#111"/>',
-  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="y"'),
+  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="y"'),
   '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-4.2)+' '+yBase+' L'+(axisX+4.2)+' '+yBase+' Z" fill="#111"/>');
  const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
  const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
@@ -317,15 +317,15 @@ function qwGraphElementsSVG(g,interactive=false){
   if(o.kind==='function'){
    for(let n=0;n<=400;n++){const x=g.xmin+(g.xmax-g.xmin)*n/400,y=qwEvaluateCurve({curveFamily:o.family,curve:o.curve},x);ps.push(qwPlotXY(g,{x,y}));}
   }else ps=(o.vertices||[{x:o.x,y:o.y},...(['line','arrow'].includes(o.kind)?[{x:o.x2,y:o.y2}]:[])]).map(p=>qwPlotXY(g,p));
-  if(['line','arrow','polyline','function'].includes(o.kind)){
-   shape='<path d="'+ps.map((p,n)=>(n?'L':'M')+p.x.toFixed(3)+' '+p.y.toFixed(3)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"'+(o.kind==='arrow'?' marker-end="url(#qw-graph-arrow-'+key+'-'+i+')"':'')+'/>';
+  if(o.kind==='arrow')shape=qwArrowSVG(ps,color,width);
+  else if(['line','polyline','function'].includes(o.kind)){
+   shape='<path d="'+ps.map((p,n)=>(n?'L':'M')+p.x.toFixed(3)+' '+p.y.toFixed(3)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"/>';
   }else if(o.kind==='point')shape='<circle cx="'+ps[0].x+'" cy="'+ps[0].y+'" r="4" fill="'+color+'"/>';
-  if(o.kind==='arrow')shape='<defs><marker id="qw-graph-arrow-'+key+'-'+i+'" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="'+color+'"/></marker></defs>'+shape;
   if(o.label&&ps.length){const p=ps[Math.floor((ps.length-1)/2)];label=qwLabelSVG('g:e:'+i,p,o.labelPosition,'<text x="'+(p.x+(o.kind==='text'?0:8))+'" y="'+(p.y+(o.kind==='text'?0:-10))+'" font-size="18" fill="'+text+'" stroke="white" stroke-width="3" paint-order="stroke">'+qwEsc(o.label)+'</text>',{plot:true,free:o.kind==='text'});}
   return '<g '+(interactive?'data-qw-element="'+i+'"':'')+' clip-path="url(#qw-plot-clip)">'+shape+label+'</g>';
  }).join('');
 }
-function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
+function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"> '+body+'</svg>';}
 
 /* Position geometry captions outside edges and away from already placed captions.
    Uses SVG coordinates, so preview and exported documents have identical placement. */
@@ -411,10 +411,8 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   const objectLabel=(...args)=>qwLabelSVG('d:'+i+':o',labelAnchor,o.labelPosition,label(...args),{free:o.kind==='text'});
   if(['ray','infiniteLine'].includes(o.kind)){const ps=qwExtendedSegment(o);if(ps.length===2)shape='<line data-qw-extended="'+o.kind+'" x1="'+ps[0].x+'" y1="'+ps[0].y+'" x2="'+ps[1].x+'" y2="'+ps[1].y+'"'+a+'/>';if(o.kind==='ray')shape+='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="'+stroke+'"/>';}
   if(['line','arrow','doubleArrow','dashed','rope','ground'].includes(o.kind)){
-   shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
-    (['arrow','doubleArrow'].includes(o.kind)?' marker-end="url(#qw-arrow-'+key+'-'+i+')"':'')+
-    (o.kind==='doubleArrow'?' marker-start="url(#qw-arrow-'+key+'-'+i+')"':'')+
-    (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
+   shape=['arrow','doubleArrow'].includes(o.kind)?qwArrowSVG([{x:o.x,y:o.y},{x:o.x2,y:o.y2}],stroke,width,{start:o.kind==='doubleArrow'}):
+    '<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+(o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
    if(o.kind==='ground'){
     const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
     for(let distance=10;distance<=length-8;distance+=14){
@@ -538,9 +536,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   if(paint.stroke||paint.width)shape=shape.replace(/stroke="#162735"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#162735"/g,'fill="'+stroke+'"');
   if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f6f8|#eef3f5|white)"/g,'fill="'+fill+'"');
   if(paint.text)captions=captions.replace(/fill="#162735"/g,'fill="'+paint.text+'"');
-  const marker=['arrow','doubleArrow'].includes(o.kind)?'<defs><marker id="qw-arrow-'+key+'-'+i+'" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="'+(o.kind==='doubleArrow'?'auto-start-reverse':'auto')+'"><path d="M0 0L6 3L0 6" fill="none" stroke="'+stroke+'" stroke-width="1"/></marker></defs>':'';
+
   const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
-  return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
+  return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';
  }).join('')));
 }
 export {qwMath,qwMathML,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};

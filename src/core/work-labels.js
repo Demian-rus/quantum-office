@@ -47,7 +47,8 @@ function qwPlaceSVGLabels(source){
    const style=getComputedStyle(e),stroke=style.stroke;
    if(['rgb(217, 222, 228)','rgb(220, 230, 236)'].includes(stroke))continue; // construction/grid lines are background
    const radius=Number(e.getAttribute('r'))||0,filledPoint=e.tagName==='circle'&&radius<=7&&style.fill!=='none';
-   if((stroke==='none'||Number(style.strokeOpacity)===0)&&!filledPoint)continue;
+   const filledHead=e.hasAttribute('data-qw-arrow-head')&&style.fill!=='none';
+   if((stroke==='none'||Number(style.strokeOpacity)===0)&&!filledPoint&&!filledHead)continue;
    const m=matrix(e),width=parseFloat(style.strokeWidth)||1,pad=Math.max(1.2,width/2)+2;
    if(filledPoint){const b=rect(e);for(let x=b.x;x<=b.x+b.w+1;x+=2)add({x,y:b.y},{x,y:b.y+b.h},1.5);continue;}
    const length=e.getTotalLength();if(!Number.isFinite(length)||length===0)continue;
