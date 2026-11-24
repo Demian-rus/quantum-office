@@ -1,0 +1,29 @@
+name: Lecture lab isolated checks
+on:
+  push:
+    branches: [feat/lecture-foundation]
+    paths:
+      - 'lecture-lab/**'
+      - 'src/core/lecture-*.js'
+      - 'tests/lecture-*.js'
+      - 'tests/lecture-*.mjs'
+      - 'scripts/build-lecture-lab.mjs'
+      - '.github/workflows/lecture-lab.yml'
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/build-lecture-lab.mjs --check
+      - run: node --test tests/lecture-model.test.js tests/lecture-project.test.js
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/lecture-lab-browser.mjs
+      - uses: actions/upload-artifact@v7
+        with:
+          path: lecture-lab/Quantum-Lectures.html
+          archive: false
+          if-no-files-found: error

@@ -338,6 +338,7 @@ function ql2Svg(raw,progressOverride){
 }
 
 
+const C=QL2_COLORS;
 function ql2Diagram(id,title,caption,make){
  let i=0;const shapes=[],add=(kind,v)=>shapes.push({id:'s'+(++i),kind,...v});
  const t=(x,y,text,size=20,align='middle',color=C.ink)=>add('text',{x,y,text,size,align,color});

@@ -1,5 +1,6 @@
 import {QL_RADIATION} from './lecture-radiation.js';
-import {QL2_COLORS as C,ql2Validate} from './lecture-project.js';
+import {QL2_COLORS,ql2Validate} from './lecture-project.js';
+const C=QL2_COLORS;
 function ql2Diagram(id,title,caption,make){
  let i=0;const shapes=[],add=(kind,v)=>shapes.push({id:'s'+(++i),kind,...v});
  const t=(x,y,text,size=20,align='middle',color=C.ink)=>add('text',{x,y,text,size,align,color});
