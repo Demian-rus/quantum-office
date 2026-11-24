@@ -3,8 +3,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable CI only');
  const out=path.join(__dirname,'..','evidence','native','scale-report.json');
- const browser=await chromium.connectOverCDP('http://127.0.0.1:9222');
- const page=browser.contexts().flatMap(c=>c.pages()).find(p=>/tauri\.localhost|tauri:\/\//.test(p.url()));if(!page)throw Error('Native page missing');
+ const {page}=await require('./task1664_cdp.cjs').connectNative('scale');
  const results=[];const save=status=>fs.writeFileSync(out,JSON.stringify({status,results,method:'Actual WebView2; same generated fixtures; SQLite IPC end-to-end vs IndexedDB; origin usage is not physical SQLite file size.'},null,2));
  // A separate archive preserves the smoke fixtures while the CI-only bank is reused.
  const initial=await page.evaluate(async()=>JSON.stringify(await qwBankRepository.createVerifiedBackup()));

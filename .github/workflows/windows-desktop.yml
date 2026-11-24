@@ -36,40 +36,36 @@ jobs:
         run: cargo test --locked --target x86_64-pc-windows-msvc
       - name: Build Windows x64 installer
         run: npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
-      - name: Launch and restart actual executable
+      - name: Package separate Windows and browser candidates
         shell: pwsh
         run: |
-          $exe = Resolve-Path "src-tauri/target/x86_64-pc-windows-msvc/release/quantum-office.exe"
-          $data = Join-Path $env:APPDATA "com.quantumoffice.desktop/bank.sqlite3"
-          $env:WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=9222 --remote-debugging-address=127.0.0.1"
-          for ($i=0; $i -lt 2; $i++) {
-            $p = Start-Process -FilePath $exe -PassThru
-            try {
-              $deadline = (Get-Date).AddSeconds(60)
-              do { Start-Sleep -Milliseconds 500; $p.Refresh() } until ($p.HasExited -or (($p.MainWindowHandle -ne 0) -and (Test-Path $data)) -or (Get-Date) -gt $deadline)
-              if ($p.HasExited -or $p.MainWindowHandle -eq 0 -or !(Test-Path $data)) { throw "Desktop launch or database creation failed" }
-              $header = [IO.File]::ReadAllBytes($data)
-              if ([Text.Encoding]::ASCII.GetString($header,0,15) -ne "SQLite format 3") { throw "Not SQLite" }
-              if ($i -eq 0) { node tests/task1664_native.cjs first } else { node tests/task1664_native.cjs second }
-              if ($LASTEXITCODE -ne 0) { throw "Native WebView integration failed" }
-              if ($i -eq 1) { node tests/task1664_scale.cjs; if ($LASTEXITCODE -ne 0) { throw "Native comparative benchmark failed" } }
-              if (!$p.CloseMainWindow()) { throw "Window close failed" }
-              if (!$p.WaitForExit(15000)) { throw "Clean close timed out" }
-            } finally { if (!$p.HasExited) { Stop-Process -Id $p.Id -Force } }
-          }
-          New-Item -ItemType Directory -Force evidence/native | Out-Null
-          @{status="PASS"; launchCount=2; database=$data; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/launch.json
-      - name: Package portable executable (requires WebView2)
+          $release = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          New-Item -ItemType Directory -Force portable | Out-Null
+          Copy-Item "$release/quantum-office.exe" portable/
+          @("Quantum Office Windows x64", "Requires Microsoft Edge WebView2 Evergreen Runtime.", "Run quantum-office.exe. Bank data is stored in the application data folder, not beside the EXE.", "Unsigned candidate; use a disposable test profile until acceptance.") | Set-Content portable/README.txt -Encoding utf8
+          Compress-Archive -Path portable/* -DestinationPath Quantum-Office-Windows-x64-Portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-Windows-x64-Setup
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-Windows-x64-Portable
+          path: Quantum-Office-Windows-x64-Portable.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-HTML
+          path: Quantum-Office.html
+          if-no-files-found: error
+      - name: Install, launch, reinstall and restart actual release
         shell: pwsh
-        run: Compress-Archive -Path src-tauri/target/x86_64-pc-windows-msvc/release/quantum-office.exe -DestinationPath Quantum-Office-Windows-x64.zip
+        run: ./scripts/task1664-windows-smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: windows-x64-evidence
-          path: |
-            evidence/native/
-            src-tauri/Cargo.lock
-            Quantum-Office.html
-            src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-            Quantum-Office-Windows-x64.zip
-          if-no-files-found: warn
+          path: evidence/native/
+          if-no-files-found: error

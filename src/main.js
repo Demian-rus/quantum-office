@@ -193,7 +193,7 @@ function renameBookInline(id,button){
  input.focus();input.select();
 }
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
-function download(name,text,mime){const blob=new Blob([text],{type:mime});if(qoNativeDesktop)return qoNativeSave(name,blob).then(saved=>{status(saved?'Файл сохранён':'Сохранение отменено',!saved);return saved;}).catch(e=>{status('Файл не сохранён: '+e.message,true);return false;});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
+function download(name,text,mime){const blob=new Blob([text],{type:mime});if(qoNativeDesktop)return qoNativeSave(name,blob).then(saved=>{status(saved?'Файл сохранён':'Сохранение отменено',!saved);return saved;}).catch(e=>{status('Файл не сохранён: '+e.message,true);return false;});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Скачивание запрошено. Проверьте файл на диске.');}
 async function saveBook(asNew=false){
  commitEditor();const b=book();if(!b)return;
  const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
@@ -1551,15 +1551,15 @@ async function qoWriterExportDocx(){
   if(!qoNativeDesktop)status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
  }catch(error){status('Не удалось создать DOCX: '+error.message,true);}
 }
-function qoWriterExport(format){
+async function qoWriterExport(format){
  qoPersistWriter();
  if(format==='txt'){
   const clone=document.createElement('div');clone.innerHTML=qoSafeRich(qoWriter.html);
   clone.querySelectorAll('[data-qo-break]').forEach(el=>el.replaceWith(document.createTextNode('\\n\\n--- Разрыв страницы ---\\n\\n')));
-  download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
+  await download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
  }else if(format==='qdoc'){
-  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdWorkingDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
- }else download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
+  await download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdWorkingDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
+ }else await download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
 }
 function qoWriterPrint(){
  qoPersistWriter();const style=document.getElementById('qo-writer-print-style')||document.createElement('style');
@@ -1619,9 +1619,9 @@ async function qoSlidesExportPNG(){
   const sx=item.align==='center'?x+w/2:item.align==='right'?x+w:x;
   for(const [lineNo,line] of String(item.text||'').split('\n').entries())ctx.fillText(line,sx,y+lineNo*(Math.max(10,Number(item.size)||20)*1.55),w);
  }
- await new Promise(resolve=>canvas.toBlob(blob=>{if(blob){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${safeFile(qoSlides.name)}_${qoSlides.active+1}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}resolve();},'image/png'));
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)return status('Не удалось экспортировать PNG',true);await download(`${safeFile(qoSlides.name)}_${qoSlides.active+1}.png`,blob,'image/png');
 }
-function qoSlidesDownload(){qoPersistSlides();download(`${safeFile(qoSlides.name)}.qslides`,JSON.stringify({format:'quantum-office-slides-v1',presentation:qoSlides},null,2),'application/json');}
+async function qoSlidesDownload(){qoPersistSlides();await download(`${safeFile(qoSlides.name)}.qslides`,JSON.stringify({format:'quantum-office-slides-v1',presentation:qoSlides},null,2),'application/json');}
 function qoSlidesPresent(){const overlay=document.getElementById('qo-slides-overlay');if(!overlay)return;
  overlay.hidden=false;overlay.innerHTML=`<button class="qo-slide-show-exit" data-action="slides-exit">× Выход</button>${qoSlidePreview(qoSlide(),false)}<div class="qo-slide-show-controls"><button data-action="slides-prev">←</button><span>${qoSlides.active+1} / ${qoSlides.slides.length}</span><button data-action="slides-next">→</button></div>`;
 }
@@ -1768,9 +1768,9 @@ function qoPhotoAdd(tool,options={}){qoPhotoSnapshot();const mid=[qoPhotoCanvasW
 function qoPhotoChangeSize(w,h){w=Math.round(Number(w));h=Math.round(Number(h));if(!Number.isFinite(w)||!Number.isFinite(h)||w<64||h<64||w>4096||h>4096){status('Размер: от 64 до 4096 px',true);return;}qoPhotoSnapshot();qoPhotoCanvasW=w;qoPhotoCanvasH=h;qoPhotoSelectedId=null;qoPhotoRefresh();qoPhotoFit();}
 function qoPhotoFit(){const stage=document.getElementById('qs-stage');if(!stage)return;qoPhotoZoom=Math.min(1.5,Math.max(.1,Math.min((stage.clientWidth-90)/qoPhotoCanvasW,(stage.clientHeight-90)/qoPhotoCanvasH)));qoPhotoRender();const r=document.getElementById('qs-zoom');if(r)r.value=Math.round(qoPhotoZoom*100);const l=document.getElementById('qs-zoom-label');if(l)l.textContent=Math.round(qoPhotoZoom*100)+'%';}
 function qoPhotoZoomTo(value){qoPhotoZoom=Math.max(.1,Math.min(2,Number(value)));qoPhotoRender();const r=document.getElementById('qs-zoom');if(r)r.value=Math.round(qoPhotoZoom*100);const l=document.getElementById('qs-zoom-label');if(l)l.textContent=Math.round(qoPhotoZoom*100)+'%';}
-function qoPhotoFileDownload(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
-async function qoPhotoExport(){try{await qoPhotoWaitImages();}catch(error){status(error.message,true);return;}const c=document.createElement('canvas');c.width=qoPhotoCanvasW;c.height=qoPhotoCanvasH;const compare=qoPhotoCompare;qoPhotoCompare=false;try{qoPhotoPaint(c.getContext('2d'),false);}finally{qoPhotoCompare=compare;}c.toBlob(blob=>{if(!blob)return status('Не удалось экспортировать PNG',true);const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);},'image/png');}
-function qoPhotoExportProject(){try{const data=JSON.stringify(validateStudioProject(qoPhotoState()));if(data.length>32000000)throw Error('Проект больше 32 МБ');qoPhotoFileDownload(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.qstudio',data,'application/json');}catch(error){status(error.message,true);}}
+function qoPhotoFileDownload(name,content,type){return download(name,content,type);}
+async function qoPhotoExport(){try{await qoPhotoWaitImages();}catch(error){status(error.message,true);return;}const c=document.createElement('canvas');c.width=qoPhotoCanvasW;c.height=qoPhotoCanvasH;const compare=qoPhotoCompare;qoPhotoCompare=false;try{qoPhotoPaint(c.getContext('2d'),false);}finally{qoPhotoCompare=compare;}const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)return status('Не удалось экспортировать PNG',true);await download(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.png',blob,'image/png');}
+async function qoPhotoExportProject(){try{const data=JSON.stringify(validateStudioProject(qoPhotoState()));if(data.length>32000000)throw Error('Проект больше 32 МБ');await qoPhotoFileDownload(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.qstudio',data,'application/json');}catch(error){status(error.message,true);}}
 async function qoPhotoReadImage(file){if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8_000_000)throw Error('Изображение: PNG, JPEG или WebP до 8 МБ');return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('Ошибка чтения файла'));r.readAsDataURL(file);});}
 async function qoPhotoFileLoad(file){if(file.name.toLowerCase().endsWith('.qstudio')){if(file.size>32000000)throw Error('Проект QSTUDIO ограничен 32 МБ');const v=JSON.parse(await file.text());if(!v||v.version!==1||!Array.isArray(v.strokes)||v.strokes.length>5000||v.width<64||v.width>4096||v.height<64||v.height>4096)throw Error('Некорректный проект QSTUDIO');const next=validateStudioProject(v);await Promise.all([...new Set([next.imageSrc,...next.strokes.filter(o=>o.tool==='image').map(o=>o.src)].filter(Boolean))].map(src=>new Promise((resolve,reject)=>{const img=new Image();img.onload=resolve;img.onerror=()=>reject(Error('Не удалось прочитать фотографию в QSTUDIO'));img.src=src;})));qoPhotoApplyState(next);qoPhotoHistory=[];qoPhotoRedo=[];qoPhotoTool='select';qoPhotoRefresh();qoPhotoFit();return;}
  const src=await qoPhotoReadImage(file);qoPhotoSnapshot();qoPhotoLoadImageSrc(src);qoPhotoFile=file.name;qoPhotoAdjust={brightness:100,contrast:100,saturation:100};qoPhotoSelectedId=null;qoPhotoRefresh();}

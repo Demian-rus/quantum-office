@@ -759,8 +759,9 @@ async function qwBank(previousFilters={}){
   try{
    reportStatus('Подготовка экспорта…');
    const payload=await qwBankRepository.exportBank();
-   download('QuantumOffice_банк_заданий.qwbank',JSON.stringify(payload,null,2),'application/json');
-   reportStatus('QWBANK экспортирован. Это отдельная копия данных.');
+   const saved=await download('QuantumOffice_банк_заданий.qwbank',JSON.stringify(payload,null,2),'application/json');
+   if(qoNativeDesktop&&saved!==true){reportStatus('QWBANK не сохранён: отмена или ошибка записи.',true);return;}
+   reportStatus(qoNativeDesktop?'QWBANK сохранён. Это отдельная копия данных.':'Скачивание QWBANK запрошено. Проверьте файл на диске.');
   }catch(e){reportStatus('Экспорт не выполнен: '+e.message,true);status('Банк: '+e.message,true);}
  };
  d.querySelector('[data-qw-action="bank-clean-assets"]').onclick=async()=>{

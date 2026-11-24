@@ -4,9 +4,7 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('n
 const out=path.join(__dirname,'..','evidence','native');
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable Windows CI only');
- fs.mkdirSync(out,{recursive:true});let browser,page;
- for(let i=0;i<60;i++){try{browser=await chromium.connectOverCDP('http://127.0.0.1:9222',{timeout:2000});page=browser.contexts().flatMap(c=>c.pages()).find(p=>/tauri\.localhost|tauri:\/\//.test(p.url()));if(page)break;}catch{}await new Promise(r=>setTimeout(r,1000));}
- if(!page)throw Error('No actual Tauri WebView2 page');
+ const {page}=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository instanceof SQLiteBankRepository&&qwBankRepository.db===true,{},{timeout:60000});
  const stage=process.argv[2];
