@@ -39,7 +39,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   const dim=stage.locator('[data-qw-object="2"]');assert.equal(await dim.locator('line').count(),3);
   const text=await dim.locator('text').boundingBox(),line=await dim.locator('line').first().boundingBox();assert.ok(text.y>line.y+5,'dimension text is clear of line');
   await tool('doubleArrow');await drag(325,215,435,265);await change('#qw-object-label','a');await p.locator('[data-style-key="stroke"][data-style-color="#2563eb"]').click();await change('[data-style="width"]',4);await change('#qw-block-rotation',20);
-  const arrow=stage.locator('[data-qw-object="3"]');assert.equal(await arrow.locator('line[marker-start][marker-end]').count(),1);assert.match(await arrow.getAttribute('transform'),/rotate\(20/);assert.equal(await arrow.locator('marker path').getAttribute('stroke'),'#2563eb');
+  const arrow=stage.locator('[data-qw-object="3"]');assert.equal(await arrow.locator('[data-qw-arrow-shaft]').count(),1);assert.equal(await arrow.locator('[data-qw-arrow-head]').count(),2);assert.match(await arrow.getAttribute('transform'),/rotate\(20/);assert.deepEqual(await arrow.locator('[data-qw-arrow-head]').evaluateAll(es=>es.map(e=>e.getAttribute('fill'))),['#2563eb','#2563eb']);
   await tool('select');
   for(const [i,x,y] of [[0,140,90],[1,372.5,51.03],[2,170,240],[3,380,240]]){
    await p.locator('[data-object-select="'+i+'"]').click();

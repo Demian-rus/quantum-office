@@ -31,7 +31,7 @@ test('TASK148 B: styles and rotation persist in QWORK v1; SVG paints arrow heads
  assert.deepEqual(restored.tasks[0].diagram,q.diagram);
  const svg=qwDiagramSVG(q.diagram);
  assert.match(svg,/stroke="#dc2626"/);assert.match(svg,/fill="#2563eb"/);assert.match(svg,/rotate\(-30/);
- assert.match(svg,/<marker[^>]+id="qw-arrow-[a-z0-9]+-0"[^>]*><path[^>]+stroke="#dc2626"/);
+ assert.match(svg,/<polygon data-qw-arrow-head="true"[^>]+fill="#dc2626" stroke="none"/);assert.match(svg,/<polyline data-qw-arrow-shaft="true"[^>]+stroke="#dc2626" stroke-width="4" stroke-linecap="butt"/);
  assert.doesNotMatch(svg,/data-qw-(?:editor|vertex|marquee)/);
  for(const raw of [{stroke:'url(https://bad)'},{fill:'red" onload="evil'},{text:'#fff'},{width:NaN},{width:99}])assert.throws(()=>qwValidateStyle(raw));
 });

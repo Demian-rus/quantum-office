@@ -47,8 +47,8 @@ test('TASK149.2 dimension ticks and double arrow heads belong to their hit geome
 });
 test('TASK149.2 printable SVG retains colors, two arrow heads, dimensions and vertex edit handles',()=>{
  const objects=qwValidateDiagram(shapes()),svg=qwDiagramSVG(objects),editing=qwDiagramSVG(objects,true);
- assert.match(svg,/<polyline /);assert.match(svg,/90°/);assert.match(svg,/5 см/);assert.match(svg,/marker-start=/);assert.match(svg,/auto-start-reverse/);
- assert.match(svg,/stroke="#2563eb" stroke-width="1"/);assert.doesNotMatch(svg,/data-qw-vertex|NaN|Infinity|\[object Object\]/);
+ assert.match(svg,/<polyline /);assert.match(svg,/90°/);assert.match(svg,/5 см/);assert.equal((svg.match(/data-qw-arrow-head="true"/g)||[]).length,2);assert.doesNotMatch(svg,/marker-(?:start|end)=/);
+ assert.match(svg,/stroke="#2563eb" stroke-width="3" stroke-linecap="butt"/);assert.match(svg,/fill="#2563eb" stroke="none"/);assert.doesNotMatch(svg,/data-qw-vertex|NaN|Infinity|\[object Object\]/);
  assert.equal((editing.match(/data-qw-vertex=/g)||[]).length,3);
 });
 test('TASK149.2 teaching source keeps the given maths, a true 30 degree incline and all four new primitives',()=>{

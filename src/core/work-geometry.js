@@ -60,6 +60,7 @@ function qwLinearSegments(o){
  if(o.kind==='dimension')for(const p of [a,b])result.push([{x:p.x+nx*7,y:p.y+ny*7},{x:p.x-nx*7,y:p.y-ny*7}]);
  if(o.kind==='doubleArrow'||o.kind==='arrow'){
   const geom=qwArrowGeometry([a,b],width,{start:o.kind==='doubleArrow'});
+  result.splice(0,result.length,...geom.shaft.slice(1).map((p,i)=>[geom.shaft[i],p]));
   for(const h of geom.heads)for(let i=0;i<3;i++)result.push([h.vertices[i],h.vertices[(i+1)%3]]);
  }
  return result;
@@ -100,7 +101,8 @@ function qwHitObject(o,point,tolerance=6){
   const d=Math.hypot((p.x-c.x)/rx,(p.y-c.y)/ry),filled=o.style?.fill!==undefined?o.style.fill!=='none':!['circle','ellipse'].includes(o.kind);
   return filled?d<=1+t/Math.min(rx,ry):Math.abs(d-1)*Math.min(rx,ry)<=t;
  }
- if(['line','arrow','dashed','rope','ground'].includes(o.kind))return qwSegmentDistance(p,a,b)<=t;
+ if(o.kind==='arrow')return qwLinearSegments(o).some(([a,b])=>qwSegmentDistance(p,a,b)<=t);
+ if(['line','dashed','rope','ground'].includes(o.kind))return qwSegmentDistance(p,a,b)<=t;
  if(o.kind==='spring'){const ps=qwSpringPoints(o);return ps.slice(1).some((b,i)=>qwSegmentDistance(p,ps[i],b)<=t);}
  if(o.kind==='angle')return qwSegmentDistance(p,a,{x:o.x2,y:o.y})<=t||qwSegmentDistance(p,a,b)<=t;
  const vs=qwObjectPolygon(o);

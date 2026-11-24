@@ -34,7 +34,7 @@ test('TASK144 graph has bounded ticks, correctly mapped coordinates and safe lab
  assert.throws(()=>qwValidateGraph({...g,step:0}));assert.throws(()=>qwValidateGraph({...g,xmin:10}));
 });
 test('TASK144 all seven diagram primitives survive validation and render as SVG',()=>{
- const shapes=['line','arrow','rect','circle','point','text','angle'].map(kind=>({kind,x:100,y:100,x2:200,y2:200,label:'α'}));assert.deepEqual(qwValidateDiagram(shapes),shapes);const svg=qwDiagramSVG(shapes,true);assert.match(svg,/ellipse/);assert.match(svg,/marker-end/);assert.match(svg,/data-qw-object="6"/);
+ const shapes=['line','arrow','rect','circle','point','text','angle'].map(kind=>({kind,x:100,y:100,x2:200,y2:200,label:'α'}));assert.deepEqual(qwValidateDiagram(shapes),shapes);const svg=qwDiagramSVG(shapes,true);assert.match(svg,/ellipse/);assert.match(svg,/data-qw-arrow-head="true"/);assert.match(svg,/stroke-linecap="butt"/);assert.doesNotMatch(svg,/marker-end=/);assert.match(svg,/data-qw-object="6"/);
 });
 test('TASK144 duplication and reorder keep original graph and identity independent',()=>{
  const d=qwProject(),a=qwTask('graph');a.prompt='A';a.graph.points=[{x:1,y:1,label:''}];d.tasks=[a];const copy=qwDuplicate(d,a.id);assert.notEqual(copy.id,a.id);copy.graph.points[0].y=7;assert.equal(a.graph.points[0].y,1);assert.ok(qwMove(d,copy.id,-1));assert.equal(d.tasks[0].id,copy.id);assert.equal(qwMove(d,copy.id,-1),false);

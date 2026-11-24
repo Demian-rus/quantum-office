@@ -41,7 +41,16 @@ function qwMathIsUnary(list,index){
 }
 function qwMathML(n,upright=false,unary=false){
  const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';
- if(n.t==='row')return tag('mrow',n.list.map((v,i)=>qwMathML(v,upright,qwMathIsUnary(n.list,i))).join(''));
+ if(n.t==='row'){
+  const operator=v=>v?.t==='text'&&/^[=+−\-×÷·±<>≤≥≠→←↔]$/.test(v.v);
+  return tag('mrow',n.list.map((v,i)=>{
+   if(!upright&&v.t==='text'&&/^\s+$/.test(v.v)){
+    let a=i-1,b=i+1;while(a>=0&&n.list[a].t==='text'&&/^\s+$/.test(n.list[a].v))a--;while(b<n.list.length&&n.list[b].t==='text'&&/^\s+$/.test(n.list[b].v))b++;
+    if(operator(n.list[a])||operator(n.list[b]))return '';
+   }
+   return qwMathML(v,upright,qwMathIsUnary(n.list,i));
+  }).join(''));
+ }
  if(n.t==='upright')return '<mstyle mathvariant="normal">'+qwMathML(n.a,true)+'</mstyle>';
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a,upright));
@@ -59,7 +68,7 @@ function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)
 function qwPlainMathHTML(value){
  const text=String(value??'');
  const operand='(?:[A-Za-zα-ωΑ-Ω][₀-₉ₐ-ₜ⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*|[+\\-−]?\\d+(?:[.,]\\d+)?(?:[·×]10[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)?[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]*)';
- const pattern=new RegExp('(?<![\\p{L}\\p{N}_./:@-])(?:'+operand+')(?:[ \\t]*[=<>≤≥≠+−×÷±→←↔][ \\t]*'+operand+')+(?![\\p{L}\\p{N}_./:@-])','gu');
+ const pattern=new RegExp('(?<![\\p{L}\\p{N}_./:@-])(?:'+operand+')(?:[ \\t]*[=<>≤≥≠+−×÷±→←↔][ \\t]*'+operand+')+(?![\\p{L}\\p{N}_/:@-]|\\.\\d)','gu');
  const split=new RegExp('^('+operand+')([ \\t]*)([=<>≤≥≠+−×÷±→←↔])([ \\t]*)','u');
  const atom=v=>/^[A-Za-zα-ωΑ-Ω]/u.test(v)?'<mi mathvariant="normal">'+qwEsc(v)+'</mi>':'<mtext>'+qwEsc(v)+'</mtext>';
  const render=chunk=>{

@@ -35,13 +35,13 @@ function qwArrowGeometry(points,width=2,options={}){
  if(ps.length<2)return {shaft:[],heads:[]};
  const ds=[0];for(let i=1;i<ps.length;i++)ds.push(ds[i-1]+Math.hypot(ps[i].x-ps[i-1].x,ps[i].y-ps[i-1].y));
  const length=ds.at(-1),start=!!options.start,end=options.end!==false,count=Number(start)+Number(end);
- const size=Math.min(options.length??Math.max(7,width*4),length/(count||1)*.82);
+ const size=Math.min(options.length??Math.max(7,width*6),length/(count||1)*.82);
  const sample=d=>{let i=1;while(i<ds.length-1&&ds[i]<d)i++;const k=(d-ds[i-1])/(ds[i]-ds[i-1]);return {x:ps[i-1].x+(ps[i].x-ps[i-1].x)*k,y:ps[i-1].y+(ps[i].y-ps[i-1].y)*k};};
  const lo=start?size:0,hi=end?length-size:length,shaft=[sample(lo),...ps.filter((_,i)=>ds[i]>lo&&ds[i]<hi),sample(hi)],heads=[];
  const head=(tip,base)=>{
   const dx=tip.x-base.x,dy=tip.y-base.y,len=Math.hypot(dx,dy);
   if(len<1e-8)return;
-  const half=Math.min(options.halfWidth??Math.max(width*.85,size*.42),len*.75);
+  const half=Math.min(options.halfWidth??Math.max(width*.85,size*.5),len*.75);
   heads.push({tip,base,vertices:[tip,{x:base.x-dy/len*half,y:base.y+dx/len*half},{x:base.x+dy/len*half,y:base.y-dx/len*half}]});
  };
  if(start)head(ps[0],shaft[0]);if(end)head(ps.at(-1),shaft.at(-1));
