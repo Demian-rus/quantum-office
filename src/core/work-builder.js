@@ -36,14 +36,14 @@ function qwInstallPanels(root,key,toolbar,panels){
 }
 // An internal mode occupies the same shell body; no modal top layer, no second route.
 // Keep the underlying document DOM mounted (including scroll and selection).
-function qwReleaseMode(d){const host=d?.closest('.qw-mode-host');if(!host)return;const body=host.parentElement;if(!body)return;host.remove();body.classList.remove('qw-mode-active');for(const el of body.children){el.inert=false;}}
+function qwReleaseMode(d){const host=d?.closest('.qw-mode-host');if(!host)return;const body=host.parentElement;if(!body)return;host.remove();body.classList.remove('qw-mode-active');for(const el of body.children){el.inert=false;}if(host.qwReturnScroll!==undefined){const center=body.querySelector('.qw-center');if(center)center.scrollTop=host.qwReturnScroll;}}
 function qwCanNavigate(){const d=document.getElementById('qw-dialog');return !d?.qwCanLeave||d.qwCanLeave();}
 function qwOpenMode(d,mode){
  const body=document.querySelector('.qo-education-workspace>.qo-education-body');if(!body)throw Error('Рабочая область недоступна');
  const host=document.createElement('section');host.className='qw-mode-host';host.dataset.qwMode=mode;host.setAttribute('aria-label',d.querySelector('header strong').textContent);
- for(const el of body.children)el.inert=true;body.classList.add('qw-mode-active');body.append(host);host.append(d);d.classList.add('qw-workspace-mode');
+ host.qwReturnScroll=body.querySelector('.qw-center')?.scrollTop;for(const el of body.children)el.inert=true;body.classList.add('qw-mode-active');body.append(host);host.append(d);d.classList.add('qw-workspace-mode');
  d.querySelector('[data-qw-close]').setAttribute('aria-label','Вернуться');d.querySelector('[data-qw-close]').title='Вернуться';
- const close=d.close.bind(d);d.close=(...args)=>{close(...args);qwReleaseMode(d);};
+ const close=d.close.bind(d),remove=d.remove.bind(d);d.close=(...args)=>{close(...args);qwReleaseMode(d);};d.remove=()=>{qwReleaseMode(d);remove();};
  const leave=()=>{if(!d.qwCanLeave||d.qwCanLeave())d.close();};
  d.querySelector('[data-qw-close]').onclick=leave;
  d.addEventListener('keydown',e=>{if(e.key==='Escape')queueMicrotask(()=>{if(!e.defaultPrevented&&d.isConnected&&d.open)leave();});});
@@ -548,7 +548,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
  collect();const initialDraft=JSON.stringify(draft);d.qwCanLeave=()=>{collect();return JSON.stringify(draft)===initialDraft||confirm('Отменить несохранённые изменения задания?');};
  const back=()=>{if(!d.qwCanLeave())return;d.close();if(active())void qwBank(returnFilters);};
  d.addEventListener('cancel',event=>{event.preventDefault();back();});
- d.addEventListener('keydown',event=>{if(originPage==='bank'&&event.key==='Escape'){event.preventDefault();back();}});
+ d.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();back();}});
  d.querySelector('[data-qw-close]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-back"]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-save"]').onclick=async()=>{

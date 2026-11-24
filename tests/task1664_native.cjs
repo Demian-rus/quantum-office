@@ -159,9 +159,11 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
    select.value=alternate.value;select.dispatchEvent(new Event('change',{bubbles:true}));if(qwDoc.layout!==alternate.value)throw Error('Layout did not change');
    if(!qoDraftStorage.pending||!document.getElementById('qo-native-draft-notice').hidden)throw Error('Layout change not quiet');
   },oldLayout);
-  assert.deepEqual(await measure(),base,'pending moves workspace');
-  await page.evaluate(()=>qoDraftStorage.flush());assert.deepEqual(await measure(),base,'ACK moves workspace');
-  await page.evaluate(()=>document.getElementById('qw-dialog').close());
+  const layoutMode=await page.evaluate(()=>{const b=document.querySelector('.qw-mode-host').getBoundingClientRect(),h=document.querySelector('.global-bar').getBoundingClientRect(),d=document.getElementById('qw-dialog');return {body:[b.x,b.y,b.width,b.height],header:[h.x,h.y,h.width,h.height],modal:d.matches(':modal')};});
+  assert.deepEqual(layoutMode.header,base['.global-bar'],'opening PDF must not move shell header');assert.equal(layoutMode.modal,false);assert.ok(layoutMode.body[2]>0&&layoutMode.body[3]>0);
+  await page.evaluate(()=>qoDraftStorage.flush());
+  assert.deepEqual(await page.evaluate(()=>{const b=document.querySelector('.qw-mode-host').getBoundingClientRect(),h=document.querySelector('.global-bar').getBoundingClientRect(),d=document.getElementById('qw-dialog');return {body:[b.x,b.y,b.width,b.height],header:[h.x,h.y,h.width,h.height],modal:d.matches(':modal')};}),layoutMode,'ACK moves layout workspace');
+  await page.evaluate(()=>document.getElementById('qw-dialog').close());assert.deepEqual(await measure(),base,'return from layout moves workspace');
   setDraftDenial(true);
   await page.evaluate(async layout=>{
    qwDoc.layout=layout;qwPersist();
@@ -213,6 +215,15 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  assert.equal(await page.evaluate(async()=>JSON.stringify((await qwBankRepository.getTask('native-0')).task)),originalBankFigure,'local layout must not alter bank');
  const manualFigure=await page.evaluate(async()=>{await qoDraftStorage.flush();return {id:qwDoc.tasks[0].id,width:qwDoc.tasks[0].figureWidth,mode:qwDoc.tasks[0].figureWidthMode};});
  fs.writeFileSync(path.join(out,'native-manual-figure.json'),JSON.stringify(manualFigure,null,2));
+ await page.locator('[data-qw-close]').click();
+ // TASK167.3: real installed WebView2 preference and shell mode acceptance.
+ await page.evaluate(()=>qwPreview());await page.locator('[data-qw-dock-toggle="left"]').click();
+ assert.equal(await page.locator('.qw-pdf-design').isVisible(),false);
+ await page.locator('[data-qw-dock-toggle="left"]').click();
+ await page.locator('[data-qw-dock-resize="left"]').focus();await page.keyboard.press('Shift+ArrowRight');
+ const dock=await page.evaluate(()=>qwPanelPreference('pdf'));assert.ok(dock.left>254&&!dock.hideLeft);
+ fs.writeFileSync(path.join(out,'native-dock-pref.json'),JSON.stringify(dock,null,2));
+ await page.screenshot({path:path.join(out,'native-dock-layout.png')});
  await page.locator('[data-qw-close]').click();
  // Controlled response tests for save acknowledgement in actual WebView2.
  // SQLite IPC above remains real; this test only controls the save dialog result.
@@ -300,6 +311,9 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const checks={rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:JSON.stringify(draft.live.images)===JSON.stringify(before.live.images),diskMatches:draft.diskMatches===true,storageError:!draft.storageError,notCorrupt:!draft.corrupt,noPending:!draft.pending&&!draft.nativeError,finalEdit:await page.evaluate(()=>qwDoc.instructions==='TASK1664 final edit before ordinary close')};
  const manualFigure=JSON.parse(fs.readFileSync(path.join(out,'native-manual-figure.json'),'utf8'));
  checks.manualFigure=await page.evaluate(expected=>{const q=qwDoc.tasks.find(t=>t.id===expected.id);return q?.figureWidth===expected.width&&q.figureWidthMode===expected.mode;},manualFigure);
+ // Profile preferences are checked across ordinary and same-profile reinstall; Portable may intentionally use an independent WebView profile.
+ const dock=JSON.parse(fs.readFileSync(path.join(out,'native-dock-pref.json'),'utf8'));
+ if(stage!=='portable')checks.dockPreference=await page.evaluate(expected=>{const actual=qwPanelPreference('pdf');return Object.keys(expected).every(k=>actual[k]===expected[k]);},dock);
  const editors=await inspectEditors(page);recordDraft('editors-'+stage,editors);
  const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
  for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];
