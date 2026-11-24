@@ -76,7 +76,7 @@ function printMetrics(){
   if(b.left<c.left-1||b.right>c.right+1||b.bottom>c.bottom+1)bounds.push(section.dataset.task);
   const text=section.querySelector('.qw-task-text'),fig=section.querySelector('figure'),answer=section.querySelector('.qw-booklet-answer'),table=section.querySelector('table');
   if(answer&&[text,fig,table].some(e=>e&&intersects(box(answer),box(e))))overlap.push(section.dataset.task);
-  if(table&&text&&box(table).top<box(text).bottom-1)overlap.push('table:'+section.dataset.task);
+  if(table&&text&&!text.contains(table))overlap.push('table moved out of condition:'+section.dataset.task);
  }
  return {error:window.__qwPrintError||null,ready:doc.body.dataset.qwLayoutReady,orientation:doc.body.dataset.qwOrientation,report,bodyFont:getComputedStyle(doc.body).fontFamily,
   taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,bounds,overlap,
@@ -88,7 +88,7 @@ function checkPrint(m,orientation){
  assert.deepEqual(m.bounds,[]);assert.deepEqual(m.overlap,[]);assert.ok(m.sheets.length>=2,'need multiple physical pages');
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');
-  if(i<m.sheets.length-1)assert.equal(s.columns,2);
+  if(orientation==='portrait')assert.equal(s.columns,1);else if(i<m.sheets.length-1)assert.equal(s.columns,2);
   assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(17, 17, 17)');assert.equal(s.brandSize,'20px');
   assert.ok(s.brandRight>=0&&s.brandRight<4&&s.brandBottom>=0&&s.brandBottom<4,'brand not bottom right');
  }
@@ -134,15 +134,35 @@ async function comparePrint(page,out){
     // document solely for this test; never print the surrounding application.
     const session=await page.context().newCDPSession(page);
     try{
-     await page.evaluate(async id=>{
-      const f=document.getElementById(id),src=f.contentDocument,head=src.head.cloneNode(true),body=src.body.cloneNode(true);
+     const images=await page.evaluate(async id=>{
+      const f=document.getElementById(id),src=f.contentDocument;
+      const sourceImages=[...src.images].map((img,index)=>({index,task:img.closest('[data-task]')?.dataset.task,src:img.getAttribute('src'),width:img.naturalWidth,height:img.naturalHeight}));
+      if(sourceImages.some(i=>!i.width||!i.height))throw Error('Prepared frame already has undecoded image');
+      const head=document.importNode(src.head,true),body=document.createElement('body');
+      for(const attr of src.body.attributes)body.setAttribute(attr.name,attr.value);
+      body.innerHTML=src.body.innerHTML;
+      // Avoid adopting img elements from a document about to be destroyed.
+      // Create each image in the destination document, assigning its exact source
+      // only after attachment. Keep the source frame until decoding finishes.
+      const targets=[...body.querySelectorAll('img')].map((old,index)=>{
+       const img=document.createElement('img');for(const attr of old.attributes)if(attr.name!=='src')img.setAttribute(attr.name,attr.value);
+       old.replaceWith(img);return {img,source:sourceImages[index]};
+      });
+      if(targets.length!==sourceImages.length)throw Error('Image count changed during print promotion');
       head.querySelectorAll('script').forEach(e=>e.remove());body.querySelectorAll('script').forEach(e=>e.remove());
       const saved={head:document.head,body:document.body,links:[...head.querySelectorAll('link[rel=stylesheet]')].map(l=>l.href)};
       window.__qoVisualSwap=saved;
       const links=[...head.querySelectorAll('link[rel=stylesheet]')];const loads=links.map(l=>new Promise((resolve,reject)=>{l.onload=resolve;l.onerror=()=>reject(Error('Print CSS reload failed'));}));
       document.head.replaceWith(head);document.body.replaceWith(body);await Promise.all(loads);
-      void body.offsetHeight;await document.fonts.ready;await Promise.all([...body.querySelectorAll('img')].map(i=>i.decode()));
+      const imageProof=await Promise.all(targets.map(async({img,source})=>{
+       img.src=source.src;
+       try{await img.decode();}catch(e){throw Error('Print promotion image #'+source.index+' task '+source.task+' '+source.src.slice(0,40)+' length '+source.src.length+': '+e.message);}
+       if(img.naturalWidth!==source.width||img.naturalHeight!==source.height||img.getAttribute('src')!==source.src)throw Error('Image changed during print promotion: task '+source.task);
+       return {task:source.task,index:source.index,width:source.width,height:source.height,length:source.src.length,mime:source.src.split(';')[0]};
+      }));
+      void body.offsetHeight;await document.fonts.ready;return imageProof;
      },id);
+     fs.writeFileSync(path.join(out,'print-'+orientation+'-image-decode.json'),JSON.stringify(images,null,2));
      await session.send('Emulation.setEmulatedMedia',{media:'print'});
      const pdf=await session.send('Page.printToPDF',{preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false,marginTop:0,marginBottom:0,marginLeft:0,marginRight:0,scale:1});
      fs.writeFileSync(path.join(out,'print-'+orientation+'-windows.pdf'),Buffer.from(pdf.data,'base64'));

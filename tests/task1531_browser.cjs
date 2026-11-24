@@ -52,20 +52,19 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
       while(node=walker.nextNode()){if(!node.textContent.trim())continue;const range=document.createRange();range.selectNodeContents(node);
        for(const r of range.getClientRects())if(Math.min(r.right,fr.right)-Math.max(r.left,fr.left)>.5&&Math.min(r.bottom,fr.bottom)-Math.max(r.top,fr.top)>.5)collisions.push(section.dataset.task);}
     }
-    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:[...document.querySelectorAll('.qw-print-sheet')].map(p=>p.querySelector('.qw-booklet-brand .qw-qx-lettering')?.textContent||''),collisions,answer:{left:bounds(answer).left,top:bounds(answer).top,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
+    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:(document.querySelectorAll('.qw-print-sheet').length?[...document.querySelectorAll('.qw-print-sheet')]:pages).map(p=>p.querySelector('.qw-booklet-brand .qw-qx-lettering')?.textContent||''),collisions,answer:{left:bounds(answer).left,top:bounds(answer).top,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
      sqrt:document.querySelectorAll('math msqrt').length,figures:document.querySelectorAll('.qw-print-section svg').length,
      footer:pages.map(p=>p.querySelector('.qw-page-footer')?.textContent||''),report:window.__qwPrintLayout};
    });
-   assert.ok(data.pages>=2&&data.pages<=3);
+   assert.ok(data.pages>=1&&data.pages<=3);
    assert.deepEqual(data.taskIds,Array.from({length:16},(_,i)=>i+1));
    assert.deepEqual(data.headers,Array(data.pages).fill(''));
    assert.deepEqual(data.meta,Array(data.pages).fill(''));
    assert.deepEqual(data.collisions,[]);
-   if(orientation==='landscape')assert.ok(data.answer.left<data.figure.left&&Math.abs(data.answer.bottom-data.figure.bottom)<10,'side answer when text fits');
-   else assert.ok(data.answer.top>=data.figure.bottom-.5,'portrait answer follows illustration');
+   assert.ok(data.answer.top>=data.figure.bottom-.5||(data.answer.left<data.figure.left&&Math.abs(data.answer.bottom-data.figure.bottom)<10),'answer follows condition or aligns safely beside figure');
    assert.ok(data.answer.left>0&&data.text.bottom<data.answer.bottom);
    assert.ok(data.mathPads>=2&&data.sqrt===1&&data.figures>=3);
-   assert.equal(data.brands.length,Math.ceil(data.pages/2));
+   assert.equal(data.brands.length,orientation==='landscape'?Math.ceil(data.pages/2):data.pages);
    assert.equal(data.brands.filter(Boolean).length,theme?data.brands.length:0);
    for(const p of data.report.pages)assert.ok(p.freeMm>=-.7,'page overflow');
    await page.emulateMedia({media:'print'});
