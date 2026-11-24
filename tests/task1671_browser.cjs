@@ -10,7 +10,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
  const p=await context.newPage(),errors=[],measurements=[];
  p.on('pageerror',e=>errors.push(String(e)));p.on('dialog',d=>d.accept());
  const url=pathToFileURL(path.join(root,'Quantum-Office.html')).href;
- const route=async target=>{await p.locator('.global-bar [data-target="'+target+'"]').click();assert.equal(await p.evaluate(()=>page),target);};
+ const route=async target=>{await p.locator('.global-bar .modules [data-target="'+target+'"]').click();assert.equal(await p.evaluate(()=>page),target);};
  const ready=()=>p.locator('#qo-bank-root .qw-bank-filter-panel').waitFor();
  const snapshot=()=>p.evaluate(()=>JSON.stringify(qwDoc));
  try{
@@ -61,7 +61,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
   await p.reload();await route('work');assert.equal(await snapshot(),saved);
   await route('writer');assert.match(await p.locator('#qo-writer-page').innerText(),/Independent Writer/);
   await route('diagnostics');assert.equal(await p.evaluate(()=>JSON.stringify(qdWorkingDoc())),diagnosis);
-  await route('bank');await ready();assert.ok(await p.locator('[data-bank-view="task1671-bank"]').count());
+  await route('bank');await ready();await p.locator('[data-bank-view="task1671-bank"]').waitFor();
   for(const [width,height] of [[1920,1080],[1440,900],[1024,768]])for(const theme of ['light','dark']){
    await p.setViewportSize({width,height});await p.evaluate(t=>{qoThemePreference=t;qoApplyAppearance();},theme);
    for(const target of ['home','writer','diagnostics','work','bank']){

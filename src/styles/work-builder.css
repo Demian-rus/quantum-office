@@ -603,3 +603,6 @@
 #qo-bank-root>.qw-bank-inline[open] {display:flex;flex:1;flex-direction:column}
 #qo-bank-root>.qw-bank-inline>header {flex:none}
 #qo-bank-root>.qw-bank-inline.qw-bank-expanded {width:100%;height:100%}
+
+#qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:auto}
+#qo-bank-root>.qw-bank-inline>footer {flex:none;flex-wrap:wrap}
