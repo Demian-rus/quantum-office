@@ -66,7 +66,8 @@ const out=path.join(root,'evidence/task1663');
    let invalid=false,mime=false;
    try{await b.createTask(task('bad','data:image/png;base64,A'));}catch(e){invalid=true;}
    try{await b.createTask(task('bad-mime','data:image/svg+xml;base64,YQ=='));}catch(e){mime=true;}
-   check(invalid&&mime&&bankStableJSON(await b._captureBackupSnapshot())===original,'invalid inputs changed bank');
+   let raster=false;try{await b.createTask(task('not-raster','data:image/png;base64,YWJj'));}catch(e){raster=e.code==='ASSET_RASTER';}
+   check(invalid&&mime&&raster&&bankStableJSON(await b._captureBackupSnapshot())===original,'invalid inputs changed bank');
    const sharedKey=raw.find(r=>r.id==='shared-a').imageAsset.key;
    const good=await read(b.db,'assets',sharedKey),corrupt=structuredClone(good);new Uint8Array(corrupt.bytes)[0]^=1;await put(b.db,'assets',corrupt);
    let checksum=false,collision=false,backupRejected=false;
@@ -117,7 +118,7 @@ const out=path.join(root,'evidence/task1663');
    IDBObjectStore.prototype.get=function(k){if(this.name==='assets')assetReads++;return oldGet.call(this,k);};
    try{await b.listTasks({},{limit:30,includeImages:false});check(assetReads===0,'catalogue loads images');await b.getTask(one.id);check(assetReads===1,'selected image not loaded on demand');}finally{IDBObjectStore.prototype.get=oldGet;}
    await target.close();
-   return {migration:{blocked,interrupted:partial.filter(r=>r.imageAsset).length,completed:migrated.length,assets:migrationStats.count,malformedRetained:true},shared:first,quota,invalid,mime,checksum,collision,backupRejected,cleanupFailed,cleaned,cancelled,restoreRollback:failed,byteExact:true,officeV3:true,qworkV1:true,lazyReads:assetReads,archiveCount:archive.count};
+   return {migration:{blocked,interrupted:partial.filter(r=>r.imageAsset).length,completed:migrated.length,assets:migrationStats.count,malformedRetained:true},shared:first,quota,invalid,mime,raster,checksum,collision,backupRejected,cleanupFailed,cleaned,cancelled,restoreRollback:failed,byteExact:true,officeV3:true,qworkV1:true,lazyReads:assetReads,archiveCount:archive.count};
   });
   await p.evaluate(()=>qwBank({__view:'shared-a'}));
   await p.locator('#qw-bank-preview img').waitFor({state:'visible'});

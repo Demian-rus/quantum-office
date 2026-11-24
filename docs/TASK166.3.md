@@ -1,6 +1,6 @@
 # TASK166.3 — binary bank images (candidate)
 
-Base ab2064c8e874708385525d7505e14c0780645988. IndexedDB v2 adds assets (key = MIME + ':' + SHA-256, ArrayBuffer, MIME, length, digest); preserves tasks, indexes and meta. Internal task rows use imageAsset and empty task.image. QWORK v1, QWBANK v1/v2/v3 and .qbackup v3 retain original data URL, including exact original Base64 final quartet. Legacy accepted bytes are retained; declared MIME and Base64 checks are not validation that every historical raster renders. New editor files already undergo image decoding.
+Base ab2064c8e874708385525d7505e14c0780645988. IndexedDB v2 adds assets (key = MIME + ':' + SHA-256, ArrayBuffer, MIME, length, digest); preserves tasks, indexes and meta. Internal task rows use imageAsset and empty task.image. QWORK v1, QWBANK v1/v2/v3 and .qbackup v3 retain original data URL, including exact original Base64 final quartet. All Base64 is decoded and hashed. Active raster images additionally require matching PNG/JPEG/WebP byte signatures and successful browser decoding. Dormant image fields in legacy QWORK (figure=graph/diagram/none) may contain arbitrary historical test/legacy bytes, so these are preserved verbatim rather than discarded; they cannot be activated as images until decoded successfully. Malformed active legacy images keep their original row and prevent migration completion. Editor uploads decode before acceptance.
 
 Schema upgrade preserves original object stores. Batches of 16 prepare bytes/hash before writes, then compare old row and atomically commit bytes/references. Failed batches abort; earlier batches remain valid; no completion marker until all inline rows are converted and references checked. Failure leaves original inline data available for repair/export; reopen retries. Existing raw legacy localStorage provenance remains untouched. Old v1 windows block upgrade; no fallback blank database. Concurrent v2 writes use CAS. Explicit mark-and-sweep holds one transaction over tasks/assets; missing refs abort. No automatic deletion.
 
@@ -8,3 +8,5 @@ CRUD/import share transactions with assets. Logical snapshot includes consistent
 
 Tests and measured results: pending candidate verification.
 The transaction helper keeps the original failure cause (e.g. quota) rather than masking it with secondary abort errors from outstanding requests. New tests separately check the actual rollback and failure reason. The benchmark uses deterministic 64×64 rasters, not a claim about maximum-size images.
+
+Opening a v1 bank displays batch progress; corrupted previews report the problem without removing the original bytes. No object URLs are retained (decoder fallback revokes immediately).

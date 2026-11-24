@@ -24,3 +24,10 @@ test('TASK166.3 binary mutation and missing references are detected',async()=>{
  await assert.rejects(()=>bankAssetVerifyMap(p.assets),{code:'ASSET_CHECKSUM'});
  assert.throws(()=>bankAssetUnpack(p.records[0],new Map()),{code:'ASSET_CORRUPT'});
 });
+
+test('TASK166.3 active raster must match its MIME signature',async()=>{
+ const invalid=row('active','data:image/png;base64,YWJj');invalid.task.figure='image';
+ await assert.rejects(()=>bankAssetPrepareMany([invalid]),{code:'ASSET_RASTER'});
+ invalid.task.figure='graph';const preserved=await bankAssetPrepareMany([invalid]);
+ assert.deepEqual(bankAssetUnpack(preserved.records[0],preserved.assets),invalid);
+});

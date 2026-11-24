@@ -95,13 +95,13 @@ class BankRepository{
   this.normalize=normalize;
   this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;this._restorePlan=null;this.assetMigrationError=null;
  }
- async open(){
+ async open({onProgress}={}){
   if(this._opening)return this._opening;
   if(this.db)return this;
-  this._opening=this._open();
+  this._opening=this._open({onProgress});
   try{return await this._opening;}finally{this._opening=null;}
  }
- async _open(){
+ async _open({onProgress}={}){
   if(!this.factory)throw new BankStorageError('IndexedDB недоступна. Банк не будет записан; сохраните QWBANK.', 'IDB_UNAVAILABLE');
   const db=await new Promise((resolve,reject)=>{
    let request;
@@ -128,7 +128,7 @@ class BankRepository{
   });
   db.onversionchange=()=>{db.close();if(this.db===db)this.db=null;};
   this.db=db;
-  try{await this._migrateLegacy();await this.migrateAssets();return this;}
+  try{await this._migrateLegacy();await this.migrateAssets({onProgress});return this;}
   catch(e){this.db=null;db.close();throw e;}
  }
  _db(){if(!this.db)throw new BankStorageError('Банк не открыт. Повторите подключение к хранилищу.', 'IDB_CLOSED');return this.db;}

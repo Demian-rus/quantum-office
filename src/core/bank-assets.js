@@ -19,6 +19,25 @@ function bankAssetValidate(asset,ref){
  !Number.isInteger(ref.size)||ref.size<1||asset.size!==ref.size||bankAssetBytes(asset.bytes).length!==ref.size)
  throw new BankAssetError('Вложение отсутствует или повреждено','ASSET_CORRUPT');
 }
+async function bankAssetValidateRaster(asset){
+ const bytes=bankAssetBytes(asset.bytes);
+ const png=bytes.length>=8&&[137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v);
+ const jpeg=bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+ const webp=bytes.length>=12&&String.fromCharCode(...bytes.subarray(0,4))==='RIFF'&&String.fromCharCode(...bytes.subarray(8,12))==='WEBP';
+ const actual=png?'image/png':jpeg?'image/jpeg':webp?'image/webp':'';
+ if(actual!==asset.mime)throw new BankAssetError('Содержимое изображения не соответствует PNG/JPEG/WebP','ASSET_RASTER');
+ // Node tests verify the signature; Chromium also decodes the real raster.
+ const blob=new Blob([asset.bytes],{type:asset.mime});
+ if(typeof createImageBitmap==='function'){
+  let bitmap;try{bitmap=await createImageBitmap(blob);if(!bitmap.width||!bitmap.height)throw Error();}
+  catch{throw new BankAssetError('Изображение повреждено и не открывается','ASSET_RASTER');}
+  finally{bitmap?.close();}
+ }else if(typeof Image==='function'){
+  const url=URL.createObjectURL(blob);try{const img=new Image();img.src=url;await img.decode();if(!img.naturalWidth||!img.naturalHeight)throw Error();}
+  catch{throw new BankAssetError('Изображение повреждено и не открывается','ASSET_RASTER');}
+  finally{URL.revokeObjectURL(url);}
+ }
+}
 async function bankAssetPrepareMany(records){
  const cache=new Map(),assets=new Map(),packed=[];
  for(const record of records){
@@ -42,6 +61,10 @@ async function bankAssetPrepareMany(records){
    if(prior&&!bankAssetSameBytes(prior.bytes,prepared.asset.bytes))throw new BankAssetError('Несовпадение двоичных данных SHA-256','ASSET_COLLISION');
    assets.set(key,prepared.asset);cache.set(url,prepared);
   }
+  // Historical QWORK records may retain dormant bytes even when figure is
+  // graph/diagram/none. Keep those exact bytes; require a decodable raster
+  // whenever the image is actually used, including migration/restore.
+  if(record.task.figure==='image'&&!prepared.rasterChecked){await bankAssetValidateRaster(prepared.asset);prepared.rasterChecked=true;}
   packed.push({...record,task:{...record.task,image:''},imageAsset:prepared.ref});
  }
  return {records:packed,assets};

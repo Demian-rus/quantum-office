@@ -253,7 +253,7 @@ function qwBankNormalize(x){
   difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
 const qwBankRepository=createBankRepository({normalize:qwBankNormalize});
-async function qwBankOpen(){await qwBankRepository.open();return qwBankRepository;}
+async function qwBankOpen(){await qwBankRepository.open({onProgress:count=>status('Перенос изображений банка: '+count+' заданий…')});return qwBankRepository;}
 async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
  qwBankSnapshot=stats.count<=500?await qwBankRepository.snapshotMetadata():[];
@@ -455,7 +455,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
     const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Файл не прочитан'));reader.readAsDataURL(file);
    });
    if(typeof data!=='string'||data.length>6_000_000)throw Error('Изображение слишком велико');
-   task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
+   await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
   }catch(e){showError(e.message);}
  };
  const back=()=>{d.close();qwBank(returnFilters);};
@@ -592,6 +592,8 @@ async function qwBank(previousFilters={}){
     '<div class="qw-bank-solution-body qw-rich"><section>'+solutionTitle+details+'</section>'+
     '<section><h3>Ответ</h3>'+answer+'</section>'+
     '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
+  const illustration=host.querySelector('img[alt="Иллюстрация задания"]');
+  if(illustration){const failed=()=>{if(token===previewSequence&&d.isConnected)reportStatus('Изображение повреждено. Исходные данные сохранены; можно заменить рисунок через редактирование.',true);};illustration.addEventListener('error',failed,{once:true});if(illustration.complete&&!illustration.naturalWidth)failed();}
  }
  const refresh=async()=>{
   const token=++requestSequence;
@@ -850,7 +852,7 @@ async function qwBank(previousFilters={}){
   }
   const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');
   if(add){
-   if(add.dataset.bankAdd){void qwBankRepository.getTask(add.dataset.bankAdd).then(entry=>{if(entry){const task=entry.task;if(qwDoc.tasks.length>=80){status('Не удалось добавить задание',true);return;}qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}else status('Задание недоступно',true);}).catch(error=>reportStatus(error.message,true));return;}
+   if(add.dataset.bankAdd){void qwBankRepository.getTask(add.dataset.bankAdd).then(entry=>{if(entry&&d.isConnected&&d.open){const task=entry.task;if(qwDoc.tasks.length>=80){status('Не удалось добавить задание',true);return;}qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}else status('Задание недоступно',true);}).catch(error=>reportStatus(error.message,true));return;}
    const own=null;
    const item=add.dataset.diagBank?diagnostic.find(x=>x.id===add.dataset.diagBank):null;
    const task=own||(item?qwFromDiagnostic(item.question||item):null);
