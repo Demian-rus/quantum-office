@@ -47,22 +47,6 @@ async function inspectEditors(page){
 }
 function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
 (async()=>{
-  const digest=async v=>v===null||v===undefined?null:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,'0')).join('');
-  const image=async q=>({title:q?.title??null,count:q?.tasks?.length??null,imagePresent:!!q?.tasks?.[0]?.image,imageSha256:await digest(q?.tasks?.[0]?.image)});
-  const result={origin:location.origin,marker:false,rawPresent:false,rawBytes:null,rawSha256:null,parse:null,validate:null,storageError:qwStorageError,corrupt:!!qwCorrupt,live:await image(qwDoc)};
-  try{
-   result.marker=!!localStorage.getItem('task1664-ci-restart');
-   const raw=localStorage.getItem(QW_KEY);result.rawPresent=raw!==null;
-   if(raw!==null){result.rawBytes=new TextEncoder().encode(raw).length;result.rawSha256=await digest(raw);
-    let parsed;try{parsed=JSON.parse(raw);result.parse={ok:true,...await image(parsed)};}catch(e){result.parse={ok:false,error:e.message};}
-    if(result.parse.ok)try{result.validate={ok:true,...await image(qwValidate(parsed))};}catch(e){result.validate={ok:false,error:e.message};}
-   }
-  }catch(e){result.readError=e.message;}
-  return result;
- });
-}
-function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
-(async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable Windows CI only');
  const {page}=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);
  const errors=[],messages=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(['error','warning'].includes(m.type()))messages.push({type:m.type(),text:m.text()});});
