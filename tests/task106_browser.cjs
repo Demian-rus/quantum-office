@@ -11,9 +11,9 @@ const {pathToFileURL}=require('node:url');
  await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
  await page.evaluate(()=>route('writer'));
  await page.locator('.global-bar [data-target="diagnostics"]').click();
- assert.equal(await page.locator('.qo-document-workspace [data-editor-panel="writer"][data-panel-tab="diagnostic"] .qo-work-group').count(),2,'only file and template command groups');
+ assert.equal(await page.locator('.qo-document-workspace [data-education-ribbon="diagnostics"] .qo-work-group').count(),2,'only file and template command groups');
  assert.equal(await page.locator('.qo-diag-guide-group').count(),0,'obsolete guidance removed');
- assert.equal(await page.locator('[data-panel-tab="diagnostic"] .qo-work-btn').count(),6,'all file controls remain');
+ assert.equal(await page.locator('[data-education-ribbon="diagnostics"] .qo-work-btn').count(),6,'all file controls remain');
  await page.locator('[data-qd-action="mode"][data-mode="library"]').click();
  assert.equal(await page.locator('.qd-library-card').count(),14);
  const width=await page.evaluate(()=>({

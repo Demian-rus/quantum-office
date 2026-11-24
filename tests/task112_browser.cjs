@@ -21,7 +21,7 @@ const {pathToFileURL}=require('node:url');
      return {x:x.x,y:x.y,width:x.width,height:x.height,right:x.right};};
    return {viewport:document.documentElement.clientWidth,overflow:document.documentElement.scrollWidth,
     root:rect('#qo-diag-root'),left:rect('.qd-topic-navigator'),middle:rect('.qd-workbench-main'),
-    right:rect('.qd-side-insights'),ribbon:rect('[data-panel-tab="diagnostic"]'),
+    right:rect('.qd-side-insights'),ribbon:rect('[data-education-ribbon="diagnostics"]'),
     tile:rect('[data-action="writer-diag-export"]'),
     card:rect('.qd-guided>.qd-chat-card')};
  });
@@ -37,8 +37,8 @@ const {pathToFileURL}=require('node:url');
  assert.equal(geometry.ribbon.height,78,'TASK117 standard-height tiled ribbon must fit');
  assert.ok(geometry.tile.width>=120&&geometry.tile.height>=28,'compact file controls must be readable tiles');
  assert.ok(geometry.overflow<=geometry.viewport+3,'no overflow on desktop');
- assert.equal(await page.locator('[data-panel-tab="diagnostic"] .qo-work-btn').count(),6);
- assert.equal(await page.locator('[data-panel-tab="diagnostic"] [data-action^="writer-diag-library"]').count(),0);
+ assert.equal(await page.locator('[data-education-ribbon="diagnostics"] .qo-work-btn').count(),6);
+ assert.equal(await page.locator('[data-education-ribbon="diagnostics"] [data-action^="writer-diag-library"]').count(),0);
  assert.equal(await page.locator('[data-qd-action="mode"]').count(),3,'mode switching only in one toolbar');
  assert.equal(await page.locator('.qd-filebar:visible').count(),0,'duplicate filebar removed');
  const pending=page.waitForEvent('download');
