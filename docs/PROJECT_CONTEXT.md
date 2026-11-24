@@ -1,5 +1,8 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## TASK166.3 — двоичные изображения банка (candidate)
+IndexedDB v2 добавляет assets; публичные QWORK и QWBANK v1/v2/v3 сохраняют data URL. Пакетная миграция, атомарные операции с вложениями, ручная очистка и выборочная загрузка. См. docs/TASK166.3.md. Приёмка только после проверок. Merge запрещён.
+
 ## TASK166.2 — проверяемая резервная копия банка (23.11.2026)
 
 Ветка feat/task166-2-bank-backup-recovery, Draft PR #155 в main от 8462e85d47b94e5a3fa6994f5f4dd6ce0400d9bf, merge запрещён. После TASK166.1 главная ветка проходит Verify и Chromium smoke; GitHub Pages deploy ломается на отсутствии настроенного Pages site (существующая внешняя проблема).

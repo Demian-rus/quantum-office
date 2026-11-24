@@ -1,0 +1,9 @@
+# TASK166.3 — binary bank images (candidate)
+
+Base ab2064c8e874708385525d7505e14c0780645988. IndexedDB v2 adds assets (key = MIME + ':' + SHA-256, ArrayBuffer, MIME, length, digest); preserves tasks, indexes and meta. Internal task rows use imageAsset and empty task.image. QWORK v1, QWBANK v1/v2/v3 and .qbackup v3 retain original data URL, including exact original Base64 final quartet. Legacy accepted bytes are retained; declared MIME and Base64 checks are not validation that every historical raster renders. New editor files already undergo image decoding.
+
+Schema upgrade preserves original object stores. Batches of 16 prepare bytes/hash before writes, then compare old row and atomically commit bytes/references. Failed batches abort; earlier batches remain valid; no completion marker until all inline rows are converted and references checked. Failure leaves original inline data available for repair/export; reopen retries. Existing raw legacy localStorage provenance remains untouched. Old v1 windows block upgrade; no fallback blank database. Concurrent v2 writes use CAS. Explicit mark-and-sweep holds one transaction over tasks/assets; missing refs abort. No automatic deletion.
+
+CRUD/import share transactions with assets. Logical snapshot includes consistent assets, SHA-256 verification outside IDB and portable hydration. Restore verifies input before atomic replacement of tasks, assets, metadata; current rows are compared before mutation and checked after commit. Catalogue requests metadata, selected preview loads one task. Compatibility-only small snapshot contains metadata (not images). QWORK/print/PDF receive hydrated records, never refs. Existing archive size limits and browser risks remain. No native adapter or SQLite.
+
+Tests and measured results: pending candidate verification.
