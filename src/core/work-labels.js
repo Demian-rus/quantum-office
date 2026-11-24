@@ -1,5 +1,6 @@
 /* Attached captions share a measured SVG layout in the editor, saved SVG and PDF.
    Model offsets are SVG-space vectors from the owning anchor to the caption centre. */
+import {qwAlignSVGText} from './work-layout.js';
 function qwLabelSVG(id,anchor,position,markup,options={}){
  const esc=s=>String(s).replace(/[&"<>]/g,c=>({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]));
  return '<g data-qw-label="'+esc(id)+'" data-label-anchor-x="'+anchor.x+'" data-label-anchor-y="'+anchor.y+'" data-label-mode="'+(options.free?'fixed':position?.mode||'auto')+'" data-label-dx="'+(position?.dx||0)+'" data-label-dy="'+(position?.dy||0)+'"'+(options.plot?' data-label-plot="true"':'')+(options.contour?' data-label-contour="'+esc(JSON.stringify(options.contour))+'" data-label-outward="'+esc(JSON.stringify(options.outward))+'"':'')+'>'+markup+'</g>';
@@ -60,7 +61,7 @@ function qwChooseLabelBox(anchor,initial,bounds,segments,occupied,contour=null,o
  }return best;
 }
 function qwPlaceSVGLabels(source){
- if(typeof document==='undefined'||!document.body||!source.includes('data-qw-label='))return source;
+ if(typeof document==='undefined'||!document.body||(!source.includes('data-qw-label=')&&!source.includes('data-axis-tip-x=')))return source;
  const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:520px;height:320px;visibility:hidden;pointer-events:none';host.innerHTML=source;document.body.append(host);
  try{
   const svg=host.querySelector('svg'),labels=[...svg.querySelectorAll('[data-qw-label]')],inverse=svg.getCTM().inverse();
@@ -89,6 +90,7 @@ function qwPlaceSVGLabels(source){
     const p=e.getPointAtLength(end==='start'?0:length),at=point(m,p.x,p.y),r=width*5;add({x:at.x-r,y:at.y},{x:at.x+r,y:at.y},r);
    }
   }
+  qwAlignSVGText(svg,{manual:false});
   const occupied=[...svg.querySelectorAll('text')].filter(e=>!e.closest('[data-qw-label],defs')).map(rect);
   // Explicit positions and free text are obstacles, never targets for automatic nudging.
   for(const e of labels.filter(e=>e.dataset.labelMode!=='auto')){
@@ -107,6 +109,7 @@ function qwPlaceSVGLabels(source){
    const conflict=ownFixed?qwChooseLabelBox(a,final,bounds,segments,others).initialScore:placement.score;
    e.dataset.labelConflict=String(conflict>0);e.style.cursor='grab';e.style.pointerEvents='bounding-box';
   }
+  if(svg.querySelector('.qw-axis-title[data-axis-tip-x]'))qwAlignSVGText(svg,{manual:false,expand:true});
   return new XMLSerializer().serializeToString(svg);
  }finally{host.remove();}
 }

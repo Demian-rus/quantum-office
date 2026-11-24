@@ -290,10 +290,11 @@ function qwGraphSVG(g,interactive=false,typography={}){
   numberBoxes.push(box);occupied.push(box);
   parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#263746">'+t.label+'</text>');
  }
- const titleFont=typography.titleFont||16,yTitleRight=axisX<(b.left+b.right)/2;
- const title=(axis,x,y,anchor,text,room)=>'<text class="qw-axis-title" data-axis="'+axis+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'"'+(text.length*titleFont*.6>room?' textLength="'+room+'" lengthAdjust="spacingAndGlyphs"':'')+' fill="#111">'+qwEsc(text)+'</text>';
- parts.push(title('x',b.right+30,axisY-12,'end',g.xlabel,b.right-b.left),
-  title('y',axisX+(yTitleRight?12:-12),b.top-22,yTitleRight?'start':'end',g.ylabel,yTitleRight?508-axisX-12:axisX-24));
+ const titleFont=typography.titleFont||16,gap=6;
+ const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#111">'+qwEsc(text)+'</text>';
+ // Final placement uses actual glyph bounds (including descenders and subscripts).
+ parts.push(title('x',xTip+gap,axisY+titleFont*.35,'start',g.xlabel,xTip,axisY),
+  title('y',axisX,yTip-gap,'middle',g.ylabel,axisX,yTip));
  if(g.curveFamily!=='points'){
   let d='',drawing=false;
   for(let i=0;i<=300;i++){

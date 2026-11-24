@@ -127,7 +127,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
-  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
+  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){
  let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
@@ -1075,7 +1075,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  let inspectorSelection='';
- const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect(),x=qwNum((e.clientX-b.left)/b.width*520,0,520,0),y=qwNum((e.clientY-b.top)/b.height*320,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
+ const point=e=>{const svg=stage.querySelector('svg'),p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()),x=qwNum(p.x,0,520,0),y=qwNum(p.y,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
   const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
  function selectOnly(index){selected=index;labelSelected='';multi=new Set(index<0?[]:[index]);}
  function selectedIndices(){return [...multi].sort((a,b)=>a-b);}
@@ -1090,7 +1090,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   return {object,ownerIndex,free:object.kind==='text',get:()=>edge?object.edgeLabelPositions?.[edgeIndex]:target.labelPosition,clear:()=>{if(edge)object.edgeLabels[edgeIndex]='';else target.label='';},set:p=>{if(edge){object.edgeLabelPositions??=object.vertices.map(()=>null);object.edgeLabelPositions[edgeIndex]=p;}else target.labelPosition=p;}};
  }
  function labelNode(){return labelSelected?stage.querySelector('[data-qw-label="'+labelSelected+'"]'):null;}
- function labelBox(node){const r=node.getBoundingClientRect(),s=stage.querySelector('svg').getBoundingClientRect();return {x:(r.left-s.left)/s.width*520,y:(r.top-s.top)/s.height*320,w:r.width/s.width*520,h:r.height/s.height*320};}
+ function labelBox(node){const r=node.getBoundingClientRect(),m=stage.querySelector('svg').getScreenCTM().inverse(),a=new DOMPoint(r.left,r.top).matrixTransform(m),z=new DOMPoint(r.right,r.bottom).matrixTransform(m);return {x:a.x,y:a.y,w:z.x-a.x,h:z.y-a.y};}
  function labelProperties(){
   const node=labelNode(),info=labelSelected&&labelInfo(labelSelected);if(!node||!info)return '';
   const conflict=node.dataset.labelConflict==='true'?'<p class="qw-error">Подпись пересекает рисунок или выходит за границы. Перетащите её или сбросьте положение.</p>':'';
@@ -1262,7 +1262,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  props.addEventListener('focusin',e=>{if(kind==='graph'&&e.target.dataset.pointIndex!==undefined){selectOnly(Number(e.target.dataset.pointIndex));draw(false);}});
  stage.onpointerdown=e=>{
   if(e.button!==0||drag)return;e.preventDefault();stage.focus();
-  const p=point(e),before=structuredClone(value),previous=selected,scale=stage.querySelector('svg').getBoundingClientRect().width/520;
+  const p=point(e),before=structuredClone(value),previous=selected,scale=Math.hypot(stage.querySelector('svg').getScreenCTM().a,stage.querySelector('svg').getScreenCTM().b);
   const prior=new Set(multi),coordinate=kind==='graph'?gridPoint(p):p;
   const caption=tool==='select'?e.target.closest('[data-qw-label]'):null;
   if(caption){const info=labelInfo(caption.dataset.qwLabel);if(info){const box=labelBox(caption),initial={dx:Number(caption.dataset.labelOffsetX),dy:Number(caption.dataset.labelOffsetY)};selectOnly(info.ownerIndex);labelSelected=caption.dataset.qwLabel;drag={label:labelSelected,free:info.free,before,previous,selection:prior,start:p,box,initial,screen:{x:e.clientX,y:e.clientY},pixels:0};stage.setPointerCapture(e.pointerId);draw();return;}}

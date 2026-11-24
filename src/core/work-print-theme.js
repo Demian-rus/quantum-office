@@ -132,6 +132,7 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
  color:#111!important;font:700 15pt/1 "QX Handwritten",cursive!important;
  letter-spacing:0!important;white-space:nowrap!important;text-transform:none!important;
 }
+.qw-print-brand.qw-booklet-brand{right:9mm!important;bottom:4.5875mm!important;transform:translateY(50%)!important}
 .qw-print-brand .qw-qx-lettering{display:block;white-space:nowrap;font:inherit;color:inherit;letter-spacing:inherit;
  -webkit-text-stroke:0;paint-order:normal;text-shadow:none}
 .qw-print-brand::after,.qw-print-brand::before{display:none!important;content:none!important}

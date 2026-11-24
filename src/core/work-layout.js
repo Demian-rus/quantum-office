@@ -2,7 +2,48 @@ import {QW_PRINT_FONT_CSS} from './work-print-fonts.js';
 import {qwPrintThemeStyles} from './work-print-theme.js';
 /* Print-only layout. Fonts and SVG ink are measured before any pagination.
    QWORK and editor geometry are never mutated by this document. */
+/* Measure in the destination SVG coordinate system. Browser text metrics can
+   change after viewBox/viewport sizing or when importing into WebView2 print.
+   Only text is repositioned; model points, grid and endpoints stay untouched. */
+function qwAlignSVGText(svg,options={}){
+ const root=svg.getCTM();if(!root)return;
+ const inverse=root.inverse();
+ const matrix=e=>inverse.multiply(e.getCTM());
+ const point=(m,x,y)=>({x:m.a*x+m.c*y+m.e,y:m.b*x+m.d*y+m.f});
+ const box=e=>{
+  const b=e.getBBox(),m=matrix(e),ps=[[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].map(([x,y])=>point(m,x,y));
+  const x=Math.min(...ps.map(p=>p.x)),y=Math.min(...ps.map(p=>p.y));
+  return {x,y,w:Math.max(...ps.map(p=>p.x))-x,h:Math.max(...ps.map(p=>p.y))-y};
+ };
+ const shift=(e,dx,dy)=>{
+  if(Math.abs(dx)<.0001&&Math.abs(dy)<.0001)return;
+  const m=matrix(e.parentElement),det=m.a*m.d-m.b*m.c;
+  if(Math.abs(det)<1e-12)return;
+  const x=(m.d*dx-m.c*dy)/det,y=(-m.b*dx+m.a*dy)/det;
+  e.setAttribute('transform','translate('+x+' '+y+') '+(e.getAttribute('transform')||''));
+ };
+ for(const e of svg.querySelectorAll('.qw-axis-title[data-axis-tip-x]')){
+  if(!e.textContent.trim())continue;
+  const tx=Number(e.dataset.axisTipX),ty=Number(e.dataset.axisTipY),vertical=e.dataset.axis==='y';
+  for(let i=0;i<3;i++){const b=box(e);shift(e,vertical?tx-b.x-b.w/2:tx+6-b.x,vertical?ty-6-b.y-b.h:ty-b.y-b.h/2);}
+ }
+ if(options.manual!==false)for(const e of svg.querySelectorAll('[data-qw-label][data-label-mode="manual"]')){
+  const owner=e.closest('[data-qw-label-owner]')||svg;
+  const a=point(matrix(owner),Number(e.dataset.labelAnchorX),Number(e.dataset.labelAnchorY));
+  const x=a.x+Number(e.dataset.labelDx),y=a.y+Number(e.dataset.labelDy);
+  for(let i=0;i<3;i++){const b=box(e);shift(e,x-b.x-b.w/2,y-b.y-b.h/2);}
+ }
+ if(options.expand){
+  // Keep the original editor viewport as minimum. Only expand for actual
+  // title bounds, so ordinary graphs retain the same on-screen coordinates.
+  const bounds=[...svg.querySelectorAll('.qw-axis-title[data-axis-tip-x]')].filter(e=>e.textContent.trim()).map(box);
+  const left=Math.min(0,...bounds.map(b=>b.x-4)),top=Math.min(0,...bounds.map(b=>b.y-4));
+  const right=Math.max(520,...bounds.map(b=>b.x+b.w+4)),bottom=Math.max(320,...bounds.map(b=>b.y+b.h+4));
+  svg.setAttribute('viewBox',[left,top,right-left,bottom-top].join(' '));
+ }
+}
 function qwMeasureSVGInk(svg){
+ qwAlignSVGText(svg);
  // Independent graph objects are clipped to the grid, which already belongs to
  // the measured ink. getBBox itself includes their invisible off-range geometry.
  const clipped=[...svg.querySelectorAll('g[clip-path="url(#qw-plot-clip)"]')].map(e=>({e,style:e.getAttribute('style')}));
@@ -263,8 +304,8 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
 /* Final print design: portrait one column; landscape two columns with one physical footer. */
 body[data-qw-format="booklet"] .qw-print-page{padding:8mm 9mm 10mm}
 body[data-qw-format="booklet"] .qw-page-content{width:192mm;height:279mm}
-body[data-qw-format="booklet"] .qw-print-header{margin-bottom:3mm}
-body[data-qw-format="booklet"] .qw-print-section{margin-bottom:3.5mm}
+body[data-qw-format="booklet"] .qw-print-header{margin-bottom:4.5mm}
+body[data-qw-format="booklet"] .qw-print-section{margin-bottom:5.25mm}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:7mm minmax(0,1fr);column-gap:2mm}
 body[data-qw-format="booklet"] .qw-booklet-entry>header{width:7mm;height:6mm}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{line-height:1.24;min-height:6mm}
@@ -451,7 +492,7 @@ async function qwPreparePrintDocument(){
    if(!pages.length&&sheet.contains(header)&&header.childElementCount){
     const headerBottom=header.getBoundingClientRect().bottom;
     const contentTop=content.getBoundingClientRect().top;
-    const clearance=Math.max(0,Math.ceil(headerBottom-contentTop+2*MM));
+    const clearance=Math.max(0,Math.ceil(headerBottom-contentTop+(format==='booklet'?4.5:2)*MM));
     sheet.style.setProperty('--qw-shared-heading-clearance',clearance+'px');
    }
   }else{
@@ -570,6 +611,9 @@ async function qwPreparePrintDocument(){
   const footer=document.createElement('footer');footer.className='qw-page-footer';
   const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=format==='booklet'?String(i+1):(i+1)+' / '+physical.length;footer.append(label,number);sheet.append(footer);
  }
+ // Recenter manually placed text and axis titles in their actual final print
+ // viewport, after figure sizing, column moves, and font activation.
+ for(const svg of host.querySelectorAll('.qw-print-section figure svg'))qwAlignSVGText(svg);
  const report={layout:spread?'spread':landscape?'wide':'portrait',sheets:physical.length,
  pages:pages.map(({page,content},i)=>{
   const sections=[...content.querySelectorAll(':scope>.qw-print-section')];
@@ -582,4 +626,4 @@ async function qwPreparePrintDocument(){
  const data=document.createElement('script');data.id='qw-print-layout-report';data.type='application/json';data.textContent=JSON.stringify(report);document.body.append(data);
  document.body.dataset.qwLayoutReady='true';window.__qwPrintLayout=report;return report;
 }
-export {qwMeasureSVGInk,qwPrintStyles,qwPreparePrintDocument};
+export {qwAlignSVGText,qwMeasureSVGInk,qwPrintStyles,qwPreparePrintDocument};
