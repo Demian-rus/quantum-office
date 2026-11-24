@@ -1083,7 +1083,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  let inspectorSelection='';
- const point=e=>{const svg=stage.querySelector('svg'),p=new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()),x=qwNum(p.x,0,520,0),y=qwNum(p.y,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
+ const point=e=>{const svg=stage.querySelector('svg'),box=svg.getBoundingClientRect(),v=svg.viewBox.baseVal,expanded=v.x!==0||v.y!==0||v.width!==520||v.height!==320,p=expanded?new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()):{x:(e.clientX-box.left)/box.width*520,y:(e.clientY-box.top)/box.height*320},x=qwNum(p.x,0,520,0),y=qwNum(p.y,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
   const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
  function selectOnly(index){selected=index;labelSelected='';multi=new Set(index<0?[]:[index]);}
  function selectedIndices(){return [...multi].sort((a,b)=>a-b);}
@@ -1098,7 +1098,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   return {object,ownerIndex,free:object.kind==='text',get:()=>edge?object.edgeLabelPositions?.[edgeIndex]:target.labelPosition,clear:()=>{if(edge)object.edgeLabels[edgeIndex]='';else target.label='';},set:p=>{if(edge){object.edgeLabelPositions??=object.vertices.map(()=>null);object.edgeLabelPositions[edgeIndex]=p;}else target.labelPosition=p;}};
  }
  function labelNode(){return labelSelected?stage.querySelector('[data-qw-label="'+labelSelected+'"]'):null;}
- function labelBox(node){const r=node.getBoundingClientRect(),m=stage.querySelector('svg').getScreenCTM().inverse(),a=new DOMPoint(r.left,r.top).matrixTransform(m),z=new DOMPoint(r.right,r.bottom).matrixTransform(m);return {x:a.x,y:a.y,w:z.x-a.x,h:z.y-a.y};}
+ function labelBox(node){const r=node.getBoundingClientRect(),svg=stage.querySelector('svg'),v=svg.viewBox.baseVal;if(v.x===0&&v.y===0&&v.width===520&&v.height===320){const s=svg.getBoundingClientRect();return {x:(r.left-s.left)/s.width*520,y:(r.top-s.top)/s.height*320,w:r.width/s.width*520,h:r.height/s.height*320};}const m=svg.getScreenCTM().inverse(),a=new DOMPoint(r.left,r.top).matrixTransform(m),z=new DOMPoint(r.right,r.bottom).matrixTransform(m);return {x:a.x,y:a.y,w:z.x-a.x,h:z.y-a.y};}
  function labelProperties(){
   const node=labelNode(),info=labelSelected&&labelInfo(labelSelected);if(!node||!info)return '';
   const conflict=node.dataset.labelConflict==='true'?'<p class="qw-error">Подпись пересекает рисунок или выходит за границы. Перетащите её или сбросьте положение.</p>':'';
