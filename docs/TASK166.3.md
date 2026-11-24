@@ -10,3 +10,5 @@ Tests and measured results: pending candidate verification.
 The transaction helper keeps the original failure cause (e.g. quota) rather than masking it with secondary abort errors from outstanding requests. New tests separately check the actual rollback and failure reason. The benchmark uses deterministic 64×64 rasters, not a claim about maximum-size images.
 
 Opening a v1 bank displays batch progress; corrupted previews report the problem without removing the original bytes. No object URLs are retained (decoder fallback revokes immediately).
+
+The specialized suite includes a genuine v1 IndexedDB upgrade, persistent-profile browser restart, actual QWORK v1/PDF and booklet print paths, and cross-version restoration of a QWBANK v3 created by the exact TASK166.2 baseline. The comparison records logical task JSON and binary bytes separately from browser origin estimates.

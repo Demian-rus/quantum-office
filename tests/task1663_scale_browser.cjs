@@ -7,11 +7,24 @@ const base=process.env.QW_TASK1662_HTML||path.join(root,'task1662-baseline','Qua
 (async()=>{
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
- const results=[];
+ const results=[];let baselineArchive=null,crossVersion=null;
  try{
   for(const [version,file] of [['166.2',base],['166.3',path.join(root,'Quantum-Office.html')]]){
    const context=await browser.newContext({offline:true});const page=await context.newPage();await page.goto(pathToFileURL(file).href);
    try{
+    if(version==='166.3'){
+     assert.ok(baselineArchive,'actual TASK166.2 archive required');
+     crossVersion=await page.evaluate(async text=>{
+      const archive=await verifyBankBackupV3(text),target=new BankRepository({dbName:'cross-version-restore',normalize:qwBankNormalize,legacyStorage:{getItem(){return null;}}});
+      await target.open();const plan=await target.inspectRestore(text);
+      const restored=await target.restoreVerifiedBackup({token:plan.token,mode:'empty'});
+      await target.close();await target.open();const after=await target._captureBackupSnapshot();
+      const sort=rows=>rows.slice().sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+      if(bankStableJSON(sort(after.records))!==bankStableJSON(sort(archive.archive.records))||!restored.verified)throw Error('TASK166.2 archive changed on v2 restoration');
+      const diagnostics=await target.assetDiagnostics();await target.close();
+      return {count:after.records.length,sha256:archive.sha256,assets:diagnostics.count,exact:true};
+     },baselineArchive);
+    }
     for(const count of [1000,5000,10000])for(const scenario of ['text','repeated','distinct','mixed']){
      const result=await page.evaluate(async({count,scenario,version})=>{
       const options={normalize:qwBankNormalize,legacyStorage:{getItem(){return null;}}},name='bench-'+scenario+'-'+count;
@@ -60,14 +73,16 @@ const base=process.env.QW_TASK1662_HTML||path.join(root,'task1662-baseline','Qua
       const usage=await source.getStatistics();
       await source.close();await target.close();
       for(const db of [name,name+'-restore'])await new Promise((resolve,reject)=>{const q=indexedDB.deleteDatabase(db);q.onsuccess=resolve;q.onerror=()=>reject(q.error);q.onblocked=()=>reject(Error('delete blocked'));});
-      return {version,count,scenario,importMs:imported.ms,openMs:reopened.ms,pageMs:page.ms,searchMs:search.ms,taskMs:one.ms,editMs:edit.ms,taskBytes,assetBytes:diagnostic?.bytes??0,uniqueAssets:diagnostic?.count??null,originUsage:usage.estimatedBytes,exportMs:logical.ms,backupMs:archive.ms,archiveBytes:new TextEncoder().encode(text).length,inspectMs:inspect.ms,restoreMs:recovery.ms,cleanupMs,cleanupDeleted};
+      return {version,count,scenario,importMs:imported.ms,openMs:reopened.ms,pageMs:page.ms,searchMs:search.ms,taskMs:one.ms,editMs:edit.ms,taskBytes,assetBytes:diagnostic?.bytes??0,uniqueAssets:diagnostic?.count??null,originUsage:usage.estimatedBytes,exportMs:logical.ms,backupMs:archive.ms,archiveBytes:new TextEncoder().encode(text).length,inspectMs:inspect.ms,restoreMs:recovery.ms,cleanupMs,cleanupDeleted,baselineArchive:version==='166.2'&&count===1000&&scenario==='mixed'?text:null};
      },{count,scenario,version});
+     if(result.baselineArchive)baselineArchive=result.baselineArchive;
+     delete result.baselineArchive;
      results.push(result);console.log('TASK1663_SCALE '+JSON.stringify(result));
      fs.writeFileSync(path.join(out,'scale-report.json'),JSON.stringify({status:'RUNNING',results},null,2));
     }
    }finally{await context.close();}
   }
   assert.equal(results.length,24);
-  fs.writeFileSync(path.join(out,'scale-report.json'),JSON.stringify({status:'PASS',results},null,2));
+  fs.writeFileSync(path.join(out,'scale-report.json'),JSON.stringify({status:'PASS',results,crossVersion},null,2));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

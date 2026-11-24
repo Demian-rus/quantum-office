@@ -114,11 +114,19 @@ const out=path.join(root,'evidence/task1663');
    const portable=await b.getTask(one.id);
    const rendered=await qwFigureImage(portable.task);check(rendered.naturalWidth===12,'print image failed decode');
    const qw=qwValidate({...qwProject(),tasks:[portable.task]});check(qw.tasks[0].image===imageC&&!qw.tasks[0].imageAsset,'QWORK v1 image mismatch');
+   const pdf=await qwPDFBytes(qw,false,{answers:true,criteria:true,comments:true});
+   check(String.fromCharCode(...pdf.slice(0,5))==='%PDF-','image PDF was not generated');
+   for(const orientation of ['portrait','landscape']){
+    const print={...qw,layout:'booklet',printSettings:{...qwPrintSettings(),orientation}};
+    const html=qwPrintDocumentHTML(print,false,{format:'booklet'});
+    const parsed=new DOMParser().parseFromString(html,'text/html');
+    check(parsed.querySelector('img[alt="Иллюстрация задания"]')?.getAttribute('src')===imageC,'print document lost image '+orientation);
+   }
    let assetReads=0;const oldGet=IDBObjectStore.prototype.get;
    IDBObjectStore.prototype.get=function(k){if(this.name==='assets')assetReads++;return oldGet.call(this,k);};
    try{await b.listTasks({},{limit:30,includeImages:false});check(assetReads===0,'catalogue loads images');await b.getTask(one.id);check(assetReads===1,'selected image not loaded on demand');}finally{IDBObjectStore.prototype.get=oldGet;}
    await target.close();
-   return {migration:{blocked,interrupted:partial.filter(r=>r.imageAsset).length,completed:migrated.length,assets:migrationStats.count,malformedRetained:true},shared:first,quota,invalid,mime,raster,checksum,collision,backupRejected,cleanupFailed,cleaned,cancelled,restoreRollback:failed,byteExact:true,officeV3:true,qworkV1:true,lazyReads:assetReads,archiveCount:archive.count};
+   return {migration:{blocked,interrupted:partial.filter(r=>r.imageAsset).length,completed:migrated.length,assets:migrationStats.count,malformedRetained:true},shared:first,quota,invalid,mime,raster,checksum,collision,backupRejected,cleanupFailed,cleaned,cancelled,restoreRollback:failed,byteExact:true,officeV3:true,qworkV1:true,pdf:true,portraitLandscape:true,lazyReads:assetReads,archiveCount:archive.count};
   });
   await p.evaluate(()=>qwBank({__view:'shared-a'}));
   await p.locator('#qw-bank-preview img').waitFor({state:'visible'});
@@ -131,7 +139,25 @@ const out=path.join(root,'evidence/task1663');
   const conflict=await second.evaluate(async old=>{try{await qwBankRepository.updateTask(old.id,old,old.revision);return false;}catch(e){return e.code==='REVISION_CONFLICT';}},stale);
   assert.equal(conflict,true);assert.equal((await p.evaluate(()=>qwBankRepository.getTask('shared-a'))).task.image,fresh.task.image);
   assert.deepEqual(errors,[]);
-  const report={status:'PASS',...result,conflict,uiPreview:true};
+  // Persist to a real browser profile, close the entire Chromium process,
+  // launch it again, and confirm the same IDs/bytes and permanent numbering.
+  const os=require('node:os'),profile=fs.mkdtempSync(path.join(os.tmpdir(),'qw1663-profile-'));
+  let persistent=null,restart=false;
+  try{
+   persistent=await chromium.launchPersistentContext(profile,{offline:true,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+   let tab=persistent.pages()[0]||await persistent.newPage();await tab.goto(url);
+   const saved=await tab.evaluate(async()=>{
+    await qwBankOpen();const canvas=document.createElement('canvas');canvas.width=canvas.height=32;const ctx=canvas.getContext('2d');ctx.fillStyle='green';ctx.fillRect(0,0,32,32);
+    const task=qwTask('short');task.prompt='Persistent image';task.figure='image';task.image=canvas.toDataURL('image/png');
+    return qwBankRepository.createTask({id:'persistent-image',subject:'physics',task});
+   });
+   await persistent.close();persistent=null;
+   persistent=await chromium.launchPersistentContext(profile,{offline:true,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
+   tab=persistent.pages()[0]||await persistent.newPage();await tab.goto(url);
+   const after=await tab.evaluate(async()=>{await qwBankOpen();return qwBankRepository.getTask('persistent-image');});
+   assert.deepEqual(after,saved);restart=true;
+  }finally{if(persistent)await persistent.close();fs.rmSync(profile,{recursive:true,force:true});}
+  const report={status:'PASS',...result,conflict,uiPreview:true,browserRestart:restart};
   fs.writeFileSync(path.join(out,'asset-report.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report));
  }finally{await context.close();await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
