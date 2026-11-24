@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod bank;
-use std::{collections::HashMap,path::PathBuf,sync::{Arc,Mutex,atomic::{AtomicBool,Ordering}},io::Write};
+mod save_file;
+use std::{collections::HashMap,path::PathBuf,sync::{Arc,Mutex,atomic::{AtomicBool,Ordering}}};
 use serde_json::Value;
 use tauri::{Manager,State,AppHandle};
 use base64::{Engine,engine::general_purpose::STANDARD};
@@ -24,10 +25,8 @@ async fn bank_command(app:AppHandle,requests:State<'_,Requests>,operation:String
  tauri::async_runtime::spawn_blocking(move||{
   if name.is_empty()||name.len()>250||name.chars().any(|c|matches!(c,'\\'|'/'|':'|'\0'))||data.len()>440_000_000{return Err("INVALID_EXPORT: filename or size".into());}
   let bytes=STANDARD.decode(data).map_err(|e|e.to_string())?;
-  let Some(dest)=rfd::FileDialog::new().set_file_name(&name).save_file() else{return Ok(false);};
-  let parent=dest.parent().ok_or("Invalid directory")?;let actual=parent.canonicalize().map_err(|e|e.to_string())?;
-  if let Ok(owned)=root.canonicalize(){if actual.starts_with(owned){return Err("Выберите папку вне каталога действующей базы".into());}}
-  let mut temp=tempfile::NamedTempFile::new_in(parent).map_err(|e|e.to_string())?;temp.write_all(&bytes).map_err(|e|e.to_string())?;temp.as_file().sync_all().map_err(|e|e.to_string())?;temp.persist(&dest).map_err(|e|e.to_string())?;Ok(true)
+  let dest=rfd::FileDialog::new().set_file_name(&name).save_file();
+  save_file::save_selected(&root,dest.as_deref(),&bytes).map_err(|e|format!("{e:#}"))
  }).await.map_err(|e|e.to_string())?
 }
 fn main(){tauri::Builder::default().manage(Requests::default())

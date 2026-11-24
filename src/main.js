@@ -304,9 +304,9 @@ async function importFile(file){if(!file)return;const maxSize=file.name.toLowerC
    const saved=await download('QuantumOffice_банк_из_архива_Office.qwbank',
     JSON.stringify(checked.bank),'application/json;charset=utf-8');
    if(qoNativeDesktop&&!saved)return;
-   status('Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
+   status(qoNativeDesktop?'Проверенный банк сохранён. Откройте «Банк → Восстановить из копии».':'Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
    if(confirm('Восстановить ТОЛЬКО четыре редактора сейчас?\n\n'+
-    'Банк IndexedDB пока НЕ изменится. Черновики редакторов будут заменены; '+
+    'Банк '+qwBankStorageName+' пока НЕ изменится. Черновики редакторов будут заменены; '+
     'при ошибке localStorage их откат ограничен возможностями браузера. '+
     'Сохраните их отдельно перед подтверждением.'))qoRestoreOfficeBackup(checked.office);
    return;

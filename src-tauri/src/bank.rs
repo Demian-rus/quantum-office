@@ -13,28 +13,46 @@ fn cancel(f:&AtomicBool)->Result<()>{ensure!(!f.load(Ordering::SeqCst),"CANCELLE
 fn meta(c:&Connection,k:&str)->Result<Value>{let x:String=c.query_row("SELECT value FROM meta WHERE key=?1",[k],|r|r.get(0))?;Ok(serde_json::from_str(&x)?)}
 fn set(c:&Connection,k:&str,v:&Value)->Result<()>{c.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![k,v.to_string()])?;Ok(())}
 fn gen(c:&Connection)->Result<i64>{meta(c,"generation")?.as_i64().context("CORRUPT: generation")}
+// Publish a fully initialized database atomically; never create an empty live file.
+fn initialize(path:&Path)->Result<()>{
+ let parent=path.parent().context("data directory")?;fs::create_dir_all(parent)?;
+ if path.try_exists()?{return Ok(());}
+ let tmp=tempfile::Builder::new().prefix(".bank-init-").tempfile_in(parent)?.into_temp_path();
+ {
+  let mut c=Connection::open(&tmp)?;
+  c.pragma_update(None,"journal_mode","DELETE")?;c.pragma_update(None,"synchronous","FULL")?;
+  let tx=c.transaction_with_behavior(TransactionBehavior::Immediate)?;tx.execute_batch(include_str!("schema.sql"))?;tx.commit()?;
+ }
+ fs::OpenOptions::new().write(true).open(&tmp)?.sync_all()?;
+ match tmp.persist_noclobber(path){
+  Ok(())=>Ok(()),
+  Err(e) if e.error.kind()==std::io::ErrorKind::AlreadyExists=>Ok(()),
+  Err(e)=>Err(e.into()),
+ }
+}
 pub fn open(path:&Path,create:bool)->Result<Connection>{
- if create{fs::create_dir_all(path.parent().context("data directory")?)?;}
- let existed=path.exists();
- if existed{ensure!(fs::metadata(path)?.len()>0,"CORRUPT: Пустой файл существующей базы");}
- let flags=OpenFlags::SQLITE_OPEN_READ_WRITE|if create{OpenFlags::SQLITE_OPEN_CREATE}else{OpenFlags::empty()};
- let mut c=Connection::open_with_flags(path,flags)?;
+ if create{initialize(path)?;}
+ ensure!(fs::metadata(path)?.len()>0,"CORRUPT: Пустой файл существующей базы");
+ let c=Connection::open_with_flags(path,OpenFlags::SQLITE_OPEN_READ_WRITE)?;
  c.busy_timeout(Duration::from_secs(10))?;c.pragma_update(None,"foreign_keys",true)?;
  let version:i64=c.pragma_query_value(None,"user_version",|r|r.get(0))?;
- if version==0{
-  ensure!(create&&!existed,"SCHEMA: Неизвестная существующая база; файл сохранён");
-  let tx=c.transaction_with_behavior(TransactionBehavior::Immediate)?;
-  let version:i64=tx.pragma_query_value(None,"user_version",|r|r.get(0))?;
-  if version==0{tx.execute_batch(include_str!("schema.sql"))?;}else{ensure!(version==1,"SCHEMA: unsupported");}
-  tx.commit()?;
- }else{ensure!(version==1,"SCHEMA: Неподдерживаемая версия {}",version);}
+ ensure!(version==1,"SCHEMA: Неподдерживаемая версия {}",version);
  if create{
   let quick:String=c.query_row("PRAGMA quick_check",[],|r|r.get(0))?;
   ensure!(quick=="ok","CORRUPT: {}",quick);
   let bad:i64=c.query_row("SELECT count(*) FROM pragma_foreign_key_check",[],|r|r.get(0))?;
   ensure!(bad==0,"CORRUPT: foreign keys");
  }
- let mode:String=c.query_row("PRAGMA journal_mode=WAL",[],|r|r.get(0))?;ensure!(mode.eq_ignore_ascii_case("wal"),"SQLITE: WAL unavailable");
+ let deadline=std::time::Instant::now()+Duration::from_secs(10);
+ loop{
+  let mode=c.query_row("PRAGMA journal_mode=WAL",[],|r|r.get::<_,String>(0));
+  match mode{
+   Ok(mode) if mode.eq_ignore_ascii_case("wal")=>break,
+   Ok(_) if std::time::Instant::now()<deadline=>std::thread::sleep(Duration::from_millis(50)),
+   Err(rusqlite::Error::SqliteFailure(e,_)) if matches!(e.code,rusqlite::ErrorCode::DatabaseBusy|rusqlite::ErrorCode::DatabaseLocked)&&std::time::Instant::now()<deadline=>std::thread::sleep(Duration::from_millis(50)),
+   Ok(_)=>bail!("SQLITE: WAL unavailable"),Err(e)=>return Err(e.into())
+  }
+ }
  c.pragma_update(None,"synchronous","FULL")?;Ok(c)
 }
 struct Asset{key:String,mime:String,hash:String,bytes:Vec<u8>,suffix:String}
@@ -102,20 +120,20 @@ fn rows(c:&Connection,sql:&str,args:&[rusqlite::types::Value],images:bool,f:&Ato
 fn snapshot(c:&Connection,f:&AtomicBool)->Result<Value>{Ok(json!({"records":rows(c,"SELECT body FROM tasks ORDER BY id",&[],true,f)?,"meta":{"sequence":meta(c,"sequence")?,"legacyMigration":meta(c,"legacyMigration")?,"legacyBackup":meta(c,"legacyBackup")?},"generation":gen(c)?}))}
 fn next(c:&Connection)->Result<i64>{Ok(meta(c,"sequence")?.as_i64().context("CORRUPT: sequence")?.max(c.query_row("SELECT coalesce(max(number),0) FROM tasks",[],|r|r.get(0))?))}
 fn alloc(r:&mut Value,n:i64,rev:i64,created:&str,now:&str){r["bankNumber"]=json!(n);r["revision"]=json!(rev);r["createdAt"]=json!(created);r["updatedAt"]=json!(now);}
-fn backup(c:&Connection,path:&Path)->Result<PathBuf>{
+fn backup(c:&Connection,path:&Path,protect:bool)->Result<PathBuf>{
  let dir=path.parent().context("data path")?.join("snapshots");fs::create_dir_all(&dir)?;
- let dest=dir.join(format!("bank-{}.sqlite3",uuid::Uuid::new_v4()));
+ let dest=dir.join(format!("{}-{}.sqlite3",if protect{"protect"}else{"bank"},uuid::Uuid::new_v4()));
  let result=(||->Result<()>{c.execute("VACUUM INTO ?1",[dest.to_str().context("backup path")?])?;let check=Connection::open_with_flags(&dest,OpenFlags::SQLITE_OPEN_READ_ONLY)?;let integrity:String=check.query_row("PRAGMA quick_check",[],|r|r.get(0))?;ensure!(integrity=="ok","BACKUP_INVALID: native snapshot");fs::OpenOptions::new().write(true).open(&dest)?.sync_all()?;Ok(())})();
  if let Err(e)=result{let _=fs::remove_file(&dest);return Err(e);}
- let mut old:Vec<_>=fs::read_dir(&dir)?.filter_map(|e|e.ok()).filter(|e|e.path()!=dest&&e.file_name().to_string_lossy().starts_with("bank-")&&e.path().extension().and_then(|x|x.to_str())==Some("sqlite3")).collect();old.sort_by_key(|e|e.metadata().and_then(|m|m.modified()).ok());
- let remove=old.len().saturating_sub(2);for e in old.into_iter().take(remove){let _=fs::remove_file(e.path());}Ok(dest)
+ // Never prune a recovery snapshot from another process. Explicit offline retention only.
+ Ok(dest)
 }
 pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
  cancel(f)?;ensure!(p.is_object(),"INVALID_REQUEST: payload");
  let mut conn=open(path,op=="open")?;
  if op=="open"{return Ok(json!({"storage":"SQLite"}));}
- if op=="native_backup"{return Ok(json!({"path":backup(&conn,path)?}));}
- if op=="restore"&&p["mode"]=="replace"{backup(&conn,path)?;}
+ if op=="native_backup"{return Ok(json!({"path":backup(&conn,path,false)?}));}
+ let protective=if op=="restore"&&p["mode"]=="replace"{Some(backup(&conn,path,true)?)}else{None};
  let writable=matches!(op,"create"|"update"|"delete"|"import"|"restore")||(op=="diagnostics"&&p["clean"]==true);
  let tx=conn.transaction_with_behavior(if writable{TransactionBehavior::Immediate}else{TransactionBehavior::Deferred})?;let c=&*tx;
  let result=match op{
@@ -162,7 +180,7 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
    c.execute("DELETE FROM tasks",[])?;c.execute("DELETE FROM assets",[])?;
    for v in input{cancel(f)?;let(r,a)=pack(v.clone())?;ensure!(n(&r,"bankNumber")?<=seq,"BACKUP_SEQUENCE: number");write(c,&r,a.as_ref(),false)?;ensure!(get(c,s(&r,"id")?,true)?.as_ref()==Some(v),"RESTORE_VERIFY: row mismatch");}
    for k in ["sequence","legacyMigration","legacyBackup"]{set(c,k,&body["meta"][k])?;}
-   ensure!(count(c)?==input.len() as i64,"RESTORE_VERIFY: count");json!({"restored":input.len(),"sequence":seq,"verified":true})
+   ensure!(count(c)?==input.len() as i64,"RESTORE_VERIFY: count");json!({"restored":input.len(),"sequence":seq,"verified":true,"protectiveSnapshot":protective})
   },
   "diagnostics"=>{
    let bad:i64=c.query_row("SELECT count(*) FROM pragma_foreign_key_check",[],|r|r.get(0))?;ensure!(bad==0,"ASSET_MISSING: invalid links");
@@ -222,6 +240,24 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   {let tx=c.transaction_with_behavior(TransactionBehavior::Immediate)?;let error=tx.execute("INSERT INTO meta(key,value) VALUES('huge',json_quote(hex(zeroblob(8000000))))",[]);assert!(error.is_err());}
   assert_eq!(count(&c)?,before);assert_eq!(c.query_row("SELECT count(*) FROM meta WHERE key='huge'",[],|r|r.get::<_,i64>(0))?,0);
   c.pragma_update(None,"user_version",99)?;drop(c);assert!(open(&p,true).is_err());let c=Connection::open(&p)?;assert_eq!(c.pragma_query_value(None,"user_version",|r|r.get::<_,i64>(0))?,99);Ok(())
+ }
+
+ #[test]fn simultaneous_first_open_preserves_existing_files()->Result<()>{
+  let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let barrier=std::sync::Arc::new(std::sync::Barrier::new(8));
+  let mut handles=vec![];
+  for i in 0..8{let q=p.clone();let gate=barrier.clone();handles.push(std::thread::spawn(move||->Result<Value>{gate.wait();let f=AtomicBool::new(false);run(&q,"open",&json!({}),&f)?;run(&q,"create",&json!({"record":record(&format!("init{i}")),"now":"2026-11-24"}),&f)}));}
+  for h in handles{h.join().expect("first-open panic")?;}
+  assert_eq!(count(&open(&p,false)?)?,8);
+  let zero=d.path().join("zero.sqlite3");fs::write(&zero,[])?;assert!(open(&zero,true).is_err());assert_eq!(fs::metadata(&zero)?.len(),0);
+  let blocked=d.path().join("directory.sqlite3");fs::create_dir(&blocked)?;assert!(open(&blocked,true).is_err());assert!(blocked.is_dir());Ok(())
+ }
+ #[test]fn concurrent_snapshots_cannot_prune_protection()->Result<()>{
+  let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let f=AtomicBool::new(false);run(&p,"open",&json!({}),&f)?;
+  run(&p,"create",&json!({"record":record("original"),"now":"2026-11-24"}),&f)?;
+  let c=open(&p,false)?;let protect=backup(&c,&p,true)?;
+  let mut handles=vec![];for _ in 0..6{let q=p.clone();handles.push(std::thread::spawn(move||run(&q,"native_backup",&json!({}),&AtomicBool::new(false))));}
+  for h in handles{let result=h.join().expect("snapshot panic")?;assert!(Path::new(result["path"].as_str().unwrap()).is_file());}
+  assert!(protect.is_file());assert!(get(&Connection::open(&protect)?,"original",true)?.is_some());Ok(())
  }
 
 }

@@ -158,14 +158,15 @@ function qoHubPackage(){
  return {format:QO_HUB_PACKAGE_FORMAT,version:1,createdAt:new Date().toISOString(),
    book:validated,sheetId:src.sheet.id,results:qoHubScopedResults(src)};
 }
-function qoHubExportProject(){
+async function qoHubExportProject(){
  try{
    commitEditor();
    const pack=qoHubPackage();
    const payload=JSON.stringify(pack);
    if(new Blob([payload]).size>QO_HUB_PACKAGE_LIMIT)throw Error('Проект превышает 20 МБ');
-   download(safeFile(pack.book.name)+'-преподаватель.qteacher',payload,'application/json;charset=utf-8');
-   status('Создан файл проекта: таблица учеников и '+pack.results.length+' результатов');
+   const saved=await download(safeFile(pack.book.name)+'-преподаватель.qteacher',payload,'application/json;charset=utf-8');
+   if(qoNativeDesktop&&saved!==true)return;
+   if(!qoNativeDesktop)status('Скачивание проекта запрошено: таблица учеников и '+pack.results.length+' результатов');
  }catch(e){status('Не удалось скачать проект: '+e.message,true);}
 }
 function qoHubValidatedPackage(text){
