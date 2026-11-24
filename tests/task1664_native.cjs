@@ -33,16 +33,25 @@ async function inspectEditors(page){
   }
   const b=workspace.books.find(x=>x.name==='TASK1664 Sheets');
   const q=qdWorkingDoc(),studio=qoPhotoState(),sheetData=b?.sheets[0];
+  const diagnosticMedia=[];
+  for(const question of qdQuestionList(q))for(const kind of ['prompt','answer']){
+   const ref=question[qdMediaKey(kind)];if(!ref)continue;
+   const asset=await qdMediaGet(ref.id);
+   if(!asset)throw Error('Missing real diagnostic image '+ref.id);
+   const bytes=await asset.blob.arrayBuffer();
+   const sha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+   diagnosticMedia.push({kind,id:ref.id,mime:asset.blob.type,bytes:bytes.byteLength,sha256});
+  }
   const live={
    writer:{name:qoWriter.name,html:qoWriter.html},
    sheets:{name:b?.name??null,a1:sheetData?getCell(sheetData,'A1').value:null,b1:sheetData?getCell(sheetData,'B1').value:null,c1:sheetData?getCell(sheetData,'C1').value:null},
    slides:{name:qoSlides.name,items:qoSlides.slides[0]?.items},
    studio:{name:studio.name,width:studio.width,height:studio.height,bg:studio.bg,strokes:studio.strokes},
-   diagnostics:{title:q.title,questions:qdQuestionList(q).map(x=>({id:x.id,prompt:x.prompt,answer:x.answer,points:x.points}))},
+   diagnostics:{title:q.title,questions:qdQuestionList(q).map(x=>({id:x.id,prompt:x.prompt,answer:x.answer,points:x.points,promptMedia:x.promptMedia??null,answerMedia:x.answerMedia??null})),media:diagnosticMedia},
    qwork:{title:qwDoc.title,count:qwDoc.tasks.length}
   };
   const signatures={};for(const [name,value] of Object.entries(live))signatures[name]=await hash(bankStableJSON(value));
-  return {rows,signatures,fixtures:{writer:live.writer.name==='TASK1664 Writer'&&live.writer.html.includes('Newton'),sheets:live.sheets.a1==='12'&&live.sheets.b1==='30'&&live.sheets.c1==='=A1+B1',slides:live.slides.name==='TASK1664 Slides'&&live.slides.items.some(x=>x.text==='TASK1664 slide body'),studio:live.studio.name==='TASK1664 Studio'&&live.studio.strokes.some(x=>x.id==='shape-1664'),diagnostics:live.diagnostics.title==='TASK1664 Diagnostics'&&live.diagnostics.questions.some(x=>x.prompt==='What is acceleration?'&&x.answer==='Change of velocity per time'),qwork:live.qwork.title==='TASK166.4 persisted draft'&&live.qwork.count===3}};
+  return {rows,signatures,fixtures:{writer:live.writer.name==='TASK1664 Writer'&&live.writer.html.includes('Newton'),sheets:live.sheets.a1==='12'&&live.sheets.b1==='30'&&live.sheets.c1==='=A1+B1',slides:live.slides.name==='TASK1664 Slides'&&live.slides.items.some(x=>x.text==='TASK1664 slide body'),studio:live.studio.name==='TASK1664 Studio'&&live.studio.strokes.some(x=>x.id==='shape-1664'),diagnostics:live.diagnostics.title==='TASK1664 Diagnostics'&&live.diagnostics.questions.some(x=>x.prompt==='What is acceleration?'&&x.answer==='Change of velocity per time')&&diagnosticMedia.length===2&&diagnosticMedia.every(x=>x.bytes>100000)&&diagnosticMedia[0].sha256!==diagnosticMedia[1].sha256,qwork:live.qwork.title==='TASK166.4 persisted draft'&&live.qwork.count===3}};
  });
 }
 function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
@@ -147,12 +156,20 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
   await page.locator('[data-bank-add="native-'+i+'"]').click();
   await page.waitForFunction(count=>qwDoc.tasks.length===count&&qwDoc.tasks.every(q=>q.image),i+1);
  }
- await page.evaluate(()=>{
+ await page.evaluate(async()=>{
   // Real editor persistence functions and actual data structures.
   route('writer');
   const title=document.getElementById('qo-writer-title');title.value='TASK1664 Writer';
   document.getElementById('qo-writer-page').innerHTML='<h1>Newton</h1><p>Force equals mass times acceleration.</p>';qoPersistWriter();
-  const q=qdWorkingDoc();q.title='TASK1664 Diagnostics';q.sections[0].questions[0].prompt='What is acceleration?';q.sections[0].questions[0].answer='Change of velocity per time';qdStore();
+  const q=qdWorkingDoc();q.title='TASK1664 Diagnostics';q.sections[0].questions[0].prompt='What is acceleration?';q.sections[0].questions[0].answer='Change of velocity per time';
+  // Persist actual distinct diagnostic media, not merely document references.
+  for(const [index,kind] of ['prompt','answer'].entries()){
+   const url=qwDoc.tasks[index].image,[header,encoded]=url.split(',');
+   const blob=new Blob([Uint8Array.from(atob(encoded),c=>c.charCodeAt(0))],{type:header.slice(5).split(';')[0]});
+   const id=qdMediaNewId();await qdMediaPut({id,blob,createdAt:Date.now()});
+   q.sections[0].questions[0][qdMediaKey(kind)]={id,caption:'TASK1664 '+kind,display:'medium'};
+  }
+  qdStore();
   route('home');createBook();book().name='TASK1664 Sheets';setCell(sheet(),'A1','12');setCell(sheet(),'B1','30');setCell(sheet(),'C1','=A1+B1');persist();route('home');
   route('slides');document.getElementById('qo-slides-title').value='TASK1664 Slides';qoSlides.slides[0].items[1].text='TASK1664 slide body';qoPersistSlides();route('home');
   route('photo');qoPhotoApplyState({...qoPhotoState(),name:'TASK1664 Studio',width:640,height:480,bg:'#f0f0f0',strokes:[{id:'shape-1664',tool:'rect',points:[[20,30],[210,180]],color:'#225588',size:4,opacity:1}]});qoPhotoPersist();route('home');
