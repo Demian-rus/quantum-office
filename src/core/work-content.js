@@ -1,8 +1,8 @@
 /* A bounded mathematical syntax shared by MathML preview and PDF canvas layout. */
 import {qwGraphGridStep,qwEvaluateCurve,qwGeometryVertices,qwValidateStyle,qwResolveDiagram,QW_PLOT,qwPlotXY} from './work-model.js';
 import {qwArcPoints,qwLinearSegments,qwExtendedSegment} from './work-geometry.js';
-import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape} from './work-physics.js';
-import {qwLabelSVG,qwPlaceSVGLabels} from './work-labels.js';
+import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape,qwArrowSVG} from './work-physics.js';
+import {qwLabelSVG,qwPlaceSVGLabels,qwClosedContour,qwContourOutward} from './work-labels.js';
 const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',iota:'ι',kappa:'κ',nu:'ν',xi:'ξ',tau:'τ',upsilon:'υ',chi:'χ',psi:'ψ',Gamma:'Γ',Theta:'Θ',Lambda:'Λ',Pi:'Π',Sigma:'Σ',Phi:'Φ',Psi:'Ψ',Delta:'Δ',theta:'θ',lambda:'λ',mu:'μ',pi:'π',rho:'ρ',sigma:'σ',phi:'φ',omega:'ω',Omega:'Ω',cdot:'·',times:'×',pm:'±',le:'≤',ge:'≥',neq:'≠',infty:'∞'};
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function qwMath(source){
@@ -41,7 +41,16 @@ function qwMathIsUnary(list,index){
 }
 function qwMathML(n,upright=false,unary=false){
  const tag=(k,v)=>'<'+k+'>'+v+'</'+k+'>';
- if(n.t==='row')return tag('mrow',n.list.map((v,i)=>qwMathML(v,upright,qwMathIsUnary(n.list,i))).join(''));
+ if(n.t==='row'){
+  const operator=v=>v?.t==='text'&&/^[=+−\-×÷·±<>≤≥≠→←↔]$/.test(v.v);
+  return tag('mrow',n.list.map((v,i)=>{
+   if(!upright&&v.t==='text'&&/^\s+$/.test(v.v)){
+    let a=i-1,b=i+1;while(a>=0&&n.list[a].t==='text'&&/^\s+$/.test(n.list[a].v))a--;while(b<n.list.length&&n.list[b].t==='text'&&/^\s+$/.test(n.list[b].v))b++;
+    if(operator(n.list[a])||operator(n.list[b]))return '';
+   }
+   return qwMathML(v,upright,qwMathIsUnary(n.list,i));
+  }).join(''));
+ }
  if(n.t==='upright')return '<mstyle mathvariant="normal">'+qwMathML(n.a,true)+'</mstyle>';
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a,upright));
@@ -49,12 +58,36 @@ function qwMathML(n,upright=false,unary=false){
  const value=n.v==='-'?'−':n.v;
  if(upright)return tag('mtext',qwEsc(value));
  if(value==='°'||/^[()[\]{},.]$/.test(value)||unary)return '<mo lspace="0" rspace="0">'+qwEsc(value)+'</mo>';
- if(/[=+−\-×÷·±<>≤≥≠]/.test(value))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(value)+'</mo>';
+ if(/[=+−\-×÷·±<>≤≥≠→←↔]/.test(value))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(value)+'</mo>';
  if(/^\s+$/.test(value))return '<mspace width="0.18em"/>';
  return tag(/[0-9]/.test(value)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(value)?'mi':'mo',qwEsc(value));
 }
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
-function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwEsc(t.v).replace(/\n/g,'<br>')).join('');}
+// Only standalone, unambiguous numeric and single-symbol mathematical
+// expressions are typeset. Original user text and code/URL tokens stay intact.
+function qwPlainMathHTML(value){
+ const text=String(value??'');
+ const operand='(?:[A-Za-zα-ωΑ-Ω][₀-₉ₐ-ₜ⁰¹²³⁴⁵⁶⁷⁸⁹⁻]*|[+\\-−]?\\d+(?:[.,]\\d+)?(?:[·×]10[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+)?[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]*)';
+ const pattern=new RegExp('(?<![\\p{L}\\p{N}_./:@-])(?:'+operand+')(?:[ \\t]*[=<>≤≥≠+−×÷±→←↔][ \\t]*'+operand+')+(?![\\p{L}\\p{N}_/:@-]|\\.\\d)','gu');
+ const split=new RegExp('^('+operand+')([ \\t]*)([=<>≤≥≠+−×÷±→←↔])([ \\t]*)','u');
+ const atom=v=>/^[A-Za-zα-ωΑ-Ω]/u.test(v)?'<mi mathvariant="normal">'+qwEsc(v)+'</mi>':'<mtext>'+qwEsc(v)+'</mtext>';
+ const render=chunk=>{
+  let out='',last=0,m;pattern.lastIndex=0;
+  while((m=pattern.exec(chunk))){
+   let expr=m[0],parts='',step;
+   while((step=split.exec(expr))){
+    parts+=atom(step[1])+'<mo lspace="0.28em" rspace="0.28em">'+qwEsc(step[3])+'</mo>';
+    expr=expr.slice(step[0].length);
+   }
+   if(!parts)continue;
+   out+=qwEsc(chunk.slice(last,m.index))+'<math class="qw-plain-math" xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(m[0])+'"><mrow>'+parts+atom(expr)+'</mrow></math>';
+   last=pattern.lastIndex;
+  }
+  return out+qwEsc(chunk.slice(last));
+ };
+ return text.split(/(\b(?:https?:\/\/|www\.)[^\s]+|\x60[^\x60]*\x60)/gi).map((s,i)=>i%2?qwEsc(s):render(s)).join('');
+}
+function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwPlainMathHTML(t.v).replace(/\n/g,'<br>')).join('');}
 /* TASK164: safe, bounded Markdown-style rendering for the PERSONAL bank preview.
    No HTML passthrough, remote markup, script, or raw CSS. The PDF engine and
    existing qwContentHTML contract remain unchanged. */
@@ -64,7 +97,7 @@ function qwRichInlineText(input,depth=0){
  const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_)/g;
  let html='',pos=0,m;
  while((m=pattern.exec(source))){
-  html+=qwEsc(source.slice(pos,m.index));
+  html+=qwPlainMathHTML(source.slice(pos,m.index));
   if(m[2]!==undefined||m[3]!==undefined)html+='<strong>'+qwRichInlineText(m[2]??m[3],depth+1)+'</strong>';
   else if(m[4]!==undefined)html+='<del>'+qwEsc(m[4])+'</del>';
   else if(m[5]!==undefined)html+='<code>'+qwEsc(m[5])+'</code>';
@@ -72,7 +105,7 @@ function qwRichInlineText(input,depth=0){
   else html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
   pos=pattern.lastIndex;
  }
- return html+qwEsc(source.slice(pos));
+ return html+qwPlainMathHTML(source.slice(pos));
 }
 function qwRichMath(value,display=false){
  try{
@@ -229,9 +262,9 @@ function qwGraphSVG(g,interactive=false,typography={}){
  // Draw arrowheads separately: the visible shaft ends at the head's base,
  // not at the tip (marker-end used to leave a line through the arrowhead).
  const xTip=b.right+16,xBase=xTip-11,yTip=b.top-16,yBase=yTip+11;
- parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="x"'),
+ parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="x"'),
   '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-4.2)+' L'+xBase+' '+(axisY+4.2)+' Z" fill="#111"/>',
-  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" data-qw-axis-shaft="y"'),
+  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="y"'),
   '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-4.2)+' '+yBase+' L'+(axisX+4.2)+' '+yBase+' Z" fill="#111"/>');
  const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
  const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
@@ -257,10 +290,11 @@ function qwGraphSVG(g,interactive=false,typography={}){
   numberBoxes.push(box);occupied.push(box);
   parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#263746">'+t.label+'</text>');
  }
- const titleFont=typography.titleFont||16,yTitleRight=axisX<(b.left+b.right)/2;
- const title=(axis,x,y,anchor,text,room)=>'<text class="qw-axis-title" data-axis="'+axis+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'"'+(text.length*titleFont*.6>room?' textLength="'+room+'" lengthAdjust="spacingAndGlyphs"':'')+' fill="#111">'+qwEsc(text)+'</text>';
- parts.push(title('x',b.right+30,axisY-12,'end',g.xlabel,b.right-b.left),
-  title('y',axisX+(yTitleRight?12:-12),b.top-22,yTitleRight?'start':'end',g.ylabel,yTitleRight?508-axisX-12:axisX-24));
+ const titleFont=typography.titleFont||16,gap=6;
+ const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#111">'+qwEsc(text)+'</text>';
+ // Final placement uses actual glyph bounds (including descenders and subscripts).
+ parts.push(title('x',xTip+gap,axisY+titleFont*.35,'start',g.xlabel,xTip,axisY),
+  title('y',axisX,yTip-gap,'middle',g.ylabel,axisX,yTip));
  if(g.curveFamily!=='points'){
   let d='',drawing=false;
   for(let i=0;i<=300;i++){
@@ -283,6 +317,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
  ps.forEach((p,i)=>{
   parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:3.5)+'" fill="'+(g.points[i].style?.stroke||'#142b42')+'"/></g>');
  });
+ const contour=g.connected&&g.curveFamily==='points'&&!g.smooth?qwClosedContour(ps):null;
  ps.forEach((p,i)=>{
   const label=g.points[i].label;if(!label)return;
   const w=Math.max(12,Array.from(label).length*10),h=20;
@@ -302,8 +337,12 @@ function qwGraphSVG(g,interactive=false,typography={}){
   }
   if(!best)return;
   best={...best,x:Math.max(b.left,Math.min(best.x,b.right-w)),y:Math.max(b.top,Math.min(best.y,b.bottom-h))};
+  const outward=contour?qwContourOutward(contour,i%contour.length):null;
+  if(outward&&g.points[i].labelPosition?.mode!=='manual'){
+   const gap=10;best={x:p.x+(outward.x<-.1?-w-gap:outward.x>.1?gap:-w/2),y:p.y+(outward.y<-.1?-h-gap/2:outward.y>.1?gap:-h/2),w,h};
+  }
   occupied.push(best);
-  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#142b42')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true}));
+  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#142b42')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
  });
  parts.push(qwGraphElementsSVG(g,interactive));
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
@@ -317,15 +356,15 @@ function qwGraphElementsSVG(g,interactive=false){
   if(o.kind==='function'){
    for(let n=0;n<=400;n++){const x=g.xmin+(g.xmax-g.xmin)*n/400,y=qwEvaluateCurve({curveFamily:o.family,curve:o.curve},x);ps.push(qwPlotXY(g,{x,y}));}
   }else ps=(o.vertices||[{x:o.x,y:o.y},...(['line','arrow'].includes(o.kind)?[{x:o.x2,y:o.y2}]:[])]).map(p=>qwPlotXY(g,p));
-  if(['line','arrow','polyline','function'].includes(o.kind)){
-   shape='<path d="'+ps.map((p,n)=>(n?'L':'M')+p.x.toFixed(3)+' '+p.y.toFixed(3)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"'+(o.kind==='arrow'?' marker-end="url(#qw-graph-arrow-'+key+'-'+i+')"':'')+'/>';
+  if(o.kind==='arrow')shape=qwArrowSVG(ps,color,width);
+  else if(['line','polyline','function'].includes(o.kind)){
+   shape='<path d="'+ps.map((p,n)=>(n?'L':'M')+p.x.toFixed(3)+' '+p.y.toFixed(3)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"/>';
   }else if(o.kind==='point')shape='<circle cx="'+ps[0].x+'" cy="'+ps[0].y+'" r="4" fill="'+color+'"/>';
-  if(o.kind==='arrow')shape='<defs><marker id="qw-graph-arrow-'+key+'-'+i+'" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="'+color+'"/></marker></defs>'+shape;
   if(o.label&&ps.length){const p=ps[Math.floor((ps.length-1)/2)];label=qwLabelSVG('g:e:'+i,p,o.labelPosition,'<text x="'+(p.x+(o.kind==='text'?0:8))+'" y="'+(p.y+(o.kind==='text'?0:-10))+'" font-size="18" fill="'+text+'" stroke="white" stroke-width="3" paint-order="stroke">'+qwEsc(o.label)+'</text>',{plot:true,free:o.kind==='text'});}
   return '<g '+(interactive?'data-qw-element="'+i+'"':'')+' clip-path="url(#qw-plot-clip)">'+shape+label+'</g>';
  }).join('');
 }
-function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"><defs><marker id="qw-arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0 0L6 3L0 6" fill="none" stroke="#111"/></marker></defs>'+body+'</svg>';}
+function qwSVG(body,label='Учебная схема'){return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 320" role="img" aria-label="'+qwEsc(label)+'" style="font:18px Arial,sans-serif;background:white;color:black"> '+body+'</svg>';}
 
 /* Position geometry captions outside edges and away from already placed captions.
    Uses SVG coordinates, so preview and exported documents have identical placement. */
@@ -411,10 +450,8 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   const objectLabel=(...args)=>qwLabelSVG('d:'+i+':o',labelAnchor,o.labelPosition,label(...args),{free:o.kind==='text'});
   if(['ray','infiniteLine'].includes(o.kind)){const ps=qwExtendedSegment(o);if(ps.length===2)shape='<line data-qw-extended="'+o.kind+'" x1="'+ps[0].x+'" y1="'+ps[0].y+'" x2="'+ps[1].x+'" y2="'+ps[1].y+'"'+a+'/>';if(o.kind==='ray')shape+='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="'+stroke+'"/>';}
   if(['line','arrow','doubleArrow','dashed','rope','ground'].includes(o.kind)){
-   shape='<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+
-    (['arrow','doubleArrow'].includes(o.kind)?' marker-end="url(#qw-arrow-'+key+'-'+i+')"':'')+
-    (o.kind==='doubleArrow'?' marker-start="url(#qw-arrow-'+key+'-'+i+')"':'')+
-    (o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
+   shape=['arrow','doubleArrow'].includes(o.kind)?qwArrowSVG([{x:o.x,y:o.y},{x:o.x2,y:o.y2}],stroke,width,{start:o.kind==='doubleArrow'}):
+    '<line x1="'+o.x+'" y1="'+o.y+'" x2="'+o.x2+'" y2="'+o.y2+'"'+a+(o.kind==='dashed'?' stroke-dasharray="6 4"':'')+'/>';
    if(o.kind==='ground'){
     const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
     for(let distance=10;distance<=length-8;distance+=14){
@@ -538,9 +575,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   if(paint.stroke||paint.width)shape=shape.replace(/stroke="#162735"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#162735"/g,'fill="'+stroke+'"');
   if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f6f8|#eef3f5|white)"/g,'fill="'+fill+'"');
   if(paint.text)captions=captions.replace(/fill="#162735"/g,'fill="'+paint.text+'"');
-  const marker=['arrow','doubleArrow'].includes(o.kind)?'<defs><marker id="qw-arrow-'+key+'-'+i+'" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="'+(o.kind==='doubleArrow'?'auto-start-reverse':'auto')+'"><path d="M0 0L6 3L0 6" fill="none" stroke="'+stroke+'" stroke-width="1"/></marker></defs>':'';
+
   const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
-  return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+marker+shape+captions+'</g>';
+  return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';
  }).join('')));
 }
 export {qwMath,qwMathML,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};

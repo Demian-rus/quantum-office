@@ -54,7 +54,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
     brandText:brand?.querySelector('.qw-qx-lettering')?.textContent,brandColor:brand?getComputedStyle(brand.querySelector('.qw-qx-lettering')).color:'',
     brandBg:brand?getComputedStyle(brand).backgroundColor:'',
     brandClip:brand?getComputedStyle(brand).clipPath:'',
-    badgeFlush:brand?{bottom:sheet.bottom-brand.getBoundingClientRect().bottom,right:sheet.right-brand.getBoundingClientRect().right}:null,
+    badgeFlush:brand?{bottom:sheet.bottom-brand.getBoundingClientRect().bottom,right:sheet.right-brand.getBoundingClientRect().right,centerDelta:(()=>{const a=brand.getBoundingClientRect(),f=sheets[0].querySelector('.qw-page-footer span:last-child').getBoundingClientRect();return Math.abs((a.top+a.bottom-f.top-f.bottom)/2);})()}:null,
     duplicatedBrandInColumn:!!document.querySelector('.qw-print-page .qw-print-brand'),
     handwrittenFont:brand?getComputedStyle(brand).fontFamily:'',fontReady:document.fonts.check('700 18px "QX Handwritten"','QX | Квант Икс'),svgBrandCount:document.querySelectorAll('svg.qw-qx-handwriting').length,
     stripes:[...pages].some(page=>getComputedStyle(page,'::before').display!=='none'),
@@ -76,7 +76,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
   assert.equal(data.brandColor,'rgb(17, 17, 17)');
   assert.equal(data.brandBg,'rgba(0, 0, 0, 0)');
   assert.equal(data.brandClip,'none','handwritten signature has no geometric badge');
-  assert.ok(data.badgeFlush.bottom>=0&&data.badgeFlush.bottom<25&&data.badgeFlush.right>=0&&data.badgeFlush.right<25,'handwritten signature is close to bottom-right');
+  assert.ok(data.badgeFlush.bottom>=0&&Math.abs(data.badgeFlush.right-9*96/25.4)<1&&data.badgeFlush.centerDelta<1,'handwritten signature aligned to physical page number and 9mm content inset');
   assert.ok(data.handwrittenFont.includes('QX Handwritten'),'brand must use embedded font');
   assert.equal(data.fontReady,true,'Latin + Cyrillic branded font loaded offline');
   assert.equal(data.svgBrandCount,0,'do not trace handwritten glyphs manually');

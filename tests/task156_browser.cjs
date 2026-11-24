@@ -88,14 +88,16 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task156');
    assert.equal(info.pagesDOM,info.logicalPages);
    assert.deepEqual(info.taskIds,Array.from({length:32},(_,i)=>i+1));
    assert.deepEqual(info.overflow,[]);
-   if(orientation==='landscape'&&landscapeLayout==='spread'){
+   if(orientation==='landscape'){
     assert.equal(info.mode,'spread');
     assert.equal(info.sheetsDOM,Math.ceil(info.logicalPages/2));
     assert.equal(info.sheets,info.sheetsDOM);
     assert.ok(info.pageBoxes[0][0]<info.pageBoxes[0][1],'logical page should be portrait-proportioned');
-    assert.ok(info.sheetBoxes[0][0]>info.sheetBoxes[0][1],'physical sheet should be landscape');
-    assert.ok(Math.abs(info.sheetBoxes[0][0]-info.pageBoxes[0][0]*2)<=2,'subpixel rounding of a 148.5mm column must not look like clipped sheet');
-   } else assert.equal(info.sheetsDOM,0);
+    assert.equal(info.sheetBoxes[0][0]>info.sheetBoxes[0][1],orientation==='landscape','physical sheet orientation');
+    assert.ok(Math.abs(info.sheetBoxes[0][0]-(orientation==='landscape'?297:210)*96/25.4)<2);
+    assert.ok(Math.abs(info.sheetBoxes[0][1]-(orientation==='landscape'?210:297)*96/25.4)<2);
+    assert.ok(Math.abs(info.sheetBoxes[0][0]-info.pageBoxes[0][0]*2)<=2,'subpixel rounding of a half-sheet column must not look like clipped sheet');
+   }else{assert.equal(info.mode,'portrait');assert.equal(info.sheetsDOM,0);assert.equal(info.sheets,info.logicalPages);assert.ok(Math.abs(info.pageBoxes[0][0]-210*96/25.4)<2);assert.ok(Math.abs(info.pageBoxes[0][1]-297*96/25.4)<2);}
    await page.emulateMedia({media:'print'});
    const name=orientation+'-'+landscapeLayout,pdf=path.join(out,name+'.pdf');
    await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});

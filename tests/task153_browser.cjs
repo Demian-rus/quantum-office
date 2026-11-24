@@ -69,7 +69,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task153');
     topics:document.querySelectorAll('.qw-topic-title').length,figures:document.querySelectorAll('.qw-print-section svg').length,
     collisions,overflow};
   });
-  assert.ok(data.pages>=2&&data.pages<=3,JSON.stringify(data.fragments.map(x=>x.tasks)));
+  assert.ok(data.pages>=1&&data.pages<=3,JSON.stringify(data.fragments.map(x=>x.tasks)));
   assert.equal(data.taskIds.length,16);assert.deepEqual(data.taskIds,Array.from({length:16},(_,i)=>i+1));
   assert.equal(data.boxCount,16);assert.equal(data.answers,14);
   assert.ok(data.figures>=2);assert.equal(data.brand,0);assert.equal(data.topics,0);

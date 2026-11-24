@@ -11,7 +11,7 @@ function qwPersist(){
  if(qwCorrupt)return false;
  try{localStorage.setItem(QW_KEY,JSON.stringify(qwDoc));qwStorageError='';}catch(e){qwStorageError='Черновик не записан. Скачайте QWORK.';}
  if(typeof page!=='undefined')qwFooter(qwActive());
- const el=document.getElementById('qw-save-state');if(el)el.textContent=qwStorageError|| (qwExported===JSON.stringify(qwDoc)?'Экспортирован QWORK':'Черновик на устройстве');return !qwStorageError;
+ const el=document.getElementById('qw-save-state');if(el)el.textContent=qwStorageError|| (qoNativeDesktop&&globalThis.qoDraftStatus?globalThis.qoDraftStatus():qwExported===JSON.stringify(qwDoc)?(qoNativeDesktop?'Экспортирован QWORK':'Скачивание QWORK запрошено'):'Черновик на устройстве');return !qwStorageError;
 }
 function qwChange(fn){qwRemember();fn();qwPersist();qwRender();}
 function qwButton(action,label,extra=''){return '<button type="button" data-qw-action="'+action+'" '+extra+'>'+label+'</button>';}
@@ -53,13 +53,19 @@ function qwRender(){
  const q=qwCurrent(),old=host.querySelector('.qw-center')?.scrollTop||0;
  host.className='qw-frame'+(qwLeft?' qw-left-open':'')+(qwRight?' qw-right-open':'');
  host.innerHTML='<aside class="qw-left" aria-label="Структура работы">'+qwButton('close-panels','Закрыть','class="qw-drawer-close"')+'<header><strong>Задания</strong><span>'+qwDoc.tasks.length+' / 80</span></header>'+qwQuickButtons()+'<div class="qw-row">'+qwButton('part','+ Часть')+'</div><nav aria-label="Порядок заданий">'+qwTaskNavigation()+'</nav><div class="qw-row">'+qwButton('bank','Банк заданий')+qwButton('from-diag','Из диагностики')+'</div></aside>'+
- '<main class="qw-center"><div class="qw-center-head"><h1>'+qwEsc(qwDoc.title)+'</h1><div class="qw-row">'+qwButton('left','Задания','class="qw-mobile"')+qwButton('right','Свойства','class="qw-mobile"')+qwButton('settings','Параметры работы')+qwButton('preview','Макет и экспорт PDF')+qwButton('pdf','Скачать PDF')+qwButton('save','Сохранить QWORK','class="qw-primary"')+'</div><div class="qw-row"><span id="qw-save-state" role="status">'+qwEsc(qwStorageError||'Черновик на устройстве')+'</span>'+qwButton('undo','Отменить',qwUndo.length?'':'disabled')+qwButton('redo','Повторить',qwRedo.length?'':'disabled')+qwButton('example','Пример работы')+'</div></div>'+
+ '<main class="qw-center"><div class="qw-center-head"><h1>'+qwEsc(qwDoc.title)+'</h1><div class="qw-row">'+qwButton('left','Задания','class="qw-mobile"')+qwButton('right','Свойства','class="qw-mobile"')+qwButton('settings','Параметры работы')+qwButton('preview','Макет и экспорт PDF')+qwButton('pdf','Скачать PDF')+qwButton('save','Сохранить QWORK','class="qw-primary"')+'</div><div class="qw-row"><span id="qw-save-state" role="status">'+qwEsc(qwStorageError||(qoNativeDesktop&&globalThis.qoDraftStatus?globalThis.qoDraftStatus():'Черновик на устройстве'))+'</span>'+qwButton('undo','Отменить',qwUndo.length?'':'disabled')+qwButton('redo','Повторить',qwRedo.length?'':'disabled')+qwButton('example','Пример работы')+'</div></div>'+
  (qwCorrupt?'<div class="qw-error" role="alert">'+qwEsc(qwStorageError)+qwButton('recovery','Скачать исходные данные')+qwButton('new','Новый проект')+'</div>':'')+
  (q?'<section class="qw-editor"><div class="qw-row"><strong>Задание '+(qwDoc.tasks.indexOf(q)+1)+'</strong>'+qwButton('up','↑','title="Переместить выше" '+(!qwDoc.tasks.indexOf(q)?'disabled':''))+qwButton('down','↓','title="Переместить ниже" '+(qwDoc.tasks.indexOf(q)===qwDoc.tasks.length-1?'disabled':''))+qwButton('duplicate','Копия')+qwButton('delete','Удалить')+'</div><label>Условие<textarea id="qw-prompt" data-qw-field="prompt" maxlength="16000" rows="7">'+qwEsc(q.prompt)+'</textarea></label>'+(q.type==='choice'?'<label>Варианты ответа (по одному в строке)<textarea data-qw-field="choices" rows="4">'+qwEsc(q.choices.join('\n'))+'</textarea></label>':'')+'<div class="qw-row qw-insert">'+qwButton('math','Формула')+qwButton('symbols','Символы')+qwButton('blank','Пустая вставка')+qwButton('graph','График')+qwButton('diagram','Схема')+qwButton('image','Изображение')+'</div></section><section class="qw-selected-preview" id="qw-task-preview" aria-label="Вид задания">'+qwTaskPreview(q,qwDoc.tasks.indexOf(q))+'</section>':'<div class="qw-empty"><h2>Нет заданий</h2>'+qwButton('add','Добавить задание','class="qw-primary"')+'</div>')+'</main>'+
  '<aside class="qw-right" aria-label="Свойства задания">'+qwButton('close-panels','Закрыть','class="qw-drawer-close"')+'<h2>Свойства задания'+(q?' № '+(qwDoc.tasks.indexOf(q)+1):'')+'</h2>'+(q?qwSelect('type','Тип',Object.entries(QW_TYPES),q.type)+qwField('part','Часть',q.part)+qwField('points','Баллы',q.points,'number','min="0" max="100"')+(!['compact','practice'].includes(qwDoc.layout)?qwCheck('answerVisible','Поле ответа',q.answerVisible)+qwSelect('answerStyle','Формат ответа',[['line','Строка'],['box','Рамка'],['boxes','Ячейки']],q.answerStyle)+(q.answerStyle==='boxes'?qwField('boxes','Количество ячеек',q.boxes,'number','min="1" max="30"'):'')+qwCheck('solutionVisible','Место для решения',q.solutionVisible)+(q.solutionVisible?qwField('solutionHeight','Высота решения, пт',q.solutionHeight,'number','min="24" max="500"')+qwSelect('solutionStyle','Разлиновка',[['lines','Строки'],['grid','Клетка'],['blank','Без разлиновки']],q.solutionStyle):''):'<p class="qw-muted">Поля для записи задаются форматом PDF.</p>')+qwSelect('figure','Иллюстрация',[['none','Нет'],['graph','График'],['diagram','Схема'],['image','Изображение']],q.figure)+(q.figure!=='none'?qwSelect('position','Расположение',[['auto','Автоматически'],['right','Справа'],['below','Под условием'],...(q.position==='left'?[['left','Слева (старый макет)']]:[])],q.position)+(!['compact','practice'].includes(qwDoc.layout)?qwField('figureWidth','Ширина, пт',q.figureWidth,'number','min="120" max="470"'):''):'')+qwCheck('pageBreak','С новой страницы',q.pageBreak)+'<details><summary>Ответ и критерии</summary>'+['answer','criteria','comment'].map((k,i)=>'<label>'+['Ответ для ключа','Критерии','Комментарий'][i]+'<textarea data-qw-field="'+k+'" rows="3" maxlength="16000">'+qwEsc(q[k])+'</textarea></label>').join('')+'</details>'+qwButton('bank-save','Сохранить задание в банк'):'<p>Нет выбранного задания</p>')+'</aside><input type="file" id="qw-file" accept=".qwork,application/json" hidden><input type="file" id="qw-image" accept="image/png,image/jpeg,image/webp" hidden>';
- host.querySelector('.qw-center').scrollTop=old;
+ host.querySelector('.qw-center').scrollTop=old;qwRefreshLiveGraphText(host);
 }
-function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q)p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
+// Remeasure the text at the actual live viewport, not only the detached
+// SVG generation size. Keep viewBox and model positions stable on resize.
+function qwRefreshLiveGraphText(scope){
+ if(!scope)return;
+ for(const svg of scope.querySelectorAll('svg:has(.qw-axis-title[data-axis-tip-x])'))if(svg.getCTM())qwAlignSVGText(svg);
+}
+function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){p.innerHTML=qwTaskPreview(q,qwDoc.tasks.indexOf(q));qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.prompt||QW_TYPES[q.type];t.parentElement.title=q.prompt;}}
 function qwDialog(title,body,footer=''){document.getElementById('qw-dialog')?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">×</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();document.body.append(d);d.showModal();return d;}
 function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[]),['worksheet','Обычная контрольная работа']],current)+'<option disabled>Вариант ОГЭ / ЕГЭ — отдельный этап</option>';}
 function qwPracticeControls(settings={},attribute='data-practice'){
@@ -124,25 +130,27 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
   ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
-  '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
+  '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
-  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main><script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script></body></html>';
+  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){
  let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
  const frame=document.createElement('iframe');frame.title='Подготовка PDF';
- frame.style.cssText='position:fixed;left:-9999px;top:0;width:794px;height:1123px;opacity:0;pointer-events:none';
+ const landscape=qwPrintSettings(qwDoc.printSettings||{}).orientation==='landscape';
+ frame.style.cssText='position:fixed;left:-9999px;top:0;width:'+(landscape?1160:830)+'px;height:'+(landscape?830:1160)+'px;opacity:0;pointer-events:none';
  document.body.append(frame);
  frame.onload=async()=>{
-  try{const win=frame.contentWindow;if(!win.qwPrintReady)return;const prepared=win.document;await win.qwPrintReady;if(frame.contentDocument!==prepared)return;if(win.__qwPrintError)throw Error(win.__qwPrintError);win.addEventListener('afterprint',()=>frame.remove(),{once:true});
+  try{const win=frame.contentWindow,prepared=win.document;if(!prepared.body?.dataset.qwFormat)return; // Ignore initial about:blank load.
+   if(!win.qwPrintReady)throw Error('Не загружен модуль печати');await win.qwPrintReady;if(frame.contentDocument!==prepared)return;if(win.__qwPrintError||prepared.body.dataset.qwLayoutReady!=='true')throw Error(win.__qwPrintError||'Макет PDF не готов');win.addEventListener('afterprint',()=>frame.remove(),{once:true});
    win.focus();win.print();status('В окне печати выберите «Сохранить как PDF»');}
   catch(e){status('PDF: '+e.message,true);frame.remove();}
  };
  frame.srcdoc=html;
 }
-function qwSaveFile(){try{const data=qwValidate(qwDoc);download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');qwExported=JSON.stringify(qwDoc);qwPersist();status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
-async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet','worksheet','exam'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
+async function qwSaveFile(){try{const data=qwValidate(qwDoc),snapshot=JSON.stringify(qwDoc);const saved=await download((typeof safeFile==='function'?safeFile(data.title):'Работа')+'.qwork',JSON.stringify(data,null,2),'application/json');if(qoNativeDesktop&&!saved)return;if(JSON.stringify(qwDoc)===snapshot){qwExported=snapshot;qwPersist();}if(!qoNativeDesktop)status('QWORK подготовлен для скачивания');}catch(e){status(e.message,true);}}
+async function qwExportPDF(teacher=false,options){if(teacher||['compact','practice','booklet','worksheet','exam'].includes(qwDoc.layout)){qwPrintTextPDF(teacher,options);return;}if(qwBusy)return;qwBusy=true;try{status('Подготовка страниц PDF…');const bytes=await qwPDFBytes(qwDoc,false,options);await download(safeFile(qwDoc.title)+'_ученик.pdf',bytes,'application/pdf');if(!qoNativeDesktop)status('PDF подготовлен для скачивания');}catch(e){status('PDF: '+e.message,true);}finally{qwBusy=false;}}
 async function qwPreview(output='tasks'){
  const key=output==='answers',prefs=qwPrintSettings(qwDoc.printSettings||{}),hasAnswers=qwDoc.tasks.some(q=>q.answer.trim()||q.comment.trim()||q.criteria.trim());
  const selected=(name,on)=>'<label class="qw-check"><input type="checkbox" data-print-setting="'+name+'" '+(on?'checked':'')+'>'+({
@@ -252,7 +260,8 @@ function qwBankNormalize(x){
   slot:/^([1-9]|[1-3]\d|40)$/.test(String(x.slot??''))?String(x.slot):'',
   difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
-const qwBankRepository=createBankRepository({normalize:qwBankNormalize});
+const qwBankRepository=createOfficeBankRepository({normalize:qwBankNormalize});
+const qwBankStorageName=qoNativeDesktop?'SQLite':'IndexedDB';
 async function qwBankOpen(){await qwBankRepository.open({onProgress:count=>status('Перенос изображений банка: '+count+' заданий…')});return qwBankRepository;}
 async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
@@ -305,7 +314,7 @@ function qwBankSave(){
     topic:metadata.topic,subtopic:metadata.subtopic,origin:metadata.origin});
    await qwBankRepository.createTask(qwBankNormalize({id:qwId(),bankNumber:0,...metadata,task}));
    await qwBankSnapshotSmall();
-   d.close();status('Задание сохранено в IndexedDB');
+   d.close();status('Задание сохранено в '+qwBankStorageName);
   }catch(e){status('Банк: '+e.message,true);}
  };
 }
@@ -410,6 +419,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
  function preview(){
   try{
    d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview({...task,answerVisible:false,solutionVisible:false},Number(draft.slot||1)-1,'worksheet',false,null,true);
+   qwRefreshLiveGraphText(d.querySelector('#qw-bank-edit-preview'));
    for(const key of ['prompt','comment','criteria']){
     const area=d.querySelector('[data-bank-render="'+key+'"]');
     if(area)area.innerHTML=qwRichMarkdownHTML(task[key]||'');
@@ -473,7 +483,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
     await qwBankRepository.updateTask(id,candidate,stored.revision);
    await qwBankSnapshotSmall();
    d.close();qwBank({...returnFilters,__view:saved.id});
-   status(creating?'Задание добавлено в IndexedDB':'Изменения сохранены в IndexedDB');
+   status(creating?'Задание добавлено в '+qwBankStorageName:'Изменения сохранены в '+qwBankStorageName);
   }catch(e){showError('Не удалось сохранить: '+e.message);}
  };
  preview();
@@ -481,12 +491,12 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
 async function qwBank(previousFilters={}){
  const bankDocument=qwDoc,bankPage=page,bankTab=qoWorkspaceTab.writer;
  const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoWorkspaceTab.writer===bankTab;
- let xs=[],facets,totalCount=0,assetMigrationError=null;
+ let xs=[],facets,totalCount=0,assetMigrationError=null,storageInfo=null;
  try{
   await qwBankOpen();
   await qwBankSnapshotSmall();
   const stats=await qwBankRepository.getStatistics();
-  totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+  storageInfo=stats;totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
  }catch(e){
   status('Банк не открыт: '+e.message,true);
   const raw=qwBankRepository.getLegacyRecovery();
@@ -531,7 +541,7 @@ async function qwBank(previousFilters={}){
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
  d.querySelector('.qw-dialog-body').insertAdjacentHTML('afterbegin',
-  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">IndexedDB · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">Банк хранится в профиле браузера. Создайте отдельную копию на диске.</span></div>'+
+  '<div class="qw-bank-storage-bar"><span id="qw-bank-storage-count">'+qwBankStorageName+' · '+totalCount+' заданий</span><span id="qw-bank-save-status" role="status">'+(qoNativeDesktop?'Локальная база Windows':'Банк хранится в профиле браузера')+'. Создайте отдельную копию на диске.</span></div>'+(qoNativeDesktop?'<div class="qw-bank-storage-bar"><small>'+qwEsc(storageInfo.path)+' · '+Math.ceil(storageInfo.estimatedBytes/1024)+' КБ</small><button type="button" id="qw-native-folder">Открыть папку данных</button><button type="button" id="qw-native-snapshot">Снимок SQLite</button></div>':'')+
   '<section id="qw-bank-restore-review" class="qw-bank-restore-review" hidden aria-label="Проверенная резервная копия">'+
    '<h3>Проверка резервной копии</h3><p id="qw-bank-restore-detail"></p>'+
    '<p id="qw-bank-restore-warning"></p>'+
@@ -541,6 +551,7 @@ async function qwBank(previousFilters={}){
    '<button type="button" id="qw-bank-restore-dismiss">Отмена</button></section>');
  const get=k=>d.querySelector('#qw-bank-'+k),pick=k=>get(k).value;
  const state=d.querySelector('#qw-bank-save-status');
+ if(qoNativeDesktop){d.querySelector('#qw-native-folder').onclick=()=>qwBankRepository.openDataFolder().catch(e=>status(e.message,true));d.querySelector('#qw-native-snapshot').onclick=()=>qwBankRepository.nativeSnapshot().then(x=>status('Снимок SQLite: '+x.path)).catch(e=>status(e.message,true));}
  const reportStatus=(message,bad=false)=>{state.textContent=message;state.classList.toggle('qw-error',bad);};
  if(assetMigrationError)reportStatus('Перенос изображений не завершён: '+assetMigrationError,true);
  let previewSequence=0;
@@ -596,6 +607,7 @@ async function qwBank(previousFilters={}){
     '<div class="qw-bank-solution-body qw-rich"><section>'+solutionTitle+details+'</section>'+
     '<section><h3>Ответ</h3>'+answer+'</section>'+
     '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
+  qwRefreshLiveGraphText(host);
   const illustration=host.querySelector('img[alt="Иллюстрация задания"]');
   if(illustration){const failed=()=>{if(token===previewSequence&&d.isConnected)reportStatus('Изображение повреждено. Исходные данные сохранены; можно заменить рисунок через редактирование.',true);};illustration.addEventListener('error',failed,{once:true});if(illustration.complete&&!illustration.naturalWidth)failed();}
  }
@@ -675,9 +687,10 @@ async function qwBank(previousFilters={}){
    await new Promise(resolve=>setTimeout(resolve,0));
    const text=JSON.stringify(archive);
    if(ctrl.signal.aborted)throw Error('Операция отменена');
-   download((protect?'QuantumOffice_банк_защитная_копия_':'QuantumOffice_банк_SHA256_')+
+   const saved=await download((protect?'QuantumOffice_банк_защитная_копия_':'QuantumOffice_банк_SHA256_')+
     new Date().toISOString().slice(0,10)+'.qwbank',text,'application/json;charset=utf-8');
-   reportStatus('Архив проверен SHA-256, скачивание запрошено. Проверьте, что файл появился на диске.');
+   if(qoNativeDesktop&&saved!==true)throw Error('Файл не сохранён');
+   reportStatus(qoNativeDesktop?'Архив проверен SHA-256 и сохранён.':'Архив проверен SHA-256, скачивание запрошено. Проверьте, что файл появился на диске.');
    return archive;
   }finally{
    backupController=null;backupButton.disabled=false;restoreButton.disabled=false;cancelBackup.hidden=true;
@@ -738,12 +751,12 @@ async function qwBank(previousFilters={}){
   restoreBusy=true;confirmRestore.disabled=true;restoreButton.disabled=true;
   restoreController=new AbortController();
   try{
-   reportStatus('Атомарное восстановление IndexedDB. Можно нажать «Отмена», чтобы прервать незавершённую транзакцию.');
+   reportStatus('Атомарное восстановление '+qwBankStorageName+'. Можно нажать «Отмена», чтобы прервать незавершённую транзакцию.');
    const outcome=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode,signal:restoreController.signal});
    await qwBankSnapshotSmall();
    totalCount=(await qwBankRepository.getStatistics()).count;
    facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
    fillYears();fillCategories();pageOffset=0;await refresh();
    dismissRestore();
    reportStatus('Восстановлено и повторно проверено: '+outcome.restored+' заданий. Счётчик номеров сохранён.');
@@ -756,8 +769,9 @@ async function qwBank(previousFilters={}){
   try{
    reportStatus('Подготовка экспорта…');
    const payload=await qwBankRepository.exportBank();
-   download('QuantumOffice_банк_заданий.qwbank',JSON.stringify(payload,null,2),'application/json');
-   reportStatus('QWBANK экспортирован. Это отдельная копия данных.');
+   const saved=await download('QuantumOffice_банк_заданий.qwbank',JSON.stringify(payload,null,2),'application/json');
+   if(qoNativeDesktop&&saved!==true){reportStatus('QWBANK не сохранён: отмена или ошибка записи.',true);return;}
+   reportStatus(qoNativeDesktop?'QWBANK сохранён. Это отдельная копия данных.':'Скачивание QWBANK запрошено. Проверьте файл на диске.');
   }catch(e){reportStatus('Экспорт не выполнен: '+e.message,true);status('Банк: '+e.message,true);}
  };
  d.querySelector('[data-qw-action="bank-clean-assets"]').onclick=async()=>{
@@ -780,7 +794,7 @@ async function qwBank(previousFilters={}){
    const stats=await qwBankRepository.getStatistics();
    totalCount=stats.count;
    facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-   d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+   d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
    fillYears();fillCategories();pageOffset=0;await refresh();
    reportStatus('Сохранено: '+imported.imported+' · пропущено совпадений: '+imported.skipped);
   }catch(error){
@@ -872,7 +886,7 @@ async function qwBank(previousFilters={}){
    const on=!d.classList.contains('qw-bank-expanded');
    d.classList.toggle('qw-bank-expanded',on);
    e.target.textContent=on?'Свернуть':'Увеличить';
-   e.target.setAttribute('aria-pressed',String(on));
+   e.target.setAttribute('aria-pressed',String(on));qwRefreshLiveGraphText(d);
    return;
   }
   if(action==='bank-assemble'){void loadAndAdd([...selected.keys()],{replace:true});return;}
@@ -903,7 +917,7 @@ async function qwBank(previousFilters={}){
      await qwBankSnapshotSmall();
      totalCount=(await qwBankRepository.getStatistics()).count;
      facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
-     d.querySelector('#qw-bank-storage-count').textContent='IndexedDB · '+totalCount+' заданий';
+     d.querySelector('#qw-bank-storage-count').textContent=qwBankStorageName+' · '+totalCount+' заданий';
      selected.delete(entry.id);if(activeId===entry.id)activeId='';
      fillYears();fillCategories();pageOffset=0;await refresh();
      reportStatus('Удаление подтверждено базой данных.');
@@ -1069,7 +1083,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');
  let inspectorSelection='';
- const point=e=>{const b=stage.querySelector('svg').getBoundingClientRect(),x=qwNum((e.clientX-b.left)/b.width*520,0,520,0),y=qwNum((e.clientY-b.top)/b.height*320,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
+ const point=e=>{const svg=stage.querySelector('svg'),box=svg.getBoundingClientRect(),v=svg.viewBox.baseVal,expanded=v.x!==0||v.y!==0||v.width!==520||v.height!==320,p=expanded?new DOMPoint(e.clientX,e.clientY).matrixTransform(svg.getScreenCTM().inverse()):{x:(e.clientX-box.left)/box.width*520,y:(e.clientY-box.top)/box.height*320},x=qwNum(p.x,0,520,0),y=qwNum(p.y,0,320,0);return kind==='diagram'&&tool!=='select'&&snapGeometry&&!e.shiftKey?(tool==='select'&&!drag?{x:Math.round(x/geometryStep)*geometryStep,y:Math.round(y/geometryStep)*geometryStep}:qwSnapDiagramPoint({x,y},value,geometryStep,drag?selected:-1)):{x,y};};
   const gridPoint=p=>{const b=QW_PLOT;return qwSnapGraphPoint(value,value.xmin+(p.x-b.left)/(b.right-b.left)*(value.xmax-value.xmin),value.ymin+(b.bottom-p.y)/(b.bottom-b.top)*(value.ymax-value.ymin));};
  function selectOnly(index){selected=index;labelSelected='';multi=new Set(index<0?[]:[index]);}
  function selectedIndices(){return [...multi].sort((a,b)=>a-b);}
@@ -1084,7 +1098,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   return {object,ownerIndex,free:object.kind==='text',get:()=>edge?object.edgeLabelPositions?.[edgeIndex]:target.labelPosition,clear:()=>{if(edge)object.edgeLabels[edgeIndex]='';else target.label='';},set:p=>{if(edge){object.edgeLabelPositions??=object.vertices.map(()=>null);object.edgeLabelPositions[edgeIndex]=p;}else target.labelPosition=p;}};
  }
  function labelNode(){return labelSelected?stage.querySelector('[data-qw-label="'+labelSelected+'"]'):null;}
- function labelBox(node){const r=node.getBoundingClientRect(),s=stage.querySelector('svg').getBoundingClientRect();return {x:(r.left-s.left)/s.width*520,y:(r.top-s.top)/s.height*320,w:r.width/s.width*520,h:r.height/s.height*320};}
+ function labelBox(node){const r=node.getBoundingClientRect(),svg=stage.querySelector('svg'),v=svg.viewBox.baseVal;if(v.x===0&&v.y===0&&v.width===520&&v.height===320){const s=svg.getBoundingClientRect();return {x:(r.left-s.left)/s.width*520,y:(r.top-s.top)/s.height*320,w:r.width/s.width*520,h:r.height/s.height*320};}const m=svg.getScreenCTM().inverse(),a=new DOMPoint(r.left,r.top).matrixTransform(m),z=new DOMPoint(r.right,r.bottom).matrixTransform(m);return {x:a.x,y:a.y,w:z.x-a.x,h:z.y-a.y};}
  function labelProperties(){
   const node=labelNode(),info=labelSelected&&labelInfo(labelSelected);if(!node||!info)return '';
   const conflict=node.dataset.labelConflict==='true'?'<p class="qw-error">Подпись пересекает рисунок или выходит за границы. Перетащите её или сбросьте положение.</p>':'';
@@ -1208,7 +1222,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
    remember();value=validated;selected=objects().length-1;multi=new Set(copies.map((_,i)=>selected-copies.length+1+i));draw();
   }catch(e){hint.textContent=e.message;hint.className='qw-error';}
  }
- function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';if(['midpoint','perpendicularBisector'].includes(tool))hint.textContent+=' · Нажмите исходный отрезок.';if(tool==='angleBisector')hint.textContent+=' · Нажмите исходный угол.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-redo').disabled=!future.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelector('#qw-visual-copy').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
+ function draw(full=true){if(kind==='diagram')value=qwResolveDiagram(value);if(labelSelected&&labelInfo(labelSelected)?.ownerIndex!==selected)labelSelected='';const scroll=props.scrollTop;stage.innerHTML=kind==='graph'?qwGraphSVG(drag?.creating||polyline.length?{...value,elements:[...value.elements,...(drag?.creating?[drag.draft]:[]),...(polyline.length?[{kind:'polyline',vertices:polyline,label:''}]:[])]}:value,true):qwDiagramSVG([...value,...(drag?.creating?[drag.draft]:[]),...(polyline.length>1?[diagramPolyline(polyline)]:[])],true,snapGeometry?geometryStep:false);qwRefreshLiveGraphText(stage);decorateSelection();if(selected>=0){const el=stage.querySelector('[data-qw-'+(kind==='graph'?'point':'object')+'="'+selected+'"]');if(el)el.classList.add('qw-visual-selected');}hint.className='';hint.textContent=kind==='graph'?value.points.length+' / 40 точек · '+value.elements.length+' / 60 объектов'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':''):value.length+' / 60 фигур'+(polyline.length?' · Ломаная: '+polyline.length+' вершин':'');if(['parallel','perpendicular'].includes(tool))hint.textContent+=' · '+(constructionReference<0?'Выберите опорную линию, затем точку.':'Укажите точку для построения.');if(tool==='equalMarks')hint.textContent+=' · Нажмите отрезок: одна, две или три засечки.';if(['midpoint','perpendicularBisector'].includes(tool))hint.textContent+=' · Нажмите исходный отрезок.';if(tool==='angleBisector')hint.textContent+=' · Нажмите исходный угол.';d.querySelector('#qw-visual-undo').disabled=!history.length;d.querySelector('#qw-visual-redo').disabled=!future.length;d.querySelector('#qw-visual-delete').disabled=selected<0;d.querySelector('#qw-visual-copy').disabled=selected<0;d.querySelectorAll('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===tool)));d.querySelector('#qw-finish-polyline').disabled=polyline.length<2;if(kind==='graph'){d.querySelector('#qw-coordinate-mode').value=value.coordinateMode||'custom';d.querySelector('#qw-coordinate-hint').textContent=({first:'X и Y начинаются с нуля. Изменить границы можно справа.',positiveX:'X ≥ 0, а Y имеет положительные и отрицательные значения.',math:'Обе оси проходят через нуль, деления подписаны возле осей.',custom:'Свободные числовые диапазоны X и Y задаются справа.'})[value.coordinateMode]||'Свободные диапазоны задаются справа.';}
   const conflicts=stage.querySelectorAll('[data-label-conflict="true"]').length;if(conflicts){hint.className='qw-error';hint.textContent+=' · Подписей с пересечениями: '+conflicts+'. Выберите подпись и перетащите её.';}
   if(!labelSelected)props.querySelector('.qw-label-settings')?.remove();
   if(!full)return;
@@ -1256,7 +1270,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
  props.addEventListener('focusin',e=>{if(kind==='graph'&&e.target.dataset.pointIndex!==undefined){selectOnly(Number(e.target.dataset.pointIndex));draw(false);}});
  stage.onpointerdown=e=>{
   if(e.button!==0||drag)return;e.preventDefault();stage.focus();
-  const p=point(e),before=structuredClone(value),previous=selected,scale=stage.querySelector('svg').getBoundingClientRect().width/520;
+  const p=point(e),before=structuredClone(value),previous=selected,scale=Math.hypot(stage.querySelector('svg').getScreenCTM().a,stage.querySelector('svg').getScreenCTM().b);
   const prior=new Set(multi),coordinate=kind==='graph'?gridPoint(p):p;
   const caption=tool==='select'?e.target.closest('[data-qw-label]'):null;
   if(caption){const info=labelInfo(caption.dataset.qwLabel);if(info){const box=labelBox(caption),initial={dx:Number(caption.dataset.labelOffsetX),dy:Number(caption.dataset.labelOffsetY)};selectOnly(info.ownerIndex);labelSelected=caption.dataset.qwLabel;drag={label:labelSelected,free:info.free,before,previous,selection:prior,start:p,box,initial,screen:{x:e.clientX,y:e.clientY},pixels:0};stage.setPointerCapture(e.pointerId);draw();return;}}

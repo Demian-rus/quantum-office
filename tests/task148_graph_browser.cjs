@@ -43,9 +43,9 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await tool('select');await drag(50,20,470,300);assert.equal(await stage.locator('.qw-visual-selected').count(),3,'marquee selects three vectors');
   await p.keyboard.down('Shift');await click(340,160);await p.keyboard.up('Shift');assert.equal(await stage.locator('.qw-visual-selected').count(),2);
   await p.keyboard.down('Shift');await click(340,160);await p.keyboard.up('Shift');assert.equal(await stage.locator('.qw-visual-selected').count(),3);
-  const paths=await stage.locator('[data-qw-object] line').evaluateAll(es=>es.map(e=>e.getAttribute('x1')));
-  await drag(340,160,360,170);assert.notDeepEqual(await stage.locator('[data-qw-object] line').evaluateAll(es=>es.map(e=>e.getAttribute('x1'))),paths,'group pointer move');
-  await p.locator('#qw-visual-undo').click();assert.deepEqual(await stage.locator('[data-qw-object] line').evaluateAll(es=>es.map(e=>e.getAttribute('x1'))),paths,'group move is one undo');
+  const paths=await stage.locator('[data-qw-object] [data-qw-arrow-shaft]').evaluateAll(es=>es.map(e=>e.getAttribute('points')));assert.equal(paths.length,3);
+  await drag(340,160,360,170);assert.notDeepEqual(await stage.locator('[data-qw-object] [data-qw-arrow-shaft]').evaluateAll(es=>es.map(e=>e.getAttribute('points'))),paths,'group pointer move');
+  await p.locator('#qw-visual-undo').click();assert.deepEqual(await stage.locator('[data-qw-object] [data-qw-arrow-shaft]').evaluateAll(es=>es.map(e=>e.getAttribute('points'))),paths,'group move is one undo');
   await p.locator('[data-object-select="0"]').click();await p.locator('[data-layer="front"]').click();
   assert.match(await p.locator('[data-object-select="2"]').textContent(),/F₁/);await p.locator('[data-layer="back"]').click();
   await p.screenshot({path:path.join(out,'colored-forces.png')});await action('visual-apply').click();

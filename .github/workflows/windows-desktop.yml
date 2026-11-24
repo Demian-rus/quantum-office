@@ -1,0 +1,80 @@
+name: Windows desktop SQLite
+on:
+  push:
+    branches: [main, 'feat/task166-4-windows-sqlite']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  windows-x64:
+    runs-on: windows-2025
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - name: Verify committed dependency lock
+        working-directory: src-tauri
+        run: cargo metadata --locked --format-version 1 --no-deps
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-cargo-lock
+          path: src-tauri/Cargo.lock
+      - name: Generate Windows icon from repository script
+        run: node scripts/native-icon.mjs
+      - name: Rust SQLite tests
+        working-directory: src-tauri
+        run: cargo test --locked --target x86_64-pc-windows-msvc
+      - name: Build Windows x64 installer
+        run: npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+      - name: Package separate Windows and browser candidates
+        shell: pwsh
+        run: |
+          $release = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          New-Item -ItemType Directory -Force portable | Out-Null
+          Copy-Item "$release/quantum-office.exe" portable/
+          @("Quantum Office Windows x64", "Requires Microsoft Edge WebView2 Evergreen Runtime.", "Run quantum-office.exe. Bank data is stored in the application data folder, not beside the EXE.", "Unsigned candidate; use a disposable test profile until acceptance.") | Set-Content portable/README.txt -Encoding utf8
+          Compress-Archive -Path portable/* -DestinationPath Quantum-Office-Windows-x64-Portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-Windows-x64-Setup
+          path: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          if-no-files-found: error
+          compression-level: 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-Windows-x64-Portable
+          path: Quantum-Office-Windows-x64-Portable.zip
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-HTML
+          path: Quantum-Office.html
+          if-no-files-found: error
+      - name: Install browser comparison and PDF raster dependencies
+        run: |
+          npx playwright install chromium
+          python -m pip install PyMuPDF==1.26.5 Pillow==11.3.0
+      - name: Install, launch, reinstall and restart actual release
+        shell: pwsh
+        run: |
+          ./scripts/task1664-windows-smoke.ps1
+          python tests/task1664_pdf_compare.py evidence/native
+          if ($LASTEXITCODE -ne 0) { throw 'PDF visual comparison failed' }
+          python tests/task1664_graphics_pdf.py evidence/native
+          if ($LASTEXITCODE -ne 0) { throw 'PDF visual comparison failed' }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-x64-evidence
+          path: evidence/native/
+          if-no-files-found: error

@@ -41,7 +41,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task165-ric
     const bb=e=>e?.getBoundingClientRect();const table=bb(tb),body=bb(text),figure=bb(fb);
     return {error:window.__qwPrintError||null,layout:window.__qwPrintLayout?.layout,ids:[...new Set(sections.map(s=>Number(s.dataset.task)))],
      rich:!!source?.querySelector('.qw-print-rich h5'),math:!!source?.querySelector('.qw-print-rich math'),
-     table:!!tb,tableUnder:table&&body?table.top>=body.bottom-1:false,tableCentered:table?Math.abs((table.left+table.right-(bb(source.querySelector('.qw-task-flow')).left+bb(source.querySelector('.qw-task-flow')).right))/2)<4:false,
+     table:!!tb,tableUnder:!!tb&&!!text&&text.contains(tb)&&tb.closest('.qw-task-tables').previousElementSibling!==null,tableCentered:table?Math.abs((table.left+table.right-(bb(source.querySelector('.qw-task-flow')).left+bb(source.querySelector('.qw-task-flow')).right))/2)<4:false,
      figureBelow:fb?.dataset.printPosition==='below',figureVisible:!!figure&&figure.width>15&&figure.height>15,
      plainStillLegacy:!sections.find(s=>s.dataset.task==='2')?.querySelector('.qw-print-rich'),
      pageOverflow:[...document.querySelectorAll('.qw-print-page')].some(x=>x.scrollWidth>x.clientWidth+3)};

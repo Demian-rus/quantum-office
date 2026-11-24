@@ -1,8 +1,9 @@
 /* Attached captions share a measured SVG layout in the editor, saved SVG and PDF.
    Model offsets are SVG-space vectors from the owning anchor to the caption centre. */
+import {qwAlignSVGText} from './work-layout.js';
 function qwLabelSVG(id,anchor,position,markup,options={}){
  const esc=s=>String(s).replace(/[&"<>]/g,c=>({'&':'&amp;','"':'&quot;','<':'&lt;','>':'&gt;'}[c]));
- return '<g data-qw-label="'+esc(id)+'" data-label-anchor-x="'+anchor.x+'" data-label-anchor-y="'+anchor.y+'" data-label-mode="'+(options.free?'fixed':position?.mode||'auto')+'" data-label-dx="'+(position?.dx||0)+'" data-label-dy="'+(position?.dy||0)+'"'+(options.plot?' data-label-plot="true"':'')+'>'+markup+'</g>';
+ return '<g data-qw-label="'+esc(id)+'" data-label-anchor-x="'+anchor.x+'" data-label-anchor-y="'+anchor.y+'" data-label-mode="'+(options.free?'fixed':position?.mode||'auto')+'" data-label-dx="'+(position?.dx||0)+'" data-label-dy="'+(position?.dy||0)+'"'+(options.plot?' data-label-plot="true"':'')+(options.contour?' data-label-contour="'+esc(JSON.stringify(options.contour))+'" data-label-outward="'+esc(JSON.stringify(options.outward))+'"':'')+'>'+markup+'</g>';
 }
 function qwLabelSegmentHits(a,b,box,padding=0){
  const r={x:box.x-padding,y:box.y-padding,w:box.w+2*padding,h:box.h+2*padding},dx=b.x-a.x,dy=b.y-a.y;let near=0,far=1;
@@ -12,11 +13,38 @@ function qwLabelSegmentHits(a,b,box,padding=0){
  }return near<=far;
 }
 function qwLabelBoxOverlap(a,b,padding=0){return Math.max(0,Math.min(a.x+a.w+padding,b.x+b.w)-Math.max(a.x-padding,b.x))*Math.max(0,Math.min(a.y+a.h+padding,b.y+b.h)-Math.max(a.y-padding,b.y));}
-function qwChooseLabelBox(anchor,initial,bounds,segments,occupied){
+function qwClosedContour(points){
+ if(points.length<4)return null;
+ const a=points[0],b=points.at(-1);if(Math.hypot(a.x-b.x,a.y-b.y)>.001)return null;
+ const ps=points.slice(0,-1);
+ if(ps.some((p,i)=>ps.some((q,j)=>j<i&&Math.hypot(p.x-q.x,p.y-q.y)<.001)))return null;
+ const area=ps.reduce((s,p,i)=>{const q=ps[(i+1)%ps.length];return s+p.x*q.y-p.y*q.x;},0);
+ return Math.abs(area)>1e-5?ps:null;
+}
+function qwContourOutward(ps,i){
+ const p=ps[i],a=ps[(i+ps.length-1)%ps.length],b=ps[(i+1)%ps.length];
+ const sign=Math.sign(ps.reduce((s,p,j)=>{const q=ps[(j+1)%ps.length];return s+p.x*q.y-p.y*q.x;},0));
+ const u=Math.hypot(p.x-a.x,p.y-a.y)||1,v=Math.hypot(b.x-p.x,b.y-p.y)||1;
+ const x=sign*((p.y-a.y)/u+(b.y-p.y)/v),y=-sign*((p.x-a.x)/u+(b.x-p.x)/v),n=Math.hypot(x,y)||1;
+ return {x:x/n,y:y/n};
+}
+function qwPointInContour(p,ps){
+ let inside=false;
+ for(let i=0,j=ps.length-1;i<ps.length;j=i++){const a=ps[i],b=ps[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside;}
+ return inside;
+}
+function qwContourPenalty(box,ps){
+ const corners=[{x:box.x,y:box.y},{x:box.x+box.w,y:box.y},{x:box.x,y:box.y+box.h},{x:box.x+box.w,y:box.y+box.h},{x:box.x+box.w/2,y:box.y+box.h/2}];
+ return corners.some(p=>qwPointInContour(p,ps))||ps.some((p,i)=>qwLabelSegmentHits(p,ps[(i+1)%ps.length],box,1))?1:0;
+}
+function qwChooseLabelBox(anchor,initial,bounds,segments,occupied,contour=null,outward=null){
  const score=r=>{
   const outside=Math.max(0,bounds.x-r.x)+Math.max(0,r.x+r.w-bounds.x-bounds.w)+Math.max(0,bounds.y-r.y)+Math.max(0,r.y+r.h-bounds.y-bounds.h);
   let lines=0;for(const s of segments){if(s.maxX<r.x-s.pad||s.minX>r.x+r.w+s.pad||s.maxY<r.y-s.pad||s.minY>r.y+r.h+s.pad)continue;if(qwLabelSegmentHits(s.a,s.b,r,s.pad))lines++;}
-  const labels=occupied.reduce((sum,b)=>sum+qwLabelBoxOverlap(r,b,2),0);return outside*100000+lines*10000+labels*100;
+  const labels=occupied.reduce((sum,b)=>sum+qwLabelBoxOverlap(r,b,2),0);const inside=contour?qwContourPenalty(r,contour):0;
+  const dx=r.x+r.w/2-anchor.x,dy=r.y+r.h/2-anchor.y;
+  const direction=outward&&dx*outward.x+dy*outward.y<=0?1:0;
+  return outside*100000+lines*10000+labels*100+inside*5000+direction*10;
  };
  const initialScore=score(initial);let best={box:initial,score:initialScore,initialScore};if(best.score===0)return best;
  for(const gap of [10,16,24,34,46,60]){
@@ -24,6 +52,7 @@ function qwChooseLabelBox(anchor,initial,bounds,segments,occupied){
   const xs=[anchor.x+gap,anchor.x-initial.w-gap],ys=[anchor.y-initial.h-gap/2,anchor.y+gap];
   const candidates=[{x:xs[0],y:ys[0]},{x:xs[1],y:ys[0]},{x:xs[0],y:ys[1]},{x:xs[1],y:ys[1]},
    {x:anchor.x-initial.w/2,y:anchor.y-initial.h-gap},{x:anchor.x-initial.w/2,y:anchor.y+gap},{x:xs[0],y:anchor.y-initial.h/2},{x:xs[1],y:anchor.y-initial.h/2}];
+  if(outward)candidates.sort((a,b)=>((b.x+initial.w/2-anchor.x)*outward.x+(b.y+initial.h/2-anchor.y)*outward.y)-((a.x+initial.w/2-anchor.x)*outward.x+(a.y+initial.h/2-anchor.y)*outward.y));
   for(const c of candidates){const box={...c,w:initial.w,h:initial.h},next=score(box);if(next<best.score)best={box,score:next,initialScore};if(next===0)return best;}
   if(initial.w<bounds.w-8&&initial.h<bounds.h-8)for(const c of candidates){
    const box={x:Math.max(bounds.x+4,Math.min(c.x,bounds.x+bounds.w-initial.w-4)),y:Math.max(bounds.y+4,Math.min(c.y,bounds.y+bounds.h-initial.h-4)),w:initial.w,h:initial.h},next=score(box);
@@ -32,7 +61,7 @@ function qwChooseLabelBox(anchor,initial,bounds,segments,occupied){
  }return best;
 }
 function qwPlaceSVGLabels(source){
- if(typeof document==='undefined'||!document.body||!source.includes('data-qw-label='))return source;
+ if(typeof document==='undefined'||!document.body||(!source.includes('data-qw-label=')&&!source.includes('data-axis-tip-x=')))return source;
  const host=document.createElement('div');host.style.cssText='position:fixed;left:-10000px;top:0;width:520px;height:320px;visibility:hidden;pointer-events:none';host.innerHTML=source;document.body.append(host);
  try{
   const svg=host.querySelector('svg'),labels=[...svg.querySelectorAll('[data-qw-label]')],inverse=svg.getCTM().inverse();
@@ -47,7 +76,8 @@ function qwPlaceSVGLabels(source){
    const style=getComputedStyle(e),stroke=style.stroke;
    if(['rgb(217, 222, 228)','rgb(220, 230, 236)'].includes(stroke))continue; // construction/grid lines are background
    const radius=Number(e.getAttribute('r'))||0,filledPoint=e.tagName==='circle'&&radius<=7&&style.fill!=='none';
-   if((stroke==='none'||Number(style.strokeOpacity)===0)&&!filledPoint)continue;
+   const filledHead=e.hasAttribute('data-qw-arrow-head')&&style.fill!=='none';
+   if((stroke==='none'||Number(style.strokeOpacity)===0)&&!filledPoint&&!filledHead)continue;
    const m=matrix(e),width=parseFloat(style.strokeWidth)||1,pad=Math.max(1.2,width/2)+2;
    if(filledPoint){const b=rect(e);for(let x=b.x;x<=b.x+b.w+1;x+=2)add({x,y:b.y},{x,y:b.y+b.h},1.5);continue;}
    const length=e.getTotalLength();if(!Number.isFinite(length)||length===0)continue;
@@ -60,6 +90,7 @@ function qwPlaceSVGLabels(source){
     const p=e.getPointAtLength(end==='start'?0:length),at=point(m,p.x,p.y),r=width*5;add({x:at.x-r,y:at.y},{x:at.x+r,y:at.y},r);
    }
   }
+  qwAlignSVGText(svg,{manual:false});
   const occupied=[...svg.querySelectorAll('text')].filter(e=>!e.closest('[data-qw-label],defs')).map(rect);
   // Explicit positions and free text are obstacles, never targets for automatic nudging.
   for(const e of labels.filter(e=>e.dataset.labelMode!=='auto')){
@@ -70,14 +101,16 @@ function qwPlaceSVGLabels(source){
   for(const e of labels){
    const a=anchor(e),r=rect(e),bounds=e.dataset.labelPlot?{x:82,y:46,w:369,h:216}:{x:3,y:3,w:514,h:314};
    const ownFixed=e.dataset.labelMode!=='auto',others=ownFixed?occupied.filter(b=>!(Math.abs(b.x-r.x)<.01&&Math.abs(b.y-r.y)<.01&&Math.abs(b.w-r.w)<.01&&Math.abs(b.h-r.h)<.01)):occupied;
-   const placement=qwChooseLabelBox(a,r,bounds,segments,others);
+   const contour=!ownFixed&&e.dataset.labelContour?JSON.parse(e.dataset.labelContour):null,outward=contour?JSON.parse(e.dataset.labelOutward):null;
+   const placement=qwChooseLabelBox(a,r,bounds,segments,others,contour,outward);
    if(!ownFixed){move(e,placement.box.x-r.x,placement.box.y-r.y);occupied.push(rect(e));}
    const final=rect(e);e.dataset.labelWorldX=a.x;e.dataset.labelWorldY=a.y;e.dataset.labelOffsetX=final.x+final.w/2-a.x;e.dataset.labelOffsetY=final.y+final.h/2-a.y;
    // Manual positions stay exact even when unsafe; the editor exposes the conflict.
    const conflict=ownFixed?qwChooseLabelBox(a,final,bounds,segments,others).initialScore:placement.score;
    e.dataset.labelConflict=String(conflict>0);e.style.cursor='grab';e.style.pointerEvents='bounding-box';
   }
+  if(svg.querySelector('.qw-axis-title[data-axis-tip-x]'))qwAlignSVGText(svg,{manual:false,expand:true});
   return new XMLSerializer().serializeToString(svg);
  }finally{host.remove();}
 }
-export {qwLabelSVG,qwLabelSegmentHits,qwLabelBoxOverlap,qwChooseLabelBox,qwPlaceSVGLabels};
+export {qwLabelSVG,qwLabelSegmentHits,qwLabelBoxOverlap,qwChooseLabelBox,qwPlaceSVGLabels,qwClosedContour,qwContourOutward,qwPointInContour,qwContourPenalty};

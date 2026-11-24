@@ -103,6 +103,7 @@ function status(message,tone=false){
 let qoWriterSavedLocal=true,qoSlidesSavedLocal=true;
 function updateSaveIndicator(){
  const n=document.querySelector('#storage-indicator');if(!n)return;
+ if(typeof qoNativeDesktop!=='undefined'&&qoNativeDesktop&&globalThis.qoDraftStatus){n.textContent=globalThis.qoDraftStatus();n.title='Нативная запись подтверждается после транзакции SQLite';return;}
  if(page==='writer'){
   n.textContent=qoWriterSavedLocal?'● Черновик текста в браузере':'⚠ Текст не записан в браузер';
   n.title='Локальная копия не заменяет файл QDOC или общую резервную копию';
@@ -193,15 +194,15 @@ function renameBookInline(id,button){
  input.focus();input.select();
 }
 function safeFile(s){return String(s).replace(/[\\/:*?"<>|]/g,'_').slice(0,90)||'quantum-office';}
-function download(name,text,mime){const blob=new Blob([text],{type:mime});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);}
+function download(name,text,mime){const blob=new Blob([text],{type:mime});if(qoNativeDesktop)return qoNativeSave(name,blob).then(saved=>{status(saved?'Файл сохранён':'Сохранение отменено',!saved);return saved;}).catch(e=>{status('Файл не сохранён: '+e.message,true);return false;});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),3000);status('Скачивание запрошено. Проверьте файл на диске.');}
 async function saveBook(asNew=false){
  commitEditor();const b=book();if(!b)return;
  const id=b.id,serialized=encodeBook(b),filename=`${safeFile(b.name)}.qbook`;
  if(savingBooks.has(id)){status('Сохранение этой книги уже выполняется',true);return;}
- if(typeof window.showSaveFilePicker!=='function'){
+ if(qoNativeDesktop||typeof window.showSaveFilePicker!=='function'){
   if(directFiles.has(id)){status('Прямое сохранение недоступно; связанный файл не изменён',true);return;}
-  download(filename,serialized,'application/json');
-  status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
+  await download(filename,serialized,'application/json');
+  if(!qoNativeDesktop)status('Скачивание .qbook запрошено — проверьте загрузки. Запись не подтверждена.');return;
  }
  savingBooks.add(id);
  try{
@@ -250,9 +251,10 @@ async function backup(){
   const bank=await qwBankRepository.createVerifiedBackup();
   status('Проверка архива четырёх редакторов и банка…');
   const content=await encodeOfficeBackupWithBank(workspace,qoWriter,qoSlides,qoPhotoState(),bank);
-  download('Quantum-Office-все-данные-'+new Date().toISOString().slice(0,10)+'.qbackup',
+  const saved=await download('Quantum-Office-все-данные-'+new Date().toISOString().slice(0,10)+'.qbackup',
    content,'application/json;charset=utf-8');
-  status('Архив с банком SHA-256 подготовлен. Скачивание запрошено; проверьте файл на диске. Восстановление разделяется по хранилищам.','success');
+  if(qoNativeDesktop&&!saved)return;
+  if(!qoNativeDesktop)status('Архив с банком SHA-256 подготовлен. Скачивание запрошено; проверьте файл на диске. Восстановление разделяется по хранилищам.','success');
  }catch(error){status('Полный архив НЕ создан: '+(error.message||'ошибка сохранения')+'. Можно отдельно экспортировать старый .qbackup v2 через функцию encodeOfficeBackup.',true);}
 }
 /* A failed import must never leave half-restored documents or overwritten local drafts. */
@@ -276,7 +278,7 @@ function qoRestoreOfficeBackup(snapshot){
   workspace.active=workspace.books[0]?.id??null;
   storeWarning=false;qoPhotoDraftSaved=true;qoWriterSavedLocal=true;qoSlidesSavedLocal=true;
   render();
-  status('Все четыре раздела восстановлены из резервного архива.','success');
+  status(qoNativeDesktop?'Разделы восстановлены в памяти; дождитесь подтверждения записи черновиков.':'Все четыре раздела восстановлены из резервного архива.',qoNativeDesktop?'warning':'success');
  }catch(error){
   for(const [key,value] of previous)try{
    if(value===null)localStorage.removeItem(key);
@@ -300,11 +302,12 @@ async function importFile(file){if(!file)return;const maxSize=file.name.toLowerC
     'Для безопасности банк извлекается отдельным файлом, а редакторы восстанавливаются отдельно.\n\n'+
     'Скачать проверенный QWBANK v3 из общего архива?');
    if(!answer)return;
-   download('QuantumOffice_банк_из_архива_Office.qwbank',
+   const saved=await download('QuantumOffice_банк_из_архива_Office.qwbank',
     JSON.stringify(checked.bank),'application/json;charset=utf-8');
-   status('Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
+   if(qoNativeDesktop&&!saved)return;
+   status(qoNativeDesktop?'Проверенный банк сохранён. Откройте «Банк → Восстановить из копии».':'Проверенный банк извлечён: проверьте скачивание, затем откройте «Банк → Восстановить из копии».','warning');
    if(confirm('Восстановить ТОЛЬКО четыре редактора сейчас?\n\n'+
-    'Банк IndexedDB пока НЕ изменится. Черновики редакторов будут заменены; '+
+    'Банк '+qwBankStorageName+' пока НЕ изменится. Черновики редакторов будут заменены; '+
     'при ошибке localStorage их откат ограничен возможностями браузера. '+
     'Сохраните их отдельно перед подтверждением.'))qoRestoreOfficeBackup(checked.office);
    return;
@@ -1545,19 +1548,19 @@ async function qoWriterExportDocx(){
  try{
   qoPersistWriter();
   const blob=await qoDocxExport(qoSafeRich(qoWriter.html),qoWriterLayout(),qoWriter.name);
-  download(`${safeFile(qoWriter.name)}.docx`,blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-  status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
+  await download(`${safeFile(qoWriter.name)}.docx`,blob,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+  if(!qoNativeDesktop)status('DOCX подготовлен к скачиванию. Проверьте загрузки.');
  }catch(error){status('Не удалось создать DOCX: '+error.message,true);}
 }
-function qoWriterExport(format){
+async function qoWriterExport(format){
  qoPersistWriter();
  if(format==='txt'){
   const clone=document.createElement('div');clone.innerHTML=qoSafeRich(qoWriter.html);
   clone.querySelectorAll('[data-qo-break]').forEach(el=>el.replaceWith(document.createTextNode('\\n\\n--- Разрыв страницы ---\\n\\n')));
-  download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
+  await download(`${safeFile(qoWriter.name)}.txt`,clone.innerText||clone.textContent||'','text/plain;charset=utf-8');
  }else if(format==='qdoc'){
-  download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdWorkingDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
- }else download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
+  await download(`${safeFile(qoWriter.name)}.qdoc`,JSON.stringify({format:'quantum-writer',version:2,name:qoWriter.name,html:qoSafeRich(qoWriter.html),layout:qoWriterLayout(),diagnostic:qdWorkingDoc(),diagnosticMode:qoWriter.diagnosticMode||'builder',updated:Date.now()},null,2),'application/json;charset=utf-8');
+ }else await download(`${safeFile(qoWriter.name)}.html`,qoWriterHTMLDocument(),'text/html;charset=utf-8');
 }
 function qoWriterPrint(){
  qoPersistWriter();const style=document.getElementById('qo-writer-print-style')||document.createElement('style');
@@ -1617,9 +1620,9 @@ async function qoSlidesExportPNG(){
   const sx=item.align==='center'?x+w/2:item.align==='right'?x+w:x;
   for(const [lineNo,line] of String(item.text||'').split('\n').entries())ctx.fillText(line,sx,y+lineNo*(Math.max(10,Number(item.size)||20)*1.55),w);
  }
- await new Promise(resolve=>canvas.toBlob(blob=>{if(blob){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${safeFile(qoSlides.name)}_${qoSlides.active+1}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(url),2000);}resolve();},'image/png'));
+ const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));if(!blob)return status('Не удалось экспортировать PNG',true);await download(`${safeFile(qoSlides.name)}_${qoSlides.active+1}.png`,blob,'image/png');
 }
-function qoSlidesDownload(){qoPersistSlides();download(`${safeFile(qoSlides.name)}.qslides`,JSON.stringify({format:'quantum-office-slides-v1',presentation:qoSlides},null,2),'application/json');}
+async function qoSlidesDownload(){qoPersistSlides();await download(`${safeFile(qoSlides.name)}.qslides`,JSON.stringify({format:'quantum-office-slides-v1',presentation:qoSlides},null,2),'application/json');}
 function qoSlidesPresent(){const overlay=document.getElementById('qo-slides-overlay');if(!overlay)return;
  overlay.hidden=false;overlay.innerHTML=`<button class="qo-slide-show-exit" data-action="slides-exit">× Выход</button>${qoSlidePreview(qoSlide(),false)}<div class="qo-slide-show-controls"><button data-action="slides-prev">←</button><span>${qoSlides.active+1} / ${qoSlides.slides.length}</span><button data-action="slides-next">→</button></div>`;
 }
@@ -1732,7 +1735,7 @@ function qoPhotoState(){return {...(!qoPhotoHasBackgroundOpacity&&qoPhotoBackgro
 function qoPhotoSnapshot(){qoPhotoHistory.push(qoPhotoState());if(qoPhotoHistory.length>35)qoPhotoHistory.shift();qoPhotoRedo=[];}
 function qoPhotoLoadImageSrc(src){qoPhotoImageSrc=src||'';qoPhotoImage=null;if(src){const img=new Image();img.onload=()=>{if(qoPhotoImageSrc===src){qoPhotoImage=img;qoPhotoRender();}};img.src=src;}}
 function qoPhotoApplyState(v){v=validateStudioProject(v);qoPhotoCompare=false;qoPhotoStrokes=v.strokes||[];qoPhotoCanvasW=v.width||1100;qoPhotoCanvasH=v.height||650;qoPhotoBG=v.bg||'#ffffff';qoPhotoBackgroundOpacity=v.backgroundOpacity??1;qoPhotoHasBackgroundOpacity=Object.hasOwn(v,'backgroundOpacity');qoPhotoTransparent=!!v.transparent;qoPhotoAdjust=v.adjust||{brightness:100,contrast:100,saturation:100};qoPhotoFile=v.name||'Без названия';qoPhotoSelectedId=null;qoPhotoSelectedIds.clear();qoPhotoCounter=Math.max(qoPhotoCounter,...qoPhotoStrokes.map(o=>Number((o.id||'').split('-')[1])||0))+1;qoPhotoLoadImageSrc(v.imageSrc||'');}
-function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
+function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoNativeDesktop&&globalThis.qoDraftStatus?globalThis.qoDraftStatus():qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
 function qoPhotoObject(){return qoPhotoStrokes.find(o=>o.id===qoPhotoSelectedId)||null;}
 function qoPhotoBounds(o){const a=o.points?.[0]||[0,0],last=o.points?.at(-1)||a;
  if(o.tool==='text')return qoPhotoTextBounds(o);
@@ -1766,9 +1769,9 @@ function qoPhotoAdd(tool,options={}){qoPhotoSnapshot();const mid=[qoPhotoCanvasW
 function qoPhotoChangeSize(w,h){w=Math.round(Number(w));h=Math.round(Number(h));if(!Number.isFinite(w)||!Number.isFinite(h)||w<64||h<64||w>4096||h>4096){status('Размер: от 64 до 4096 px',true);return;}qoPhotoSnapshot();qoPhotoCanvasW=w;qoPhotoCanvasH=h;qoPhotoSelectedId=null;qoPhotoRefresh();qoPhotoFit();}
 function qoPhotoFit(){const stage=document.getElementById('qs-stage');if(!stage)return;qoPhotoZoom=Math.min(1.5,Math.max(.1,Math.min((stage.clientWidth-90)/qoPhotoCanvasW,(stage.clientHeight-90)/qoPhotoCanvasH)));qoPhotoRender();const r=document.getElementById('qs-zoom');if(r)r.value=Math.round(qoPhotoZoom*100);const l=document.getElementById('qs-zoom-label');if(l)l.textContent=Math.round(qoPhotoZoom*100)+'%';}
 function qoPhotoZoomTo(value){qoPhotoZoom=Math.max(.1,Math.min(2,Number(value)));qoPhotoRender();const r=document.getElementById('qs-zoom');if(r)r.value=Math.round(qoPhotoZoom*100);const l=document.getElementById('qs-zoom-label');if(l)l.textContent=Math.round(qoPhotoZoom*100)+'%';}
-function qoPhotoFileDownload(name,content,type){const blob=new Blob([content],{type}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);}
-async function qoPhotoExport(){try{await qoPhotoWaitImages();}catch(error){status(error.message,true);return;}const c=document.createElement('canvas');c.width=qoPhotoCanvasW;c.height=qoPhotoCanvasH;const compare=qoPhotoCompare;qoPhotoCompare=false;try{qoPhotoPaint(c.getContext('2d'),false);}finally{qoPhotoCompare=compare;}c.toBlob(blob=>{if(!blob)return status('Не удалось экспортировать PNG',true);const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),3000);},'image/png');}
-function qoPhotoExportProject(){try{const data=JSON.stringify(validateStudioProject(qoPhotoState()));if(data.length>32000000)throw Error('Проект больше 32 МБ');qoPhotoFileDownload(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.qstudio',data,'application/json');}catch(error){status(error.message,true);}}
+function qoPhotoFileDownload(name,content,type){return download(name,content,type);}
+async function qoPhotoExport(){try{await qoPhotoWaitImages();}catch(error){status(error.message,true);return;}const c=document.createElement('canvas');c.width=qoPhotoCanvasW;c.height=qoPhotoCanvasH;const compare=qoPhotoCompare;qoPhotoCompare=false;try{qoPhotoPaint(c.getContext('2d'),false);}finally{qoPhotoCompare=compare;}const blob=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!blob)return status('Не удалось экспортировать PNG',true);await download(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.png',blob,'image/png');}
+async function qoPhotoExportProject(){try{const data=JSON.stringify(validateStudioProject(qoPhotoState()));if(data.length>32000000)throw Error('Проект больше 32 МБ');await qoPhotoFileDownload(safeFile(qoPhotoFile.replace(/\.[^.]+$/,''))+'.qstudio',data,'application/json');}catch(error){status(error.message,true);}}
 async function qoPhotoReadImage(file){if(!file||!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>8_000_000)throw Error('Изображение: PNG, JPEG или WebP до 8 МБ');return await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result);r.onerror=()=>reject(Error('Ошибка чтения файла'));r.readAsDataURL(file);});}
 async function qoPhotoFileLoad(file){if(file.name.toLowerCase().endsWith('.qstudio')){if(file.size>32000000)throw Error('Проект QSTUDIO ограничен 32 МБ');const v=JSON.parse(await file.text());if(!v||v.version!==1||!Array.isArray(v.strokes)||v.strokes.length>5000||v.width<64||v.width>4096||v.height<64||v.height>4096)throw Error('Некорректный проект QSTUDIO');const next=validateStudioProject(v);await Promise.all([...new Set([next.imageSrc,...next.strokes.filter(o=>o.tool==='image').map(o=>o.src)].filter(Boolean))].map(src=>new Promise((resolve,reject)=>{const img=new Image();img.onload=resolve;img.onerror=()=>reject(Error('Не удалось прочитать фотографию в QSTUDIO'));img.src=src;})));qoPhotoApplyState(next);qoPhotoHistory=[];qoPhotoRedo=[];qoPhotoTool='select';qoPhotoRefresh();qoPhotoFit();return;}
  const src=await qoPhotoReadImage(file);qoPhotoSnapshot();qoPhotoLoadImageSrc(src);qoPhotoFile=file.name;qoPhotoAdjust={brightness:100,contrast:100,saturation:100};qoPhotoSelectedId=null;qoPhotoRefresh();}
@@ -2640,7 +2643,9 @@ function smartTableHelpPanel(){
  </div></section></div>`;
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button><button class="qo-sheet-nav-button" data-action="sheet-navigator" title="Найти и открыть лист" aria-label="Найти и открыть лист">☷</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
+let qoGridResizeObserver=null;
 function render(){
+ qoGridResizeObserver?.disconnect();qoGridResizeObserver=null;
  qoMiniSheetHide();
  closeBulkReplacePreview();closeWorkbookSearchResults();closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
@@ -2672,7 +2677,10 @@ function render(){
    view._gridFrame=null;
    if(view.isConnected&&view.dataset.sheetId===sheet()?.id)drawGrid(true);
   });
- },{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();syncHistoryButtons();}
+ },{passive:true});drawGrid();
+ // Virtualized rows/columns must be materialized again when the actual viewport changes.
+ if(typeof ResizeObserver==='function'){let width=view.clientWidth,height=view.clientHeight;qoGridResizeObserver=new ResizeObserver(()=>{if(!view.isConnected||view.dataset.sheetId!==sheet()?.id)return;const w=view.clientWidth,h=view.clientHeight;if(w===width&&h===height)return;width=w;height=h;drawGrid();refreshSheetCharts();});qoGridResizeObserver.observe(view);}
+ refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();syncHistoryButtons();}
 let frozenRowScrollX=null;
 function refreshFillHandle(){
  const handle=document.getElementById('grid-fill-handle'),frame=document.getElementById('grid-frame');
@@ -3067,8 +3075,8 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  if(t.startsWith('slides-')){qoSlides=qoNewSlides();if(t==='slides-lesson'){qoSlides.name='Учебная презентация';qoSlides.slides.push(qoNewSlide(2));}if(t==='slides-report')qoSlides.name='Доклад';page='slides';render();qoPersistSlides();break;}
  createBook(t==='new'?false:t);break;}case 'select-row':{if(headerIgnoreClick?.axis==='row'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(index,0),b=cellName(index,LIMITS.columns-1);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-col':{if(headerIgnoreClick?.axis==='col'&&performance.now()<headerIgnoreClick.until){headerIgnoreClick=null;break;}const index=Number(target.dataset.index),a=cellName(0,index),b=cellName(LIMITS.rows-1,index);if(e.ctrlKey||e.metaKey)addSelection(a,b);else setSelection(a,b);break;}case 'select-all':setSelection('A1',cellName(LIMITS.rows-1,LIMITS.columns-1));break;case 'route':route(target.dataset.target);break;case 'new':createBook();break;case 'schedule':createBook('schedule');break;case 'example':createBook(true);break;case 'open':openBook(id);break;case 'clone':cloneBook(id);break;case 'rename-book':renameBookInline(id,target);break;case 'delete':removeBook(id);break;
  case 'import':if(page==='photo'){document.getElementById('qo-photo-file')?.click();break;}if(page==='writer'){document.getElementById(qoWorkspaceTab.writer==='work'?'qw-file':'qo-writer-file')?.click();break;}if(page==='slides'){document.getElementById('qo-slide-import-picker')?.click();break;}document.querySelector('#file-picker')?.click();break;case 'open-disk':await openBookFromDisk();break;case 'backup':backup();break;case 'save':if(page==='writer'){if(qoWorkspaceTab.writer==='work')qwSaveFile();else qoWriterExport('qdoc');break;}if(page==='slides'){qoSlidesDownload();break;}if(page==='photo'){qoPhotoExportProject();break;}await saveBook();break;case 'save-as':await saveBook(true);break;
- case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');status('XLSX скачан: диаграммы, проверки данных, условное форматирование, области и параметры печати сохранены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
- case 'csv':if(sheet()){download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');status('CSV скачан (текущий лист)');}break;
+ case 'xlsx':if(book()){try{commitEditor();const data=await exportXLSX(book());await download(`${safeFile(book().name)}.xlsx`,data,'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');if(!qoNativeDesktop)status('Скачивание XLSX запрошено: диаграммы, проверки данных, условное форматирование, области и параметры печати включены. Совместимость с Excel остаётся частичной; сохраните .qbook.');}catch(err){status(err.message||'Ошибка экспорта XLSX',true);}}break;
+ case 'csv':if(sheet()){await download(`${safeFile(book().name)}-${safeFile(sheet().name)}.csv`,'\uFEFF'+exportCSV(sheet(),book()),'text/csv;charset=utf-8');if(!qoNativeDesktop)status('Скачивание CSV запрошено (текущий лист).');}break;
  case 'size-context-close':sizeContext=null;document.getElementById('size-context-menu')?.remove();break;
  case 'size-context-mode':if(sizeContext)openSizeContext(target.dataset.kind,parseCell(activeCell)?.[target.dataset.kind==='col'?'col':'row']??sizeContext.index,sizeContext.x,sizeContext.y);break;
  case 'size-context-apply':applyContextSize();break;
@@ -3588,3 +3596,9 @@ window.addEventListener('beforeunload',()=>{if(editing)commitEditor();});
 qoWriterNavigationInstall();
 render();
 qoMiniSheetInstall();
+if(qoNativeDesktop){
+ globalThis.qoFlushForClose=()=>{if(editing)commitEditor();};
+ globalThis.qoDraftStatusChanged=()=>{updateSaveIndicator();const label=document.getElementById('qw-save-state');if(label)label.textContent=qwStorageError||globalThis.qoDraftStatus();const studio=document.querySelector('.qs-saved-indicator');if(studio)studio.textContent=globalThis.qoDraftStatus();};
+ globalThis.qoDraftStatusChanged();
+ void qwBankOpen().catch(error=>status('Банк SQLite: '+error.message,true));
+}

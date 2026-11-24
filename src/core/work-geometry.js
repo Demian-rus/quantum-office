@@ -1,6 +1,6 @@
 /* Shared geometric operations. Model coordinates never depend on viewport size. */
 import {qwGeometryVertices,qwPlotXY,qwEvaluateCurve,QW_PLOT} from './work-model.js';
-import {QW_MECHANICS,QW_ELECTRICS} from './work-physics.js';
+import {QW_MECHANICS,QW_ELECTRICS,qwArrowGeometry} from './work-physics.js';
 function qwRotatePoint(p,center,degrees){
  const a=degrees*Math.PI/180,c=Math.cos(a),s=Math.sin(a),x=p.x-center.x,y=p.y-center.y;
  return {...p,x:center.x+x*c-y*s,y:center.y+x*s+y*c};
@@ -58,7 +58,11 @@ function qwLinearSegments(o){
  const a={x:o.x,y:o.y},b={x:o.x2,y:o.y2},dx=b.x-a.x,dy=b.y-a.y,len=Math.hypot(dx,dy)||1,ux=dx/len,uy=dy/len,nx=-uy,ny=ux;
  const result=[[a,b]],width=o.style?.width||2;
  if(o.kind==='dimension')for(const p of [a,b])result.push([{x:p.x+nx*7,y:p.y+ny*7},{x:p.x-nx*7,y:p.y-ny*7}]);
- if(o.kind==='doubleArrow')for(const [p,sign] of [[a,1],[b,-1]])for(const side of [-1,1])result.push([p,{x:p.x+sign*ux*6*width+side*nx*3*width,y:p.y+sign*uy*6*width+side*ny*3*width}]);
+ if(o.kind==='doubleArrow'||o.kind==='arrow'){
+  const geom=qwArrowGeometry([a,b],width,{start:o.kind==='doubleArrow'});
+  result.splice(0,result.length,...geom.shaft.slice(1).map((p,i)=>[geom.shaft[i],p]));
+  for(const h of geom.heads)for(let i=0;i<3;i++)result.push([h.vertices[i],h.vertices[(i+1)%3]]);
+ }
  return result;
 }
 function qwExtendedSegment(o){
@@ -97,7 +101,8 @@ function qwHitObject(o,point,tolerance=6){
   const d=Math.hypot((p.x-c.x)/rx,(p.y-c.y)/ry),filled=o.style?.fill!==undefined?o.style.fill!=='none':!['circle','ellipse'].includes(o.kind);
   return filled?d<=1+t/Math.min(rx,ry):Math.abs(d-1)*Math.min(rx,ry)<=t;
  }
- if(['line','arrow','dashed','rope','ground'].includes(o.kind))return qwSegmentDistance(p,a,b)<=t;
+ if(o.kind==='arrow')return qwLinearSegments(o).some(([a,b])=>qwSegmentDistance(p,a,b)<=t);
+ if(['line','dashed','rope','ground'].includes(o.kind))return qwSegmentDistance(p,a,b)<=t;
  if(o.kind==='spring'){const ps=qwSpringPoints(o);return ps.slice(1).some((b,i)=>qwSegmentDistance(p,ps[i],b)<=t);}
  if(o.kind==='angle')return qwSegmentDistance(p,a,{x:o.x2,y:o.y})<=t||qwSegmentDistance(p,a,b)<=t;
  const vs=qwObjectPolygon(o);

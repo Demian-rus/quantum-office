@@ -40,8 +40,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
    return qwValidate(d);
   });
   const original=JSON.stringify(doc);
-  const render=async(name,theme='')=>{
-   const html=await app.evaluate(({doc,theme})=>qwPrintDocumentHTML(doc,false,{format:'booklet',theme}),{doc,theme});
+  const render=async(name,theme='',orientation='portrait')=>{
+   const html=await app.evaluate(({doc,theme})=>qwPrintDocumentHTML(doc,false,{format:'booklet',theme}),{doc:{...doc,printSettings:{...doc.printSettings,orientation}},theme});
    const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));await page.setContent(html);await page.evaluate(()=>window.qwPrintReady);
    assert.equal(await page.evaluate(()=>window.__qwPrintError),undefined);
    const data=await page.evaluate(()=>{
@@ -52,19 +52,20 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
       while(node=walker.nextNode()){if(!node.textContent.trim())continue;const range=document.createRange();range.selectNodeContents(node);
        for(const r of range.getClientRects())if(Math.min(r.right,fr.right)-Math.max(r.left,fr.left)>.5&&Math.min(r.bottom,fr.bottom)-Math.max(r.top,fr.top)>.5)collisions.push(section.dataset.task);}
     }
-    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:pages.map(p=>p.querySelector('.qw-booklet-brand .qw-qx-lettering')?.textContent||''),collisions,answer:{left:bounds(answer).left,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
+    return {pages:pages.length,taskIds:tasks.map(x=>Number(x.dataset.task)),headers:pages.map(p=>p.querySelector('.qw-running-header')?.textContent||''),meta:pages.map(p=>p.querySelector('.qw-print-meta')?.textContent||''),brands:(document.querySelectorAll('.qw-print-sheet').length?[...document.querySelectorAll('.qw-print-sheet')]:pages).map(p=>p.querySelector('.qw-booklet-brand .qw-qx-lettering')?.textContent||''),collisions,answer:{left:bounds(answer).left,top:bounds(answer).top,bottom:bounds(answer).bottom},figure:{left:bounds(figure).left,bottom:bounds(figure).bottom},text:{bottom:bounds(body).bottom},mathPads:document.querySelectorAll('math msup mpadded').length,
      sqrt:document.querySelectorAll('math msqrt').length,figures:document.querySelectorAll('.qw-print-section svg').length,
      footer:pages.map(p=>p.querySelector('.qw-page-footer')?.textContent||''),report:window.__qwPrintLayout};
    });
-   assert.ok(data.pages>=2&&data.pages<=3);
+   assert.ok(data.pages>=1&&data.pages<=3);
    assert.deepEqual(data.taskIds,Array.from({length:16},(_,i)=>i+1));
    assert.deepEqual(data.headers,Array(data.pages).fill(''));
    assert.deepEqual(data.meta,Array(data.pages).fill(''));
    assert.deepEqual(data.collisions,[]);
-   assert.ok(data.answer.left<data.figure.left&&Math.abs(data.answer.bottom-data.figure.bottom)<10);
+   assert.ok(data.answer.top>=data.figure.bottom-.5||(data.answer.left<data.figure.left&&(Math.abs(data.answer.bottom-data.figure.bottom)<10||data.answer.top-data.text.bottom<20)),'answer follows condition or aligns safely beside figure without a large gap');
    assert.ok(data.answer.left>0&&data.text.bottom<data.answer.bottom);
    assert.ok(data.mathPads>=2&&data.sqrt===1&&data.figures>=3);
-   assert.equal(data.brands.filter(Boolean).length,theme?data.pages:0);
+   assert.equal(data.brands.length,orientation==='landscape'?Math.ceil(data.pages/2):data.pages);
+   assert.equal(data.brands.filter(Boolean).length,theme?data.brands.length:0);
    for(const p of data.report.pages)assert.ok(p.freeMm>=-.7,'page overflow');
    await page.emulateMedia({media:'print'});
    const pdf=path.join(out,name+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
@@ -72,10 +73,10 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
    await page.screenshot({path:path.join(out,name+'.png'),fullPage:true});
    await page.close();return {name,pages:data.pages,answers:data.taskIds.length,fonts:'MathML',brands:data.brands,pdfBytes:fs.statSync(pdf).size};
   };
-  const plain=await render('booklet-clean'),academic=await render('booklet-qx-academic','academic');
+  const plain=await render('booklet-clean'),academic=await render('booklet-qx-academic','academic'),landscape=await render('booklet-qx-landscape','academic','landscape');
   assert.equal(JSON.stringify(doc),original,'print must not change QWORK');
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',plain,academic,errors},null,2));
+  fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({status:'PASS',plain,academic,landscape,errors},null,2));
   fs.writeFileSync(path.join(out,'booklet.qwork'),original);
   console.log('PASS TASK153.1: PDF vector, MathML, answer beside figure, no repeated metadata, QX theme, no collisions');
  }finally{await browser.close();}

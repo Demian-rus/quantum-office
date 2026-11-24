@@ -52,7 +52,7 @@ stress_text = re.sub(r'\s+', ' ', ' '.join(page.get_text() for page in stress))
 assert stress_text.count('Измерения повторяют через равные интервалы времени.') == 60
 assert stress_text.count('приведена формула и объяснён смысл каждой величины.') == 0
 for i, page in enumerate(stress):
-    assert 'Контрольная работа' in page.get_text(), ('missing running header', i + 1)
+    assert ('Контрольная работа' in page.get_text()) == (i == 0), ('title must appear only on first physical page', i + 1)
     for block in page.get_text('blocks'):
         assert block[1] >= 30 and block[3] <= page.rect.height - 12, ('stress bounds', i + 1, block)
     page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).save(out / 'stress' / ('long-layout-' + str(i + 1) + '.png'))
