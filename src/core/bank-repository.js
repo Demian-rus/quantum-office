@@ -1,9 +1,10 @@
 import {createBankBackupV3,verifyBankBackupV3,bankStableJSON} from './bank-backup.js';
+import {BANK_ASSET_STORE,BankAssetError,bankAssetPrepareMany,bankAssetUnpack,bankAssetVerifyMap,bankAssetCollect,bankAssetWriteSet,bankAssetWithoutImage,bankAssetValidate} from './bank-assets.js';
 /* TASK166.1 — one durable bank repository for browser HTML.
    Future native SQLite implements the same asynchronous contract; no mock
    SQLite adapter is shipped with this browser implementation. */
 const BANK_DB_NAME='quantum-office-bank';
-const BANK_DB_VERSION=1;
+const BANK_DB_VERSION=2;
 const BANK_LEGACY_KEY='quantum-office.work-bank.v1';
 const BANK_LEGACY_COUNTER_KEY='quantum-office.work-bank.number-sequence.v1';
 const BANK_NUMBER_LIMIT=99999;
@@ -27,7 +28,7 @@ function bankTransaction(db,names,mode,work){
   tx.onabort=()=>reject(manualError||tx.error||new BankStorageError('Транзакция банка отменена'));
   tx.onerror=()=>{}; // onabort reports the transaction's final error
   const set=value=>{response=value;};
-  const fail=error=>{manualError=error;try{tx.abort();}catch{}};
+  const fail=error=>{if(!manualError)manualError=error;try{tx.abort();}catch{}};
   try{work(tx,set,fail);}catch(error){fail(error);}
  });
 }
@@ -58,6 +59,15 @@ function bankSignature(e){
  delete content.id;delete content.bankNumber;
  return bankCanonicalJSON(content);
 }
+function bankStoredSignature(e){
+ const content=bankPortable(e);delete content.id;delete content.bankNumber;
+ if(e.imageAsset)content.imageAsset=e.imageAsset;
+ return bankCanonicalJSON(content);
+}
+async function bankHydrateSet(data){
+ await bankAssetVerifyMap(data.assets);const urls=new Map();
+ return data.records.map(r=>bankAssetUnpack(r,data.assets,urls));
+}
 function bankClone(e){return structuredClone(e);}
 function bankPortable(e){
  const x={};for(const k of BANK_RECORD_FIELDS)if(e[k]!==undefined)x[k]=bankClone(e[k]);return x;
@@ -83,15 +93,15 @@ class BankRepository{
   this.factory=indexedDB===undefined?bankSafeGlobal('indexedDB'):indexedDB;
   this.legacyStorage=legacyStorage===undefined?bankSafeGlobal('localStorage'):legacyStorage;
   this.normalize=normalize;
-  this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;this._restorePlan=null;
+  this.dbName=dbName;this.db=null;this._opening=null;this.migration=null;this._restorePlan=null;this.assetMigrationError=null;
  }
- async open(){
-  if(this.db)return this;
+ async open({onProgress}={}){
   if(this._opening)return this._opening;
-  this._opening=this._open();
+  if(this.db)return this;
+  this._opening=this._open({onProgress});
   try{return await this._opening;}finally{this._opening=null;}
  }
- async _open(){
+ async _open({onProgress}={}){
   if(!this.factory)throw new BankStorageError('IndexedDB недоступна. Банк не будет записан; сохраните QWBANK.', 'IDB_UNAVAILABLE');
   const db=await new Promise((resolve,reject)=>{
    let request;
@@ -109,14 +119,16 @@ class BankRepository{
       tasks.createIndex(name,name,{unique:name==='bankNumber'});
     }
     if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});
+    if(!db.objectStoreNames.contains(BANK_ASSET_STORE))db.createObjectStore(BANK_ASSET_STORE,{keyPath:'key'});
    };
    request.onerror=()=>reject(request.error||new BankStorageError('Не удалось открыть IndexedDB'));
-   request.onblocked=()=>reject(new BankStorageError('Другая вкладка блокирует обновление базы. Закройте другие окна.', 'IDB_BLOCKED'));
-   request.onsuccess=()=>resolve(request.result);
+   let blocked=false;
+   request.onblocked=()=>{blocked=true;reject(new BankStorageError('Другая вкладка блокирует обновление базы. Закройте другие окна.', 'IDB_BLOCKED'));};
+   request.onsuccess=()=>{if(blocked)request.result.close();else resolve(request.result);};
   });
   db.onversionchange=()=>{db.close();if(this.db===db)this.db=null;};
   this.db=db;
-  try{await this._migrateLegacy();return this;}
+  try{await this._migrateLegacy();await this.migrateAssets({onProgress});return this;}
   catch(e){this.db=null;db.close();throw e;}
  }
  _db(){if(!this.db)throw new BankStorageError('Банк не открыт. Повторите подключение к хранилищу.', 'IDB_CLOSED');return this.db;}
@@ -230,13 +242,80 @@ class BankRepository{
   try{return this.legacyStorage?.getItem(BANK_LEGACY_KEY)??null;}
   catch{return null;}
  }
- async getTask(id){return bankRequest(this._db().transaction('tasks').objectStore('tasks').get(String(id)));}
+ /** Upgrade in bounded transactions, never remove the old row before its bytes are committed. */
+ async migrateAssets({signal,onProgress}={}){
+  this.assetMigrationError=null;
+  try{
+   if((await this._meta('assetMigration'))?.state==='complete')return true;
+   let last=null,processed=0;
+   for(;;){
+    if(signal?.aborted)throw new BankAssetError('Перенос изображений прерван','ASSET_CANCELLED');
+    const rows=await bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
+     const req=tx.objectStore('tasks').getAll(last===null?null:IDBKeyRange.lowerBound(last,true),16);
+     req.onerror=()=>fail(req.error);req.onsuccess=()=>set(req.result);
+    });
+    if(!rows.length)break;
+    last=rows.at(-1).id;const candidates=rows.filter(r=>r.task?.image&&!r.imageAsset);
+    if(candidates.length){
+     const packed=await bankAssetPrepareMany(candidates);
+     if(signal?.aborted)throw new BankAssetError('Перенос изображений прерван','ASSET_CANCELLED');
+     await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
+      const store=tx.objectStore('tasks');bankAssetWriteSet(tx,packed.assets,fail);
+      const abort=()=>fail(new BankAssetError('Перенос изображений прерван','ASSET_CANCELLED'));
+      if(signal){signal.addEventListener('abort',abort,{once:true});for(const event of ['complete','abort'])tx.addEventListener(event,()=>signal.removeEventListener('abort',abort),{once:true});if(signal.aborted){abort();return;}}
+      candidates.forEach((original,i)=>{
+       const req=store.get(original.id);req.onerror=()=>fail(req.error);
+       req.onsuccess=()=>{try{
+        const current=req.result;
+        if(!current||current.imageAsset||!current.task?.image)return;
+        if(bankStableJSON(current)!==bankStableJSON(original))throw new BankAssetError('Задание изменилось во время переноса; повторите открытие банка','ASSET_CONFLICT');
+        store.put(packed.records[i]);
+       }catch(e){fail(e);}};
+      });
+     });
+    }
+    processed+=rows.length;onProgress?.(processed);await new Promise(resolve=>setTimeout(resolve,0));
+   }
+   if(signal?.aborted)throw new BankAssetError('Перенос изображений прерван','ASSET_CANCELLED');
+   await bankTransaction(this._db(),['tasks','meta',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
+    const req=tx.objectStore('tasks').openCursor();
+    req.onerror=()=>fail(req.error);
+    const known=new Map();
+    req.onsuccess=()=>{try{
+     const c=req.result;
+     if(c){
+      const r=c.value;
+      if(r.task?.image)throw new BankAssetError('Остались неперенесённые изображения','ASSET_MIGRATION');
+      if(r.imageAsset){
+       const ref=r.imageAsset,prior=known.get(ref.key);
+       if(prior){if(prior.mime!==ref.mime||prior.size!==ref.size||prior.sha256!==ref.sha256)throw new BankAssetError('Несогласованные ссылки','ASSET_CORRUPT');c.continue();}
+       else bankAssetCollect(tx,[r],assets=>{bankAssetValidate(assets.get(ref.key),ref);known.set(ref.key,{mime:ref.mime,size:ref.size,sha256:ref.sha256});c.continue();},fail);
+      }else c.continue();return;
+     }
+     tx.objectStore('meta').put({key:'assetMigration',state:'complete'});
+    }catch(e){fail(e);}};
+   });
+   return true;
+  }catch(error){this.assetMigrationError=error.message||'Перенос изображений не завершён';return false;}
+ }
+ async getTask(id){
+  const data=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
+   const req=tx.objectStore('tasks').get(String(id));req.onerror=()=>fail(req.error);
+   req.onsuccess=()=>{const records=req.result?[req.result]:[];bankAssetCollect(tx,records,assets=>set({records,assets}),fail);};
+  });return (await bankHydrateSet(data))[0];
+ }
+ async snapshotMetadata(){
+  return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
+   const list=[],req=tx.objectStore('tasks').openCursor();req.onerror=()=>fail(req.error);
+   req.onsuccess=()=>{const c=req.result;if(!c){set(list);return;}list.push(bankPortable(bankAssetWithoutImage(c.value)));c.continue();};
+  });
+ }
  async listTasks(filters={},pagination={}){
   const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Number(pagination.limit)||30));
   const offset=Math.max(0,Math.floor(Number(pagination.offset)||0));
   const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
    (filters.type&&filters.type!=='all'?'type':null);
-  return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
+  const data=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
    // A catalogue without category filters is ordered by permanent numeric
    // bankNumber, not by lexical UUID/ID. This also keeps the initial preview
    // consistent with the first displayed numbered task.
@@ -246,7 +325,9 @@ class BankRepository{
    req.onerror=()=>fail(req.error||Error('Ошибка поиска по банку'));
    req.onsuccess=()=>{
     const cursor=req.result;
-    if(!cursor){set({items,total,offset,limit,hasMore:offset+items.length<total});return;}
+    if(!cursor){const result={total,offset,limit,hasMore:offset+items.length<total};
+     if(pagination.includeImages===false){set({...result,items:items.map(bankAssetWithoutImage)});return;}
+     bankAssetCollect(tx,items,assets=>set({...result,records:items,assets}),fail);return;}
     const e=cursor.value;
     if(bankSearchMatch(e,filters)){
      if(total>=offset&&items.length<limit)items.push(e);
@@ -255,6 +336,9 @@ class BankRepository{
     cursor.continue();
    };
   });
+  if(data.items)return data;
+  const {assets,records,...result}=data;
+  return {...result,items:await bankHydrateSet({assets,records})};
  }
  async listFacets(fields=['topic','subtopic','year']){
   const keys=fields.filter(k=>BANK_INDEX_FIELDS.includes(k)&&k!=='bankNumber');
@@ -276,8 +360,9 @@ class BankRepository{
   });
  }
  async createTask(input){
-  const candidate=this._clean({...input,id:input.id||bankIdentity()});
-  return bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
+  const packed=await bankAssetPrepareMany([this._clean({...input,id:input.id||bankIdentity()})]),candidate=packed.records[0];
+  const saved=await bankTransaction(this._db(),['tasks','meta',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
+   bankAssetWriteSet(tx,packed.assets,fail);
    const tasks=tx.objectStore('tasks'),meta=tx.objectStore('meta');
    let sequence,high,ready=0;
    const finish=()=>{
@@ -296,10 +381,12 @@ class BankRepository{
    const last=tasks.index('bankNumber').openKeyCursor(null,'prev');
    last.onsuccess=()=>{high=Number(last.result?.key)||0;finish();};last.onerror=()=>fail(last.error);
   });
+  return bankAssetUnpack(saved,packed.assets);
  }
  async updateTask(id,input,revision){
-  const candidate=this._clean({...input,id});
-  return bankTransaction(this._db(),'tasks','readwrite',(tx,set,fail)=>{
+  const packed=await bankAssetPrepareMany([this._clean({...input,id})]),candidate=packed.records[0];
+  const saved=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
+   bankAssetWriteSet(tx,packed.assets,fail);
    const store=tx.objectStore('tasks'),req=store.get(String(id));
    req.onsuccess=()=>{
     const old=req.result;
@@ -313,28 +400,36 @@ class BankRepository{
    };
    req.onerror=()=>fail(req.error);
   });
+  return bankAssetUnpack(saved,packed.assets);
  }
  async deleteTask(id,revision){
-  return bankTransaction(this._db(),'tasks','readwrite',(tx,set,fail)=>{
+  return bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),req=store.get(String(id));
    req.onsuccess=()=>{
     const old=req.result;
     if(!old){fail(new BankStorageError('Запись удалена из банка','NOT_FOUND'));return;}
     if(revision!==undefined&&revision!==old.revision){fail(new BankStorageError('Запись уже изменена в другом окне','REVISION_CONFLICT'));return;}
-    store.delete(old.id);set(old);
+    bankAssetCollect(tx,[old],assets=>{const portable=bankAssetUnpack(old,assets);store.delete(old.id);set(portable);},fail);
    };
    req.onerror=()=>fail(req.error);
   });
  }
- async importBank(file){
+ async importBank(file,{signal}={}){
   const data=typeof file==='string'?JSON.parse(file):file;
   if(!data||data.format!=='quantum-work-bank'||!Array.isArray(data.items)||
    ![1,2].includes(data.version)||data.items.length>(data.version===1?500:20000))
    throw new BankStorageError('Требуется QWBANK v1 или расширенный QWBANK v2','BAD_IMPORT');
   if(data.version===2&&(data.count!==data.items.length||data.checksum!==bankHash(JSON.stringify(data.items))))
    throw new BankStorageError('Контрольная сумма QWBANK v2 не совпадает. Импорт не выполнен.','BAD_CHECKSUM');
-  const entries=data.items.map(e=>this._clean({...e,id:e.id||bankIdentity()}));
-  return bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
+  if(signal?.aborted)throw new BankAssetError('Импорт отменён','ASSET_CANCELLED');
+  if(this.assetMigrationError)throw new BankAssetError('Сначала завершите перенос изображений: '+this.assetMigrationError,'ASSET_MIGRATION');
+  const packed=await bankAssetPrepareMany(data.items.map(e=>this._clean({...e,id:e.id||bankIdentity()})));
+  const entries=packed.records;
+  if(signal?.aborted)throw new BankAssetError('Импорт отменён','ASSET_CANCELLED');
+  return bankTransaction(this._db(),['tasks','meta',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
+   const abort=()=>fail(new BankAssetError('Импорт отменён','ASSET_CANCELLED'));
+   if(signal){signal.addEventListener('abort',abort,{once:true});for(const event of ['complete','abort'])tx.addEventListener(event,()=>signal.removeEventListener('abort',abort),{once:true});if(signal.aborted){abort();return;}}
+   bankAssetWriteSet(tx,packed.assets,fail);
    const store=tx.objectStore('tasks'),meta=tx.objectStore('meta'),signatures=new Set(),used=new Set(),ids=new Set();
    let high=0,sequence=0;
    const marker=meta.get('sequence');
@@ -343,13 +438,13 @@ class BankRepository{
    const cursor=store.openCursor();
    cursor.onerror=()=>fail(cursor.error);
    cursor.onsuccess=()=>{
-    const c=cursor.result;if(c){const e=c.value;signatures.add(bankSignature(e));used.add(e.bankNumber);ids.add(e.id);high=Math.max(high,e.bankNumber);c.continue();return;}
+    const c=cursor.result;if(c){const e=c.value;signatures.add(bankStoredSignature(e));used.add(e.bankNumber);ids.add(e.id);high=Math.max(high,e.bankNumber);c.continue();return;}
     // All existing keys and the sequence are consulted in the same write
     // transaction, so two tabs cannot reserve the same number.
     let imported=0,skipped=0;let next=Math.max(sequence,high);
     const now=new Date().toISOString();
     for(const e of entries){
-     const signature=bankSignature(e);
+     const signature=bankStoredSignature(e);
      if(signatures.has(signature)){skipped++;continue;}
      signatures.add(signature);
      let bankNumber=e.bankNumber;
@@ -362,7 +457,8 @@ class BankRepository{
      let id=e.id;
      if(ids.has(id)){do{id=bankIdentity();}while(ids.has(id));}
      ids.add(id);
-     store.add({...e,id,bankNumber,revision:1,createdAt:now,updatedAt:now});imported++;
+     if(signal?.aborted){abort();return;}
+     try{store.add({...e,id,bankNumber,revision:1,createdAt:now,updatedAt:now});imported++;}catch(error){fail(error);return;}
     }
     meta.put({key:'sequence',value:next});
     set({imported,skipped});
@@ -373,10 +469,10 @@ class BankRepository{
  /** Consistent bank snapshot, including metadata required to continue numbering.
   * All reads occur inside one IndexedDB readonly transaction. */
  async _captureBackupSnapshot(){
-  return bankTransaction(this._db(),['tasks','meta'],'readonly',(tx,set,fail)=>{
+  const snapshot=await bankTransaction(this._db(),['tasks','meta',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
    const records=[],result={records,meta:{sequence:0,legacyMigration:null,legacyBackup:null}};
    let remaining=4;
-   const finish=()=>{if(!--remaining)set(result);};
+   const finish=()=>{if(!--remaining)bankAssetCollect(tx,records,assets=>set({...result,assets}),fail);};
    const meta=tx.objectStore('meta');
    for(const [key,field] of [['sequence','sequence'],['legacyMigration','legacyMigration'],['legacyBackup','legacyBackup']]){
     const req=meta.get(key);
@@ -394,6 +490,7 @@ class BankRepository{
     records.push(c.value);c.continue();
    };
   });
+  return {records:await bankHydrateSet(snapshot),meta:snapshot.meta};
  }
  async createVerifiedBackup({signal,onProgress}={}){
   await this.open();
@@ -422,6 +519,7 @@ class BankRepository{
     (bankHash(legacy.legacyBackup?.raw||'')!==legacy.legacyBackup?.hash||
      legacy.legacyMigration.hash!==legacy.legacyBackup.hash))
    throw new BankStorageError('Исходная копия миграции повреждена','RESTORE_LEGACY');
+  await bankAssetPrepareMany(checked.archive.records);
   const before=await this._captureBackupSnapshot();
   const token=bankIdentity();
   this._restorePlan={token,archive:structuredClone(checked.archive),before};
@@ -446,8 +544,9 @@ class BankRepository{
   const validated=await verifyBankBackupV3(plan.archive,{signal});
   if(signal?.aborted)throw new BankStorageError('Восстановление отменено','RESTORE_CANCELLED');
   const expected=plan.before;
-  const archived=validated.archive;
-  await bankTransaction(this._db(),['tasks','meta'],'readwrite',(tx,set,fail)=>{
+  const archived=validated.archive,packed=await bankAssetPrepareMany(archived.records);
+  if(signal?.aborted)throw new BankStorageError('Восстановление отменено','RESTORE_CANCELLED');
+  await bankTransaction(this._db(),['tasks','meta',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),meta=tx.objectStore('meta');
    const cancelled=()=>fail(new BankStorageError('Восстановление отменено','RESTORE_CANCELLED'));
    if(signal){
@@ -458,17 +557,19 @@ class BankRepository{
    }
    // Serialize writer and restore in one transaction; compare every prior row
    // and metadata against the inspected snapshot to reject changes from tabs.
-   let index=0;
+   let index=0;const readAssets=new Map(),urls=new Map();
    const cursor=store.openCursor();
    cursor.onerror=()=>fail(cursor.error);
    cursor.onsuccess=()=>{
     const c=cursor.result;
     if(c){
-     if(index>=expected.records.length||
-      bankStableJSON(c.value)!==bankStableJSON(expected.records[index++])){
-      fail(new BankStorageError('Банк изменился после проверки архива. Проверьте архив заново.','RESTORE_CONFLICT'));return;
-     }
-     c.continue();return;
+     bankAssetCollect(tx,[c.value],assets=>{
+      const current=bankAssetUnpack(c.value,assets,urls);
+      if(index>=expected.records.length||bankStableJSON(current)!==bankStableJSON(expected.records[index++])){
+       fail(new BankStorageError('Банк изменился после проверки архива. Проверьте архив заново.','RESTORE_CONFLICT'));return;
+      }
+      c.continue();
+     },fail,readAssets);return;
     }
     if(index!==expected.records.length){
      fail(new BankStorageError('Количество записей изменилось','RESTORE_CONFLICT'));return;
@@ -487,9 +588,10 @@ class BankRepository{
         fail(new BankStorageError('Метаданные банка изменились в другом окне','RESTORE_CONFLICT'));return;
        }
        try{
-        store.clear();
+        store.clear();tx.objectStore(BANK_ASSET_STORE).clear();
+        bankAssetWriteSet(tx,packed.assets,fail);
         let writes=0;
-        for(const record of archived.records){
+        for(const record of packed.records){
          if(signal?.aborted){cancelled();return;}
          store.add(record);
          writes++;
@@ -498,6 +600,7 @@ class BankRepository{
          }
         }
         meta.put({key:'sequence',value:archived.meta.sequence});
+        meta.put({key:'assetMigration',state:'complete'});
         const marker=archived.meta.legacyMigration||
          {key:'legacyMigration',state:'none',createdAt:new Date().toISOString()};
         meta.put({...marker,key:'legacyMigration'});
@@ -511,7 +614,7 @@ class BankRepository{
     }
    };
   });
-  this.migration=archived.meta.legacyMigration||{state:'none'};
+  this.migration=archived.meta.legacyMigration||{state:'none'};this.assetMigrationError=null;
   this._restorePlan=null;
   // Post-commit exhaustive check, not a claim of cross-storage atomicity.
   const after=await this._captureBackupSnapshot();
@@ -528,16 +631,44 @@ class BankRepository{
  }
 
  async exportBank(){
-  const items=await bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
-   const list=[],req=tx.objectStore('tasks').openCursor();
-   req.onerror=()=>fail(req.error);
-   req.onsuccess=()=>{const c=req.result;if(!c){set(list);return;}list.push(bankPortable(c.value));c.continue();};
-  });
+  const items=(await this._captureBackupSnapshot()).records.map(bankPortable);
   if(items.length<=500)return {format:'quantum-work-bank',version:1,items};
   // QWBANK v2 is the preliminary large-bank interchange format. A complete
   // binary-attachment backup with cryptographic manifest belongs to TASK166.4.
-  return {format:'quantum-work-bank',version:2,schema:BANK_DB_VERSION,
+  return {format:'quantum-work-bank',version:2,schema:1,
    count:items.length,checksum:bankHash(JSON.stringify(items)),items};
+ }
+ /** Mark-and-sweep: the reference scan and deletion share one write transaction. */
+ async assetDiagnostics({clean=false,signal}={}){
+  return bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],clean?'readwrite':'readonly',(tx,set,fail)=>{
+   const refs=new Map(),assets=tx.objectStore(BANK_ASSET_STORE),tasks=tx.objectStore('tasks');
+   const report={count:0,bytes:0,references:0,orphans:0,orphanBytes:0,deleted:0,inline:0};
+   const abort=()=>fail(new BankAssetError('Очистка отменена','ASSET_CANCELLED'));
+   if(signal){signal.addEventListener('abort',abort,{once:true});for(const event of ['complete','abort'])tx.addEventListener(event,()=>signal.removeEventListener('abort',abort),{once:true});if(signal.aborted){abort();return;}}
+   const req=tasks.openCursor();req.onerror=()=>fail(req.error);
+   req.onsuccess=()=>{try{
+    const c=req.result;
+    if(c){const r=c.value;if(r.task?.image)report.inline++;
+     if(r.imageAsset){const ref=r.imageAsset;if(r.task?.image||typeof ref.key!=='string')throw new BankAssetError('Повреждена ссылка','ASSET_REFERENCE');
+      const prior=refs.get(ref.key);
+      if(prior&&(prior.mime!==ref.mime||prior.size!==ref.size||prior.sha256!==ref.sha256))throw new BankAssetError('Несогласованные ссылки','ASSET_CORRUPT');
+      refs.set(ref.key,ref);report.references++;}
+     c.continue();return;
+    }
+    const found=new Set(),orphans=[],a=assets.openCursor();a.onerror=()=>fail(a.error);
+    a.onsuccess=()=>{try{
+     const x=a.result;
+     if(x){const v=x.value;bankAssetValidate(v,v);report.count++;report.bytes+=v.size;
+      if(refs.has(x.key)){bankAssetValidate(v,refs.get(x.key));found.add(x.key);}
+      else{report.orphans++;report.orphanBytes+=v.size;orphans.push(x.key);}
+      x.continue();return;
+     }
+     if(found.size!==refs.size)throw new BankAssetError('В банке отсутствуют используемые изображения; очистка запрещена','ASSET_MISSING');
+     if(clean)for(const key of orphans){if(signal?.aborted){abort();return;}assets.delete(key);report.deleted++;}
+     set(report);
+    }catch(error){fail(error);}};
+   }catch(error){fail(error);}};
+  });
  }
  async getStatistics(){
   const [count,migration,backup]=await Promise.all([
@@ -546,7 +677,7 @@ class BankRepository{
   let estimatedBytes=null;
   try{estimatedBytes=(await navigator.storage?.estimate?.())?.usage??null;}catch{}
   return {count,estimatedBytes,lastBackupAt:backup?.at||null,
-   migration:migration?.state||'none',storage:'IndexedDB'};
+   migration:migration?.state||'none',assetMigrationError:this.assetMigrationError,storage:'IndexedDB'};
  }
  async close(){if(this._opening)await this._opening;if(this.db){this.db.close();this.db=null;}}
 }

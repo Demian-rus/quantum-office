@@ -253,10 +253,10 @@ function qwBankNormalize(x){
   difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
 }
 const qwBankRepository=createBankRepository({normalize:qwBankNormalize});
-async function qwBankOpen(){await qwBankRepository.open();return qwBankRepository;}
+async function qwBankOpen(){await qwBankRepository.open({onProgress:count=>status('Перенос изображений банка: '+count+' заданий…')});return qwBankRepository;}
 async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
- qwBankSnapshot=stats.count<=500?(await qwBankRepository.exportBank()).items:[];
+ qwBankSnapshot=stats.count<=500?await qwBankRepository.snapshotMetadata():[];
 }
 function qwBankRead(){
  // Read-only compatibility for historical QWBANK test fixtures before the
@@ -455,7 +455,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
     const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Файл не прочитан'));reader.readAsDataURL(file);
    });
    if(typeof data!=='string'||data.length>6_000_000)throw Error('Изображение слишком велико');
-   task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
+   await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
   }catch(e){showError(e.message);}
  };
  const back=()=>{d.close();qwBank(returnFilters);};
@@ -479,12 +479,14 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
  preview();
 }
 async function qwBank(previousFilters={}){
- let xs=[],facets,totalCount=0;
+ const bankDocument=qwDoc,bankPage=page,bankTab=qoWorkspaceTab.writer;
+ const sameWorkspace=()=>qwDoc===bankDocument&&page===bankPage&&qoWorkspaceTab.writer===bankTab;
+ let xs=[],facets,totalCount=0,assetMigrationError=null;
  try{
   await qwBankOpen();
   await qwBankSnapshotSmall();
   const stats=await qwBankRepository.getStatistics();
-  totalCount=stats.count;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
+  totalCount=stats.count;assetMigrationError=stats.assetMigrationError;facets=await qwBankRepository.listFacets(['topic','subtopic','year']);
  }catch(e){
   status('Банк не открыт: '+e.message,true);
   const raw=qwBankRepository.getLegacyRecovery();
@@ -498,8 +500,9 @@ async function qwBank(previousFilters={}){
   }
   return;
  }
+ if(!sameWorkspace())return;
  const selected=new Map((previousFilters.__selected||[]).map(id=>[id,true])),diagnostic=typeof qdBankRead==='function'?qdBankRead():[];
- let activeId=previousFilters.__view||'',pageOffset=0,requestSequence=0;
+ let activeId=previousFilters.__view||'',pageOffset=0,requestSequence=0,addPending=false;
  const filters='<div class="qw-bank-catalogue"><section class="qw-bank-catalogue-results"><div id="qw-bank-filters" class="qw-bank-filter-panel">'+
   '<label>Поиск<input id="qw-bank-search" type="search" placeholder="Номер, условие, ответ или тема"></label>'+
   '<label>Предмет<select id="qw-bank-subject">'+qwOptions([['all','Все'],['physics','Физика'],['math','Математика'],['geometry','Геометрия'],['algebra','Алгебра']],'all')+'</select></label>'+
@@ -523,7 +526,7 @@ async function qwBank(previousFilters={}){
   qwButton('bank-backup','Создать резервную копию')+
   qwButton('bank-restore','Восстановить из копии')+
   qwButton('bank-cancel-backup','Отмена','hidden')+
-  qwButton('bank-export','Экспорт QWBANK v1/v2')+qwButton('bank-import','Импорт')+
+  qwButton('bank-export','Экспорт QWBANK v1/v2')+qwButton('bank-import','Импорт')+qwButton('bank-clean-assets','Очистить вложения')+
   qwButton('bank-add-selection','Добавить выбранные','disabled')+
   qwButton('bank-assemble','Собрать вариант → PDF','class="qw-primary" disabled'));
  d.classList.add('qw-bank-assemble-dialog');
@@ -539,6 +542,8 @@ async function qwBank(previousFilters={}){
  const get=k=>d.querySelector('#qw-bank-'+k),pick=k=>get(k).value;
  const state=d.querySelector('#qw-bank-save-status');
  const reportStatus=(message,bad=false)=>{state.textContent=message;state.classList.toggle('qw-error',bad);};
+ if(assetMigrationError)reportStatus('Перенос изображений не завершён: '+assetMigrationError,true);
+ let previewSequence=0;
  function fillYears(){
   const old=pick('year');
   const years=[...new Set([...(facets.year||[]),'2018'])].sort((a,b)=>Number(b)-Number(a));
@@ -555,10 +560,14 @@ async function qwBank(previousFilters={}){
  const signature=x=>[x.subject,x.grade,x.exam,x.year,x.part,x.slot,x.topic,x.subtopic,x.task.prompt.trim().toLocaleLowerCase('ru-RU')].join('|');
  const markSelection=()=>{
   d.querySelector('#qw-bank-selected-count').textContent='Выбрано: '+selected.size;
-  for(const k of ['bank-add-selection','bank-assemble'])d.querySelector('[data-qw-action="'+k+'"]').disabled=!selected.size;
+  for(const k of ['bank-add-selection','bank-assemble'])d.querySelector('[data-qw-action="'+k+'"]').disabled=addPending||!selected.size;
+  for(const button of d.querySelectorAll('[data-bank-add],[data-diag-bank]'))button.disabled=addPending;
  };
- function showPreview(){
-  const entry=xs.find(x=>x.id===activeId),host=d.querySelector('#qw-bank-preview');
+ async function showPreview(){
+  const token=++previewSequence,id=activeId,host=d.querySelector('#qw-bank-preview');let entry;
+  try{entry=id?await qwBankRepository.getTask(id):null;}
+  catch(error){if(token===previewSequence&&d.isConnected){host.textContent='Не удалось открыть изображение: '+error.message;reportStatus(error.message,true);}return;}
+  if(token!==previewSequence||id!==activeId||!d.isConnected)return;
   for(const row of d.querySelectorAll('[data-bank-entry]'))
    row.classList.toggle('is-active',row.dataset.bankEntry===activeId);
   if(!entry){
@@ -587,6 +596,8 @@ async function qwBank(previousFilters={}){
     '<div class="qw-bank-solution-body qw-rich"><section>'+solutionTitle+details+'</section>'+
     '<section><h3>Ответ</h3>'+answer+'</section>'+
     '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
+  const illustration=host.querySelector('img[alt="Иллюстрация задания"]');
+  if(illustration){const failed=()=>{if(token===previewSequence&&d.isConnected)reportStatus('Изображение повреждено. Исходные данные сохранены; можно заменить рисунок через редактирование.',true);};illustration.addEventListener('error',failed,{once:true});if(illustration.complete&&!illustration.naturalWidth)failed();}
  }
  const refresh=async()=>{
   const token=++requestSequence;
@@ -595,7 +606,7 @@ async function qwBank(previousFilters={}){
   query.search=pick('search').toLocaleLowerCase('ru-RU').trim();
   get('count').textContent='Загрузка…';
   let result;
-  try{result=await qwBankRepository.listTasks(query,{offset:pageOffset,limit:30});}
+  try{result=await qwBankRepository.listTasks(query,{offset:pageOffset,limit:30,includeImages:false});}
   catch(e){if(token===requestSequence){get('count').textContent='Ошибка чтения';reportStatus(e.message,true);}return;}
   if(token!==requestSequence||!d.isConnected)return;
   xs=result.items;
@@ -627,13 +638,14 @@ async function qwBank(previousFilters={}){
    '<div class="qw-bank-item"><span>'+qwEsc(x.question?.prompt||x.prompt||'')+'</span>'+
    '<button type="button" data-diag-bank="'+qwEsc(x.id)+'">Добавить</button></div>').join(''):'';
   d.querySelector('#qw-bank-list').innerHTML=items+other||'<p class="qw-muted">Заданий не найдено. Создайте задачу кнопкой «+ Новая задача».</p>';
+  markSelection();
   if(!shown.some(x=>x.id===activeId)){
    const offPage=activeId?await qwBankRepository.getTask(activeId):null;
    if(token!==requestSequence)return;
    if(offPage&&!shown.some(x=>x.id===offPage.id))xs=[...shown,offPage];
    else activeId=shown[0]?.id||'';
   }
-  showPreview();markSelection();
+  await showPreview();markSelection();
  };
 
  let backupController=null,restoreController=null,restorePlan=null,protectionRequested=false,restoreBusy=false;
@@ -748,6 +760,14 @@ async function qwBank(previousFilters={}){
    reportStatus('QWBANK экспортирован. Это отдельная копия данных.');
   }catch(e){reportStatus('Экспорт не выполнен: '+e.message,true);status('Банк: '+e.message,true);}
  };
+ d.querySelector('[data-qw-action="bank-clean-assets"]').onclick=async()=>{
+  try{
+   const before=await qwBankRepository.assetDiagnostics();
+   if(!before.orphans){reportStatus('Неиспользуемых изображений нет.');return;}
+   if(!confirm('Удалить '+before.orphans+' неиспользуемых изображений? Используемые задания останутся без изменений.'))return;
+   const result=await qwBankRepository.assetDiagnostics({clean:true});reportStatus('Удалено неиспользуемых изображений: '+result.deleted);
+  }catch(error){reportStatus('Очистка не выполнена: '+error.message,true);}
+ };
  const fileInput=d.querySelector('#qw-bank-import-file');
  d.querySelector('[data-qw-action="bank-import"]').onclick=()=>fileInput.click();
  fileInput.onchange=async()=>{
@@ -768,13 +788,42 @@ async function qwBank(previousFilters={}){
    status('Импорт банка: '+error.message,true);
   }
  };
- const entries=async()=> (await Promise.all([...selected.keys()].map(id=>qwBankRepository.getTask(id)))).filter(Boolean);
- function addTasks(choices,replace=false){
+ // TASK166.3 final: one in-flight hydration per dialog. Capture document identity,
+ // not just its ID (reopening the same file also creates a different model).
+ const canAdd=()=>d.isConnected&&d.open&&sameWorkspace();
+ async function loadAndAdd(ids,{replace=false,single=false}={}){
+  if(addPending||!canAdd()||!ids.length)return;
+  addPending=true;d.setAttribute('aria-busy','true');markSelection();
+  reportStatus('Загрузка выбранных заданий и изображений…');
+  try{
+   const found=await Promise.all(ids.map(id=>qwBankRepository.getTask(id)));
+   if(!canAdd())return;
+   if(found.some((entry,i)=>!entry||entry.id!==ids[i]||!entry.task))
+    throw Error('Выбранное задание недоступно. Ничего не добавлено.');
+   // Unmigrated legacy rows may still contain invalid raster data. Do not
+   // append an incomplete task even if its database read was successful.
+   for(const image of new Set(found.filter(e=>e.task.figure==='image').map(e=>e.task.image))){
+    if(!image)throw Error('Изображение недоступно. Ничего не добавлено.');
+    await qwImage(image);
+    if(!canAdd())return;
+   }
+   if(canAdd())addTasks(found,replace,single);
+  }catch(error){
+   if(canAdd())reportStatus('Добавление не выполнено: '+error.message,true);
+  }finally{
+   addPending=false;d.removeAttribute('aria-busy');
+   if(d.isConnected&&d.open)markSelection();
+  }
+ }
+ function addTasks(choices,replace=false,single=false){
+  if(!canAdd())return;
   if(!choices.length)return;
   if(choices.length+(replace?0:qwDoc.tasks.length)>80){status('В одной работе не более 80 заданий',true);return;}
   if(replace&&qwDoc.tasks.length&&!confirm('Заменить текущую работу выбранными заданиями? Сначала сохраните QWORK при необходимости.'))return;
   const copies=choices.map(entry=>{
-   const t=structuredClone(entry.task);t.id=qwId();t.source={kind:'bank',id:entry.id,number:entry.bankNumber,...(entry.slot?{slot:entry.slot}:{})};
+   const t=structuredClone(entry.task);t.id=qwId();
+   if(single)return t; // Preserve the historical single-copy QWORK semantics.
+   t.source={kind:'bank',id:entry.id,number:entry.bankNumber,...(entry.slot?{slot:entry.slot}:{})};
    t.grade=entry.grade;t.exam=entry.exam;t.topic=entry.topic;t.subtopic=entry.subtopic;
    t.part=entry.part?'Часть '+entry.part:'';
    return t;
@@ -818,7 +867,7 @@ async function qwBank(previousFilters={}){
    qwBankEdit(null,null,{...saved,__view:activeId,__selected:[...selected.keys()]});return;
   }
   const view=e.target.closest('[data-bank-view]');
-  if(view){activeId=view.dataset.bankView;showPreview();return;}
+  if(view){activeId=view.dataset.bankView;void showPreview();return;}
   if(e.target.closest('[data-bank-enlarge]')){
    const on=!d.classList.contains('qw-bank-expanded');
    d.classList.toggle('qw-bank-expanded',on);
@@ -826,8 +875,8 @@ async function qwBank(previousFilters={}){
    e.target.setAttribute('aria-pressed',String(on));
    return;
   }
-  if(action==='bank-assemble'){void entries().then(found=>addTasks(found,true)).catch(error=>status(error.message,true));return;}
-  if(action==='bank-add-selection'){void entries().then(found=>addTasks(found,false)).catch(error=>status(error.message,true));return;}
+  if(action==='bank-assemble'){void loadAndAdd([...selected.keys()],{replace:true});return;}
+  if(action==='bank-add-selection'){void loadAndAdd([...selected.keys()]);return;}
   const edit=e.target.closest('[data-bank-edit]');
   if(edit){
    const filters=Object.fromEntries(['search','subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'].map(k=>[k,pick(k)]));
@@ -837,7 +886,9 @@ async function qwBank(previousFilters={}){
   }
   const add=e.target.closest('[data-bank-add],[data-diag-bank]'),del=e.target.closest('[data-bank-delete]');
   if(add){
-   const own=add.dataset.bankAdd?xs.find(x=>x.id===add.dataset.bankAdd)?.task:null;
+   if(addPending||!canAdd())return;
+   if(add.dataset.bankAdd){void loadAndAdd([add.dataset.bankAdd],{single:true});return;}
+   const own=null;
    const item=add.dataset.diagBank?diagnostic.find(x=>x.id===add.dataset.diagBank):null;
    const task=own||(item?qwFromDiagnostic(item.question||item):null);
    if(task&&qwDoc.tasks.length<80){qwChange(()=>{const copy=structuredClone(task);copy.id=qwId();qwDoc.tasks.push(copy);qwSelected=copy.id;});d.close();}
