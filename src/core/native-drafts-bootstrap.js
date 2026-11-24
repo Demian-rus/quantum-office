@@ -14,7 +14,7 @@
  };
  const check=key=>{key=String(key);if(!allowed.has(key))throw Error('Недопустимый ключ черновика: '+key);return key;};
  function change(key,value){
-  key=check(key);if(value!==null){value=String(value);if(new TextEncoder().encode(value).length>limit)throw Error('Черновик больше 64 МБ');}
+  key=check(key);if(value!==null){value=String(value);if(new TextEncoder().encode(value).length>limit){error='Черновик больше 64 МБ; сохраните отдельный файл';notify();throw Error(error);}}
   const existing=records.get(key);
   if(existing?.value===value)return;
   records.set(key,{revision:existing?.revision??0,value});dirty.set(key,value);
@@ -54,8 +54,7 @@
   try{
    globalThis.qoFlushForClose?.();
    if(app)app.inert=true;
-   if(ready)await flush();
-   else if(dirty.size)throw Error('Не завершён перенос черновиков');
+   if(ready){await flush();if(error)throw Error(error);}
    await invoke('draft_close');
   }catch(e){error=errText(e);notify();if(app)app.inert=false;closing=false;}
  }

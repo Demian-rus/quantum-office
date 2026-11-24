@@ -37,7 +37,7 @@ fn draft_path(app:&AppHandle)->Result<PathBuf,String>{Ok(app.path().app_data_dir
 #[tauri::command]async fn draft_write(app:AppHandle,changes:Value)->Result<Value,String>{
  let path=draft_path(&app)?;tauri::async_runtime::spawn_blocking(move||drafts::write(&path,&changes).map_err(|e|format!("{e:#}"))).await.map_err(|e|e.to_string())?
 }
-#[tauri::command]fn draft_close(window:tauri::WebviewWindow)->Result<(),String>{
+#[tauri::command]async fn draft_close(window:tauri::WebviewWindow)->Result<(),String>{
  if window.label()!="main"{return Err("DRAFT_CLOSE: invalid window".into());}window.destroy().map_err(|e|e.to_string())
 }
 fn main(){tauri::Builder::default().manage(Requests::default())

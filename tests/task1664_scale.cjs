@@ -7,6 +7,7 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
  const results=[];const save=status=>fs.writeFileSync(out,JSON.stringify({status,results,method:'Actual WebView2; same generated fixtures; SQLite IPC end-to-end vs IndexedDB; origin usage is not physical SQLite file size.'},null,2));
  // A separate archive preserves the smoke fixtures while the CI-only bank is reused.
  const initial=await page.evaluate(async()=>JSON.stringify(await qwBankRepository.createVerifiedBackup()));
+ save('RUNNING');
  for(const count of [1000,5000,10000])for(const scenario of ['text','repeated','distinct','mixed'])for(const storage of ['IndexedDB','SQLite']){
   const result=await page.evaluate(async({count,scenario,storage})=>{
    const options={normalize:qwBankNormalize,legacyStorage:{getItem(){return null;}}},name='native-scale-'+count+'-'+scenario;

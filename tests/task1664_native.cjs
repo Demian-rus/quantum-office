@@ -4,6 +4,49 @@ const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('n
 const out=path.join(__dirname,'..','evidence','native');
 async function inspectDraft(page){
  return page.evaluate(async()=>{
+  const hashBytes=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',v)),b=>b.toString(16).padStart(2,'0')).join('');
+  const digest=async v=>v===null||v===undefined?null:hashBytes(new TextEncoder().encode(v));
+  const image=async q=>({title:q?.title??null,count:q?.tasks?.length??null,imagePresent:!!q?.tasks?.[0]?.image,imageSha256:await digest(q?.tasks?.[0]?.image),images:await Promise.all((q?.tasks||[]).map(async t=>t.image?hashBytes(Uint8Array.from(atob(t.image.split(',')[1]),c=>c.charCodeAt(0))):null))});
+  const result={origin:location.origin,marker:false,legacyRawPresent:false,legacyRawBytes:null,legacyRawSha256:null,rawPresent:false,rawBytes:null,rawSha256:null,parse:null,validate:null,storageError:qwStorageError,corrupt:!!qwCorrupt,live:await image(qwDoc)};
+  try{
+   result.marker=!!localStorage.getItem('task1664-ci-restart');
+   const legacy=localStorage.getItem(QW_KEY);result.legacyRawPresent=legacy!==null;result.legacyRawBytes=legacy===null?null:new TextEncoder().encode(legacy).length;result.legacyRawSha256=await digest(legacy);
+  }catch(e){result.legacyReadError=e.message;}
+  try{
+   const raw=qoDraftStorage.getItem(QW_KEY),rows=await __TAURI__.core.invoke('draft_load'),disk=rows[QW_KEY];result.rawPresent=raw!==null;result.nativeRevision=disk?.revision??null;result.nativeSha256=disk?.sha256??null;result.pending=qoDraftStorage.pending;result.nativeError=qoDraftStorage.error;
+   if(raw!==null){result.rawBytes=new TextEncoder().encode(raw).length;result.rawSha256=await digest(raw);result.diskMatches=raw===disk?.value&&result.rawSha256===disk.sha256;
+    let parsed;try{parsed=JSON.parse(raw);result.parse={ok:true,...await image(parsed)};}catch(e){result.parse={ok:false,error:e.message};}
+    if(result.parse.ok)try{result.validate={ok:true,...await image(qwValidate(parsed))};}catch(e){result.validate={ok:false,error:e.message};}
+   }
+   result.liveSha256=await digest(bankStableJSON(qwValidate(qwDoc)));
+  }catch(e){result.readError=e.message;}
+  return result;
+ });
+}
+async function inspectEditors(page){
+ return page.evaluate(async()=>{
+  const hash=async s=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))),b=>b.toString(16).padStart(2,'0')).join('');
+  const disk=await __TAURI__.core.invoke('draft_load');
+  const rows={};for(const [name,key] of Object.entries({writer:qoWriterKey,sheets:STORE_KEY,slides:qoSlidesKey,studio:qoPhotoStorageKey,qwork:QW_KEY})){
+   const raw=qoDraftStorage.getItem(key);if(raw===null||disk[key]?.value!==raw||await hash(raw)!==disk[key]?.sha256)throw Error('Missing or unconfirmed native draft '+name);
+   rows[name]={bytes:new TextEncoder().encode(raw).length,sha256:disk[key].sha256,revision:disk[key].revision};
+  }
+  const b=workspace.books.find(x=>x.name==='TASK1664 Sheets');
+  const q=qdWorkingDoc(),studio=qoPhotoState(),sheetData=b?.sheets[0];
+  const live={
+   writer:{name:qoWriter.name,html:qoWriter.html},
+   sheets:{name:b?.name??null,a1:sheetData?getCell(sheetData,'A1').value:null,b1:sheetData?getCell(sheetData,'B1').value:null,c1:sheetData?getCell(sheetData,'C1').value:null},
+   slides:{name:qoSlides.name,items:qoSlides.slides[0]?.items},
+   studio:{name:studio.name,width:studio.width,height:studio.height,bg:studio.bg,strokes:studio.strokes},
+   diagnostics:{title:q.title,questions:qdQuestionList(q).map(x=>({id:x.id,prompt:x.prompt,answer:x.answer,points:x.points}))},
+   qwork:{title:qwDoc.title,count:qwDoc.tasks.length}
+  };
+  const signatures={};for(const [name,value] of Object.entries(live))signatures[name]=await hash(bankStableJSON(value));
+  return {rows,signatures,fixtures:{writer:live.writer.name==='TASK1664 Writer'&&live.writer.html.includes('Newton'),sheets:live.sheets.a1==='12'&&live.sheets.b1==='30'&&live.sheets.c1==='=A1+B1',slides:live.slides.name==='TASK1664 Slides'&&live.slides.items.some(x=>x.text==='TASK1664 slide body'),studio:live.studio.name==='TASK1664 Studio'&&live.studio.strokes.some(x=>x.id==='shape-1664'),diagnostics:live.diagnostics.title==='TASK1664 Diagnostics'&&live.diagnostics.questions.some(x=>x.prompt==='What is acceleration?'&&x.answer==='Change of velocity per time'),qwork:live.qwork.title==='TASK166.4 persisted draft'&&live.qwork.count===3}};
+ });
+}
+function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
+(async()=>{
   const digest=async v=>v===null||v===undefined?null:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),b=>b.toString(16).padStart(2,'0')).join('');
   const image=async q=>({title:q?.title??null,count:q?.tasks?.length??null,imagePresent:!!q?.tasks?.[0]?.image,imageSha256:await digest(q?.tasks?.[0]?.image)});
   const result={origin:location.origin,marker:false,rawPresent:false,rawBytes:null,rawSha256:null,parse:null,validate:null,storageError:qwStorageError,corrupt:!!qwCorrupt,live:await image(qwDoc)};
@@ -27,6 +70,22 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository instanceof SQLiteBankRepository&&qwBankRepository.db===true,{},{timeout:60000});
  const stage=process.argv[2];
  if(stage==='first'){
+ // Exercise actual migration before any editor data is created. No mock IPC.
+ const seed=await page.evaluate(()=>{
+  if(qoDraftStorage.getItem(QW_KEY)!==null)throw Error('Migration test requires absent native QWORK');
+  const draft=qwProject();draft.title='TASK1664 legacy draft';const task=qwTask('short');task.prompt='Legacy migration question';task.answer='42';draft.tasks=[task];
+  const raw=JSON.stringify(draft);localStorage.setItem(QW_KEY,raw);return raw;
+ });
+ await page.reload({waitUntil:'load'});
+ await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository.db===true,{},{timeout:60000});
+ const migration=await page.evaluate(async raw=>{
+  const disk=(await __TAURI__.core.invoke('draft_load'))[QW_KEY];
+  if(localStorage.getItem(QW_KEY)!==raw||disk?.value!==raw||qwDoc.title!=='TASK1664 legacy draft'||qwDoc.tasks[0]?.prompt!=='Legacy migration question')throw Error('Legacy migration not exact');
+  qwDoc=qwProject();qwDoc.layout='compact';if(!qwPersist())throw Error('Reset disposable fixture failed');await qoDraftStorage.flush();
+  if(localStorage.getItem(QW_KEY)!==raw)throw Error('Legacy source overwritten');
+  return {status:'PASS',sourceRetained:true,migrationRevision:disk.revision,migrationSha256:disk.sha256};
+ },seed);
+ fs.writeFileSync(path.join(out,'native-migration.json'),JSON.stringify(migration,null,2));
  const result=await page.evaluate(async()=>{
   const check=(v,m)=>{if(!v)throw Error(m);},sort=rows=>rows.slice().sort((a,b)=>a.id.localeCompare(b.id));
   const native=qwBankRepository,options={normalize:qwBankNormalize,legacyStorage:{getItem(){return null;}}};
@@ -97,11 +156,43 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
   return {pdfBytes:bytes.length,frames};
  });
  fs.writeFileSync(path.join(out,'native-print.json'),JSON.stringify(print,null,2));await page.screenshot({path:path.join(out,'native-window.png')});
- const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,1);assert.equal(before.live.imagePresent,true);
+ // Keep the original one-task assertion above, then add two more real bank images
+ // to exceed the browser localStorage quota while remaining within QWORK limits.
+ for(let i=1;i<3;i++){
+  await page.evaluate(i=>qwBank({__view:'native-'+i}),i);
+  await page.locator('[data-bank-add="native-'+i+'"]').click();
+  await page.waitForFunction(count=>qwDoc.tasks.length===count&&qwDoc.tasks.every(q=>q.image),i+1);
+ }
+ await page.evaluate(()=>{
+  // Real editor persistence functions and actual data structures.
+  route('writer');
+  const title=document.getElementById('qo-writer-title');title.value='TASK1664 Writer';
+  document.getElementById('qo-writer-page').innerHTML='<h1>Newton</h1><p>Force equals mass times acceleration.</p>';qoPersistWriter();
+  const q=qdWorkingDoc();q.title='TASK1664 Diagnostics';q.sections[0].questions[0].prompt='What is acceleration?';q.sections[0].questions[0].answer='Change of velocity per time';qdStore();
+  route('home');createBook();book().name='TASK1664 Sheets';setCell(sheet(),'A1','12');setCell(sheet(),'B1','30');setCell(sheet(),'C1','=A1+B1');persist();route('home');
+  route('slides');document.getElementById('qo-slides-title').value='TASK1664 Slides';qoSlides.slides[0].items[1].text='TASK1664 slide body';qoPersistSlides();route('home');
+  route('photo');qoPhotoApplyState({...qoPhotoState(),name:'TASK1664 Studio',width:640,height:480,bg:'#f0f0f0',strokes:[{id:'shape-1664',tool:'rect',points:[[20,30],[210,180]],color:'#225588',size:4,opacity:1}]});qoPhotoPersist();route('home');
+ });
+ await page.evaluate(()=>qoDraftStorage.flush());
+ const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,3);assert.equal(before.live.imagePresent,true);assert.equal(before.diskMatches,true);assert.ok(before.rawBytes>5*1024*1024,'large QWORK exceeds 5 MiB');assert.equal(before.pending,false);assert.equal(before.legacyRawPresent,true);
+ const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));
+ // Stage a real final edit without waiting for the debounce. OS close must flush it.
+ const pending=await page.evaluate(()=>{qwDoc.instructions='TASK1664 final edit before ordinary close';if(!qwPersist())throw Error('Pending draft not queued');return {queued:qoDraftStorage.pending};});
+ assert.equal(pending.queued,true);
+ fs.writeFileSync(path.join(out,'draft-close-pending.json'),JSON.stringify(pending,null,2));
  }else if(['ordinary','reinstall','portable'].includes(stage)){
  const draft=await inspectDraft(page);recordDraft(stage,draft);
  const before=JSON.parse(fs.readFileSync(path.join(out,'draft-before-close.json'),'utf8'));
- const checks={marker:draft.marker,rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:draft.live.imageSha256===before.live.imageSha256,rawHash:draft.rawSha256===before.rawSha256,storageError:!draft.storageError,notCorrupt:!draft.corrupt};
+ const checks={rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:JSON.stringify(draft.live.images)===JSON.stringify(before.live.images),diskMatches:draft.diskMatches===true,storageError:!draft.storageError,notCorrupt:!draft.corrupt,noPending:!draft.pending&&!draft.nativeError,finalEdit:await page.evaluate(()=>qwDoc.instructions==='TASK1664 final edit before ordinary close')};
+ const editors=await inspectEditors(page);recordDraft('editors-'+stage,editors);
+ const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
+ for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];
+ for(const name of Object.keys(oldEditors.rows))if(name!=='qwork')checks['hash_'+name]=editors.rows[name].sha256===oldEditors.rows[name].sha256;
+ if(stage==='ordinary'){assert.notEqual(draft.rawSha256,before.rawSha256,'final edit must change raw hash');fs.writeFileSync(path.join(out,'draft-after-ordinary.json'),JSON.stringify(draft,null,2));}
+ else {const ordinary=JSON.parse(fs.readFileSync(path.join(out,'draft-after-ordinary.json'),'utf8'));checks.rawHash=draft.rawSha256===ordinary.rawSha256;checks.liveHash=draft.liveSha256===ordinary.liveSha256;}
+ // Legacy marker is diagnostic only: SQLite is now authoritative. If present,
+ // the original legacy document must remain byte-identical, never overwritten.
+ checks.legacySourceNotOverwritten=!draft.legacyRawPresent||draft.legacyRawSha256===before.legacyRawSha256;
  fs.writeFileSync(path.join(out,'draft-checks-'+stage+'.json'),JSON.stringify(checks,null,2));
  const result=await page.evaluate(async()=>{
   const r=await qwBankRepository.getTask('native-0');if(r?.task.answer!=='edited'||!r.task.image||r.revision!==2)throw Error('SQLite restart mismatch');

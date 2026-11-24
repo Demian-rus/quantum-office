@@ -117,6 +117,7 @@ try {
       Save-Diagnostics $stage
       node tests/task1664_native.cjs $stage
       if ($LASTEXITCODE -ne 0) { $failures += $stage; if ($i -eq 0) { throw 'Initial native WebView integration failed' } }
+      elseif ($i -eq 3 -and $failures.Count -eq 0) { node tests/task1664_scale.cjs; if ($LASTEXITCODE -ne 0) { $failures += 'scale' } }
       if (!$p.CloseMainWindow()) { throw 'Window close failed' }
       if (!$p.WaitForExit(15000)) { throw 'Clean close timed out' }
       if ($p.ExitCode -ne 0) { throw "Unexpected exit $($p.ExitCode)" }
@@ -127,6 +128,9 @@ try {
     Wait-PortClosed
   }
   if ($failures.Count -gt 0) { throw "Draft acceptance failed: $($failures -join ', ')" }
+  $snapshotDir = Join-Path (Split-Path $data -Parent) 'snapshots'
+  $snapshots = @(Get-ChildItem $snapshotDir -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -eq '.sqlite3' })
+  @{count=$snapshots.Count;bytes=($snapshots | Measure-Object Length -Sum).Sum;protectiveCount=@($snapshots | Where-Object Name -Like 'protect-*').Count;files=@($snapshots | Select-Object Name,Length);retention='manual offline only'} | ConvertTo-Json -Depth 5 | Set-Content evidence/native/snapshot-storage.json
   @{status='PASS'; launchCount=4; installed=$exe; reinstall=$true; database=$data; commit=$env:GITHUB_SHA} | ConvertTo-Json | Set-Content evidence/native/launch.json
 } finally {
   Remove-ItemProperty -Path $policy -Name $name -ErrorAction Stop
@@ -138,6 +142,19 @@ $p = Start-Process -FilePath (Resolve-Path 'portable/quantum-office.exe') -PassT
 try {
   Wait-Office $p
   Start-Sleep -Seconds 3
+  # The Portable has already passed full draft/SQLite comparison over the
+  # temporary CI-only CDP connection; ordinary launch must expose actual UI.
+  Add-Type -AssemblyName UIAutomationClient,UIAutomationTypes
+  $root = [System.Windows.Automation.AutomationElement]::FromHandle($p.MainWindowHandle)
+  $deadline = (Get-Date).AddSeconds(25)
+  $visible = $false
+  do {
+    $elements = $root.FindAll([System.Windows.Automation.TreeScope]::Descendants,[System.Windows.Automation.Condition]::TrueCondition)
+    foreach ($element in $elements) { if ($element.Current.Name -like '*TASK1664 Sheets*') { $visible=$true; break } }
+    if (!$visible) { Start-Sleep -Milliseconds 500 }
+  } until ($visible -or (Get-Date) -gt $deadline)
+  @{sheetTitleAccessible=$visible;scope='real Windows accessibility tree, no CDP'} | ConvertTo-Json | Set-Content evidence/native/portable-uia.json
+  if (!$visible) { throw 'Portable existing workbook not visible in Windows accessibility tree' }
   Save-Diagnostics 'portable-no-policy'
   if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Unexpected debug listener in portable release' }
   if (!$p.CloseMainWindow() -or !$p.WaitForExit(15000)) { throw 'Portable close failed' }
