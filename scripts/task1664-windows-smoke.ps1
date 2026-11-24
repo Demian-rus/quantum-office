@@ -28,6 +28,28 @@ function Wait-PortClosed {
   while ((Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 500 }
   if (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue) { throw 'Previous WebView2 CDP port still open' }
 }
+Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class QOWindowSize {
+ [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left,Top,Right,Bottom; }
+ [DllImport("user32.dll", SetLastError=true)] public static extern bool GetWindowRect(IntPtr h, out RECT r);
+ [DllImport("user32.dll", SetLastError=true)] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint flags);
+}
+'@
+function Resize-Office($p) {
+  $results = @()
+  foreach ($size in @(@{w=1000;h=740},@{w=1200;h=800})) {
+    if (![QOWindowSize]::SetWindowPos($p.MainWindowHandle,[IntPtr]::Zero,0,0,$size.w,$size.h,0x16)) { throw 'SetWindowPos failed' }
+    Start-Sleep -Milliseconds 500
+    $rect = New-Object QOWindowSize+RECT
+    if (![QOWindowSize]::GetWindowRect($p.MainWindowHandle,[ref]$rect)) { throw 'GetWindowRect failed' }
+    $w = $rect.Right-$rect.Left; $h = $rect.Bottom-$rect.Top
+    if ($w -ne $size.w -or $h -ne $size.h) { throw "Window size mismatch: $w x $h" }
+    $results += @{width=$w;height=$h}
+  }
+  @{status='PASS';sizes=$results} | ConvertTo-Json -Depth 4 | Set-Content evidence/native/resize.json
+}
 function Save-Diagnostics($stage) {
   $procs = Get-CimInstance Win32_Process -Filter "Name='msedgewebview2.exe' OR Name='quantum-office.exe'" | Select-Object Name,ProcessId,ParentProcessId,ExecutablePath,CommandLine
   $ports = Get-NetTCPConnection -LocalPort 9222 -ErrorAction SilentlyContinue | Select-Object LocalAddress,State,OwningProcess
@@ -71,6 +93,7 @@ try {
     try {
       Wait-Office $p
       $env:QO_NATIVE_PID = [string]$p.Id
+      if ($i -eq 0) { Resize-Office $p }
       Save-Diagnostics $stage
       node tests/task1664_native.cjs $stage
       if ($LASTEXITCODE -ne 0) { throw 'Native WebView integration failed' }

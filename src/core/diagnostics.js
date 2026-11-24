@@ -697,7 +697,8 @@ function qdVariantPrintDownload(d,index,kind){
   if(!html)return {ok:false,message:'Не удалось создать бланк'};
   const file=(typeof safeFile==='function'?safeFile(d.title):'diagnostic')+
     '-variant-'+variant.label+'-'+(kind==='key'?'answers':'student')+'.html';
-  download(file,html,'text/html;charset=utf-8');
+  const saved=download(file,html,'text/html;charset=utf-8');
+  if(saved&&typeof saved.then==='function')return saved.then(ok=>ok?{ok:true,file}:{ok:false,message:'Файл не сохранён'});
   return {ok:true,file};
 }
 
@@ -2550,7 +2551,8 @@ function qdOnClick(event){
   }
   if(action==='variant-print'){
     const result=qdVariantPrintDownload(d,Number(button.dataset.variantIndex),button.dataset.variantKind);
-    if(!result.ok)status(result.message,true);
+    if(result&&typeof result.then==='function')void result.then(outcome=>{if(!outcome.ok)status(outcome.message,true);});
+    else if(!result.ok)status(result.message,true);
     return;
   }
   if(action==='variant-download'){

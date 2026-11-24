@@ -410,10 +410,9 @@ async function qdMediaExportArchive(type,data,filename){
   }
   zip.file('manifest.json',JSON.stringify({format:'quantum-diagnostic-media',version:1,type,data,assets}));
   const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5}});
-  const url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=filename;document.body.append(a);a.click();a.remove();
-  setTimeout(()=>URL.revokeObjectURL(url),30000);
-  status('Скачивание '+filename+' запрошено. Изображения включены в архив.');
+  const saved=await download(filename,blob,'application/zip');
+  if(qoNativeDesktop){if(saved===true)status('Архив сохранён. Изображения включены.');}
+  else status('Скачивание '+filename+' запрошено. Изображения включены в архив.');
 }
 async function qdMediaImportArchive(file,type){
   try{
