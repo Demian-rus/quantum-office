@@ -1,0 +1,454 @@
+<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Quantum Office — Лекции (лаборатория)</title><style>*{box-sizing:border-box}body{margin:0;background:#eaf0f5;color:#26384a;font:15px/1.55 Arial,sans-serif}header{background:#152339;color:#e9f3fa;padding:9px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:2;box-shadow:0 2px 8px #15233922}header b{color:#81d5a8}header small{margin-left:auto}main{max-width:1000px;margin:24px auto;padding:0 18px 50px}.toolbar,.actions,.fields{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.toolbar{background:white;border:1px solid #cbd5df;padding:10px;border-radius:6px;margin-bottom:12px}button,select,input[type=file]{font:inherit}button,.file{border:1px solid #b9c8d5;border-radius:4px;background:white;color:#24374b;padding:6px 10px;cursor:pointer;line-height:1.2}.file{display:inline-block}button:hover,.file:hover{background:#e8f4ed;border-color:#479a78}button:focus-visible,summary:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:2px solid #368c69;outline-offset:2px}#project-title{font-size:23px;font-weight:bold;width:100%;border:0;background:transparent;color:#24374b;margin:8px 0 4px;padding:4px}#total,#status,.note{font-size:13px;color:#52687c}.scene{border:1px solid #ccd8e3;background:white;border-radius:7px;margin:10px 0;overflow:hidden}.scene>summary{padding:13px 16px;cursor:pointer;background:#f9fbfd;display:flex;align-items:center;gap:12px}.scene>summary::before{content:'›';font-size:20px;color:#438f70;line-height:1}.scene[open]>summary::before{transform:rotate(90deg)}.time{font-size:13px;font-variant-numeric:tabular-nums;min-width:92px;color:#368161}.scene-body{padding:16px 20px;border-top:1px solid #e1e8ef}.field{display:flex;flex-direction:column;gap:4px;margin:7px 0;font-size:13px;color:#53677a}.field input,.field textarea,select{border:1px solid #c6d2de;border-radius:4px;padding:7px;font:inherit;color:#20354a;background:white}.field textarea{font-size:15px;line-height:1.6;width:100%;resize:vertical}.fields>.field{flex:1;min-width:120px}.visual{margin:14px 0;padding:12px;border:1px solid #dce5ee;border-radius:6px}.visual h4{margin:0 0 8px}.picture{background:white;border:1px solid #e5ebf1;max-width:720px;margin:auto}.picture svg{display:block;width:100%;height:auto}.properties{margin-top:10px;background:#f5f8fb;padding:9px;border-radius:4px}.properties summary{cursor:pointer;color:#326d55}.editor select{width:100%}.note{margin:8px 0}.actions{margin:8px 0}input[type=range]{flex:1;min-width:100px;accent-color:#368c69}h3{font-size:16px;margin-top:20px}@media(max-width:600px){header small{display:none}main{padding:0 8px}.scene-body{padding:10px}.scene>summary{padding:10px;gap:5px}.time{min-width:80px}}</style></head><body><header><b>QUANTUM OFFICE</b><span>Лекции</span><small>Изолированная экспериментальная версия</small></header><main><div class="toolbar"><button id="new">Новый материал</button><button id="example">Лекция о радиации</button><button id="save">Сохранить QLECTURE</button><label class="file">Открыть QLECTURE<input id="load" type="file" accept=".qlecture,application/json" hidden></label><label>Режим <select id="mode"><option value="lecture">Лекция</option><option value="script">Сценарий</option></select></label><button id="add">+ Раздел</button></div><input id="project-title" aria-label="Название материала"><p id="total"></p><p id="status" role="status">Экспериментальный редактор: сохраняйте проект отдельным файлом. Автосохранения нет.</p><section id="scenes"></section></main><script>/* Isolated lecture model. No DOM, storage, network, or existing editor mutations. */
+const QL_DEMOS=Object.freeze({
+  decay:Object.freeze({duration:60,defaults:Object.freeze({n0:64,halfLife:10})}),
+  attenuation:Object.freeze({duration:8,defaults:Object.freeze({halfLayer:1})}),
+  photon:Object.freeze({duration:1,defaults:Object.freeze({minNm:0.001,maxNm:1000})})
+});
+function qlFail(message){throw new Error('QLECTURE: '+message);}
+function qlNumber(v,min,max){if(typeof v!=='number'||!Number.isFinite(v)||v<min||v>max)qlFail('недопустимый параметр');return v;}
+function qlString(v,max){if(typeof v!=='string'||!v.trim()||v.length>max)qlFail('недопустимый текст');return v;}
+function qlList(v,max){if(!Array.isArray(v)||v.length>max)qlFail('недопустимый список');return v;}
+function qlRecord(v){if(!v||typeof v!=='object'||Array.isArray(v))qlFail('ожидается объект');return v;}
+function qlDemo(raw){
+  qlRecord(raw);
+  if(!Object.hasOwn(QL_DEMOS,raw.kind))qlFail('неизвестная демонстрация');
+  const p=qlRecord(raw.params);
+  if(raw.kind==='decay'){
+    const n0=qlNumber(p.n0,1,1000000);if(!Number.isInteger(n0))qlFail('число ядер должно быть целым');
+    return {kind:raw.kind,params:{n0,halfLife:qlNumber(p.halfLife,.001,1e9)}};
+  }
+  if(raw.kind==='attenuation')return {kind:raw.kind,params:{halfLayer:qlNumber(p.halfLayer,.001,1e6)}};
+  const minNm=qlNumber(p.minNm,1e-9,1e9),maxNm=qlNumber(p.maxNm,1e-9,1e9);
+  if(maxNm<=minNm)qlFail('проверьте диапазон длин волн');
+  return {kind:raw.kind,params:{minNm,maxNm}};
+}
+function qlSample(raw,progress){
+  const {kind,params:p}=qlDemo(raw),u=qlNumber(progress,0,1);
+  if(kind==='decay'){
+    const periods=6*u,time=periods*p.halfLife,fraction=2**(-periods);
+    return {kind,time,periods,fraction,expected:p.n0*fraction};
+  }
+  if(kind==='attenuation'){
+    const layers=8*u,thickness=layers*p.halfLayer,fraction=2**(-layers);
+    return {kind,layers,thickness,fraction,attenuated:1-fraction};
+  }
+  const wavelengthNm=p.maxNm*(p.minNm/p.maxNm)**u;
+  // Exact SI-defined h, c, e; conversion nm to m and joules to eV.
+  const energyEv=6.62607015e-34*299792458/(wavelengthNm*1e-9*1.602176634e-19);
+  return {kind,wavelengthNm,energyEv};
+}
+function qlValidate(raw){
+  qlRecord(raw);
+  if(raw.format!=='QLECTURE'||raw.version!==1)qlFail('неподдерживаемый формат');
+  const ids=new Set(),scenes=qlList(raw.scenes,200).map(s=>{
+    qlRecord(s);const id=qlString(s.id,100);
+    if(ids.has(id))qlFail('повтор идентификатора сцены');ids.add(id);
+    const result={id,title:qlString(s.title,200),narration:qlString(s.narration,30000),
+      board:qlList(s.board,40).map(x=>qlString(x,2000)),
+      figures:qlList(s.figures,30).map(x=>qlString(x,300)),
+      durationSec:qlNumber(s.durationSec,1,7200)};
+    if(s.demo!==undefined)result.demo=qlDemo(s.demo);
+    return result;
+  });
+  if(!scenes.length)qlFail('лекция не содержит сцен');
+  return {format:'QLECTURE',version:1,title:qlString(raw.title,200),subject:qlString(raw.subject,100),audience:qlString(raw.audience,100),scenes};
+}
+function qlSerialize(raw){return JSON.stringify(qlValidate(raw),null,2);}
+function qlParse(text){if(typeof text!=='string'||text.length>8000000)qlFail('файл слишком большой');return qlValidate(JSON.parse(text));}
+
+
+// Condensed first lecture. Figure strings are specifications, not rendered assets.
+const QL_RADIATION={
+  "format": "QLECTURE",
+  "version": 1,
+  "title": "Радиация: физика невидимого излучения",
+  "subject": "Физика",
+  "audience": "8–11 классы",
+  "scenes": [
+    {
+      "id": "intro",
+      "title": "Радиация вокруг нас",
+      "durationSec": 50,
+      "narration": "Прямо сейчас через окружающие предметы и наше тело могут проходить высокоэнергетические частицы. Некоторые приходят из космоса, другие возникают при распаде ядер в земной коре. Радиоактивные изотопы есть даже в нашем организме. Почему бумага задерживает альфа-частицы, а гамма-излучение требует другой защиты? Почему излучение может вредить и одновременно помогать в медицине? Начнём с атомного ядра.",
+      "board": [
+        "Источники: космос, горные породы, организм"
+      ],
+      "figures": [
+        "Естественный радиационный фон: космос, породы, человек"
+      ]
+    },
+    {
+      "id": "terms",
+      "title": "Излучение, ионизация, радиоактивность",
+      "durationSec": 70,
+      "narration": "Излучение переносит энергию в форме волн или частиц. Ионизирующее излучение способно образовывать ионы, например удаляя электроны из атомов. Радиоактивность — свойство нестабильных ядер самопроизвольно претерпевать ядерные превращения. Не всякое излучение ионизирует, и не всякое ионизирующее излучение связано с распадом: рентгеновский аппарат — пример другого источника.",
+      "board": [
+        "Излучение → ионизирующее / неионизирующее",
+        "Радиоактивность ≠ излучение"
+      ],
+      "figures": [
+        "Классификация излучения и его источников"
+      ]
+    },
+    {
+      "id": "nucleus",
+      "title": "Строение и устойчивость ядра",
+      "durationSec": 90,
+      "narration": "Атом имеет положительно заряженное ядро и электронное облако. Ядро состоит из протонов и нейтронов, кроме протия, у которого один протон. Протоны отталкиваются электрически; короткодействующее ядерное притяжение связывает нуклоны. Устойчивость зависит от размеров, отношения числа протонов к нейтронам и квантовой структуры. Радиоактивными бывают и лёгкие ядра — например углерод-14.",
+      "board": [
+        "A = Z + N",
+        "²³⁸₉₂U: N = 146"
+      ],
+      "figures": [
+        "Атом и увеличенное ядро (не в масштабе)",
+        "Кулоновское отталкивание и ядерное притяжение"
+      ]
+    },
+    {
+      "id": "decay",
+      "title": "Радиоактивный распад и полураспад",
+      "durationSec": 90,
+      "narration": "Нестабильное ядро может самопроизвольно превратиться или перейти в менее возбуждённое состояние. Момент конкретного распада предсказать нельзя. Для ансамбля одинаковых ядер среднее число нераспавшихся уменьшается вдвое за каждый период полураспада. Из тысячи ядер в среднем останется 500, затем 250, затем 125. Это средняя закономерность, не точное расписание отдельных распадов.",
+      "board": [
+        "N(t) = N₀ · 2^(−t/T½)",
+        "λ = ln 2 / T½",
+        "N = N₀ exp(−λt)"
+      ],
+      "figures": [
+        "Сетка ядер (иллюстрация среднего)",
+        "График N/N₀ от t/T½"
+      ],
+      "demo": {
+        "kind": "decay",
+        "params": {
+          "n0": 64,
+          "halfLife": 10
+        }
+      }
+    },
+    {
+      "id": "alpha",
+      "title": "Альфа-распад",
+      "durationSec": 60,
+      "narration": "Альфа-частица — ядро гелия-4, два протона и два нейтрона. У исходного ядра массовое число уменьшается на четыре, зарядовое — на два. При распаде урана-238 получается торий-234. Альфа-частицы интенсивно ионизируют вещество и быстро теряют энергию.",
+      "board": [
+        "²³⁸₉₂U → ²³⁴₉₀Th + ⁴₂He",
+        "238 = 234 + 4; 92 = 90 + 2"
+      ],
+      "figures": [
+        "Схема распада урана с отдельной альфа-частицей"
+      ]
+    },
+    {
+      "id": "beta",
+      "title": "Бета-распад",
+      "durationSec": 75,
+      "narration": "При бета-минус-распаде нейтрон превращается в протон, рождаются электрон и электронное антинейтрино. Электрон не извлекается из оболочки атома и не был готовой частицей внутри нейтрона. Массовое число ядра не изменяется, зарядовое возрастает на единицу. В энергетически подходящих ядрах возможен и бета-плюс-распад с испусканием позитрона и нейтрино.",
+      "board": [
+        "n → p + e⁻ + ν̄ₑ",
+        "¹⁴₆C → ¹⁴₇N + e⁻ + ν̄ₑ",
+        "p → n + e⁺ + νₑ (в подходящем ядре)"
+      ],
+      "figures": [
+        "Продукты бета-минус-распада",
+        "Углерод-14 и азот-14: точные числа нуклонов"
+      ]
+    },
+    {
+      "id": "gamma",
+      "title": "Гамма-излучение",
+      "durationSec": 75,
+      "narration": "Возбуждённое ядро может перейти на более низкий энергетический уровень, испустив фотон. Гамма-кванты имеют ту же электромагнитную природу, что и видимый свет, но обычно намного большую энергию. Энергия фотона растёт с частотой. При гамма-переходе числа протонов и нейтронов не меняются. Диапазоны рентгеновских и гамма-квантов могут перекрываться; различие часто определяется происхождением.",
+      "board": [
+        "E = hν = hc/λ",
+        "Eγ ≈ E₂ − E₁ (без отдачи ядра)",
+        "ᴬZX* → ᴬZX + γ"
+      ],
+      "figures": [
+        "Энергетические уровни ядра",
+        "Электромагнитный спектр (схематично)"
+      ],
+      "demo": {
+        "kind": "photon",
+        "params": {
+          "minNm": 0.001,
+          "maxNm": 1000
+        }
+      }
+    },
+    {
+      "id": "shield",
+      "title": "Проникающая способность и защита",
+      "durationSec": 90,
+      "narration": "Альфа-частицы обычно задерживает лист бумаги, бета-частицы — пластик или алюминий подходящей толщины. Гамма-кванты могут поглощаться и рассеиваться любым веществом. Интенсивность узкого первичного моноэнергетического пучка убывает экспоненциально. Проникающая способность зависит от энергии и материала; она не равна биологической опасности. Источник альфа-излучения внутри организма может быть особенно опасен.",
+      "board": [
+        "I = I₀ exp(−μx)",
+        "d½ = ln 2 / μ",
+        "I/I₀ = 2^(−x/d½)"
+      ],
+      "figures": [
+        "Бумага, пластик/алюминий, свинец: условное сравнение",
+        "График ослабления первичного пучка"
+      ],
+      "demo": {
+        "kind": "attenuation",
+        "params": {
+          "halfLayer": 1
+        }
+      }
+    },
+    {
+      "id": "ion",
+      "title": "Ионизация вещества",
+      "durationSec": 60,
+      "narration": "В нейтральном атоме числа протонов и электронов равны. При достаточной передаче энергии электрон может покинуть атом, образовав положительный ион. Заряженные частицы непосредственно ионизируют вещество. Гамма-кванты передают энергию электронам, например при фотоэффекте или комптоновском рассеянии. Вторичные электроны вызывают новые ионизации.",
+      "board": [
+        "X → X⁺ + e⁻ (при передаче энергии)",
+        "Eперед ≥ Eион",
+        "Водород из основного состояния: 13,6 эВ"
+      ],
+      "figures": [
+        "Нейтральный атом и положительный ион",
+        "След ионизации и вторичные электроны"
+      ]
+    },
+    {
+      "id": "biology",
+      "title": "Воздействие на живые клетки",
+      "durationSec": 90,
+      "narration": "Ионизирующее излучение может непосредственно повреждать биологические молекулы или действовать косвенно через радиолиз воды. Образуются химически активные частицы, в частности гидроксильные радикалы. Возможны повреждения ДНК, мембран и белков. Клетки могут восстановить повреждения; возможны также мутации, нарушение деления или гибель клетки. Результат зависит от дозы, вида излучения и чувствительности тканей.",
+      "board": [
+        "Излучение → ионизация → возможное повреждение",
+        "Прямое воздействие / радиолиз воды"
+      ],
+      "figures": [
+        "Прямое и косвенное повреждение ДНК",
+        "Варианты исхода повреждения"
+      ]
+    },
+    {
+      "id": "dose",
+      "title": "Беккерель, грей и зиверт",
+      "durationSec": 90,
+      "narration": "Активность показывает среднее число распадов в секунду, измеряется в беккерелях. Поглощённая доза — энергия, переданная единице массы вещества, измеряется в греях. В радиационной защите эквивалентная доза учитывает вид излучения, эффективная — дополнительно радиочувствительность органов и тканей; обе измеряются в зивертах. Активность сама по себе не определяет опасность.",
+      "board": [
+        "Активность = λN; 1 Бк = 1 с⁻¹",
+        "D = Eпогл/m; 1 Гр = 1 Дж/кг",
+        "H_T = Σ_R w_R D_T,R",
+        "0,01 Дж / 2 кг = 5 мГр"
+      ],
+      "figures": [
+        "Сравнение трёх дозиметрических величин"
+      ]
+    },
+    {
+      "id": "background",
+      "title": "Естественный радиационный фон",
+      "durationSec": 60,
+      "narration": "Радиоактивные изотопы присутствуют в горных породах, воздухе, пище и организме. Радон возникает в природных цепочках распада. Магнитное поле Земли отклоняет часть заряженных космических частиц, но не фотоны. Атмосфера поглощает излучение и участвует в образовании вторичных частиц. Естественное облучение неодинаково в разных местах.",
+      "board": [
+        "Космические лучи, земные радионуклиды, радон, пища",
+        "F = q(v × B)"
+      ],
+      "figures": [
+        "Магнитосфера и атмосфера",
+        "Источники природного облучения"
+      ]
+    },
+    {
+      "id": "applications",
+      "title": "Применение и заключение",
+      "durationSec": 60,
+      "narration": "Рентгенография позволяет исследовать внутреннюю структуру тела и изделий. Радиоизотопы используются в диагностике, лучевая терапия — для лечения опухолей. Углерод-14 помогает датировать органические материалы. Радиация подчиняется физическим законам; последствия зависят от энергии, дозы, вида излучения и взаимодействия с веществом. Понимание этих законов позволяет защищаться от опасности и использовать излучение.",
+      "board": [
+        "Сравнение α, β, γ",
+        "Вопрос: чем отличается активность от дозы?"
+      ],
+      "figures": [
+        "Многопольная лучевая терапия (условно)",
+        "Итоговая таблица альфа-, бета- и гамма-излучения"
+      ]
+    }
+  ]
+};
+
+
+const QL2_COLORS={ink:'#27384c',blue:'#6596c5',red:'#d96c65',green:'#56a58c',purple:'#8d79cf',gold:'#d49c53',pale:'#e3eaf2',white:'#ffffff'};
+function ql2Assert(ok,msg){if(!ok)throw Error('QLECTURE: '+msg);}
+function ql2Text(v,max=300){ql2Assert(typeof v==='string'&&v.length<=max,'некорректный текст');return v;}
+function ql2Num(v,min=0,max=10000){ql2Assert(typeof v==='number'&&Number.isFinite(v)&&v>=min&&v<=max,'некорректное число');return v;}
+function ql2Color(v){ql2Assert(typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v),'некорректный цвет');return v;}
+function ql2Obj(v){ql2Assert(v&&typeof v==='object'&&!Array.isArray(v),'некорректный объект');return v;}
+function ql2Arr(v,max){ql2Assert(Array.isArray(v)&&v.length<=max,'некорректный список');return v;}
+function ql2Id(v){ql2Assert(typeof v==='string'&&/^[a-zA-Z0-9_-]{1,100}$/.test(v),'некорректный идентификатор');return v;}
+function ql2Shape(s){
+ ql2Obj(s);const t=s.kind;ql2Assert(['rect','circle','line','text'].includes(t),'неизвестная фигура');
+ const v={id:ql2Id(s.id),kind:t,x:ql2Num(s.x,0,720),y:ql2Num(s.y,0,400),color:ql2Color(s.color)};
+ if(t==='rect'){v.w=ql2Num(s.w,1,720);v.h=ql2Num(s.h,1,400);ql2Assert(v.x+v.w<=720&&v.y+v.h<=400,'прямоугольник за границей');}
+ if(t==='circle'){v.r=ql2Num(s.r,1,200);ql2Assert(v.x-v.r>=0&&v.x+v.r<=720&&v.y-v.r>=0&&v.y+v.r<=400,'окружность за границей');}
+ if(t==='line'){v.x2=ql2Num(s.x2,0,720);v.y2=ql2Num(s.y2,0,400);v.width=ql2Num(s.width,1,12);v.arrow=!!s.arrow;}
+ if(t==='text'){v.text=ql2Text(s.text,120);v.size=ql2Num(s.size,10,64);v.align=s.align==='middle'?'middle':'start';}
+ return v;
+}
+function ql2Unique(arr){const ids=new Set();for(const v of arr){ql2Assert(!ids.has(v.id),'повтор идентификатора');ids.add(v.id);}return arr;}
+function ql2Visual(raw){
+ ql2Obj(raw);const v={id:ql2Id(raw.id),kind:raw.kind,title:ql2Text(raw.title),caption:ql2Text(raw.caption??'',1000)};
+ if(v.kind==='diagram'){v.shapes=ql2Unique(ql2Arr(raw.shapes,300).map(ql2Shape));}
+ else if(v.kind==='graph'){v.demo=qlDemo(raw.demo);ql2Assert(v.demo.kind!=='photon','график поддерживает распад и ослабление');v.xLabel=ql2Text(raw.xLabel,60);v.yLabel=ql2Text(raw.yLabel,60);v.color=ql2Color(raw.color);v.progress=ql2Num(raw.progress??0,0,1);}
+ else ql2Assert(false,'неизвестный тип иллюстрации');
+ return v;
+}
+function ql2Validate(raw){
+ ql2Obj(raw);ql2Assert(raw.format==='QLECTURE'&&(raw.version===1||raw.version===2),'неподдерживаемый формат');
+ const v=qlValidate({...raw,version:1});
+ ql2Assert(raw.mode===undefined||['lecture','script'].includes(raw.mode),'неизвестный режим');
+ return {...v,version:2,mode:raw.mode??'script',scenes:v.scenes.map((s,i)=>({...s,visuals:ql2Unique(ql2Arr(raw.scenes[i].visuals??[],30).map(ql2Visual))}))};
+}
+function ql2Parse(text){ql2Assert(typeof text==='string'&&text.length<=8000000,'файл слишком большой');return ql2Validate(JSON.parse(text));}
+function ql2Serialize(v){const s=JSON.stringify(ql2Validate(v),null,2);ql2Assert(s.length<=8000000,'файл слишком большой');return s;}
+function ql2Timeline(raw){let t=0;return raw.scenes.map(s=>{const start=t;t+=s.durationSec;return {id:s.id,start,end:t};});}
+function ql2Escape(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[c]));}
+function ql2Svg(raw,progressOverride){
+ const v=ql2Visual(raw),e=ql2Escape,C=QL2_COLORS;
+ const text=(x,y,s,size=17,align='start',color=C.ink)=>'<text x="'+x+'" y="'+y+'" font-size="'+size+'" text-anchor="'+align+'" fill="'+color+'">'+e(s)+'</text>';
+ let a='<svg xmlns="http://www.w3.org/2000/svg" width="720" height="400" viewBox="0 0 720 400" font-family="Arial, sans-serif"><rect width="720" height="400" fill="#ffffff"/>';
+ const line=(x,y,x2,y2,c,w=2)=>'<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" stroke="'+c+'" stroke-width="'+w+'" stroke-linecap="round"/>';
+ const arrow=(x,y,x2,y2,c,w)=>{const d=Math.hypot(x2-x,y2-y);if(!d)return '';const ux=(x2-x)/d,uy=(y2-y)/d,h=Math.min(12,d*.4),bx=x2-h*ux,by=y2-h*uy;return line(x,y,bx,by,c,w)+'<path d="M '+x2+' '+y2+' L '+(bx-uy*h*.45)+' '+(by+ux*h*.45)+' L '+(bx+uy*h*.45)+' '+(by-ux*h*.45)+' Z" fill="'+c+'"/>';};
+ if(v.kind==='diagram'){
+  for(const s of v.shapes){
+   if(s.kind==='rect')a+='<rect x="'+s.x+'" y="'+s.y+'" width="'+s.w+'" height="'+s.h+'" rx="5" fill="'+s.color+'"/>';
+   if(s.kind==='circle')a+='<circle cx="'+s.x+'" cy="'+s.y+'" r="'+s.r+'" fill="'+s.color+'"/>';
+   if(s.kind==='line')a+=(s.arrow?arrow:line)(s.x,s.y,s.x2,s.y2,s.color,s.width);
+   if(s.kind==='text')a+=text(s.x,s.y,s.text,s.size,s.align,s.color);
+  }
+ }else{
+  const L=78,R=615,T=52,B=320,m=v.demo.kind==='decay'?6:8,p=progressOverride??v.progress;
+  ql2Num(p,0,1);
+  for(let k=0;k<=4;k++){const y=B-k*(B-T)/4;a+=line(L,y,R,y,C.pale,1)+text(L-10,y+5,k*25,13,'end');}
+  for(let k=0;k<=m;k++){const x=L+k*(R-L)/m;a+=line(x,T,x,B,C.pale,1)+text(x,B+22,k,13,'middle');}
+  a+=arrow(L,B,L,T-13,C.ink,2)+arrow(L,B,R+15,B,C.ink,2);
+  a+=text(L,T-24,v.yLabel,15,'middle')+text(R+22,B+5,v.xLabel,15);
+  const xy=u=>[L+(R-L)*u,B-(B-T)*qlSample(v.demo,u).fraction];
+  a+='<path d="'+Array.from({length:161},(_,i)=>(i?'L':'M')+xy(i/160).join(' ')).join(' ')+'" fill="none" stroke="'+v.color+'" stroke-width="3"/>';
+  const [x,y]=xy(p);a+=line(L,y,x,y,C.gold,1)+line(x,y,x,B,C.gold,1)+'<circle cx="'+x+'" cy="'+y+'" r="6" fill="'+C.gold+'"/>';
+  const sample=qlSample(v.demo,p);
+  a+=text(360,374,(100*sample.fraction).toFixed(2)+'% · '+(v.demo.kind==='decay'?'Среднее N = '+sample.expected.toFixed(2)+'; t = '+sample.time.toFixed(2)+' с':'x = '+sample.thickness.toFixed(2)+' усл. ед.'),16,'middle');
+ }
+ return a+'</svg>';
+}
+
+
+function ql2Diagram(id,title,caption,make){
+ let i=0;const shapes=[],add=(kind,v)=>shapes.push({id:'s'+(++i),kind,...v});
+ const t=(x,y,text,size=20,align='middle',color=C.ink)=>add('text',{x,y,text,size,align,color});
+ const r=(x,y,w,h,color=C.pale)=>add('rect',{x,y,w,h,color});
+ const c=(x,y,r,color)=>add('circle',{x,y,r,color});
+ const l=(x,y,x2,y2,color=C.ink,arrow=false,width=2)=>add('line',{x,y,x2,y2,color,arrow,width});
+ const header=()=>t(360,34,title,24);make({t,r,c,l,header});
+ return {id,kind:'diagram',title,caption,shapes};
+}
+function ql2Graph(id,title,demo){return {id,kind:'graph',title,caption:demo.kind==='decay'?'Среднее число нераспавшихся ядер, не случайная реализация.':'Узкий моноэнергетический первичный пучок, без рассеянного излучения.',demo,xLabel:demo.kind==='decay'?'t/T½':'x/d½',yLabel:demo.kind==='decay'?'N/N₀, %':'I/I₀, %',color:C.blue,progress:.25};}
+function ql2Nucleus(c,x,y,n,z,step=12,r=10){for(let i=0;i<n;i++){const a=i*2.399963,d=step*Math.sqrt(i);c(Math.round(x+d*Math.cos(a)),Math.round(y+d*Math.sin(a)),r,i<z?C.red:C.blue);}}
+const QL2_SEED_VIS={
+ intro:[ql2Diagram('sources','Источники природного излучения','Условная схема: частицы и излучение из разных источников.',({t,r,c,l,header})=>{header();r(30,270,660,95,C.pale);c(350,130,27,C.blue);r(320,160,60,105,C.blue);t(350,295,'Человек');for(const x of [100,210,500,610])l(x,62,350+(x-350)*.45,144,C.gold,true,3);t(360,62,'Космические частицы',17);r(55,302,130,42,C.red);r(535,302,130,42,C.red);l(140,303,310,215,C.gold,true);l(580,303,390,215,C.gold,true);t(120,330,'Породы',18,'middle',C.white);t(600,330,'Породы',18,'middle',C.white);c(347,205,6,C.gold);t(440,205,'Радионуклиды',15,'start');})],
+ terms:[ql2Diagram('classification','Излучение и его источники','Радиоактивность — свойство ядер, а не синоним излучения.',({t,r,l,header})=>{header();r(260,70,200,52);t(360,104,'Излучение');l(360,122,180,166,C.ink,true);l(360,122,540,166,C.ink,true);r(40,170,280,68);r(400,170,280,68);t(180,198,'Неионизирующее',20);t(180,220,'Свет, радиоволны',16);t(540,198,'Ионизирующее',20);t(540,220,'α, β, γ, рентген',16);l(540,238,450,280,C.ink,true);l(540,238,630,280,C.ink,true);t(450,308,'Распад',18);t(630,308,'Другие источники',16);})],
+ nucleus:[ql2Diagram('atom','Атом и ядро','Размеры условны, электронное облако не является орбитой.',({t,c,l,header})=>{header();for(let i=0;i<100;i++){const a=i*2.399963,d=105*Math.sqrt((i+.5)/100);c(Math.round(185+d*Math.cos(a)),Math.round(190+d*Math.sin(a)),2,C.blue);}c(185,190,8,C.red);l(193,180,415,104,C.blue);l(193,200,415,278,C.blue);ql2Nucleus(c,520,190,14,6,20,15);t(185,330,'Электронное облако');t(520,330,'Ядро');t(520,356,'Протоны + нейтроны',16);})],
+ decay:[ql2Graph('decay-graph','Закон радиоактивного распада',{kind:'decay',params:{n0:64,halfLife:10}})],
+ alpha:[ql2Diagram('alpha','Альфа-распад','Число нуклонов на рисунке условно; у α-частицы показаны все четыре.',({t,c,l,header})=>{header();ql2Nucleus(c,145,176,36,14,11,10);ql2Nucleus(c,455,176,32,12,11,10);l(230,176,365,176,C.ink,true,3);for(let i=0;i<4;i++)c(620+(i%2)*22,98+Math.floor(i/2)*22,12,i===0||i===3?C.red:C.blue);l(510,135,602,106,C.gold,true);t(145,270,'Уран-238');t(455,270,'Торий-234');t(630,155,'α',24);t(360,342,'²³⁸₉₂U → ²³⁴₉₀Th + ⁴₂He',25);})],
+ beta:[ql2Diagram('beta','Бета-минус-распад','Схема продуктов превращения, не точные траектории.',({t,c,l,header})=>{header();c(125,176,43,C.blue);t(125,184,'n',27,'middle',C.white);l(180,176,320,176,C.ink,true,3);c(385,176,43,C.red);t(385,184,'p',27,'middle',C.white);l(430,150,560,94,C.purple,true);l(430,202,560,258,C.green,true);c(590,80,18,C.purple);c(590,270,12,C.green);t(590,121,'Электрон');t(590,308,'Антинейтрино',17);t(125,245,'Нейтрон');t(385,245,'Протон');t(360,360,'n → p + e⁻ + ν̄ₑ',24);}),ql2Diagram('carbon','Углерод-14 → Азот-14','Точное число нуклонов; расположение частиц условно.',({t,c,l,header})=>{header();ql2Nucleus(c,150,180,14,6,24,18);ql2Nucleus(c,485,180,14,7,24,18);l(250,180,365,180,C.ink,true,3);t(150,300,'6p + 8n');t(485,300,'7p + 7n');t(360,356,'¹⁴₆C → ¹⁴₇N + e⁻ + ν̄ₑ',23);})],
+ gamma:[ql2Diagram('levels','Гамма-переход','Энергия фотона приблизительно равна разности уровней; без учёта отдачи.',({t,l,header})=>{header();l(85,330,85,70,C.ink,true);t(85,58,'E');l(140,100,475,100,C.blue,false,4);l(140,300,475,300,C.blue,false,4);l(305,110,305,290,C.gold,true,4);t(490,106,'E₂',19,'start');t(490,306,'E₁',19,'start');t(300,80,'Возбуждённое состояние',18);t(300,336,'Нижнее состояние',18);for(let i=0;i<24;i++)l(325+i*12,200+12*Math.sin(i*.8),337+i*12,200+12*Math.sin((i+1)*.8),C.gold);t(525,178,'γ',24);})],
+ shield:[ql2Diagram('penetration','Проникающая способность','Качественное сравнение; толщина защиты зависит от энергии и вещества.',({t,r,l,header})=>{header();r(210,85,9,250,'#d9cbb0');r(350,85,30,250,'#a0afbd');r(530,85,65,250,'#6f798d');t(215,72,'Бумага',16);t(365,72,'Алюминий',16);t(562,72,'Свинец',16);for(let i=0;i<3;i++){l(65,120+i*12,210,120+i*12,C.red);l(65,200+i*12,350,200+i*12,C.purple);l(65,280+i*12,i===0?665:i===1?530:573,280+i*12,C.gold);}t(42,135,'α',25);t(42,215,'β',25);t(42,295,'γ',25);}),ql2Graph('shield-graph','Ослабление гамма-излучения',{kind:'attenuation',params:{halfLayer:1}})],
+ ion:[ql2Diagram('ion','Ионизация атома','Схема гелия; положения электронов условны.',({t,c,l,header})=>{header();for(const x of [170,490]){c(x,180,75,C.pale);c(x,180,28,C.red);t(x,188,'+2',22,'middle',C.white);c(x-42,139,14,C.purple);t(x-42,145,'−',18,'middle',C.white);}c(207,219,14,C.purple);t(207,225,'−',18,'middle',C.white);l(260,180,390,180,C.ink,true,3);l(520,180,620,110,C.gold,true,3);c(641,95,14,C.purple);t(641,101,'−',18,'middle',C.white);t(170,300,'Нейтральный атом');t(490,300,'Положительный ион');t(170,330,'q = 0');t(490,330,'q = +e');})],
+ biology:[ql2Diagram('dna','Повреждение биологических молекул','Возможны прямое воздействие и косвенное действие через радиолиз воды.',({t,r,l,header})=>{header();r(235,64,250,48);t(360,94,'Излучение');l(360,112,170,168,C.ink,true);l(360,112,550,168,C.ink,true);r(40,170,260,54);r(420,170,260,54);t(170,203,'Прямое действие');t(550,203,'Радиолиз воды');l(550,224,550,260,C.ink,true);t(550,283,'Активные радикалы',17);l(170,224,360,320,C.red,true);l(550,288,360,320,C.red,true);r(205,322,310,44,'#f3d8d5');t(360,351,'Возможное повреждение ДНК',18);})],
+ dose:[ql2Diagram('units','Три физические величины','Не следует отождествлять активность, поглощённую и эквивалентную дозу.',({t,r,header})=>{header();for(const [x,unit,name,formula,col] of [[20,'Бк','Активность','λN',C.blue],[250,'Гр','Поглощённая доза','E / m',C.gold],[480,'Зв','Эквивалентная доза','Σ wᵣDᵣ',C.purple]]){r(x,90,220,245,C.pale);t(x+110,145,unit,44,'middle',col);t(x+110,200,name,17);t(x+110,260,formula,26);}})],
+ background:[ql2Diagram('earth','Земля и космические частицы','Магнитное поле отклоняет заряды, атмосфера взаимодействует с излучением.',({t,c,l,header})=>{header();c(360,205,114,C.pale);c(360,205,94,C.blue);c(342,185,25,C.green);c(398,224,20,C.green);for(let i=0;i<4;i++){l(35,90+i*25,190,90+i*25,C.gold);l(190,90+i*25,265,50+i*8,C.gold,true);}l(610,60,450,140,C.gold,true);l(450,140,400,205,C.gold,true);t(600,105,'Космические',16);t(600,126,'частицы',16);t(360,356,'Атмосфера и магнитное поле',20);})],
+ applications:[ql2Diagram('therapy','Принцип лучевой терапии','Условная схема, не расчёт реальной лечебной дозы.',({t,c,l,header})=>{header();c(360,200,110,C.pale);for(const [x,y] of [[80,80],[640,80],[80,320],[640,320],[360,62]])l(x,y,360,200,C.gold,true,4);c(360,200,28,C.red);l(386,200,515,200,C.red);t(526,206,'Опухоль',17,'start');t(360,365,'Облучение с нескольких направлений',20);})]
+};
+const QL2_RADIATION=ql2Validate({...QL_RADIATION,version:2,mode:'script',scenes:QL_RADIATION.scenes.map(s=>({...s,visuals:QL2_SEED_VIS[s.id]??[]}))});
+
+
+let project=structuredClone(QL2_RADIATION),open=new Set(['intro']),dirty=false;
+let counter=0;const uid=()=> 'u'+Date.now().toString(36)+'_'+(++counter);
+const $=id=>document.getElementById(id),root=$('scenes'),status=$('status');
+function elem(tag,attrs={},...children){const n=document.createElement(tag);for(const [k,v] of Object.entries(attrs)){if(k==='class')n.className=v;else if(k==='text')n.textContent=v;else if(k==='on')n.addEventListener('click',v);else if(k==='value')n.value=v;else n.setAttribute(k,String(v));}for(const c of children)if(c!==null&&c!==undefined)n.append(c);return n;}
+function btn(t,on){return elem('button',{type:'button',on,text:t});}
+function note(t){return elem('p',{class:'note',text:t});}
+function say(t){status.textContent=t;}
+function edit(fn,refresh=true){try{const v=structuredClone(project);fn(v);project=ql2Validate(v);dirty=true;say('Есть несохранённые изменения. Сохраните QLECTURE.');if(refresh)render();return true;}catch(e){say(e.message);return false;}}
+function fmt(n){const m=Math.floor(n/60),s=Math.floor(n%60);return String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');}
+function field(label,value,change,type='text',opts={}){const input=elem(type==='textarea'?'textarea':'input',type==='textarea'?{rows:5}:{type,...opts});input.value=value;input.addEventListener('change',()=>{if(!change(type==='number'?Number(input.value):input.value))input.value=value;});return elem('label',{class:'field'},elem('span',{text:label}),input);}
+function saveBlob(blob,name){const url=URL.createObjectURL(blob),a=elem('a',{href:url,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function safe(s){return s.replace(/[^\p{L}\p{N}_-]+/gu,'-').slice(0,70)||'illustration';}
+function svgBlob(v,p){return new Blob([ql2Svg(v,p)],{type:'image/svg+xml;charset=utf-8'});}
+async function png(v,p){const url=URL.createObjectURL(svgBlob(v,p));try{const im=new Image();im.src=url;await im.decode();const c=document.createElement('canvas');c.width=1440;c.height=800;c.getContext('2d').drawImage(im,0,0,1440,800);const b=await new Promise(resolve=>c.toBlob(resolve,'image/png'));if(!b)throw Error('Не удалось получить PNG');saveBlob(b,safe(v.title)+'.png');}finally{URL.revokeObjectURL(url);}}
+function graphEditor(v,change,draw){
+ const box=elem('div',{class:'fields'});box.append(field('Подпись X',v.xLabel,x=>change(o=>o.xLabel=x)),field('Подпись Y',v.yLabel,x=>change(o=>o.yLabel=x)),field('Цвет',v.color,x=>change(o=>o.color=x),'color'));
+ for(const [k,label] of Object.entries(v.demo.kind==='decay'?{n0:'Начальное число ядер',halfLife:'Период полураспада, с'}:{halfLayer:'Толщина слоя (усл. ед.)'}))box.append(field(label,v.demo.params[k],x=>change(o=>o.demo.params[k]=x),'number',{step:'any'}));
+ return box;
+}
+function diagramEditor(v,change){
+ const wrap=elem('div',{class:'editor'}),sel=elem('select',{'aria-label':'Объект схемы'});
+ for(const s of v.shapes)sel.append(elem('option',{value:s.id,text:s.kind+' · '+(s.text??s.id)}));
+ const panel=elem('div',{class:'fields'});
+ function populate(){panel.replaceChildren();const s=v.shapes.find(a=>a.id===sel.value);if(!s)return;
+  const f=(k,label,type='number')=>field(label,s[k],x=>change(o=>o.shapes.find(a=>a.id===s.id)[k]=x,false)?(s[k]=x,true):false,type,type==='number'?{step:'any'}:{});
+  panel.append(f('x','X'),f('y','Y'),f('color','Цвет','color'));
+  if(s.kind==='rect')panel.append(f('w','Ширина'),f('h','Высота'));
+  if(s.kind==='circle')panel.append(f('r','Радиус'));
+  if(s.kind==='line')panel.append(f('x2','X₂'),f('y2','Y₂'),f('width','Толщина'));
+  if(s.kind==='text')panel.append(f('text','Текст','text'),f('size','Размер'));
+  panel.append(btn('Удалить объект',()=>change(o=>o.shapes=o.shapes.filter(a=>a.id!==s.id))));
+ }
+ sel.addEventListener('change',populate);wrap.append(sel,panel);
+ const add=elem('div',{class:'actions'});
+ for(const [k,t,extra] of [['rect','Прямоугольник',{w:100,h:60}],['circle','Круг',{r:20}],['line','Линия',{x2:220,y2:150,width:2,arrow:false}],['text','Надпись',{text:'Подпись',size:20,align:'start'}]])add.append(btn('+ '+t,()=>change(o=>o.shapes.push({id:uid(),kind:k,x:100,y:100,color:QL2_COLORS.ink,...extra}))));
+ wrap.append(add);populate();return wrap;
+}
+function visualCard(scene,v){
+ const card=elem('article',{class:'visual','data-visual':v.id}),title=elem('h4',{text:v.title}),preview=elem('div',{class:'picture'}),caption=note(v.caption);
+ let progress=v.kind==='graph'?v.progress:0,raf=0;
+ function current(){return project.scenes.find(s=>s.id===scene.id).visuals.find(o=>o.id===v.id);}
+ function draw(){preview.innerHTML=ql2Svg(current(),progress);}
+ function change(fn,refresh=true){const ok=edit(p=>fn(p.scenes.find(s=>s.id===scene.id).visuals.find(o=>o.id===v.id)),refresh);if(ok&&!refresh)draw();return ok;}
+ const tools=elem('div',{class:'actions'},btn('SVG',()=>saveBlob(svgBlob(current(),progress),safe(current().title)+'.svg')),btn('PNG',()=>png(current(),progress).catch(e=>say(e.message))),btn('Удалить рисунок',()=>{if(confirm('Удалить иллюстрацию?'))edit(p=>{const s=p.scenes.find(x=>x.id===scene.id);s.visuals=s.visuals.filter(x=>x.id!==v.id);});}));
+ const props=elem('details',{class:'properties'},elem('summary',{text:'Редактировать иллюстрацию'}),field('Название',v.title,x=>change(o=>o.title=x)),field('Пояснение',v.caption,x=>change(o=>o.caption=x),'textarea'));
+ props.append(v.kind==='graph'?graphEditor(v,change,draw):diagramEditor(v,change));
+ card.append(title,preview,caption,tools);
+ if(v.kind==='graph'){
+  const range=elem('input',{type:'range',min:0,max:1,step:.005,'aria-label':'Положение на графике'});range.value=progress;
+  const stop=()=>{cancelAnimationFrame(raf);raf=0;};
+  range.addEventListener('input',()=>{stop();progress=Number(range.value);draw();});
+  range.addEventListener('change',()=>change(o=>o.progress=progress,false));
+  card.append(elem('div',{class:'actions'},btn('Воспроизвести',()=>{stop();const start=performance.now();progress=0;const tick=now=>{if(!card.isConnected)return;progress=Math.min(1,(now-start)/6000);range.value=progress;draw();if(progress<1)raf=requestAnimationFrame(tick);else{raf=0;change(o=>o.progress=progress,false);}};raf=requestAnimationFrame(tick);}),btn('Пауза',()=>{stop();change(o=>o.progress=progress,false);}),btn('Сброс',()=>{stop();progress=0;range.value=0;change(o=>o.progress=0,false);}),range));
+ }
+ card.append(props);draw();return card;
+}
+function newScene(){return {id:uid(),title:'Новый раздел',durationSec:60,narration:'Текст раздела',board:[],figures:[],visuals:[]};}
+function render(){
+ $('mode').value=project.mode;$('project-title').value=project.title;root.replaceChildren();const times=ql2Timeline(project);
+ project.scenes.forEach((s,i)=>{
+  const time=times[i],block=elem('details',{class:'scene','data-scene':s.id});block.open=project.mode==='lecture'||open.has(s.id);
+  block.addEventListener('toggle',()=>{if(project.mode==='script'){if(block.open)open.add(s.id);else open.delete(s.id);}});
+  const summary=elem('summary',{},elem('span',{class:'time',text:project.mode==='script'?fmt(time.start)+' — '+fmt(time.end):String(i+1).padStart(2,'0')}),elem('strong',{text:s.title}));
+  const body=elem('div',{class:'scene-body'}),mut=(fn,refresh=true)=>edit(p=>fn(p.scenes.find(x=>x.id===s.id)),refresh);
+  body.append(elem('div',{class:'fields'},field('Подзаголовок',s.title,x=>mut(o=>o.title=x)),project.mode==='script'?field('Длительность блока, с',s.durationSec,x=>mut(o=>o.durationSec=x),'number',{min:1,max:7200,step:1}):null));
+  body.append(field(project.mode==='script'?'Текст озвучки':'Текст лекции',s.narration,x=>mut(o=>o.narration=x,false),'textarea'));
+  body.append(field('На доске / формулы (по строкам)',s.board.join('\n'),x=>mut(o=>o.board=x.split('\n').filter(a=>a.trim()),false),'textarea'));
+  const actions=elem('div',{class:'actions'},btn('Выше',()=>{if(i>0)edit(p=>{[p.scenes[i-1],p.scenes[i]]=[p.scenes[i],p.scenes[i-1]];});}),btn('Ниже',()=>{if(i<project.scenes.length-1)edit(p=>{[p.scenes[i+1],p.scenes[i]]=[p.scenes[i],p.scenes[i+1]];});}),btn('Удалить блок',()=>{if(project.scenes.length>1&&confirm('Удалить блок?'))edit(p=>p.scenes.splice(i,1));}));
+  body.append(actions,elem('h3',{text:'Иллюстрации и демонстрации'}));
+  for(const v of s.visuals)body.append(visualCard(s,v));
+  const missing=s.figures.filter(f=>!s.visuals.some(v=>v.title===f));if(missing.length){const plan=elem('details',{},elem('summary',{text:'Исходный план иллюстраций (справка)'}));for(const f of s.figures)plan.append(note(f));body.append(plan);}
+  body.append(elem('div',{class:'actions'},btn('+ Схема',()=>mut(o=>o.visuals.push({id:uid(),kind:'diagram',title:'Новая схема',caption:'',shapes:[]}))),btn('+ График распада',()=>mut(o=>o.visuals.push(ql2Graph(uid(),'График распада',{kind:'decay',params:{n0:64,halfLife:10}})))),btn('+ График ослабления',()=>mut(o=>o.visuals.push(ql2Graph(uid(),'График ослабления',{kind:'attenuation',params:{halfLayer:1}}))))));
+  block.append(summary,body);root.append(block);
+ });$('total').textContent=project.mode==='script'?'План: '+fmt(times.at(-1).end)+' · '+project.scenes.length+' блоков':project.scenes.length+' разделов';
+}
+$('mode').addEventListener('change',e=>edit(p=>p.mode=e.target.value));
+$('project-title').addEventListener('change',e=>edit(p=>p.title=e.target.value));
+$('add').addEventListener('click',()=>{const s=newScene();open.add(s.id);edit(p=>p.scenes.push(s));});
+$('save').addEventListener('click',()=>{try{saveBlob(new Blob([ql2Serialize(project)],{type:'application/json'}),safe(project.title)+'.qlecture');say('Файл передан браузеру для скачивания. Проверьте сохранение.');}catch(e){say(e.message);}});
+$('load').addEventListener('change',async e=>{const f=e.target.files[0];if(!f)return;try{if(f.size>16000000)throw Error('Файл слишком большой');const v=ql2Parse(await f.text());if(dirty&&!confirm('Заменить текущий проект? Несохранённые изменения будут потеряны.'))return;project=v;dirty=false;open=new Set([v.scenes[0].id]);render();say('Проект открыт.');}catch(err){say(err.message);}finally{e.target.value='';}});
+$('example').addEventListener('click',()=>{if(dirty&&!confirm('Заменить текущий проект?'))return;project=structuredClone(QL2_RADIATION);dirty=false;open=new Set(['intro']);render();say('Пример открыт.');});
+$('new').addEventListener('click',()=>{if(dirty&&!confirm('Заменить текущий проект?'))return;const s=newScene();project=ql2Validate({format:'QLECTURE',version:2,mode:project.mode,title:'Новый материал',subject:'Физика',audience:'Школьники',scenes:[s]});dirty=true;open=new Set([s.id]);render();say('Новый проект. Сохраните QLECTURE.');});
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+render();
+</script></body></html>
