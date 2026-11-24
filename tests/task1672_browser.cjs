@@ -145,8 +145,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1672');
   await p.locator('[data-qw-close]').click();
   const saved=await snapshot(),download=p.waitForEvent('download');await p.locator('[data-qw-action="save"]').click();
   const file=path.join(out,'roundtrip.qwork');await (await download).saveAs(file);
-  await p.locator('#qw-file').setInputFiles(file);await p.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Работа открыта'));assert.equal(await snapshot(),saved);
-  await p.reload();await route('work');assert.equal(await snapshot(),saved);
+  await p.locator('#qw-file').setInputFiles(file);await p.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Работа открыта'));assert.deepStrictEqual(JSON.parse(await snapshot()),JSON.parse(saved));
+  await p.reload();await route('work');assert.deepStrictEqual(JSON.parse(await snapshot()),JSON.parse(saved));
   assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({auto,small,big,report,matrix},null,2));
   console.log('PASS TASK167.2: offline controls, four current formats and reopened legacy exam, ten format/orientation cases, independent sizes, bank, geometry, both PDF orientations, QWORK/reload and themes');
  }finally{await browser.close();}
