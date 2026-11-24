@@ -60,9 +60,16 @@ jobs:
           name: Quantum-Office-HTML
           path: Quantum-Office.html
           if-no-files-found: error
+      - name: Install browser comparison and PDF raster dependencies
+        run: |
+          npx playwright install chromium
+          python -m pip install PyMuPDF==1.26.5 Pillow==11.3.0
       - name: Install, launch, reinstall and restart actual release
         shell: pwsh
-        run: ./scripts/task1664-windows-smoke.ps1
+        run: |
+          ./scripts/task1664-windows-smoke.ps1
+          python tests/task1664_pdf_compare.py evidence/native
+          if ($LASTEXITCODE -ne 0) { throw 'PDF visual comparison failed' }
       - uses: actions/upload-artifact@v4
         if: always()
         with:

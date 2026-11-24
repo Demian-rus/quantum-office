@@ -2,6 +2,7 @@
 const {chromium}=require('playwright');
 const fs=require('node:fs'),assert=require('node:assert/strict'),path=require('node:path');
 const out=path.join(__dirname,'..','evidence','native');
+const visual=require('./task1664_visual.cjs');
 async function inspectDraft(page){
  return page.evaluate(async()=>{
   const hashBytes=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',v)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -173,10 +174,19 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
    question[qdMediaKey(kind)]={id,caption:'TASK1664 '+kind,display:'medium'};
   }
   qdStore();
-  route('home');createBook();book().name='TASK1664 Sheets';setCell(sheet(),'A1','12');setCell(sheet(),'B1','30');setCell(sheet(),'C1','=A1+B1');persist();route('home');
+  route('home');createBook();book().name='TASK1664 Sheets';setCell(sheet(),'A1','12');setCell(sheet(),'B1','30');setCell(sheet(),'C1','=A1+B1');
+  const sh=sheet();for(const [index,width] of [[0,112],[1,138],[2,160],[3,96],[4,120],[5,310],[6,115]])setColumnWidth(sh,index,width);
+  setRowHeight(sh,1,38);setRowHeight(sh,2,35);setRowHeight(sh,3,32);
+  setCell(sh,'A2','График занятий');mergeCells(sh,'A2','G2');setStyle(sh,'A2',{bg:'#167a40',color:'#ffffff',bold:true,align:'center',fontFamily:'Comic Sans MS',fontSize:12});
+  setCell(sh,'A3','Пн');mergeCells(sh,'A3','A7');setStyle(sh,'A3',{bg:'#f28c00',bold:true,align:'center',verticalAlign:'center',fontSize:14,border:'thin'});
+  for(let row=3;row<=24;row++){setCell(sh,'B'+row,'Ученик '+row);setCell(sh,'C'+row,'Физика');setCell(sh,'D'+row,'12:00');setCell(sh,'E'+row,row%2?'☐':'☑');setCell(sh,'F'+row,'План занятия');setStyle(sh,'B'+row,{border:'thin',align:'center',fontFamily:'Comic Sans MS'});}
+  persist();route('home');
   route('slides');document.getElementById('qo-slides-title').value='TASK1664 Slides';qoSlides.slides[0].items[1].text='TASK1664 slide body';qoPersistSlides();route('home');
   route('photo');qoPhotoApplyState({...qoPhotoState(),name:'TASK1664 Studio',width:640,height:480,bg:'#f0f0f0',strokes:[{id:'shape-1664',tool:'rect',points:[[20,30],[210,180]],color:'#225588',size:4,opacity:1}]});qoPhotoPersist();route('home');
  });
+ await page.evaluate(()=>qoDraftStorage.flush());
+ await visual.compareSheet(page,stage,out,true);
+ await visual.comparePrint(page,out);
  await page.evaluate(()=>qoDraftStorage.flush());
  const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,3);assert.equal(before.live.imagePresent,true);assert.equal(before.diskMatches,true);assert.ok(before.rawBytes>5*1024*1024,'large QWORK exceeds 5 MiB');assert.equal(before.pending,false);assert.equal(before.legacyRawPresent,true);
  const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));
@@ -205,6 +215,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  });
  fs.writeFileSync(path.join(out,'native-restart-'+stage+'.json'),JSON.stringify(result,null,2));
  assert.ok(Object.values(checks).every(Boolean),'Real QWORK draft restart mismatch: '+JSON.stringify(checks));
+ await visual.compareSheet(page,stage,out,false);
  }else throw Error('Unknown stage');
- assert.deepEqual(errors,[]);console.log('TASK1664_NATIVE '+stage+' PASS');process.exit(0);
+ assert.deepEqual(errors,[]);assert.deepEqual(messages.filter(m=>/Applying inline style violates|Refused to apply.*style|Loading the stylesheet.*violates/i.test(m.text)),[],'CSP must not block styles');console.log('TASK1664_NATIVE '+stage+' PASS');process.exit(0);
 })().catch(e=>{console.error(e);process.exit(1);});
