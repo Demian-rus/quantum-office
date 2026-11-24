@@ -509,8 +509,8 @@ async function qwPreparePrintDocument(){
  }
  function splitLong(original){
   const text=original.querySelector('.qw-task-text'),article=bodyOf(original),flow=original.querySelector('.qw-task-flow');
-  const answer=original.querySelector('.qw-answer-preview'),teacher=original.querySelector('.qw-teacher-notes');
-  answer?.remove();teacher?.remove();const items=tokens(text);
+  const answer=original.querySelector('.qw-answer-preview,.qw-booklet-answer'),teacher=original.querySelector('.qw-teacher-notes');
+  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure');const items=tokens(text);
   const tails=[...article.children].filter(e=>e!==flow&&e.tagName!=='HEADER'&&e!==answer&&!e.classList.contains('qw-exam-grid'));
   if(teacher)tails.push(teacher);
   let start=0,first=true,last;

@@ -7,9 +7,9 @@ from PIL import Image, ImageChops, ImageStat
 
 root = Path(sys.argv[1])
 report = []
-for orientation in ("portrait", "landscape"):
+for prefix, orientation in ((p, o) for p in ("print", "ege2018") for o in ("portrait", "landscape")):
     expected = (595.28, 841.89) if orientation == "portrait" else (841.89, 595.28)
-    with fitz.open(root / f"print-{orientation}-browser.pdf") as browser, fitz.open(root / f"print-{orientation}-windows.pdf") as native:
+    with fitz.open(root / f"{prefix}-{orientation}-browser.pdf") as browser, fitz.open(root / f"{prefix}-{orientation}-windows.pdf") as native:
         assert len(browser) == len(native) >= 2, (orientation, len(browser), len(native))
         pages = []
         for index, (b, n) in enumerate(zip(browser, native)):
@@ -29,10 +29,10 @@ for orientation in ("portrait", "landscape"):
             diff = ImageChops.difference(bi, ni).convert("L")
             avg = ImageStat.Stat(diff).mean[0]
             changed = sum(diff.histogram()[32:]) / (diff.width * diff.height)
-            bi.save(root / f"print-{orientation}-{index+1:02d}-browser.png")
-            ni.save(root / f"print-{orientation}-{index+1:02d}-windows.png")
-            diff.save(root / f"print-{orientation}-{index+1:02d}-diff.png")
+            bi.save(root / f"{prefix}-{orientation}-{index+1:02d}-browser.png")
+            ni.save(root / f"{prefix}-{orientation}-{index+1:02d}-windows.png")
+            diff.save(root / f"{prefix}-{orientation}-{index+1:02d}-diff.png")
             pages.append({"page":index+1,"meanAbsoluteGrayDifference":avg,"changedPixelsOver32":changed,"browserSizePt":[b.rect.width,b.rect.height],"windowsSizePt":[n.rect.width,n.rect.height]})
             assert avg < 12 and changed < .12, (orientation, index, avg, changed)
-        report.append({"orientation":orientation,"pages":pages})
+        report.append({"fixture":prefix,"orientation":orientation,"pages":pages})
 (root / "pdf-raster-comparison.json").write_text(json.dumps({"status":"PASS","orientations":report},indent=2),encoding="utf8")

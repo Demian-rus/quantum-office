@@ -79,35 +79,42 @@ function printMetrics(){
   if(table&&text&&!text.contains(table))overlap.push('table moved out of condition:'+section.dataset.task);
  }
  return {error:window.__qwPrintError||null,ready:doc.body.dataset.qwLayoutReady,orientation:doc.body.dataset.qwOrientation,report,bodyFont:getComputedStyle(doc.body).fontFamily,
-  taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,bounds,overlap,
-  sheets:sheets.map(s=>{const b=box(s),brand=s.querySelector('.qw-qx-lettering'),c=brand&&box(brand);return {w:b.width/mm,h:b.height/mm,columns:s.matches('.qw-print-sheet')?s.querySelectorAll(':scope>.qw-print-page').length:1,brand:s.querySelectorAll('.qw-qx-lettering').length,brandFont:brand?getComputedStyle(brand).fontFamily:null,brandSize:brand?getComputedStyle(brand).fontSize:null,brandColor:brand?getComputedStyle(brand).color:null,brandRight:c?(b.right-c.right)/mm:null,brandBottom:c?(b.bottom-c.bottom)/mm:null};})};
+  taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,images:[...doc.images].map(i=>({task:i.closest('[data-task]')?.dataset.task,width:i.naturalWidth,height:i.naturalHeight})),bounds,overlap,
+  sheets:sheets.map(s=>{const b=box(s),brand=s.querySelector('.qw-qx-lettering'),c=brand&&box(brand);return {w:b.width/mm,h:b.height/mm,columns:s.matches('.qw-print-sheet')?s.querySelectorAll(':scope>.qw-print-page').length:1,brand:s.querySelectorAll('.qw-qx-lettering').length,brandFont:brand?getComputedStyle(brand).fontFamily:null,brandSize:brand?getComputedStyle(brand).fontSize:null,brandColor:brand?getComputedStyle(brand).color:null,brandRight:c?(b.right-c.right)/mm:null,brandBottom:c?(b.bottom-c.bottom)/mm:null,footers:s.querySelectorAll('.qw-page-footer').length,pageNumber:s.querySelector('.qw-page-footer span:last-child')?.textContent};})};
 }
-function checkPrint(m,orientation){
+function checkPrint(m,orientation,fixture){
  assert.equal(m.error,null);assert.equal(m.ready,'true');assert.equal(m.orientation,orientation);
- assert.match(m.bodyFont,/QO Print/);assert.deepEqual([...new Set(m.taskIds)],Array.from({length:32},(_,i)=>i+1));assert.ok(m.math>=3&&m.figures>=6);
+ assert.match(m.bodyFont,/QO Print/);assert.deepEqual([...new Set(m.taskIds)],Array.from({length:fixture.tasks.length},(_,i)=>i+1));assert.equal(m.figures,fixture.tasks.filter(t=>t.figure!=='none').length);assert.equal(m.images.length,fixture.tasks.filter(t=>t.figure==='image').length);if(fixture.id!=='qx-original-physics-2018-01')assert.ok(m.math>=3);
  assert.deepEqual(m.bounds,[]);assert.deepEqual(m.overlap,[]);assert.ok(m.sheets.length>=2,'need multiple physical pages');
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');
   if(orientation==='portrait')assert.equal(s.columns,1);else if(i<m.sheets.length-1)assert.equal(s.columns,2);
-  assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(17, 17, 17)');assert.equal(s.brandSize,'20px');
+  assert.equal(s.footers,1);assert.equal(s.pageNumber,String(i+1));assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(17, 17, 17)');assert.equal(s.brandSize,'20px');
   assert.ok(s.brandRight>=0&&s.brandRight<4&&s.brandBottom>=0&&s.brandBottom<4,'brand not bottom right');
  }
  assert.ok(m.report.pages.every(p=>p.capacityMm>150&&p.freeMm>=-.7),'invalid physical pagination');
 }
-async function comparePrint(page,out){
- const fixture=await page.evaluate(()=>{
+async function makePrintFixture(page){
+ return page.evaluate(()=>{
   const d=qwProject();d.title='Физика. Проверка Windows PDF';d.layout='booklet';d.grade='11';d.printSettings={fontPt:10,theme:'academic',showTitle:true,titleText:d.title,showMeta:false,showVariant:true,figurePosition:'auto'};
   d.tasks=Array.from({length:32},(_,i)=>{
    const q=qwTask('short');q.prompt='Условие '+(i+1)+'. Тело движется по горизонтальной поверхности. Определите скорость по формуле \\(v=\\frac{s}{t}\\). Запишите результат в СИ.';q.answer='12';q.answerVisible=true;
    if(i%4===0){q.figure='graph';q.graph=qwGraphDefault();q.graph.points=[{x:0,y:1,label:''},{x:2,y:3,label:''},{x:4,y:4,label:''}];}
    if(i%4===1){q.figure='diagram';q.diagram=[{kind:'ground',x:90,y:240,x2:450,y2:240,label:''},{kind:'block',x:200,y:170,x2:300,y2:240,label:'m'},{kind:'arrow',x:250,y:170,x2:250,y2:90,label:'N'}];}
    if(i===2){q.figure='image';const c=document.createElement('canvas');c.width=260;c.height=150;const ctx=c.getContext('2d');ctx.fillStyle='#fff';ctx.fillRect(0,0,260,150);ctx.strokeStyle='#172b37';ctx.lineWidth=3;ctx.strokeRect(20,40,220,80);ctx.fillStyle='#172b37';ctx.font='22px Arial';ctx.fillText('m = 2 kg',75,85);q.image=c.toDataURL('image/png');}
-   if(i===4){q.prompt='Измерения выполнены через одинаковые интервалы времени. TASK1664_TABLE_MARKER';}
+   if(i===4){q.prompt='Измерения выполнены через одинаковые интервалы времени.\n\n| t, с | 0 | 2 |\n| --- | --- | --- |\n| v, м/с | 1 | 3 |\n\nИспользуя таблицу, определите ускорение тела.';}
+   if(i===5){q.figure='diagram';q.position='right';q.figureWidth=180;q.diagram=[{kind:'battery',x:65,y:110,x2:158,y2:175,label:'ε'},{kind:'resistor',x:240,y:110,x2:326,y2:175,label:'R'},{kind:'line',x:158,y:142,x2:240,y2:142,label:''},{kind:'line',x:326,y:142,x2:326,y2:240,label:''},{kind:'line',x:326,y:240,x2:65,y2:240,label:''},{kind:'line',x:65,y:240,x2:65,y2:142,label:''}];q.prompt='На схеме показана электрическая цепь. Сопротивление резистора 6 Ом, ЭДС источника 12 В. Внутренним сопротивлением пренебречь. Определите силу тока.';}
+   if(i===6){q.type='choice';q.choices=['Скорость увеличивается.','Ускорение постоянно.','Сила трения равна нулю.','Энергия сохраняется.','Импульс уменьшается.'];q.prompt='Выберите два верных утверждения о равномерно ускоренном движении.';}
+   if(i===7){q.prompt=('Тело движется по горизонтальной поверхности, затем по наклонной плоскости. На каждом участке измеряют скорость и время. ').repeat(5)+'Определите путь, объясните выбор модели и запишите ответ.';}
+   if(i===8){q.position='below';q.figureWidth=320;q.prompt='На широком графике показана зависимость координаты от времени. Определите среднюю скорость.';}
    return q;
   });
   return qwValidate(d);
  });
- fs.writeFileSync(path.join(out,'visual-print.qwork'),JSON.stringify(fixture,null,2));
+}
+async function comparePrint(page,out,fixture=null,prefix='print'){
+ fixture??=await makePrintFixture(page);
+ fs.writeFileSync(path.join(out,prefix+'.qwork'),JSON.stringify(fixture,null,2));
  const browser=await browserReference(),app=await browser.newPage(),report=[];
  try{
   await app.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
@@ -120,15 +127,15 @@ async function comparePrint(page,out){
    const id='task1664-visual-print';
    try{
     await p.setContent(referenceHtml);await p.evaluate(()=>window.qwPrintReady);
-    const b=await p.evaluate(printMetrics);checkPrint(b,orientation);
-    await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,'print-'+orientation+'-browser.pdf'),preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false});
-    await p.screenshot({path:path.join(out,'print-'+orientation+'-browser.png'),fullPage:true});
+    const b=await p.evaluate(printMetrics);checkPrint(b,orientation,fixture);
+    await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,prefix+'-'+orientation+'-browser.pdf'),preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false});
+    await p.screenshot({path:path.join(out,prefix+'-'+orientation+'-browser.png'),fullPage:true});
     await page.evaluate(({html,id})=>{const f=document.createElement('iframe');f.id=id;f.style.cssText='position:fixed;inset:0;width:100%;height:100%;background:white;z-index:999999';f.srcdoc=html;document.body.append(f);},{html:nativeHtml,id});
     const handle=await page.waitForSelector('#'+id),frame=await handle.contentFrame();
     await frame.waitForFunction(()=>!!window.qwPrintReady,{},{timeout:30000});await frame.evaluate(()=>window.qwPrintReady);
-    const n=await frame.evaluate(printMetrics);checkPrint(n,orientation);
+    const n=await frame.evaluate(printMetrics);checkPrint(n,orientation,fixture);
     assert.deepEqual(n.taskIds,b.taskIds);assert.equal(n.sheets.length,b.sheets.length);assert.deepEqual(n.report.pages.map(x=>x.tasks.map(t=>t.task)),b.report.pages.map(x=>x.tasks.map(t=>t.task)));
-    await page.screenshot({path:path.join(out,'print-'+orientation+'-windows-preview.png')});
+    await page.screenshot({path:path.join(out,prefix+'-'+orientation+'-windows-preview.png')});
     // Print the same prepared, already measured srcdoc using the actual release
     // WebView2 CDP PDF engine. Temporarily promote its DOM to the top-level
     // document solely for this test; never print the surrounding application.
@@ -162,10 +169,10 @@ async function comparePrint(page,out){
       }));
       void body.offsetHeight;await document.fonts.ready;return imageProof;
      },id);
-     fs.writeFileSync(path.join(out,'print-'+orientation+'-image-decode.json'),JSON.stringify(images,null,2));
+     fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-image-decode.json'),JSON.stringify(images,null,2));
      await session.send('Emulation.setEmulatedMedia',{media:'print'});
      const pdf=await session.send('Page.printToPDF',{preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false,marginTop:0,marginBottom:0,marginLeft:0,marginRight:0,scale:1});
-     fs.writeFileSync(path.join(out,'print-'+orientation+'-windows.pdf'),Buffer.from(pdf.data,'base64'));
+     fs.writeFileSync(path.join(out,prefix+'-'+orientation+'-windows.pdf'),Buffer.from(pdf.data,'base64'));
     }finally{
      await session.send('Emulation.setEmulatedMedia',{media:''}).catch(()=>{});
      await page.evaluate(()=>{const s=window.__qoVisualSwap;if(s){document.head.replaceWith(s.head);document.body.replaceWith(s.body);delete window.__qoVisualSwap;}});
@@ -174,7 +181,7 @@ async function comparePrint(page,out){
     report.push({orientation,native:n,browser:b,scope:'Actual WebView2 prepared srcdoc and CDP vector PDF; system dialog requires separate manual check'});
    }finally{await page.evaluate(id=>document.getElementById(id)?.remove(),id);await p.close();}
   }
-  fs.writeFileSync(path.join(out,'print-visual.json'),JSON.stringify({status:'PASS',report},null,2));
+  fs.writeFileSync(path.join(out,prefix+'-visual.json'),JSON.stringify({status:'PASS',report},null,2));
  }finally{await browser.close();}
 }
-module.exports={compareSheet,comparePrint};
+module.exports={compareSheet,comparePrint,makePrintFixture,printMetrics,checkPrint};

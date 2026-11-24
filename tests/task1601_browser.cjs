@@ -69,7 +69,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
      const flow=box(s.querySelector('.qw-task-flow'));
      if(answer&&(overlaps(answer,text)||overlaps(answer,figure)||overlaps(answer,table)||
       Math.abs(answer.left-flow.left)>1.5))violations.push({task,type:'answer overlap or offset'});
-     if(table&&text&&!text.contains(table))
+     if(table&&!s.querySelector('.qw-task-text')?.contains(s.querySelector('table')))
       violations.push({task,type:'table before condition ends'});
     }
     const graph=n(7)?.querySelector('figure');

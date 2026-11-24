@@ -564,6 +564,13 @@ jobs:
       - run: npm run build
       - run: npx playwright install --with-deps chromium
       - run: node tests/task1601_browser.cjs
+      - run: node tests/task1664_print_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1664-final-print-browser
+          path: evidence/task1664-print/
+          if-no-files-found: warn
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -188,6 +188,7 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.evaluate(()=>qoDraftStorage.flush());
  await visual.compareSheet(page,stage,out,true);
  await visual.comparePrint(page,out);
+ await visual.comparePrint(page,out,JSON.parse(fs.readFileSync(path.join(__dirname,'fixtures','QuantumOffice_EGE2018_32.qwork'),'utf8')),'ege2018');
  await page.evaluate(()=>qoDraftStorage.flush());
  const before=await inspectDraft(page);recordDraft('before-close',before);assert.equal(before.marker,true);assert.equal(before.rawPresent,true);assert.equal(before.parse?.ok,true);assert.equal(before.validate?.ok,true);assert.equal(before.live.title,'TASK166.4 persisted draft');assert.equal(before.live.count,3);assert.equal(before.live.imagePresent,true);assert.equal(before.diskMatches,true);assert.ok(before.rawBytes>5*1024*1024,'large QWORK exceeds 5 MiB');assert.equal(before.pending,false);assert.equal(before.legacyRawPresent,true);
  const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));
