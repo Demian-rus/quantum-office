@@ -7,7 +7,7 @@ try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.pars
 
 // TASK167.3: view preferences only; never include these in QWORK/QWBANK.
 const QW_PANELS_KEY='quantum-office.education-panels.v1';
-const qwPanelDefaults={work:{left:228,right:260,hideLeft:false,hideRight:false},visual:{left:254,right:278,hideLeft:false,hideRight:false},pdf:{left:254,hideLeft:false}};
+const qwPanelDefaults={work:{left:228,right:260,hideLeft:false,hideRight:false},visual:{left:254,right:278,hideLeft:false,hideRight:false},pdf:{left:254,hideLeft:false},diagnostics:{left:208,right:260,hideLeft:false,hideRight:false}};
 function qwPanelPreference(key){let saved={};try{saved=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}')[key]||{};}catch{}const result={...qwPanelDefaults[key]};for(const side of ['left','right'])if(side in result){const n=saved[side];if(typeof n==='number'&&Number.isFinite(n))result[side]=Math.max(180,Math.min(440,n));result[side==='left'?'hideLeft':'hideRight']=saved[side==='left'?'hideLeft':'hideRight']===true;}return result;}
 function qwSavePanelPreference(key,value){try{let all;try{all=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}');}catch{all={};}if(!all||typeof all!=='object'||Array.isArray(all))all={};all[key]=value;localStorage.setItem(QW_PANELS_KEY,JSON.stringify(all));}catch{}}
 function qwInstallPanels(root,key,toolbar,panels){
@@ -38,6 +38,7 @@ function qwInstallPanels(root,key,toolbar,panels){
 // Keep the underlying document DOM mounted (including scroll and selection).
 function qwReleaseMode(d){const host=d?.closest('.qw-mode-host');if(!host)return;const body=host.parentElement;if(!body)return;host.remove();body.classList.remove('qw-mode-active');for(const el of body.children){el.inert=false;}if(host.qwReturnScroll!==undefined){const center=body.querySelector('.qw-center');if(center)center.scrollTop=host.qwReturnScroll;}}
 function qwCanNavigate(){const d=document.getElementById('qw-dialog');return !d?.qwCanLeave||d.qwCanLeave();}
+if(typeof window!=='undefined')window.addEventListener('beforeunload',e=>{if(document.getElementById('qw-dialog')?.qwDirty?.()){e.preventDefault();e.returnValue='';}});
 function qwOpenMode(d,mode){
  const body=document.querySelector('.qo-education-workspace>.qo-education-body');if(!body)throw Error('Рабочая область недоступна');
  const host=document.createElement('section');host.className='qw-mode-host';host.dataset.qwMode=mode;host.setAttribute('aria-label',d.querySelector('header strong').textContent);
@@ -545,7 +546,7 @@ async function qwBankEdit(id,draft=null,returnFilters={}){
    await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
   }catch(e){showError(e.message);}
  };
- collect();const initialDraft=JSON.stringify(draft);d.qwCanLeave=()=>{collect();return JSON.stringify(draft)===initialDraft||confirm('Отменить несохранённые изменения задания?');};
+ collect();const initialDraft=JSON.stringify(draft);d.qwDirty=()=>{collect();return JSON.stringify(draft)!==initialDraft;};d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения задания?');
  const back=()=>{if(!d.qwCanLeave())return;d.close();if(active())void qwBank(returnFilters);};
  d.addEventListener('cancel',event=>{event.preventDefault();back();});
  d.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();back();}});
@@ -1166,7 +1167,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null){
   '<span id="qw-visual-state" role="status"></span>'+qwButton('visual-cancel','Отменить редактирование')+qwButton('visual-apply','Применить','class="qw-primary"'),'visual');
  d.classList.add('qw-visual-dialog','qw-visual-'+kind);d.querySelector('.qw-dialog-body').classList.add('qw-visual-body');
  qwInstallPanels(d.querySelector('.qw-visual-body'),'visual',d.querySelector('header'),{left:['.qw-visual-tools','Инструменты'],right:['.qw-visual-inspector','Свойства']});
- let visualCommitted=false;const initialVisual=JSON.stringify(value);d.qwCanLeave=()=>visualCommitted||(JSON.stringify(value)===initialVisual&&!polyline.length&&!drag)||confirm('Отменить несохранённые изменения рисунка?');
+ let visualCommitted=false;const initialVisual=JSON.stringify(value);d.qwDirty=()=>!visualCommitted&&(JSON.stringify(value)!==initialVisual||polyline.length>0||!!drag);d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения рисунка?');
  d.querySelector('[data-qw-action="visual-cancel"]').onclick=()=>{if(d.qwCanLeave())d.close();};
  if(onCancel)d.addEventListener('close',()=>{if(!visualCommitted)onCancel();});
  const stage=d.querySelector('#qw-visual-stage'),props=d.querySelector('#qw-visual-properties'),hint=d.querySelector('#qw-visual-state');

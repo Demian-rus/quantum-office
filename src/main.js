@@ -3026,6 +3026,10 @@ app.addEventListener('click',async e=>{const target=e.target.closest('[data-acti
  }
 
  if(action==='link-open'){e.stopPropagation();return;}
+ const educationMode=document.querySelector('.qw-mode-host')?.dataset.qwMode;
+ if(target.closest('.global-bar')&&educationMode&&action==='import'){status('Сначала вернитесь из текущего редактора');return;}
+ if(target.closest('.global-bar')&&educationMode==='visual'&&action==='save'){status('Сначала примените изменения рисунка');return;}
+ if(target.closest('.global-bar')&&educationMode==='bank-edit'&&action==='save'){document.querySelector('[data-qw-action="bank-edit-save"]')?.click();return;}
  switch(action){case 'templates':templateKind=target.dataset.kind||'sheet';page='templates';render();break;case 'template-create':{
  const t=target.dataset.template;
  if(t.startsWith('writer-')){qoReplaceWriter(qoNewWriter());if(t==='writer-lesson')qoWriter.html='<h1>Конспект занятия</h1><h2>Цель занятия</h2><p>Описание цели.</p><h2>Материалы</h2><ul><li>Материал 1</li></ul><h2>Ход занятия</h2><p>План работы.</p>';if(t==='writer-letter')qoWriter.html='<p>Дата</p><h2>Тема письма</h2><p>Уважаемые коллеги!</p><p>Текст письма.</p><p>С уважением,</p>';page='writer';render();qoPersistWriter();break;}

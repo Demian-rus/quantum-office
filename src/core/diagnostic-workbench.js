@@ -44,6 +44,8 @@ function qdDeskDecorate(){
   qdDeskBoundRoots.add(root);
  }
  if(qdMode!=='builder')return;
+ const frame=root.querySelector('.qd-workbench'),toolbar=root.querySelector('.qd-top');
+ if(qdDesk.panels&&frame&&toolbar&&!frame.dataset.qwPanelKind&&frame.querySelector('.qd-topic-navigator')&&frame.querySelector('.qd-side-insights')&&typeof qwInstallPanels==='function')qwInstallPanels(frame,'diagnostics',toolbar,{left:['.qd-topic-navigator','Разделы'],right:['.qd-side-insights','Свойства']});
  const card=[...root.querySelectorAll('.qd-edit-card')].find(el=>el.dataset.qid===qdDesk.question);
  const properties=root.querySelector('#qd-question-properties');
  if(card){card.classList.add('qd-current-card');card.setAttribute('aria-label','Выбранный вопрос');}

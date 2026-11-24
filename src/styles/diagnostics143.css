@@ -101,3 +101,9 @@
 #qo-diag-root.qd-layout143 .qd-editor-section{border:0;border-radius:0;padding:8px}
 #qo-diag-root.qd-layout143 .qd-top{gap:5px;padding-bottom:6px;margin-bottom:6px}
 #qo-diag-root.qd-layout143 .qd-top h1{font-size:16px}
+
+@media(min-width:1200px){
+ #qo-diag-root.qd-layout143:not(.qd-desk-wide) .qd-workbench.qw-dock-layout{grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr) var(--qw-dock-right-size)}
+ #qo-diag-root.qd-layout143 .qd-workbench.qw-dock-hide-left>.qd-topic-navigator,#qo-diag-root.qd-layout143 .qd-workbench.qw-dock-hide-right>.qd-side-insights{display:none}
+}
+@media(max-width:1199px){#qo-diag-root .qw-dock-controls,#qo-diag-root .qw-dock-divider{display:none}}

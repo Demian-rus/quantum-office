@@ -153,14 +153,16 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  let educationDraftLayout;
  let session;
  try{
+  await page.evaluate(()=>qwPreview());
+  const modeBefore=await page.evaluate(()=>{const b=document.querySelector('.qw-mode-host').getBoundingClientRect(),h=document.querySelector('.global-bar').getBoundingClientRect(),d=document.getElementById('qw-dialog');return {body:[b.x,b.y,b.width,b.height],header:[h.x,h.y,h.width,h.height],modal:d.matches(':modal')};});
   await page.evaluate(layout=>{
-   qwPreview();const select=document.querySelector('select[name="qw-pdf-layout"]'),alternate=[...select.options].find(x=>x.value!==layout&&!x.disabled);
+   const select=document.querySelector('select[name="qw-pdf-layout"]'),alternate=[...select.options].find(x=>x.value!==layout&&!x.disabled);
    if(!alternate)throw Error('Missing actual layout control');
    select.value=alternate.value;select.dispatchEvent(new Event('change',{bubbles:true}));if(qwDoc.layout!==alternate.value)throw Error('Layout did not change');
    if(!qoDraftStorage.pending||!document.getElementById('qo-native-draft-notice').hidden)throw Error('Layout change not quiet');
   },oldLayout);
   const layoutMode=await page.evaluate(()=>{const b=document.querySelector('.qw-mode-host').getBoundingClientRect(),h=document.querySelector('.global-bar').getBoundingClientRect(),d=document.getElementById('qw-dialog');return {body:[b.x,b.y,b.width,b.height],header:[h.x,h.y,h.width,h.height],modal:d.matches(':modal')};});
-  assert.deepEqual(layoutMode.header,base['.global-bar'],'opening PDF must not move shell header');assert.equal(layoutMode.modal,false);assert.ok(layoutMode.body[2]>0&&layoutMode.body[3]>0);
+  assert.deepEqual(layoutMode,modeBefore,'pending moves layout workspace');assert.deepEqual(layoutMode.header,base['.global-bar'],'opening PDF must not move shell header');assert.equal(layoutMode.modal,false);assert.ok(layoutMode.body[2]>0&&layoutMode.body[3]>0);
   await page.evaluate(()=>qoDraftStorage.flush());
   assert.deepEqual(await page.evaluate(()=>{const b=document.querySelector('.qw-mode-host').getBoundingClientRect(),h=document.querySelector('.global-bar').getBoundingClientRect(),d=document.getElementById('qw-dialog');return {body:[b.x,b.y,b.width,b.height],header:[h.x,h.y,h.width,h.height],modal:d.matches(':modal')};}),layoutMode,'ACK moves layout workspace');
   await page.evaluate(()=>document.getElementById('qw-dialog').close());assert.deepEqual(await measure(),base,'return from layout moves workspace');
