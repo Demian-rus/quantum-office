@@ -265,6 +265,9 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
 @media print{.qw-print-page{margin:0;box-shadow:none}}
 `+qwPrintThemeStyles();}
 async function qwPreparePrintDocument(){
+ // A blocked stylesheet must never produce a seemingly successful unstyled PDF.
+ const printBody=document.body;
+ if(!getComputedStyle(printBody).getPropertyValue('--qw-print-family').trim())throw Error('Не загружены стили печатного макета');
  await document.fonts.ready;
  const existing=document.getElementById('qw-print-layout-report');
  if(existing){window.__qwPrintLayout=JSON.parse(existing.textContent);return window.__qwPrintLayout;}

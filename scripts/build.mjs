@@ -1,4 +1,5 @@
 import '../src/vendor/jszip.min.js';
+import {qwPrintStyles} from '../src/core/work-layout.js';
 import {readFileSync,mkdirSync,writeFileSync,copyFileSync} from 'node:fs';
 import {isAbsolute,relative,resolve,sep} from 'node:path';
 const root=resolve(import.meta.dirname,'..');const read=p=>readFileSync(resolve(root,p),'utf8').replace(/\r\n/g,'\n');
@@ -27,7 +28,12 @@ const catalog=read('docs/components.html').replace('<link rel="stylesheet" href=
 writeFileSync(resolve(root,'dist/components.html'),catalog);
 
 // Same source bundle; native marker makes unavailable IPC fail closed. External script is CSP-compatible.
-mkdirSync(resolve(root,'dist-native'),{recursive:true});writeFileSync(resolve(root,'dist-native/index.html'),html.replace('<meta name="quantum-office-build"','<meta name="quantum-office-native" content="true"><meta name="quantum-office-build"').replace(/<script>[\s\S]*<\/script><\/body>/,'<script src="draft-bootstrap.js"></script></body>'));writeFileSync(resolve(root,'dist-native/app.js'),bundle(true));writeFileSync(resolve(root,'dist-native/draft-bootstrap.js'),read('src/core/native-drafts-bootstrap.js'));
+mkdirSync(resolve(root,'dist-native'),{recursive:true});writeFileSync(resolve(root,'dist-native/index.html'),html.replace('<style>'+styles+'</style>','<link rel="stylesheet" href="./app.css">').replace('<meta name="quantum-office-build"','<meta name="quantum-office-native" content="true"><meta name="quantum-office-build"').replace(/<script>[\s\S]*<\/script><\/body>/,'<script src="draft-bootstrap.js"></script></body>'));writeFileSync(resolve(root,'dist-native/app.js'),bundle(true));writeFileSync(resolve(root,'dist-native/draft-bootstrap.js'),read('src/core/native-drafts-bootstrap.js'));
+
+// Keep static styles in same-origin assets. Tauri adds a CSP nonce to inline <style>
+// in bundled HTML; that nonce disables the configured unsafe-inline for style attributes.
+writeFileSync(resolve(root,'dist-native/app.css'),styles);
+for(const orientation of ['portrait','landscape'])writeFileSync(resolve(root,'dist-native/print-'+orientation+'.css'),qwPrintStyles(orientation,'spread'));
 
 // Standalone print layout executes from a local trusted script in native WebView2.
 const printSource=read('src/core/work-layout.js').replace(/^import .*?;\r?\n/gm,'').replace(/^export \{[^\n]*\};?\r?\n/gm,'');

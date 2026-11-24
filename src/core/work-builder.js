@@ -124,7 +124,7 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
   ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
-  '</title><style>'+styles+'</style></head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
+  '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(format==='booklet'?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
   '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
   '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
@@ -132,10 +132,12 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
 function qwPrintTextPDF(teacher=false,options){
  let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
  const frame=document.createElement('iframe');frame.title='Подготовка PDF';
- frame.style.cssText='position:fixed;left:-9999px;top:0;width:794px;height:1123px;opacity:0;pointer-events:none';
+ const landscape=qwPrintSettings(qwDoc.printSettings||{}).orientation==='landscape';
+ frame.style.cssText='position:fixed;left:-9999px;top:0;width:'+(landscape?1160:830)+'px;height:'+(landscape?830:1160)+'px;opacity:0;pointer-events:none';
  document.body.append(frame);
  frame.onload=async()=>{
-  try{const win=frame.contentWindow;if(!win.qwPrintReady)return;const prepared=win.document;await win.qwPrintReady;if(frame.contentDocument!==prepared)return;if(win.__qwPrintError)throw Error(win.__qwPrintError);win.addEventListener('afterprint',()=>frame.remove(),{once:true});
+  try{const win=frame.contentWindow,prepared=win.document;if(!prepared.body?.dataset.qwFormat)return; // Ignore initial about:blank load.
+   if(!win.qwPrintReady)throw Error('Не загружен модуль печати');await win.qwPrintReady;if(frame.contentDocument!==prepared)return;if(win.__qwPrintError||prepared.body.dataset.qwLayoutReady!=='true')throw Error(win.__qwPrintError||'Макет PDF не готов');win.addEventListener('afterprint',()=>frame.remove(),{once:true});
    win.focus();win.print();status('В окне печати выберите «Сохранить как PDF»');}
   catch(e){status('PDF: '+e.message,true);frame.remove();}
  };

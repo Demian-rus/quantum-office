@@ -2643,7 +2643,9 @@ function smartTableHelpPanel(){
  </div></section></div>`;
 }
 function sheetpage(){const b=book(),s=sheet();return `<main class="sheet-page">${ribbon()}<div class="formula-line"><input id="name-box" aria-label="Адрес выбранной ячейки" value="${esc(activeCell)}" spellcheck="false"><div id="validation-choice-slot">${validationDropdown()}</div><div class="fx-symbol">ƒx</div><input id="formula-input" aria-label="Формула или значение" spellcheck="false" value="${esc(getCell(s,activeCell).value)}" placeholder="Значение или формула (например, =SUM(A1:A9))"></div>${filterPopup()}<div id="grid-frame" class="grid-frame"><div id="grid-scroll" class="grid-scroll" tabindex="0" role="grid" aria-label="Лист ${esc(s.name)}"><div id="grid-canvas" class="grid-canvas"></div><div id="grid-charts-layer" class="grid-charts-layer" aria-label="Диаграммы на листе"></div></div><div id="grid-fill-handle" class="grid-fill-handle" role="button" aria-label="Маркер автозаполнения" title="Перетащите для продолжения значений или формул" hidden></div><div id="grid-frozen-rows" class="grid-frozen-rows" aria-label="Закреплённые строки"></div><div id="grid-frozen-cols" class="grid-frozen-cols" aria-label="Закреплённые столбцы"></div><div id="grid-col-overlay" class="grid-col-overlay" aria-label="Заголовки столбцов"></div><div id="grid-row-overlay" class="grid-row-overlay" aria-label="Заголовки строк"></div><button id="grid-corner" class="grid-corner-fixed" data-action="select-all" aria-label="Выделить весь лист" title="Выделить весь лист"></button>${palettePopup()}</div><div class="sheet-footer"><div class="sheet-tabs"><button class="sheet-menu" data-action="sheet-add" title="Добавить лист">+</button><button class="qo-sheet-nav-button" data-action="sheet-navigator" title="Найти и открыть лист" aria-label="Найти и открыть лист">☷</button>${b.sheets.map(x=>`<button class="sheet-tab ${s.id===x.id?'selected':''}" data-action="sheet-select" data-id="${esc(x.id)}" title="Двойной щелчок — переименовать лист; правый клик — меню">${esc(x.name)}</button>`).join('')}<button class="qo-sheet-more" data-action="sheet-more" aria-label="Действия с листом" title="Действия с листом">⋯</button><button class="sheet-options" data-action="sheet-delete" title="Удалить лист">×</button></div><div class="sheet-status"><span id="selection-info">${esc(activeCell)}</span><span id="selection-stats">Выделено: 1</span></div></div>${hyperlinkPanel()}${chartPanel()}${conditionalPanel()}${validationPanel()}${printPreviewPanel()}${dataToolPanel()}${smartTableHelpPanel()}</main>`;}
+let qoGridResizeObserver=null;
 function render(){
+ qoGridResizeObserver?.disconnect();qoGridResizeObserver=null;
  qoMiniSheetHide();
  closeBulkReplacePreview();closeWorkbookSearchResults();closeSheetNavigator();clearSheetTabDrag();closeSheetContextMenu();closeFillOptions();qoCloseTheme();
  const oldStage=document.getElementById('qs-stage'),stageScroll=oldStage?[oldStage.scrollLeft,oldStage.scrollTop]:null;
@@ -2675,7 +2677,10 @@ function render(){
    view._gridFrame=null;
    if(view.isConnected&&view.dataset.sheetId===sheet()?.id)drawGrid(true);
   });
- },{passive:true});drawGrid();refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();syncHistoryButtons();}
+ },{passive:true});drawGrid();
+ // Virtualized rows/columns must be materialized again when the actual viewport changes.
+ if(typeof ResizeObserver==='function'){let width=view.clientWidth,height=view.clientHeight;qoGridResizeObserver=new ResizeObserver(()=>{if(!view.isConnected||view.dataset.sheetId!==sheet()?.id)return;const w=view.clientWidth,h=view.clientHeight;if(w===width&&h===height)return;width=w;height=h;drawGrid();refreshSheetCharts();});qoGridResizeObserver.observe(view);}
+ refreshSheetCharts();updateSelectionStats();}updateSaveIndicator();syncHistoryButtons();}
 let frozenRowScrollX=null;
 function refreshFillHandle(){
  const handle=document.getElementById('grid-fill-handle'),frame=document.getElementById('grid-frame');
