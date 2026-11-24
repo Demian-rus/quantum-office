@@ -114,7 +114,23 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  fs.writeFileSync(path.join(out,'native-first.json'),JSON.stringify(result,null,2));
  const routes=await page.evaluate(()=>{const result=[];for(const target of ['home','sheet','writer','slides','photo']){route(target);if(!document.querySelector('#app')?.innerText.trim())throw Error('Empty route '+target);result.push({target,visible:true});}route('home');return result;});
  fs.writeFileSync(path.join(out,'native-routes.json'),JSON.stringify(routes,null,2));
- await page.evaluate(()=>route('writer'));await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
+ const draftLayout=await page.evaluate(async()=>{
+  route('writer');await qoDraftStorage.flush();
+  const key='quantum-office-theme-v1',original=qoDraftStorage.getItem(key);
+  const measure=()=>Object.fromEntries(['#app','.global-bar','.qo-office-toolbar','.qo-writer-body'].map(s=>{
+   const box=document.querySelector(s).getBoundingClientRect();return [s,[box.x,box.y,box.width,box.height]];
+  }));
+  const baseline=measure();
+  try{
+   qoDraftStorage.setItem(key,original==='light'?'dark':'light');
+   if(!qoDraftStorage.pending||!document.getElementById('qo-native-draft-notice').hidden)throw Error('Ordinary pending write is not quiet');
+   const pending=measure();await qoDraftStorage.flush();const confirmed=measure();
+   if(JSON.stringify(baseline)!==JSON.stringify(pending)||JSON.stringify(baseline)!==JSON.stringify(confirmed))throw Error('Draft status moves the workspace '+JSON.stringify({baseline,pending,confirmed}));
+   return {baseline,pending,confirmed,status:'PASS'};
+  }finally{if(original===null)qoDraftStorage.removeItem(key);else qoDraftStorage.setItem(key,original);await qoDraftStorage.flush();}
+ });
+ fs.writeFileSync(path.join(out,'native-draft-layout.json'),JSON.stringify(draftLayout,null,2));
+ await page.locator('[data-editor="writer"][data-tab="diagnostic"]').click();
  await page.locator('#qo-diag-workspace').waitFor({state:'visible'});await page.screenshot({path:path.join(out,'native-diagnostics.png')});
  await page.locator('[data-editor="writer"][data-tab="work"]').click();
  await page.evaluate(()=>qwBank({__view:'native-0'}));await page.locator('[data-bank-add="native-0"]').click();

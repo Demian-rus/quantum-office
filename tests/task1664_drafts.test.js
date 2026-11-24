@@ -7,8 +7,9 @@ const KEY='quantum-office.work-builder.v1',WRITER='quantum-office-writer-v1';
 async function harness({legacy={},initial={},write,afterWrite,saveExport,waitForBoot=true}={}){
  const rows=structuredClone(initial),calls=[],nodes=new Map(),events={};let loaded=false,closed=false;
  const app={inert:false,textContent:''};nodes.set('app',app);
- const node=()=>({id:'',hidden:false,textContent:'',setAttribute(){}});
- const context=vm.createContext({TextEncoder,btoa,setTimeout,clearTimeout,document:{getElementById:id=>nodes.get(id),createElement:node,body:{prepend:n=>nodes.set(n.id,n),append:()=>{loaded=true;}}},localStorage:{getItem:key=>legacy[key]??null},__TAURI__:{event:{listen:async(name,fn)=>{events[name]=fn;}},core:{invoke:async(command,args)=>{
+ const node=()=>({id:'',hidden:false,textContent:'',children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){nodes.delete(this.id);}});
+ const register=n=>{nodes.set(n.id,n);for(const child of n.children||[])register(child);};
+ const context=vm.createContext({TextEncoder,btoa,setTimeout,clearTimeout,document:{getElementById:id=>nodes.get(id),createElement:node,body:{prepend:register,append:()=>{loaded=true;}}},localStorage:{getItem:key=>legacy[key]??null},__TAURI__:{event:{listen:async(name,fn)=>{events[name]=fn;}},core:{invoke:async(command,args)=>{
   calls.push({command,args});
   if(command==='draft_load')return structuredClone(rows);
   if(command==='draft_close'){closed=true;return;}
@@ -95,4 +96,22 @@ test('conflicted draft can be exported exactly before close; cancelling does not
  assert.equal(copy.format,'quantum-office-draft-recovery');
  assert.deepEqual(copy.entries,[{key:KEY,revision:1,value:'my unsaved edit — физика'}]);
  assert.equal(h.rows[KEY].value,'other instance');
+});
+
+test('native draft notifications are quiet during pending and ACK, persistent on failure, deduplicated and recoverable',async()=>{
+ let fail=true;
+ const h=await harness({write:()=>{if(fail)throw Error('test write denied');}});
+ const notice=h.nodes.get('qo-native-draft-notice'),banner=h.nodes.get('qo-native-draft-status'),retry=h.nodes.get('qo-native-draft-retry'),recovery=h.nodes.get('qo-native-draft-recovery');
+ assert.equal(notice.hidden,true);assert.equal(h.context.qoDraftStatusSummary(),'Черновик сохранён');
+ h.context.qoDraftStorage.setItem(KEY,'changed');
+ assert.equal(notice.hidden,true);assert.equal(h.context.qoDraftStatusSummary(),'Запись…');
+ await assert.rejects(h.context.qoDraftStorage.flush(),/test write denied/);
+ assert.equal(notice.hidden,false);assert.match(banner.textContent,/test write denied/);assert.equal(retry.hidden,false);assert.equal(recovery.hidden,false);
+ assert.equal(h.context.qoDraftStatusSummary(),'Ошибка записи');
+ let notifications=0;h.context.qoDraftStatusChanged=()=>notifications++;
+ await assert.rejects(h.context.qoDraftStorage.flush(),/test write denied/);
+ assert.equal(notifications,0,'same problem must not produce repeated status announcements');
+ fail=false;retry.onclick();await until(()=>!h.context.qoDraftStorage.pending);
+ assert.equal(notice.hidden,true);assert.equal(recovery.hidden,true);assert.equal(retry.hidden,true);
+ assert.equal(h.rows[KEY].value,'changed');assert.equal(h.context.qoDraftStatusSummary(),'Черновик сохранён');
 });

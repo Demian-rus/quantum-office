@@ -103,7 +103,7 @@ function status(message,tone=false){
 let qoWriterSavedLocal=true,qoSlidesSavedLocal=true;
 function updateSaveIndicator(){
  const n=document.querySelector('#storage-indicator');if(!n)return;
- if(typeof qoNativeDesktop!=='undefined'&&qoNativeDesktop&&globalThis.qoDraftStatus){n.textContent=globalThis.qoDraftStatus();n.title='Нативная запись подтверждается после транзакции SQLite';return;}
+ if(typeof qoNativeDesktop!=='undefined'&&qoNativeDesktop&&globalThis.qoDraftStatus){n.textContent=(globalThis.qoDraftStatusSummary?.()||globalThis.qoDraftStatus());n.title='Нативная запись подтверждается после транзакции SQLite';return;}
  if(page==='writer'){
   n.textContent=qoWriterSavedLocal?'● Черновик текста в браузере':'⚠ Текст не записан в браузер';
   n.title='Локальная копия не заменяет файл QDOC или общую резервную копию';
@@ -1735,7 +1735,7 @@ function qoPhotoState(){return {...(!qoPhotoHasBackgroundOpacity&&qoPhotoBackgro
 function qoPhotoSnapshot(){qoPhotoHistory.push(qoPhotoState());if(qoPhotoHistory.length>35)qoPhotoHistory.shift();qoPhotoRedo=[];}
 function qoPhotoLoadImageSrc(src){qoPhotoImageSrc=src||'';qoPhotoImage=null;if(src){const img=new Image();img.onload=()=>{if(qoPhotoImageSrc===src){qoPhotoImage=img;qoPhotoRender();}};img.src=src;}}
 function qoPhotoApplyState(v){v=validateStudioProject(v);qoPhotoCompare=false;qoPhotoStrokes=v.strokes||[];qoPhotoCanvasW=v.width||1100;qoPhotoCanvasH=v.height||650;qoPhotoBG=v.bg||'#ffffff';qoPhotoBackgroundOpacity=v.backgroundOpacity??1;qoPhotoHasBackgroundOpacity=Object.hasOwn(v,'backgroundOpacity');qoPhotoTransparent=!!v.transparent;qoPhotoAdjust=v.adjust||{brightness:100,contrast:100,saturation:100};qoPhotoFile=v.name||'Без названия';qoPhotoSelectedId=null;qoPhotoSelectedIds.clear();qoPhotoCounter=Math.max(qoPhotoCounter,...qoPhotoStrokes.map(o=>Number((o.id||'').split('-')[1])||0))+1;qoPhotoLoadImageSrc(v.imageSrc||'');}
-function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoNativeDesktop&&globalThis.qoDraftStatus?globalThis.qoDraftStatus():qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
+function qoPhotoPersist(){try{localStorage.setItem(qoPhotoStorageKey,JSON.stringify(qoPhotoState()));qoPhotoDraftSaved=true;}catch{qoPhotoDraftSaved=false;}const indicator=document.querySelector('.qs-saved-indicator');if(indicator)indicator.textContent=qoNativeDesktop&&globalThis.qoDraftStatus?(globalThis.qoDraftStatusSummary?.()||globalThis.qoDraftStatus()):qoPhotoDraftSaved?'Черновик в браузере':'Не записан в браузер';updateSaveIndicator();}
 function qoPhotoObject(){return qoPhotoStrokes.find(o=>o.id===qoPhotoSelectedId)||null;}
 function qoPhotoBounds(o){const a=o.points?.[0]||[0,0],last=o.points?.at(-1)||a;
  if(o.tool==='text')return qoPhotoTextBounds(o);
@@ -2654,6 +2654,7 @@ function render(){
   scrollLeft=previousGrid.scrollLeft;scrollTop=previousGrid.scrollTop;
  }
  app.innerHTML=topbar()+(page==='home'?homepage():page==='templates'?templatesPage():page==='sheet'&&book()?sheetpage():page==='writer'?qoWriterPage():page==='slides'?qoSlidesPage():page==='photo'?qoPhotoPage():placeholder(page))+`<input id="file-picker" type="file" accept=".qbook,.qbackup,.csv,.xlsx" hidden><div id="toast" class="toast" role="status"></div>`;
+ globalThis.qoDraftAttachToast?.(app.querySelector('#toast'));
  // Keep the filter dialog inside the scrollable worksheet frame, below the ribbon.
  if(page==='writer'){qoWriterStats();qoWriterNavRefresh();qoDiagnosticMount();qwRender();}
  if(page==='photo'){qoPhotoRender();const stage=document.getElementById('qs-stage');if(stage&&stageScroll){stage.scrollLeft=stageScroll[0];stage.scrollTop=stageScroll[1];}}
@@ -3598,7 +3599,7 @@ render();
 qoMiniSheetInstall();
 if(qoNativeDesktop){
  globalThis.qoFlushForClose=()=>{if(editing)commitEditor();};
- globalThis.qoDraftStatusChanged=()=>{updateSaveIndicator();const label=document.getElementById('qw-save-state');if(label)label.textContent=qwStorageError||globalThis.qoDraftStatus();const studio=document.querySelector('.qs-saved-indicator');if(studio)studio.textContent=globalThis.qoDraftStatus();};
+ globalThis.qoDraftStatusChanged=()=>{updateSaveIndicator();const label=document.getElementById('qw-save-state');if(label)label.textContent=qwStorageError||(globalThis.qoDraftStatusSummary?.()||globalThis.qoDraftStatus());const studio=document.querySelector('.qs-saved-indicator');if(studio)studio.textContent=(globalThis.qoDraftStatusSummary?.()||globalThis.qoDraftStatus());};
  globalThis.qoDraftStatusChanged();
  void qwBankOpen().catch(error=>status('Банк SQLite: '+error.message,true));
 }

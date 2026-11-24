@@ -5,14 +5,20 @@
  const invoke=(command,args={})=>globalThis.__TAURI__.core.invoke(command,args);
  const errText=e=>typeof e==='string'?e:e?.message||String(e);
  const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map(),rejectedValues=new Map();let running=null,timer=null,error='',closing=false,ready=false,bootTask;
+ let lastState='',lastSummary='',transientToast=null;
  const notify=()=>{
   const problem=error||[...rejected.values()][0]||'';
   const state=problem?'Ошибка записи черновиков: '+problem+'. Сохраните документ отдельным файлом или аварийную копию перед закрытием.':dirty.size||running?'Черновики: запись не подтверждена…':'Черновики: запись подтверждена';
-  const banner=document.getElementById('qo-native-draft-status');
-  if(banner){banner.textContent=state;banner.hidden=!problem&&!dirty.size&&!running;}
+  const summary=problem?'Ошибка записи':!ready?'Открытие черновиков…':dirty.size||running?'Запись…':'Черновик сохранён';
+  const banner=document.getElementById('qo-native-draft-status'),notice=document.getElementById('qo-native-draft-notice');
+  const message=problem?state:!ready?'Открытие нативных черновиков…':'';
+  if(banner&&banner.textContent!==message){banner.textContent=message;banner.setAttribute('role',problem?'alert':'status');banner.setAttribute('aria-live',problem?'assertive':'polite');}
+  if(notice){notice.hidden=!message;notice.className='toast active qo-draft-notice'+(problem?' bad':'');}
   const recovery=document.getElementById('qo-native-draft-recovery');if(recovery)recovery.hidden=!(ready&&problem&&(dirty.size||rejectedValues.size));
+  const retry=document.getElementById('qo-native-draft-retry');if(retry)retry.hidden=!(ready&&problem&&dirty.size);
   globalThis.qoDraftStatus=()=>state;
-  globalThis.qoDraftStatusChanged?.();
+  globalThis.qoDraftStatusSummary=()=>summary;
+  if(lastState!==state||lastSummary!==summary){lastState=state;lastSummary=summary;globalThis.qoDraftStatusChanged?.();}
  };
  const check=key=>{key=String(key);if(!allowed.has(key))throw Error('Недопустимый ключ черновика: '+key);return key;};
  function change(key,value,fromLegacy=false){
@@ -103,9 +109,16 @@
  }
  async function boot(){
   const app=document.getElementById('app');
-  const banner=document.createElement('div');banner.id='qo-native-draft-status';banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');document.body.prepend(banner);
+  // Both transient and durable notifications share one fixed stack, outside #app.
+  // Background pending/ACK changes update only the existing compact indicator.
+  const stack=document.createElement('aside');stack.id='qo-native-notifications';stack.setAttribute('aria-label','Уведомления');
+  const notice=document.createElement('section');notice.id='qo-native-draft-notice';notice.className='toast active qo-draft-notice';
+  const banner=document.createElement('div');banner.id='qo-native-draft-status';banner.setAttribute('role','status');banner.setAttribute('aria-live','polite');
   banner.textContent='Открытие нативных черновиков…';
-  const recovery=document.createElement('button');recovery.id='qo-native-draft-recovery';recovery.type='button';recovery.textContent='Сохранить аварийную копию и закрыть';recovery.hidden=true;recovery.onclick=()=>void recoverAndClose();document.body.prepend(recovery);
+  const retry=document.createElement('button');retry.id='qo-native-draft-retry';retry.type='button';retry.textContent='Повторить запись';retry.hidden=true;retry.onclick=()=>void flush().catch(()=>{});
+  const recovery=document.createElement('button');recovery.id='qo-native-draft-recovery';recovery.type='button';recovery.textContent='Сохранить аварийную копию и закрыть';recovery.hidden=true;recovery.onclick=()=>void recoverAndClose();
+  notice.append(banner,retry,recovery);stack.append(notice);document.body.prepend(stack);
+  globalThis.qoDraftAttachToast=node=>{if(!node)return;if(transientToast&&transientToast!==node)transientToast.remove();transientToast=node;stack.append(node);};
   await globalThis.__TAURI__.event.listen('qo-draft-close',()=>void onClose());
   const loaded=await invoke('draft_load');
   for(const key of keys){
