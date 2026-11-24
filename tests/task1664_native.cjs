@@ -180,7 +180,8 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
   setCell(sh,'A2','График занятий');mergeCells(sh,'A2','G2');setStyle(sh,'A2',{bg:'#167a40',color:'#ffffff',bold:true,align:'center',fontFamily:'Comic Sans MS',fontSize:12});
   setCell(sh,'A3','Пн');mergeCells(sh,'A3','A7');setStyle(sh,'A3',{bg:'#f28c00',bold:true,align:'center',verticalAlign:'center',fontSize:14,border:'thin'});
   for(let row=3;row<=24;row++){setCell(sh,'B'+row,'Ученик '+row);setCell(sh,'C'+row,'Физика');setCell(sh,'D'+row,'12:00');setCell(sh,'E'+row,row%2?'☐':'☑');setCell(sh,'F'+row,'План занятия');setStyle(sh,'B'+row,{border:'thin',align:'center',fontFamily:'Comic Sans MS'});}
-  persist();route('home');
+  // Fixture bypasses UI transactions: invalidate the old blank calculation session.
+  recalculator.reset();persist();route('home');
   route('slides');document.getElementById('qo-slides-title').value='TASK1664 Slides';qoSlides.slides[0].items[1].text='TASK1664 slide body';qoPersistSlides();route('home');
   route('photo');qoPhotoApplyState({...qoPhotoState(),name:'TASK1664 Studio',width:640,height:480,bg:'#f0f0f0',strokes:[{id:'shape-1664',tool:'rect',points:[[20,30],[210,180]],color:'#225588',size:4,opacity:1}]});qoPhotoPersist();route('home');
  });
