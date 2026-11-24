@@ -7,3 +7,5 @@ Tests: model roundtrip, independent widths, invalid input, reset, unchanged geom
 Baseline Verify passed; Chromium dependency install failure and Pages configuration error separately observed. Windows was in progress at initial check.
 
 Second candidate revision adds diagnostic/media SVG actions, actual effective width output, browser offline tests with a bank-sourced raster and graph/circuit, two physical PDF orientations and comparison with preview, QWORK and reload, theme/viewport snapshots. Native WebView2 test drives the real select and width inputs, checks original bank record and verifies persisted manual width after close/reinstall/Portable. Test execution on final HEAD is required; no results claimed yet.
+
+Verify at b1d6354 failed 10 historical diagnostic renderer tests because the VM ran diagnostics without the shell's icon function (617/627 passed). Extracted the existing icon component unchanged into workspace-icons.js; bundle and isolated diagnostic tests now use the actual same component, not a stub. Historical assertions retained. New HEAD requires full CI.
