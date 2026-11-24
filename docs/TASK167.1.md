@@ -22,3 +22,6 @@ The first standalone bank screenshots showed the page navigation partially cover
 
 ### Real native error acceptance
 The preceding WebView2 test could not intercept the frozen Tauri IPC API and correctly failed because the write actually succeeded. The replacement test installs a temporary, narrowly scoped SQLite trigger only in the disposable GitHub Actions database, verifies an actual aborted write, screenshots both ordinary and 800×600 emulated WebView2 viewports, drops the trigger in a finally block, retries through the real UI and checks geometry and persistence. No fault-injection path is shipped with the app. Final six workflow results remain required.
+
+### TASK167.1 final integration fix
+On `221409df`, Verify push/PR passed (624 JS tests) and the specialized TASK167.1 Chromium jobs passed; both overall Chromium runs failed at TASK122 line 44 because the student roster decoration was still gated by the obsolete Writer route. Both guards now target `diagnostics`; the unused Writer-navigation diagnostic tab fallback is removed. TASK122 keeps all prior assertions and additionally checks that the selected student and roster survive reload and Writer navigation, without mounting in Writer. No storage or backup format changes. Native acceptance and all six workflows on the new HEAD must still be confirmed.

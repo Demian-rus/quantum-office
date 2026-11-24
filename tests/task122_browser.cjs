@@ -89,6 +89,12 @@ const path=require('node:path'),{pathToFileURL}=require('node:url');
  await page.reload();await page.evaluate(()=>route('sheet'));
  assert.equal(await page.evaluate(()=>qoHubRoster().length),11,'source remains connected after reload');
  assert.equal(await page.evaluate(()=>qoHubResults().length),2,'global journal remains after reload');
+ await page.evaluate(()=>route('writer'));
+ assert.equal(await page.locator('.qo-hub-roster,#qo-diag-root').count(),0,'Writer must not mount the roster');
+ await page.evaluate(()=>route('diagnostics'));
+ assert.equal(await page.locator('.qo-hub-roster').count(),1,'roster must be restored in diagnostics after reload and Writer navigation');
+ assert.equal(await page.evaluate(()=>qdDoc().session.student),'Тестовый ученик 12','selected student persists after reload');
+ await page.evaluate(()=>route('sheet'));
  for(const width of [1600,1100,650,390]){
    await page.setViewportSize({width,height:850});
    await page.evaluate(()=>{qoHubOpen=true;qoHubDecorate();});

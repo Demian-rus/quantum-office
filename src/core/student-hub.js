@@ -356,7 +356,7 @@ function qoHubDiagDecorate(){
 }
 function qoHubDecorate(){
  if(page==='sheet')qoHubSheetDecorate();
- else if(page==='writer')qoHubDiagDecorate();
+ else if(page==='diagnostics')qoHubDiagDecorate();
 }
 function qoHubCSV(rows){
  return '\ufeff'+[['Дата','Ученик','Диагностика','Результат %','Проверено','Всего','Баллы','Максимум','Темы'],
@@ -364,7 +364,7 @@ function qoHubCSV(rows){
   r.title,r.percent,r.rated,r.total,r.earned??'',r.possible??'',
   r.topics.map(x=>x.name+' '+x.percent+'%').join(' | ')])].map(row=>row.map(qdCsvCell).join(';')).join('\r\n');
 }
-function qoHubChoose(id,openInWriter=false){
+function qoHubChoose(id,openDiagnostics=false){
  const student=qoHubRoster().find(s=>s.id===id);
  if(!student||student.duplicate){status('Неоднозначный ученик в таблице',true);return;}
  const d=qdDoc(),profile=qdAddStudent(d,student.name);
@@ -372,7 +372,7 @@ function qoHubChoose(id,openInWriter=false){
  d.session.student=profile.name;d.session.studentId=profile.id;
  qdStudentFilter=profile.id;
  qdStore();
- if(openInWriter){qdMode='run';qoWriter.diagnosticMode='run';route('diagnostics');}
+ if(openDiagnostics){qdMode='run';qoWriter.diagnosticMode='run';route('diagnostics');}
  else {qdRefresh();}
  status('Выбран ученик из таблицы: '+student.name);
 }
@@ -438,7 +438,7 @@ qdOnClick=function(e){
  return result;
 };
 const qoHubOriginalQDRefresh=qdRefresh;
-qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='writer')qoHubDiagDecorate();if(typeof qdFrameRestore==='function')qdFrameRestore();};
+qdRefresh=function(){qoHubOriginalQDRefresh();if(page==='diagnostics')qoHubDiagDecorate();if(typeof qdFrameRestore==='function')qdFrameRestore();};
 const qoHubOriginalDrawGrid=drawGrid;
 drawGrid=function(...args){const ret=qoHubOriginalDrawGrid(...args);qoHubBadges();return ret;};
 const qoHubOriginalRender=render;
