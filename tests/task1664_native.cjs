@@ -135,40 +135,68 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  await page.locator('.global-bar [data-target="work"]').click();
  await page.evaluate(()=>qwBank({__view:'native-0'}));await page.locator('[data-bank-add="native-0"]').click();
  await page.waitForFunction(()=>qwDoc.tasks.length===1&&!!qwDoc.tasks[0].image);
- // Original owner reproduction: real layout controls, pending writes and a
- // controlled IPC write error on the actual WebView2 UI. Durable data remains real.
- const educationDraftLayout=await page.evaluate(async()=>{
-  const originalInvoke=__TAURI__.core.invoke;
-  const measure=()=>Object.fromEntries(['#app','.global-bar','.qo-office-toolbar','.qo-education-body','#qo-work-workspace'].map(s=>{
-   const b=document.querySelector(s).getBoundingClientRect();return [s,[b.x,b.y,b.width,b.height]];
-  }));
-  const eq=(a,b,label)=>{if(JSON.stringify(a)!==JSON.stringify(b))throw Error(label+' '+JSON.stringify({a,b}));};
-  await qoDraftStorage.flush();const base=measure(),oldLayout=qwDoc.layout;
-  let failure=false;
-  try{
-   qwPreview();const radios=[...document.querySelectorAll('[name="qw-pdf-layout"]')];const alternate=radios.find(x=>x.value!==oldLayout&&!x.disabled);
+ // Original owner reproduction: real layout controls, pending writes, and an
+ // actual SQLite transaction rejection in the disposable CI database.
+ // Tauri's frozen JS API cannot be replaced reliably; do not mock or modify production IPC.
+ const draftDb=path.join(process.env.APPDATA,'com.quantumoffice.desktop','drafts.sqlite3');
+ assert.ok(fs.existsSync(draftDb),'Disposable native drafts database missing');
+ const setDraftDenial=enabled=>{
+  const sql=enabled?"CREATE TRIGGER qo_ci_task1671_denial BEFORE INSERT ON drafts WHEN NEW.key='quantum-office.work-builder.v1' BEGIN SELECT RAISE(ABORT,'TASK167.1 controlled write denial'); END;":"DROP TRIGGER IF EXISTS qo_ci_task1671_denial;";
+  const result=require('node:child_process').spawnSync('python',['-c','import sqlite3,sys; c=sqlite3.connect(sys.argv[1],timeout=10); c.executescript(sys.argv[2]); c.commit(); c.close()',draftDb,sql],{encoding:'utf8'});
+  if(result.status!==0)throw Error('CI SQLite fault control failed: '+(result.error||result.stderr));
+ };
+ const measure=()=>page.evaluate(()=>Object.fromEntries(['#app','.global-bar','.qo-office-toolbar','.qo-education-body','#qo-work-workspace'].map(s=>{
+  const b=document.querySelector(s).getBoundingClientRect();return [s,[b.x,b.y,b.width,b.height]];
+ })));
+ const oldLayout=await page.evaluate(async()=>{await qoDraftStorage.flush();return qwDoc.layout;});
+ const base=await measure();
+ let educationDraftLayout;
+ let session;
+ try{
+  await page.evaluate(layout=>{
+   qwPreview();const alternate=[...document.querySelectorAll('[name="qw-pdf-layout"]')].find(x=>x.value!==layout&&!x.disabled);
    if(!alternate)throw Error('Missing actual layout control');
    alternate.click();if(qwDoc.layout!==alternate.value)throw Error('Layout did not change');
    if(!qoDraftStorage.pending||!document.getElementById('qo-native-draft-notice').hidden)throw Error('Layout change not quiet');
-   eq(base,measure(),'pending moves workspace');
-   await qoDraftStorage.flush();eq(base,measure(),'ACK moves workspace');
-   document.getElementById('qw-dialog').close();
-   __TAURI__.core.invoke=(command,args)=>command==='draft_write'&&failure?Promise.reject(Error('TASK167.1 controlled write denial')):originalInvoke.call(__TAURI__.core,command,args);
-   failure=true;qwDoc.layout=oldLayout;qwPersist();
+  },oldLayout);
+  assert.deepEqual(await measure(),base,'pending moves workspace');
+  await page.evaluate(()=>qoDraftStorage.flush());assert.deepEqual(await measure(),base,'ACK moves workspace');
+  await page.evaluate(()=>document.getElementById('qw-dialog').close());
+  setDraftDenial(true);
+  await page.evaluate(async layout=>{
+   qwDoc.layout=layout;qwPersist();
    try{await qoDraftStorage.flush();throw Error('write unexpectedly succeeded');}catch(e){if(!String(e).includes('controlled write denial'))throw e;}
    const notice=document.getElementById('qo-native-draft-notice'),retry=document.getElementById('qo-native-draft-retry'),recovery=document.getElementById('qo-native-draft-recovery');
    if(notice.hidden||retry.hidden||recovery.hidden||!qoDraftStorage.pending)throw Error('Real-risk notice or action hidden');
-   eq(base,measure(),'error moves workspace');
-   const b=notice.getBoundingClientRect();if(b.left<0||b.right>innerWidth||b.top<0||b.bottom>innerHeight)throw Error('notice outside viewport');
-   failure=false;retry.click();await qoDraftStorage.flush();
-   if(!notice.hidden||qoDraftStorage.pending||qoDraftStorage.error)throw Error('retry did not recover');
-   eq(base,measure(),'recovery moves workspace');
-   for(const target of ['diagnostics','writer','bank','work'])route(target);
-   eq(base,measure(),'return to work moves workspace');
-   if(qwDoc.layout!==oldLayout)throw Error('layout did not persist');
-   return {status:'PASS',base,controlledWriteError:true,layoutSwitch:true,routeReturn:true};
-  }finally{__TAURI__.core.invoke=originalInvoke;document.getElementById('qw-dialog')?.remove();if(qwDoc.layout!==oldLayout){qwDoc.layout=oldLayout;qwPersist();}await qoDraftStorage.flush();}
- });
+  },oldLayout);
+  assert.deepEqual(await measure(),base,'error moves workspace');
+  const checkNotice=()=>page.evaluate(()=>{
+   const bounds=id=>{const e=document.getElementById(id),b=e.getBoundingClientRect();return {visible:!e.hidden&&b.width>0&&b.height>0,left:b.left,top:b.top,right:b.right,bottom:b.bottom};};
+   const boxes=['qo-native-draft-notice','qo-native-draft-retry','qo-native-draft-recovery'].map(bounds);
+   if(boxes.some(b=>!b.visible||b.left<0||b.right>innerWidth||b.top<0||b.bottom>innerHeight))throw Error('Notice or action outside viewport '+JSON.stringify({width:innerWidth,height:innerHeight,boxes}));
+   return {width:innerWidth,height:innerHeight,boxes};
+  });
+  const normalNotice=await checkNotice();
+  await page.screenshot({path:path.join(out,'native-draft-error.png')});
+  session=await page.context().newCDPSession(page);
+  await session.send('Emulation.setDeviceMetricsOverride',{width:800,height:600,deviceScaleFactor:1,mobile:false});
+  await page.waitForFunction(()=>innerWidth===800&&innerHeight===600);
+  const narrowBase=await measure(),narrowNotice=await checkNotice();
+  await page.screenshot({path:path.join(out,'native-draft-error-800x600.png')});
+  setDraftDenial(false);
+  await page.evaluate(async()=>{document.getElementById('qo-native-draft-retry').click();await qoDraftStorage.flush();if(!document.getElementById('qo-native-draft-notice').hidden||qoDraftStorage.pending||qoDraftStorage.error)throw Error('Retry did not recover');});
+  assert.deepEqual(await measure(),narrowBase,'recovery moves narrow workspace');
+  await session.send('Emulation.clearDeviceMetricsOverride');await session.detach();session=null;
+  await page.waitForFunction(w=>innerWidth===w,normalNotice.width);
+  assert.deepEqual(await measure(),base,'recovery moves workspace');
+  await page.evaluate(layout=>{for(const target of ['diagnostics','writer','bank','work'])route(target);if(qwDoc.layout!==layout)throw Error('Layout did not persist');},oldLayout);
+  assert.deepEqual(await measure(),base,'return to work moves workspace');
+  educationDraftLayout={status:'PASS',base,actualSQLiteRejection:true,layoutSwitch:true,routeReturn:true,normalNotice,narrowNotice};
+ }finally{
+  setDraftDenial(false);
+  if(session){await session.send('Emulation.clearDeviceMetricsOverride');await session.detach();}
+  await page.evaluate(async layout=>{document.getElementById('qw-dialog')?.remove();if(qwDoc.layout!==layout){qwDoc.layout=layout;qwPersist();}await qoDraftStorage.flush();},oldLayout);
+ }
  fs.writeFileSync(path.join(out,'native-education-draft-layout.json'),JSON.stringify(educationDraftLayout,null,2));
  await page.screenshot({path:path.join(out,'native-workspace.png')});
  await page.evaluate(()=>route('bank'));await page.locator('#qo-bank-root .qw-bank-filter-panel').waitFor();await page.screenshot({path:path.join(out,'native-bank.png')});

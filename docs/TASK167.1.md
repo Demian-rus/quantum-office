@@ -19,3 +19,6 @@ CI first dedicated workspace smoke reached reload and confirmed actual route iso
 
 ### Follow-up visual inspection
 The first standalone bank screenshots showed the page navigation partially covered by the action footer: the catalogue occupied 100% of a body also containing storage bars. The catalogue now fills the remaining flex space, with pagination kept outside the scrolling results list. The viewport/theme regression checks pagination bounds against both the body and footer. Final CI required on this revision.
+
+### Real native error acceptance
+The preceding WebView2 test could not intercept the frozen Tauri IPC API and correctly failed because the write actually succeeded. The replacement test installs a temporary, narrowly scoped SQLite trigger only in the disposable GitHub Actions database, verifies an actual aborted write, screenshots both ordinary and 800×600 emulated WebView2 viewports, drops the trigger in a finally block, retries through the real UI and checks geometry and persistence. No fault-injection path is shipped with the app. Final six workflow results remain required.
