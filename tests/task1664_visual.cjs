@@ -84,7 +84,7 @@ function printMetrics(){
 }
 function checkPrint(m,orientation,fixture){
  assert.equal(m.error,null);assert.equal(m.ready,'true');assert.equal(m.orientation,orientation);
- assert.match(m.bodyFont,/QO Print/);assert.deepEqual([...new Set(m.taskIds)],Array.from({length:fixture.tasks.length},(_,i)=>i+1));assert.equal(m.figures,fixture.tasks.filter(t=>t.figure!=='none').length);assert.equal(m.images.length,fixture.tasks.filter(t=>t.figure==='image').length);if(fixture.id!=='qx-original-physics-2018-01')assert.ok(m.math>=3);
+ assert.match(m.bodyFont,/QO Print/);assert.deepEqual([...new Set(m.taskIds)],Array.from({length:fixture.tasks.length},(_,i)=>i+1));assert.equal(m.figures,fixture.tasks.filter(t=>t.figure!=='none').length);assert.equal(m.images.length,fixture.tasks.filter(t=>t.figure==='image').length);assert.ok(m.images.every(i=>i.width>0&&i.height>0));assert.deepEqual(m.images.map(i=>Number(i.task)),fixture.tasks.flatMap((t,i)=>t.figure==='image'?[i+1]:[]));if(fixture.id!=='qx-original-physics-2018-01')assert.ok(m.math>=3);
  assert.deepEqual(m.bounds,[]);assert.deepEqual(m.overlap,[]);assert.ok(m.sheets.length>=2,'need multiple physical pages');
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');

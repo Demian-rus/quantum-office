@@ -61,7 +61,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
    assert.deepEqual(data.headers,Array(data.pages).fill(''));
    assert.deepEqual(data.meta,Array(data.pages).fill(''));
    assert.deepEqual(data.collisions,[]);
-   assert.ok(data.answer.top>=data.figure.bottom-.5||(data.answer.left<data.figure.left&&Math.abs(data.answer.bottom-data.figure.bottom)<10),'answer follows condition or aligns safely beside figure');
+   assert.ok(data.answer.top>=data.figure.bottom-.5||(data.answer.left<data.figure.left&&(Math.abs(data.answer.bottom-data.figure.bottom)<10||data.answer.top-data.text.bottom<20)),'answer follows condition or aligns safely beside figure without a large gap');
    assert.ok(data.answer.left>0&&data.text.bottom<data.answer.bottom);
    assert.ok(data.mathPads>=2&&data.sqrt===1&&data.figures>=3);
    assert.equal(data.brands.length,orientation==='landscape'?Math.ceil(data.pages/2):data.pages);

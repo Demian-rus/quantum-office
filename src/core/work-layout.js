@@ -274,6 +274,8 @@ body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-left figure{margin:0
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{margin:1.5mm auto 0!important}
 body[data-qw-format="booklet"] .qw-booklet-answer{margin:.8mm 0 0;font-size:inherit;line-height:1.2}
 body[data-qw-format="booklet"] .qw-booklet-answer span{height:3.3mm}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{justify-self:stretch;min-width:0}
+body[data-qw-format="booklet"] .qw-booklet-answer-by-figure.qw-booklet-answer-near .qw-booklet-answer{align-self:start;margin:.8mm 0 0!important}
 .qw-task-tables{clear:both;margin:1.2mm auto;break-inside:avoid}
 .qw-task-tables :is(th,td),.qw-print-rich :is(th,td){padding:.5mm 1.2mm;border:.18mm solid #555}
 .qw-print-rich .qw-rich-table-scroll{clear:both;break-inside:avoid}
@@ -384,7 +386,7 @@ async function qwPreparePrintDocument(){
   if(format==='answers'&&text.classList.contains('qw-answer-columns')&&[...text.querySelectorAll('.qw-answer-item math')].some(m=>m.getBoundingClientRect().width>m.closest('.qw-answer-item').getBoundingClientRect().width))text.style.gridTemplateColumns='1fr';
   if(!modern&&!figure&&!section.querySelector('.qw-solution-preview')&&text.getBoundingClientRect().height<=parseFloat(getComputedStyle(text).lineHeight)*2+1)section.classList.add('qw-compact-task');
   // A wide indivisible expression gets the whole text width, without modifying QWORK.
-  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>(flow.getBoundingClientRect().width-figure.getBoundingClientRect().width-3*MM))){
+  if(figure&&!flow.classList.contains('qw-figure-below')&&[...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>(format==='booklet'?flow.getBoundingClientRect().width-figure.getBoundingClientRect().width-3*MM:modern?contentWidth-7*MM-figure.getBoundingClientRect().width-3*MM:text.getBoundingClientRect().width))){
    flow.classList.remove('qw-figure-right','qw-figure-left');flow.classList.add('qw-figure-below');section.dataset.layoutReason='wide-formula';
    if(modern)flow.append(figure);
   }
@@ -404,10 +406,12 @@ async function qwPreparePrintDocument(){
      const figureHeight=figure.getBoundingClientRect().height;
      if(textHeight+answerHeight+2*MM<=figureHeight-2){
       flow.append(answer);flow.classList.add('qw-booklet-answer-by-figure');
+      // Align near the figure's bottom only if the gap after the condition is small.
+      flow.classList.toggle('qw-booklet-answer-near',figureHeight-textHeight-answerHeight>5*MM);
       // If font metrics changed on activation, do not retain an unsafe layout.
       const textBottom=text.getBoundingClientRect().bottom,answerTop=answer.getBoundingClientRect().top;
-      if(answerTop<textBottom+MM){
-       flow.classList.remove('qw-booklet-answer-by-figure');
+      if(answerTop<textBottom+.5*MM){
+       flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');
        section.querySelector('.qw-booklet-entry').append(answer);
       }
      }
@@ -510,7 +514,7 @@ async function qwPreparePrintDocument(){
  function splitLong(original){
   const text=original.querySelector('.qw-task-text'),article=bodyOf(original),flow=original.querySelector('.qw-task-flow');
   const answer=original.querySelector('.qw-answer-preview,.qw-booklet-answer'),teacher=original.querySelector('.qw-teacher-notes');
-  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure');const items=tokens(text);
+  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');const items=tokens(text);
   const tails=[...article.children].filter(e=>e!==flow&&e.tagName!=='HEADER'&&e!==answer&&!e.classList.contains('qw-exam-grid'));
   if(teacher)tails.push(teacher);
   let start=0,first=true,last;

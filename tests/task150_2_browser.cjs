@@ -24,7 +24,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
      }
     }
     return {layout:window.__qwPrintLayout,boxes,collisions,outside,bodyPt:parseFloat(getComputedStyle(document.body).fontSize)*.75,
-     headers:pages.map(p=>({page:pages.indexOf(p)+1,box:rect(p.querySelector('.qw-print-header,.qw-running-header'),p)})),
+     headers:pages.map(p=>{const header=p.querySelector('.qw-print-header,.qw-running-header');return {page:pages.indexOf(p)+1,box:header?rect(header,p):null};}),
      brands:[...document.querySelectorAll('.qw-print-brand')].map(e=>({text:e.textContent,position:getComputedStyle(e).position,box:rect(e,e.closest('.qw-print-page'))})),
      topicColor:document.querySelector('.qw-print-topic')?getComputedStyle(document.querySelector('.qw-print-topic')).color:null,
      math:[...document.querySelectorAll('.qw-task-text math')].map(e=>({task:+e.closest('[data-task]').dataset.task,size:parseFloat(getComputedStyle(e).fontSize)*.75,box:rect(e,e.closest('.qw-print-page')),fraction:[...e.querySelectorAll('mfrac>mi,mfrac>mn,mfrac>mrow>mi')].map(n=>parseFloat(getComputedStyle(n).fontSize)*.75)})),
@@ -32,6 +32,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
    });
    assert.deepEqual(measurement.collisions,[],name+' ink collision');assert.deepEqual(measurement.outside,[],name+' bounds');
    if(!before){
+    if(!name.endsWith('-Answers'))assert.ok(measurement.headers.slice(1).every(h=>h.box===null),'student header occurs on first physical page only');
     assert.ok(Math.abs(measurement.bodyPt-10)<.001);assert.deepEqual(measurement.english,[]);assert.equal(measurement.brandIcons,0);
     if(project.topic)assert.equal(measurement.topicColor,options.monochrome?'rgb(34, 34, 34)':options.theme?'rgb(17, 17, 17)':'rgb(180, 35, 24)');
     for(const b of measurement.brands){assert.equal(b.position,'absolute');assert.ok(b.box.y>285&&b.box.y+b.box.h<=297,'QX handwritten signature must stay at bottom-right of A4');}
