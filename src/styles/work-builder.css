@@ -374,37 +374,75 @@
 .qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;list-style-type:decimal;line-height:1.4}
 
 
-/* TASK156: bank entry editor; same workbench geometry, no tutorial overlays. */
-.qw-bank-edit-dialog{width:min(1180px,calc(100vw - 20px));max-width:none;max-height:calc(100dvh - 20px)}
-.qw-bank-edit-dialog>.qw-dialog-body{min-height:0;overflow:auto}
-.qw-bank-edit-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.9fr);gap:15px;align-items:start}
-.qw-bank-edit-layout h3{font-size:13px;margin:0 0 8px}
-.qw-bank-edit-main,.qw-bank-edit-side{min-width:0}
-.qw-bank-edit-fields,.qw-bank-edit-categories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.qw-bank-edit-fields>label,.qw-bank-edit-categories>label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:11px;font-weight:600}
-.qw-bank-edit-fields>label:has(textarea),.qw-bank-choice-field,.qw-bank-edit-visual-actions,#qw-bank-edit-preview{grid-column:1/-1}
-.qw-bank-edit-fields label.qw-check{display:flex;flex-direction:row;align-items:center;gap:6px}
-.qw-bank-edit-fields input,.qw-bank-edit-fields select,.qw-bank-edit-fields textarea,
-.qw-bank-edit-categories input,.qw-bank-edit-categories select{
- width:100%;min-width:0;box-sizing:border-box;border:1px solid var(--qo-border);
- background:var(--qo-surface);color:var(--qo-text);border-radius:5px;
- padding:6px;font:12px/1.4 "Segoe UI",Arial,sans-serif
+/* BANK-02: a single formatting toolbar for the active field. */
+.qw-bank-edit-dialog>.qw-dialog-body {
+ display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:0;
 }
-.qw-bank-edit-fields textarea{resize:vertical;min-height:50px}
-.qw-bank-edit-fields select,.qw-bank-edit-categories select,.qw-bank-edit-categories input{min-height:32px}
-.qw-bank-edit-visual-actions{display:flex;gap:7px;flex-wrap:wrap}
-.qw-bank-edit-visual-actions button{flex:1;min-width:125px}
-#qw-bank-edit-preview{margin-top:3px;padding:12px;border:1px solid var(--qo-border);
- background:#fff;color:#171717;min-height:70px;max-height:350px;overflow:auto}
-.qw-bank-edit-dialog [hidden]{display:none!important}
-@media(max-width:820px){
- .qw-bank-edit-layout{grid-template-columns:minmax(0,1fr)}
- .qw-bank-edit-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
+.qw-bank-edit-top,.qw-bank-edit-tabs,.qw-bank-rich-tools,.qw-bank-tool-group,.qw-bank-edit-visual-actions {
+ display:flex;align-items:center;gap:4px;flex-wrap:wrap;
 }
-@media(max-width:530px){
- .qw-bank-edit-fields,.qw-bank-edit-categories{grid-template-columns:minmax(0,1fr)}
+.qw-bank-edit-top {
+ flex:none;padding:5px 10px;border-bottom:1px solid var(--qo-border);background:var(--qo-surface-alt);
 }
-
+.qw-bank-edit-top .qw-dock-controls {margin-left:auto}
+.qw-bank-edit-top :is(button,select),.qw-bank-rich-tools :is(button,select),.qw-bank-edit-visual-actions button {
+ min-height:27px;padding:3px 7px;font-size:11px;
+}
+.qw-bank-edit-tabs button {border-color:transparent;background:transparent}
+.qw-bank-edit-tabs button[aria-selected=true],.qw-bank-edit-top button[aria-pressed=true] {
+ color:var(--qo-accent);background:var(--qo-accent-soft);border-color:var(--qo-accent-border);
+}
+.qw-bank-edit-dialog .qo-work-icon {width:15px;height:15px;vertical-align:middle}
+.qw-bank-edit-layout.qw-dock-layout {
+ --qw-dock-right-size:min(var(--qw-dock-right),35vw);
+ display:grid;grid-template-columns:minmax(0,1fr) var(--qw-dock-right-size);
+ flex:1;min-height:0;min-width:0;overflow:hidden;
+}
+.qw-bank-edit-layout.qw-dock-hide-right {--qw-dock-right-size:0px}
+.qw-bank-edit-layout.qw-dock-hide-right>.qw-bank-edit-side {display:none}
+.qw-bank-edit-main {
+ display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--qo-surface);
+}
+.qw-bank-edit-commandbar {
+ display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+ flex:none;padding:5px 10px;border-bottom:1px solid var(--qo-border);
+}
+.qw-bank-rich-tools {min-width:0}
+.qw-bank-edit-visual-actions {gap:4px}
+.qw-bank-rich-tools select {width:auto;max-width:185px}
+.qw-bank-tool-group {border-inline-end:1px solid var(--qo-border);padding-inline-end:5px}
+.qw-bank-rich-tools button:has(.qo-work-icon) {min-width:29px}
+.qw-bank-edit-visual-actions button {background:var(--qo-surface-alt)}
+.qw-bank-rich-editor {display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;min-height:0;padding:10px;overflow:auto}
+.qw-bank-rich-editor>textarea {
+ flex:1;min-height:0;resize:none;padding:12px 14px;
+ font:14px/1.64 "Segoe UI",Arial,sans-serif;background:var(--qo-surface);color:var(--qo-text);
+}
+.qw-bank-rich-render {
+ overflow:auto;min-width:0;padding:12px 16px;
+ font:17px/1.6 Georgia,"Times New Roman",serif;color:var(--qo-text);
+}
+.qw-bank-rich-render .qw-paper-task {
+ background:transparent;color:inherit;border:0;padding:0;font:inherit;
+}
+.qw-bank-rich-render .qw-paper-task>header {display:none}
+.qw-bank-edit-side {
+ min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:10px 12px;
+ border-inline-start:1px solid var(--qo-border);background:var(--qo-surface-alt);
+}
+.qw-bank-edit-categories {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.qw-bank-edit-categories label {font-weight:600;gap:3px}
+.qw-bank-edit-categories :is(select,input:not([type=checkbox])) {min-height:30px;padding:4px 6px}
+.qw-bank-edit-categories .qw-check {grid-column:1/-1}
+.qw-bank-edit-categories label:last-child {grid-column:1/-1}
+.qw-bank-edit-dialog #qw-bank-edit-error {flex:none;margin:0;border-radius:0;padding:5px 12px}
+.qw-bank-edit-dialog [hidden] {display:none!important}
+:is(.qw-bank-edit-dialog,.qw-bank-assemble-dialog) button.qw-primary:hover:not(:disabled) {
+ background:var(--qo-accent-fill-hover,var(--qo-accent-fill));color:var(--qo-on-accent);
+}
+@media(max-width:850px){
+ .qw-bank-edit-categories {grid-template-columns:minmax(0,1fr)}
+}
 
 /* BANK-01: compact bank workspace in both the standalone route and the constructor. */
 .qw-bank-assemble-dialog {display:flex;flex-direction:column;overflow:hidden}
@@ -439,7 +477,7 @@
 .qw-bank-navigation,.qw-bank-catalogue-results,.qw-bank-catalogue-preview {grid-row:1;min-width:0;min-height:0}
 .qw-bank-navigation {
  grid-column:1;overflow:auto;overscroll-behavior:contain;padding:8px;
- display:flex;flex-direction:column;gap:8px;border-inline-end:1px solid var(--qo-border);
+ display:flex;flex-direction:column;gap:8px;border-inline-end:1px solid color-mix(in srgb,var(--qo-border) 65%,transparent);
 }
 .qw-bank-navigation>button {width:100%;text-align:left}
 .qw-bank-navigation>button[aria-pressed=true] {background:var(--qo-accent-soft);border-color:var(--qo-accent-border)}
@@ -453,7 +491,7 @@
 .qw-bank-extra-filters {padding:3px 0;border-top:1px solid var(--qo-border)}
 .qw-bank-extra-filters summary {cursor:pointer;padding:5px 0;color:var(--qo-text);font-size:11px;font-weight:650}
 .qw-bank-extra-grid {display:grid;gap:7px;padding-top:5px}
-.qw-bank-catalogue-results {grid-column:2;display:flex;flex-direction:column;border-inline-end:1px solid var(--qo-border)}
+.qw-bank-catalogue-results {grid-column:2;display:flex;flex-direction:column;border-inline-end:1px solid color-mix(in srgb,var(--qo-border) 65%,transparent)}
 .qw-bank-selection-line,.qw-bank-pages {
  display:flex;align-items:center;gap:8px;flex:none;padding:5px 8px;
  font-size:11px;color:var(--qo-muted);font-variant-numeric:tabular-nums;
@@ -473,8 +511,9 @@
  display:grid;gap:1px;min-height:37px;padding:3px 1px;text-align:start;line-height:1.25;font-size:12px;
 }
 .qw-bank-choice button[data-bank-view]:hover {border-color:transparent;background:transparent}
-.qw-bank-choice strong {display:flex;gap:5px;min-width:0}
-.qw-bank-choice strong span:last-child,.qw-bank-choice small {
+.qw-bank-row-main {display:flex;gap:6px;min-width:0}
+.qw-bank-choice .qw-bank-summary {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-width:0;overflow:hidden;font-weight:400}
+.qw-bank-choice small {
  display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .qw-bank-choice small {font-size:11px;color:var(--qo-muted);font-weight:500}
@@ -490,8 +529,15 @@
 .qw-bank-preview-meta :is(span,small) {font-size:11px;color:var(--qo-muted)}
 .qw-bank-preview-actions {display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .qw-bank-preview-actions button {min-height:28px}
-.qw-bank-video-canvas {background:#fff;color:#111;padding:clamp(14px,2vw,28px)}
-.qw-bank-video-canvas .qw-paper-task {border:0;background:transparent;padding:0;color:#111;font:18px/1.55 Georgia,"Times New Roman",serif;overflow:visible}
+.qw-bank-video-canvas {background:var(--qw-bank-page,var(--qo-surface));color:var(--qw-bank-ink,var(--qo-text));padding:clamp(10px,1.6vw,21px)}
+.qw-bank-paper-view {--qw-bank-page:#fff;--qw-bank-ink:#111;--qw-bank-table-head:#edf1f5;--qw-bank-table-border:#aeb7c0}
+.qw-bank-paper-view .qw-bank-solution {background:var(--qw-bank-page);color:var(--qw-bank-ink);padding-inline:12px}
+.qw-bank-zoom {display:none!important}
+.qw-bank-expanded .qw-bank-zoom {display:flex!important;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+.qw-bank-zoom input {width:85px;accent-color:var(--qo-accent);padding:0}
+.qw-bank-zoom output {min-width:34px}
+.qw-bank-expanded :is(.qw-bank-video-canvas,.qw-bank-solution) {zoom:var(--qw-bank-preview-zoom,1)}
+.qw-bank-video-canvas .qw-paper-task {border:0;background:transparent;padding:0;color:inherit;font:18px/1.55 Georgia,"Times New Roman",serif;overflow:visible}
 .qw-bank-video-canvas .qw-paper-task>header {display:none}
 .qw-bank-video-canvas .qw-task-flow figure {width:min(45%,470px)!important;max-width:45%;margin-block:3px 12px}
 .qw-bank-video-canvas .qw-task-flow figure :is(svg,img) {width:100%;height:auto;display:block}
@@ -536,7 +582,7 @@
 .qw-rich :is(ul,ol) {padding-left:1.5em;margin:.55em 0 .95em}
 .qw-rich li {margin:.25em 0;padding-left:.1em}
 .qw-rich blockquote {border-left:3px solid var(--qo-accent-border,#97a5b5);background:var(--qo-surface-alt,#f7f8fa);margin:1em 0;padding:.7em 1em;border-radius:0 5px 5px 0}
-.qw-bank-video-canvas .qw-rich blockquote {background:#f3f6f8;border-color:#788ea7}
+.qw-bank-paper-view .qw-rich :is(blockquote,pre) {background:#f3f6f8;border-color:#788ea7}
 .qw-rich blockquote p {margin:0}
 .qw-rich :is(code,pre) {font-family:Consolas,'Courier New',monospace;font-size:.9em}
 .qw-rich code {background:rgba(120,135,150,.13);padding:.1em .25em;border-radius:3px}
@@ -549,37 +595,13 @@
 .qw-rich table {width:100%;border-collapse:collapse;font-size:.91em;table-layout:auto}
 .qw-rich :is(th,td) {border:1px solid #aeb7c0;padding:.45em .55em;text-align:left;vertical-align:top}
 .qw-rich th {background:#edf1f5;font-weight:700;color:#1d2937}
+:is(.qw-bank-rich-render,.qw-bank-catalogue-preview) :is(th,td) {border-color:var(--qw-bank-table-border,var(--qo-border-strong))}
+:is(.qw-bank-rich-render,.qw-bank-catalogue-preview) th {background:var(--qw-bank-table-head,var(--qo-surface-alt));color:var(--qw-bank-ink,var(--qo-text))}
 .qw-bank-solution-body section+section {border-top:1px solid var(--qo-border);margin-top:15px;padding-top:6px}
 .qw-bank-video-canvas .qw-task-text.qw-rich :first-child {margin-top:0}
 .qw-bank-video-canvas .qw-task-text.qw-rich {font-family:Georgia,'Times New Roman',serif;font-size:inherit}
 .qw-bank-video-canvas .qw-task-text.qw-rich p:last-child {margin-bottom:0}
 
-/* Note editor: separate content, formatting and live preview. */
-.qw-bank-edit-fields .qw-bank-rich-editor {grid-column:1/-1;display:flex;flex-direction:column;gap:7px;min-width:0;padding:12px;border:1px solid var(--qo-border);border-radius:9px;background:var(--qo-surface)}
-.qw-bank-rich-head {display:flex;align-items:center;justify-content:space-between;gap:8px}
-.qw-bank-rich-head strong {font:700 13px/1.4 'Segoe UI',Arial,sans-serif;color:var(--qo-text)}
-.qw-bank-rich-head button {padding:6px 10px;font-size:11px;color:var(--qo-accent)}
-.qw-bank-rich-head button[aria-pressed=true] {background:var(--qo-accent-soft)}
-.qw-bank-rich-tools {display:flex;flex-wrap:wrap;gap:5px;padding-bottom:5px;border-bottom:1px solid var(--qo-border)}
-.qw-bank-rich-tools button {min-width:32px;min-height:30px;padding:5px 9px;font-size:11px}
-.qw-bank-rich-editor textarea {width:100%;resize:vertical;min-height:96px;font:13px/1.62 'Segoe UI',Arial,sans-serif;padding:10px;background:var(--qo-surface);color:var(--qo-text)}
-.qw-bank-rich-render {min-height:90px;max-height:470px;overflow:auto;padding:14px;background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:6px;font:14px/1.65 Georgia,serif;color:var(--qo-text)}
-.qw-bank-rich-render [hidden],.qw-bank-rich-editor [hidden] {display:none!important}
-.qw-bank-rich-hint {font:10px/1.55 'Segoe UI',Arial,sans-serif;color:var(--qo-muted)}
-.qw-bank-edit-dialog .qw-selected-preview {margin-top:12px}
-.qw-bank-edit-dialog #qw-bank-edit-preview {background:#fff;padding:16px;border:1px solid #d7dce0;color:#121212;border-radius:5px;max-height:490px;overflow:auto}
-.qw-bank-edit-dialog #qw-bank-edit-preview .qw-paper-task {font:17px/1.58 Georgia,serif;border:0;padding:0;background:transparent}
-@media(max-width:560px){.qw-bank-expanded .qw-bank-video-canvas {padding:18px}.qw-bank-expanded .qw-bank-video-canvas .qw-paper-task {font-size:18px}.qw-bank-rich-tools button {font-size:10px;padding:4px 7px}}
-
-
-/* Editable task preview remains visible alongside the authoring controls. */
-.qw-bank-edit-side {position:sticky;top:0}
-.qw-bank-edit-preview-side {margin-top:16px;padding-top:13px;border-top:1px solid var(--qo-border)}
-.qw-bank-edit-preview-side h3 {margin:0 0 9px;color:var(--qo-muted)}
-.qw-bank-edit-side #qw-bank-edit-preview {margin:0;min-height:165px;max-height:min(410px,46vh);padding:12px;background:#fff}
-.qw-bank-edit-side #qw-bank-edit-preview .qw-paper-task {font-size:14px;line-height:1.55}
-.qw-bank-edit-side #qw-bank-edit-preview .qw-task-flow figure {max-width:50%}
-@media(max-width:820px){.qw-bank-edit-side{position:static}.qw-bank-edit-preview-side {margin-bottom:12px}}
 .qw-bank-restore-review{border:1px solid var(--line,#d6dce7);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--panel,#f8fafc);display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 .qw-bank-restore-review[hidden],.qw-bank-restore-review [hidden]{display:none!important}
 .qw-bank-restore-review h3{width:100%;margin:0;font-size:14px}
@@ -596,7 +618,7 @@
 #qo-bank-root>.qw-bank-inline>header {flex:none}
 #qo-bank-root>.qw-bank-inline.qw-bank-expanded {width:100%;height:100%}
 
-#qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:auto}
+#qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:hidden}
 #qo-bank-root>.qw-bank-inline>footer {flex:none;flex-wrap:wrap}
 
 /* TASK167.1: bank catalogue consumes only the space remaining below storage controls. */

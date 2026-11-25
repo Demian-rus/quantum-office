@@ -7,6 +7,13 @@ const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function qwMath(source){
  const s=String(source);if(!s.trim()||s.length>600)throw Error('Формула должна содержать 1–600 символов');let i=0;
+ if(s.trimStart().startsWith('\\begin{cases}')){
+  const body=s.trim().match(/^\\begin\{cases\}([\s\S]+)\\end\{cases\}$/)?.[1];
+  const rows=body?.split(/\\\\/).map(row=>row.trim());
+  if(!rows||rows.length<2||rows.length>8||rows.some(row=>!row||/\\(?:begin|end)\b/.test(row)))
+   throw Error('Система должна содержать от 2 до 8 строк');
+  return {t:'cases',rows:rows.map(row=>qwMath(row.replace(/&/g,'')))};
+ }
  const plain=n=>n.t==='text'?n.v:n.t==='row'?n.list.map(plain).join(''):'';
  function command(depth){
   const match=s.slice(i).match(/^[A-Za-z]+/);if(!match)return {t:'text',v:s[i++]||''};
@@ -54,6 +61,8 @@ function qwMathML(n,upright=false,unary=false){
  if(n.t==='upright')return '<mstyle mathvariant="normal">'+qwMathML(n.a,true)+'</mstyle>';
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a,upright));
+ if(n.t==='cases')return tag('mrow','<mo fence="true" stretchy="true">{</mo><mtable columnalign="left">'+
+  n.rows.map(row=>tag('mtr',tag('mtd',qwMathML(row,upright)))).join('')+'</mtable>');
  if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  const value=n.v==='-'?'−':n.v;
  if(upright)return tag('mtext',qwEsc(value));
@@ -88,13 +97,12 @@ function qwPlainMathHTML(value){
  return text.split(/(\b(?:https?:\/\/|www\.)[^\s]+|\x60[^\x60]*\x60)/gi).map((s,i)=>i%2?qwEsc(s):render(s)).join('');
 }
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwPlainMathHTML(t.v).replace(/\n/g,'<br>')).join('');}
-/* TASK164: safe, bounded Markdown-style rendering for the PERSONAL bank preview.
-   No HTML passthrough, remote markup, script, or raw CSS. The PDF engine and
-   existing qwContentHTML contract remain unchanged. */
+/* Safe, bounded Markdown-style rendering shared by the bank and print.
+   Explicit syntax is rendered as known elements. User HTML is escaped. */
 function qwRichInlineText(input,depth=0){
  const source=String(input||'');
  if(depth>4)return qwEsc(source);
- const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_)/g;
+ const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_|\+\+([^+\n]+)\+\+|\^\{([^{}\n]+)\}|~\{([^{}\n]+)\})/g;
  let html='',pos=0,m;
  while((m=pattern.exec(source))){
   html+=qwPlainMathHTML(source.slice(pos,m.index));
@@ -102,7 +110,11 @@ function qwRichInlineText(input,depth=0){
   else if(m[4]!==undefined)html+='<del>'+qwEsc(m[4])+'</del>';
   else if(m[5]!==undefined)html+='<code>'+qwEsc(m[5])+'</code>';
   else if(m[6]!==undefined)html+='<em>'+qwRichInlineText(m[6],depth+1)+'</em>';
-  else html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
+  else if(m[8]!==undefined)html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
+  else {
+   const tag=m[9]!==undefined?'u':m[10]!==undefined?'sup':'sub';
+   html+='<'+tag+'>'+qwRichInlineText(m[9]??m[10]??m[11],depth+1)+'</'+tag+'>';
+  }
   pos=pattern.lastIndex;
  }
  return html+qwPlainMathHTML(source.slice(pos));
@@ -115,27 +127,27 @@ function qwRichMath(value,display=false){
  }
 }
 function qwRichInline(source){
- return qwTokens(String(source||'')).map(token=>{
-  if(token.t==='math')return qwRichMath(token.v);
-  if(token.t==='blank')return '<span class="qw-inline-blank" style="width:'+token.size+'ch" aria-label="Место для ответа"></span>';
-  if(token.t==='error')return '<span class="qw-formula-error" title="'+qwEsc(token.error)+'">'+qwEsc(token.v)+'</span>';
-  // Obsidian-compatible $...$ maths, without changing QWORK's original formula grammar.
-  const text=token.v,formula=/\$([^$\n]{1,600})\$/g;
-  let match,start=0,out='';
-  while((match=formula.exec(text))){
-   out+=qwRichInlineText(text.slice(start,match.index));
-   out+=qwRichMath(match[1]);
-   start=formula.lastIndex;
-  }
-  return out+qwRichInlineText(text.slice(start));
- }).join('');
+ // Keep formulas and blanks atomic inside styles such as **F = \(ma\)**.
+ // Literal NUL would be replaced by the HTML parser anyway.
+ const atoms=[];
+ const text=String(source||'').replace(/\0/g,'�').replace(
+  /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$/g,
+  (match,code,formula,blank,alternate)=>{
+   if(code)return match;
+   const html=blank!==undefined?
+    '<span class="qw-inline-blank" style="width:'+Math.max(1,Math.min(30,Number(blank)))+'ch" aria-label="Место для ответа"></span>':
+    qwRichMath(formula??alternate);
+   return '\0'+(atoms.push(html)-1)+'\0';
+  });
+ return qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
 }
 /* TASK165: leave ordinary legacy exercises byte-for-byte on the original PDF
    text path. Only explicit Markdown syntax opts an individual field in. */
 function qwHasRichSyntax(value){
  const text=String(value??'');
- return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$)/m.test(text)||
-  /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])\*[^*\n]+\*|\$[^$\n]{1,600}\$/.test(text)||
+ return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
+  /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])(?:\*[^*\n]+\*|_[^_\n]+_)|`[^`\n]+`|\$[^$\n]{1,600}\$/.test(text)||
+  (/\+\+|[\^~]\{/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
   /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
 }
 function qwPrintFieldHTML(value){
@@ -147,12 +159,13 @@ function qwRichMarkdownHTML(value){
  const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
  const numbered=line=>/^\s{0,3}\d{1,3}[.)]\s+/.test(line);
  const heading=line=>/^\s{0,3}#{1,4}\s+/.test(line);
+ const alignment=line=>line.match(/^\s{0,3}::(left|center|right|justify)[ \t]+(.+)$/);
  const quote=line=>/^\s{0,3}>\s?/.test(line);
  const fence=line=>/^\s{0,3}```/.test(line);
  const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
  const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
  const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
- const startBlock=line=>bullet(line)||numbered(line)||heading(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
+ const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
  let i=0;
  while(i<lines.length){
   const line=lines[i];
@@ -175,6 +188,10 @@ function qwRichMarkdownHTML(value){
   if(heading(line)){
    const m=line.match(/^\s{0,3}(#{1,4})\s+(.*)$/),level=Math.min(5,m[1].length+2);
    result.push('<h'+level+'>'+qwRichInline(m[2])+'</h'+level+'>');i++;continue;
+  }
+  const aligned=alignment(line);
+  if(aligned){
+   result.push('<p style="text-align:'+aligned[1]+'">'+qwRichInline(aligned[2])+'</p>');i++;continue;
   }
   if(ruler(line)){result.push('<hr>');i++;continue;}
   if(quote(line)){

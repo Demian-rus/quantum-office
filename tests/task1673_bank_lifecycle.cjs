@@ -23,7 +23,10 @@ async function checkBankLifecycle(p,id,dialogDecision){
  await edit();await graph();
  if(await p.locator('#qw-graph-preset').isVisible()===false)await p.locator('[data-visual-panel="tools"]').click();
  await p.locator('#qw-graph-preset').selectOption('v');await action('visual-apply').click();await prompt.waitFor();
- const preview=await p.locator('#qw-bank-edit-preview').innerHTML();await sameEditor();assert.equal(await p.locator('#qw-bank-edit-preview').innerHTML(),preview,'applied graph remains in working copy');
+ const previewToggle=p.locator('[data-bank-preview-toggle="prompt"]');await previewToggle.click();
+ const rendered=p.locator('#qw-bank-edit-preview');await rendered.locator('svg[viewBox]').first().waitFor();
+ const preview=await rendered.innerHTML();await sameEditor();assert.equal(await rendered.innerHTML(),preview,'applied graph remains in working copy');
+ await previewToggle.click();
  dialogDecision.accept=false;count=dialogDecision.count;await route('diagnostics');assert.equal(dialogDecision.count,count+1);assert.ok(await prompt.isVisible());await unchanged();
  await prompt.fill('TASK167.3 explicitly saved bank condition');dialogDecision.accept=true;await action('bank-edit-save').click();await p.locator('[data-bank-view="'+id+'"]').waitFor();
  const saved=await p.evaluate(async id=>JSON.parse(JSON.stringify(await qwBankRepository.getTask(id))),id);

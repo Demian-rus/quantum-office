@@ -12252,37 +12252,75 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-choice-list{margin:1.5mm 0 0;padding-left:6mm;list-style-type:decimal;line-height:1.4}
 
 
-/* TASK156: bank entry editor; same workbench geometry, no tutorial overlays. */
-.qw-bank-edit-dialog{width:min(1180px,calc(100vw - 20px));max-width:none;max-height:calc(100dvh - 20px)}
-.qw-bank-edit-dialog>.qw-dialog-body{min-height:0;overflow:auto}
-.qw-bank-edit-layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.9fr);gap:15px;align-items:start}
-.qw-bank-edit-layout h3{font-size:13px;margin:0 0 8px}
-.qw-bank-edit-main,.qw-bank-edit-side{min-width:0}
-.qw-bank-edit-fields,.qw-bank-edit-categories{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
-.qw-bank-edit-fields>label,.qw-bank-edit-categories>label{display:flex;flex-direction:column;gap:4px;min-width:0;font-size:11px;font-weight:600}
-.qw-bank-edit-fields>label:has(textarea),.qw-bank-choice-field,.qw-bank-edit-visual-actions,#qw-bank-edit-preview{grid-column:1/-1}
-.qw-bank-edit-fields label.qw-check{display:flex;flex-direction:row;align-items:center;gap:6px}
-.qw-bank-edit-fields input,.qw-bank-edit-fields select,.qw-bank-edit-fields textarea,
-.qw-bank-edit-categories input,.qw-bank-edit-categories select{
- width:100%;min-width:0;box-sizing:border-box;border:1px solid var(--qo-border);
- background:var(--qo-surface);color:var(--qo-text);border-radius:5px;
- padding:6px;font:12px/1.4 "Segoe UI",Arial,sans-serif
+/* BANK-02: a single formatting toolbar for the active field. */
+.qw-bank-edit-dialog>.qw-dialog-body {
+ display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;padding:0;
 }
-.qw-bank-edit-fields textarea{resize:vertical;min-height:50px}
-.qw-bank-edit-fields select,.qw-bank-edit-categories select,.qw-bank-edit-categories input{min-height:32px}
-.qw-bank-edit-visual-actions{display:flex;gap:7px;flex-wrap:wrap}
-.qw-bank-edit-visual-actions button{flex:1;min-width:125px}
-#qw-bank-edit-preview{margin-top:3px;padding:12px;border:1px solid var(--qo-border);
- background:#fff;color:#171717;min-height:70px;max-height:350px;overflow:auto}
-.qw-bank-edit-dialog [hidden]{display:none!important}
-@media(max-width:820px){
- .qw-bank-edit-layout{grid-template-columns:minmax(0,1fr)}
- .qw-bank-edit-categories{grid-template-columns:repeat(3,minmax(0,1fr))}
+.qw-bank-edit-top,.qw-bank-edit-tabs,.qw-bank-rich-tools,.qw-bank-tool-group,.qw-bank-edit-visual-actions {
+ display:flex;align-items:center;gap:4px;flex-wrap:wrap;
 }
-@media(max-width:530px){
- .qw-bank-edit-fields,.qw-bank-edit-categories{grid-template-columns:minmax(0,1fr)}
+.qw-bank-edit-top {
+ flex:none;padding:5px 10px;border-bottom:1px solid var(--qo-border);background:var(--qo-surface-alt);
 }
-
+.qw-bank-edit-top .qw-dock-controls {margin-left:auto}
+.qw-bank-edit-top :is(button,select),.qw-bank-rich-tools :is(button,select),.qw-bank-edit-visual-actions button {
+ min-height:27px;padding:3px 7px;font-size:11px;
+}
+.qw-bank-edit-tabs button {border-color:transparent;background:transparent}
+.qw-bank-edit-tabs button[aria-selected=true],.qw-bank-edit-top button[aria-pressed=true] {
+ color:var(--qo-accent);background:var(--qo-accent-soft);border-color:var(--qo-accent-border);
+}
+.qw-bank-edit-dialog .qo-work-icon {width:15px;height:15px;vertical-align:middle}
+.qw-bank-edit-layout.qw-dock-layout {
+ --qw-dock-right-size:min(var(--qw-dock-right),35vw);
+ display:grid;grid-template-columns:minmax(0,1fr) var(--qw-dock-right-size);
+ flex:1;min-height:0;min-width:0;overflow:hidden;
+}
+.qw-bank-edit-layout.qw-dock-hide-right {--qw-dock-right-size:0px}
+.qw-bank-edit-layout.qw-dock-hide-right>.qw-bank-edit-side {display:none}
+.qw-bank-edit-main {
+ display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--qo-surface);
+}
+.qw-bank-edit-commandbar {
+ display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+ flex:none;padding:5px 10px;border-bottom:1px solid var(--qo-border);
+}
+.qw-bank-rich-tools {min-width:0}
+.qw-bank-edit-visual-actions {gap:4px}
+.qw-bank-rich-tools select {width:auto;max-width:185px}
+.qw-bank-tool-group {border-inline-end:1px solid var(--qo-border);padding-inline-end:5px}
+.qw-bank-rich-tools button:has(.qo-work-icon) {min-width:29px}
+.qw-bank-edit-visual-actions button {background:var(--qo-surface-alt)}
+.qw-bank-rich-editor {display:flex;flex-direction:column;gap:8px;flex:1;min-width:0;min-height:0;padding:10px;overflow:auto}
+.qw-bank-rich-editor>textarea {
+ flex:1;min-height:0;resize:none;padding:12px 14px;
+ font:14px/1.64 "Segoe UI",Arial,sans-serif;background:var(--qo-surface);color:var(--qo-text);
+}
+.qw-bank-rich-render {
+ overflow:auto;min-width:0;padding:12px 16px;
+ font:17px/1.6 Georgia,"Times New Roman",serif;color:var(--qo-text);
+}
+.qw-bank-rich-render .qw-paper-task {
+ background:transparent;color:inherit;border:0;padding:0;font:inherit;
+}
+.qw-bank-rich-render .qw-paper-task>header {display:none}
+.qw-bank-edit-side {
+ min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;padding:10px 12px;
+ border-inline-start:1px solid var(--qo-border);background:var(--qo-surface-alt);
+}
+.qw-bank-edit-categories {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.qw-bank-edit-categories label {font-weight:600;gap:3px}
+.qw-bank-edit-categories :is(select,input:not([type=checkbox])) {min-height:30px;padding:4px 6px}
+.qw-bank-edit-categories .qw-check {grid-column:1/-1}
+.qw-bank-edit-categories label:last-child {grid-column:1/-1}
+.qw-bank-edit-dialog #qw-bank-edit-error {flex:none;margin:0;border-radius:0;padding:5px 12px}
+.qw-bank-edit-dialog [hidden] {display:none!important}
+:is(.qw-bank-edit-dialog,.qw-bank-assemble-dialog) button.qw-primary:hover:not(:disabled) {
+ background:var(--qo-accent-fill-hover,var(--qo-accent-fill));color:var(--qo-on-accent);
+}
+@media(max-width:850px){
+ .qw-bank-edit-categories {grid-template-columns:minmax(0,1fr)}
+}
 
 /* BANK-01: compact bank workspace in both the standalone route and the constructor. */
 .qw-bank-assemble-dialog {display:flex;flex-direction:column;overflow:hidden}
@@ -12317,7 +12355,7 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-bank-navigation,.qw-bank-catalogue-results,.qw-bank-catalogue-preview {grid-row:1;min-width:0;min-height:0}
 .qw-bank-navigation {
  grid-column:1;overflow:auto;overscroll-behavior:contain;padding:8px;
- display:flex;flex-direction:column;gap:8px;border-inline-end:1px solid var(--qo-border);
+ display:flex;flex-direction:column;gap:8px;border-inline-end:1px solid color-mix(in srgb,var(--qo-border) 65%,transparent);
 }
 .qw-bank-navigation>button {width:100%;text-align:left}
 .qw-bank-navigation>button[aria-pressed=true] {background:var(--qo-accent-soft);border-color:var(--qo-accent-border)}
@@ -12331,7 +12369,7 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-bank-extra-filters {padding:3px 0;border-top:1px solid var(--qo-border)}
 .qw-bank-extra-filters summary {cursor:pointer;padding:5px 0;color:var(--qo-text);font-size:11px;font-weight:650}
 .qw-bank-extra-grid {display:grid;gap:7px;padding-top:5px}
-.qw-bank-catalogue-results {grid-column:2;display:flex;flex-direction:column;border-inline-end:1px solid var(--qo-border)}
+.qw-bank-catalogue-results {grid-column:2;display:flex;flex-direction:column;border-inline-end:1px solid color-mix(in srgb,var(--qo-border) 65%,transparent)}
 .qw-bank-selection-line,.qw-bank-pages {
  display:flex;align-items:center;gap:8px;flex:none;padding:5px 8px;
  font-size:11px;color:var(--qo-muted);font-variant-numeric:tabular-nums;
@@ -12351,8 +12389,9 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
  display:grid;gap:1px;min-height:37px;padding:3px 1px;text-align:start;line-height:1.25;font-size:12px;
 }
 .qw-bank-choice button[data-bank-view]:hover {border-color:transparent;background:transparent}
-.qw-bank-choice strong {display:flex;gap:5px;min-width:0}
-.qw-bank-choice strong span:last-child,.qw-bank-choice small {
+.qw-bank-row-main {display:flex;gap:6px;min-width:0}
+.qw-bank-choice .qw-bank-summary {display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-width:0;overflow:hidden;font-weight:400}
+.qw-bank-choice small {
  display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .qw-bank-choice small {font-size:11px;color:var(--qo-muted);font-weight:500}
@@ -12368,8 +12407,15 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-bank-preview-meta :is(span,small) {font-size:11px;color:var(--qo-muted)}
 .qw-bank-preview-actions {display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .qw-bank-preview-actions button {min-height:28px}
-.qw-bank-video-canvas {background:#fff;color:#111;padding:clamp(14px,2vw,28px)}
-.qw-bank-video-canvas .qw-paper-task {border:0;background:transparent;padding:0;color:#111;font:18px/1.55 Georgia,"Times New Roman",serif;overflow:visible}
+.qw-bank-video-canvas {background:var(--qw-bank-page,var(--qo-surface));color:var(--qw-bank-ink,var(--qo-text));padding:clamp(10px,1.6vw,21px)}
+.qw-bank-paper-view {--qw-bank-page:#fff;--qw-bank-ink:#111;--qw-bank-table-head:#edf1f5;--qw-bank-table-border:#aeb7c0}
+.qw-bank-paper-view .qw-bank-solution {background:var(--qw-bank-page);color:var(--qw-bank-ink);padding-inline:12px}
+.qw-bank-zoom {display:none!important}
+.qw-bank-expanded .qw-bank-zoom {display:flex!important;align-items:center;gap:5px;font-variant-numeric:tabular-nums}
+.qw-bank-zoom input {width:85px;accent-color:var(--qo-accent);padding:0}
+.qw-bank-zoom output {min-width:34px}
+.qw-bank-expanded :is(.qw-bank-video-canvas,.qw-bank-solution) {zoom:var(--qw-bank-preview-zoom,1)}
+.qw-bank-video-canvas .qw-paper-task {border:0;background:transparent;padding:0;color:inherit;font:18px/1.55 Georgia,"Times New Roman",serif;overflow:visible}
 .qw-bank-video-canvas .qw-paper-task>header {display:none}
 .qw-bank-video-canvas .qw-task-flow figure {width:min(45%,470px)!important;max-width:45%;margin-block:3px 12px}
 .qw-bank-video-canvas .qw-task-flow figure :is(svg,img) {width:100%;height:auto;display:block}
@@ -12414,7 +12460,7 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-rich :is(ul,ol) {padding-left:1.5em;margin:.55em 0 .95em}
 .qw-rich li {margin:.25em 0;padding-left:.1em}
 .qw-rich blockquote {border-left:3px solid var(--qo-accent-border,#97a5b5);background:var(--qo-surface-alt,#f7f8fa);margin:1em 0;padding:.7em 1em;border-radius:0 5px 5px 0}
-.qw-bank-video-canvas .qw-rich blockquote {background:#f3f6f8;border-color:#788ea7}
+.qw-bank-paper-view .qw-rich :is(blockquote,pre) {background:#f3f6f8;border-color:#788ea7}
 .qw-rich blockquote p {margin:0}
 .qw-rich :is(code,pre) {font-family:Consolas,'Courier New',monospace;font-size:.9em}
 .qw-rich code {background:rgba(120,135,150,.13);padding:.1em .25em;border-radius:3px}
@@ -12427,37 +12473,13 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-rich table {width:100%;border-collapse:collapse;font-size:.91em;table-layout:auto}
 .qw-rich :is(th,td) {border:1px solid #aeb7c0;padding:.45em .55em;text-align:left;vertical-align:top}
 .qw-rich th {background:#edf1f5;font-weight:700;color:#1d2937}
+:is(.qw-bank-rich-render,.qw-bank-catalogue-preview) :is(th,td) {border-color:var(--qw-bank-table-border,var(--qo-border-strong))}
+:is(.qw-bank-rich-render,.qw-bank-catalogue-preview) th {background:var(--qw-bank-table-head,var(--qo-surface-alt));color:var(--qw-bank-ink,var(--qo-text))}
 .qw-bank-solution-body section+section {border-top:1px solid var(--qo-border);margin-top:15px;padding-top:6px}
 .qw-bank-video-canvas .qw-task-text.qw-rich :first-child {margin-top:0}
 .qw-bank-video-canvas .qw-task-text.qw-rich {font-family:Georgia,'Times New Roman',serif;font-size:inherit}
 .qw-bank-video-canvas .qw-task-text.qw-rich p:last-child {margin-bottom:0}
 
-/* Note editor: separate content, formatting and live preview. */
-.qw-bank-edit-fields .qw-bank-rich-editor {grid-column:1/-1;display:flex;flex-direction:column;gap:7px;min-width:0;padding:12px;border:1px solid var(--qo-border);border-radius:9px;background:var(--qo-surface)}
-.qw-bank-rich-head {display:flex;align-items:center;justify-content:space-between;gap:8px}
-.qw-bank-rich-head strong {font:700 13px/1.4 'Segoe UI',Arial,sans-serif;color:var(--qo-text)}
-.qw-bank-rich-head button {padding:6px 10px;font-size:11px;color:var(--qo-accent)}
-.qw-bank-rich-head button[aria-pressed=true] {background:var(--qo-accent-soft)}
-.qw-bank-rich-tools {display:flex;flex-wrap:wrap;gap:5px;padding-bottom:5px;border-bottom:1px solid var(--qo-border)}
-.qw-bank-rich-tools button {min-width:32px;min-height:30px;padding:5px 9px;font-size:11px}
-.qw-bank-rich-editor textarea {width:100%;resize:vertical;min-height:96px;font:13px/1.62 'Segoe UI',Arial,sans-serif;padding:10px;background:var(--qo-surface);color:var(--qo-text)}
-.qw-bank-rich-render {min-height:90px;max-height:470px;overflow:auto;padding:14px;background:var(--qo-surface-alt);border:1px solid var(--qo-border);border-radius:6px;font:14px/1.65 Georgia,serif;color:var(--qo-text)}
-.qw-bank-rich-render [hidden],.qw-bank-rich-editor [hidden] {display:none!important}
-.qw-bank-rich-hint {font:10px/1.55 'Segoe UI',Arial,sans-serif;color:var(--qo-muted)}
-.qw-bank-edit-dialog .qw-selected-preview {margin-top:12px}
-.qw-bank-edit-dialog #qw-bank-edit-preview {background:#fff;padding:16px;border:1px solid #d7dce0;color:#121212;border-radius:5px;max-height:490px;overflow:auto}
-.qw-bank-edit-dialog #qw-bank-edit-preview .qw-paper-task {font:17px/1.58 Georgia,serif;border:0;padding:0;background:transparent}
-@media(max-width:560px){.qw-bank-expanded .qw-bank-video-canvas {padding:18px}.qw-bank-expanded .qw-bank-video-canvas .qw-paper-task {font-size:18px}.qw-bank-rich-tools button {font-size:10px;padding:4px 7px}}
-
-
-/* Editable task preview remains visible alongside the authoring controls. */
-.qw-bank-edit-side {position:sticky;top:0}
-.qw-bank-edit-preview-side {margin-top:16px;padding-top:13px;border-top:1px solid var(--qo-border)}
-.qw-bank-edit-preview-side h3 {margin:0 0 9px;color:var(--qo-muted)}
-.qw-bank-edit-side #qw-bank-edit-preview {margin:0;min-height:165px;max-height:min(410px,46vh);padding:12px;background:#fff}
-.qw-bank-edit-side #qw-bank-edit-preview .qw-paper-task {font-size:14px;line-height:1.55}
-.qw-bank-edit-side #qw-bank-edit-preview .qw-task-flow figure {max-width:50%}
-@media(max-width:820px){.qw-bank-edit-side{position:static}.qw-bank-edit-preview-side {margin-bottom:12px}}
 .qw-bank-restore-review{border:1px solid var(--line,#d6dce7);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--panel,#f8fafc);display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center}
 .qw-bank-restore-review[hidden],.qw-bank-restore-review [hidden]{display:none!important}
 .qw-bank-restore-review h3{width:100%;margin:0;font-size:14px}
@@ -12474,7 +12496,7 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 #qo-bank-root>.qw-bank-inline>header {flex:none}
 #qo-bank-root>.qw-bank-inline.qw-bank-expanded {width:100%;height:100%}
 
-#qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:auto}
+#qo-bank-root>.qw-bank-inline.qw-bank-edit-dialog>.qw-dialog-body {flex:1;min-height:0;overflow:hidden}
 #qo-bank-root>.qw-bank-inline>footer {flex:none;flex-wrap:wrap}
 
 /* TASK167.1: bank catalogue consumes only the space remaining below storage controls. */
@@ -23858,6 +23880,13 @@ const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function qwMath(source){
  const s=String(source);if(!s.trim()||s.length>600)throw Error('Формула должна содержать 1–600 символов');let i=0;
+ if(s.trimStart().startsWith('\\begin{cases}')){
+  const body=s.trim().match(/^\\begin\{cases\}([\s\S]+)\\end\{cases\}$/)?.[1];
+  const rows=body?.split(/\\\\/).map(row=>row.trim());
+  if(!rows||rows.length<2||rows.length>8||rows.some(row=>!row||/\\(?:begin|end)\b/.test(row)))
+   throw Error('Система должна содержать от 2 до 8 строк');
+  return {t:'cases',rows:rows.map(row=>qwMath(row.replace(/&/g,'')))};
+ }
  const plain=n=>n.t==='text'?n.v:n.t==='row'?n.list.map(plain).join(''):'';
  function command(depth){
   const match=s.slice(i).match(/^[A-Za-z]+/);if(!match)return {t:'text',v:s[i++]||''};
@@ -23905,6 +23934,8 @@ function qwMathML(n,upright=false,unary=false){
  if(n.t==='upright')return '<mstyle mathvariant="normal">'+qwMathML(n.a,true)+'</mstyle>';
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a,upright));
+ if(n.t==='cases')return tag('mrow','<mo fence="true" stretchy="true">{</mo><mtable columnalign="left">'+
+  n.rows.map(row=>tag('mtr',tag('mtd',qwMathML(row,upright)))).join('')+'</mtable>');
  if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  const value=n.v==='-'?'−':n.v;
  if(upright)return tag('mtext',qwEsc(value));
@@ -23939,13 +23970,12 @@ function qwPlainMathHTML(value){
  return text.split(/(\b(?:https?:\/\/|www\.)[^\s]+|\x60[^\x60]*\x60)/gi).map((s,i)=>i%2?qwEsc(s):render(s)).join('');
 }
 function qwContentHTML(text){return qwTokens(text).map(t=>t.t==='math'?'<math xmlns="http://www.w3.org/1998/Math/MathML" aria-label="'+qwEsc(t.v)+'">'+qwMathML(t.ast)+'</math>':t.t==='blank'?'<span class="qw-inline-blank" style="width:'+t.size+'ch" aria-label="Место для ответа"></span>':t.t==='error'?'<span class="qw-formula-error" title="'+qwEsc(t.error)+'">'+qwEsc(t.v)+'</span>':qwPlainMathHTML(t.v).replace(/\n/g,'<br>')).join('');}
-/* TASK164: safe, bounded Markdown-style rendering for the PERSONAL bank preview.
-   No HTML passthrough, remote markup, script, or raw CSS. The PDF engine and
-   existing qwContentHTML contract remain unchanged. */
+/* Safe, bounded Markdown-style rendering shared by the bank and print.
+   Explicit syntax is rendered as known elements. User HTML is escaped. */
 function qwRichInlineText(input,depth=0){
  const source=String(input||'');
  if(depth>4)return qwEsc(source);
- const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_)/g;
+ const pattern=/(\*\*([^*\n]+)\*\*|__([^_\n]+)__|~~([^~\n]+)~~|`([^`\n]+)`|\*([^*\n]+)\*|(^|[^\w])_([^_\n]+)_|\+\+([^+\n]+)\+\+|\^\{([^{}\n]+)\}|~\{([^{}\n]+)\})/g;
  let html='',pos=0,m;
  while((m=pattern.exec(source))){
   html+=qwPlainMathHTML(source.slice(pos,m.index));
@@ -23953,7 +23983,11 @@ function qwRichInlineText(input,depth=0){
   else if(m[4]!==undefined)html+='<del>'+qwEsc(m[4])+'</del>';
   else if(m[5]!==undefined)html+='<code>'+qwEsc(m[5])+'</code>';
   else if(m[6]!==undefined)html+='<em>'+qwRichInlineText(m[6],depth+1)+'</em>';
-  else html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
+  else if(m[8]!==undefined)html+=qwEsc(m[7])+'<em>'+qwRichInlineText(m[8],depth+1)+'</em>';
+  else {
+   const tag=m[9]!==undefined?'u':m[10]!==undefined?'sup':'sub';
+   html+='<'+tag+'>'+qwRichInlineText(m[9]??m[10]??m[11],depth+1)+'</'+tag+'>';
+  }
   pos=pattern.lastIndex;
  }
  return html+qwPlainMathHTML(source.slice(pos));
@@ -23966,27 +24000,27 @@ function qwRichMath(value,display=false){
  }
 }
 function qwRichInline(source){
- return qwTokens(String(source||'')).map(token=>{
-  if(token.t==='math')return qwRichMath(token.v);
-  if(token.t==='blank')return '<span class="qw-inline-blank" style="width:'+token.size+'ch" aria-label="Место для ответа"></span>';
-  if(token.t==='error')return '<span class="qw-formula-error" title="'+qwEsc(token.error)+'">'+qwEsc(token.v)+'</span>';
-  // Obsidian-compatible $...$ maths, without changing QWORK's original formula grammar.
-  const text=token.v,formula=/\$([^$\n]{1,600})\$/g;
-  let match,start=0,out='';
-  while((match=formula.exec(text))){
-   out+=qwRichInlineText(text.slice(start,match.index));
-   out+=qwRichMath(match[1]);
-   start=formula.lastIndex;
-  }
-  return out+qwRichInlineText(text.slice(start));
- }).join('');
+ // Keep formulas and blanks atomic inside styles such as **F = \(ma\)**.
+ // Literal NUL would be replaced by the HTML parser anyway.
+ const atoms=[];
+ const text=String(source||'').replace(/\0/g,'�').replace(
+  /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$/g,
+  (match,code,formula,blank,alternate)=>{
+   if(code)return match;
+   const html=blank!==undefined?
+    '<span class="qw-inline-blank" style="width:'+Math.max(1,Math.min(30,Number(blank)))+'ch" aria-label="Место для ответа"></span>':
+    qwRichMath(formula??alternate);
+   return '\0'+(atoms.push(html)-1)+'\0';
+  });
+ return qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
 }
 /* TASK165: leave ordinary legacy exercises byte-for-byte on the original PDF
    text path. Only explicit Markdown syntax opts an individual field in. */
 function qwHasRichSyntax(value){
  const text=String(value??'');
- return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$)/m.test(text)||
-  /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])\*[^*\n]+\*|\$[^$\n]{1,600}\$/.test(text)||
+ return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
+  /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])(?:\*[^*\n]+\*|_[^_\n]+_)|`[^`\n]+`|\$[^$\n]{1,600}\$/.test(text)||
+  (/\+\+|[\^~]\{/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
   /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
 }
 function qwPrintFieldHTML(value){
@@ -23998,12 +24032,13 @@ function qwRichMarkdownHTML(value){
  const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
  const numbered=line=>/^\s{0,3}\d{1,3}[.)]\s+/.test(line);
  const heading=line=>/^\s{0,3}#{1,4}\s+/.test(line);
+ const alignment=line=>line.match(/^\s{0,3}::(left|center|right|justify)[ \t]+(.+)$/);
  const quote=line=>/^\s{0,3}>\s?/.test(line);
  const fence=line=>/^\s{0,3}```/.test(line);
  const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
  const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
  const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
- const startBlock=line=>bullet(line)||numbered(line)||heading(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
+ const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
  let i=0;
  while(i<lines.length){
   const line=lines[i];
@@ -24026,6 +24061,10 @@ function qwRichMarkdownHTML(value){
   if(heading(line)){
    const m=line.match(/^\s{0,3}(#{1,4})\s+(.*)$/),level=Math.min(5,m[1].length+2);
    result.push('<h'+level+'>'+qwRichInline(m[2])+'</h'+level+'>');i++;continue;
+  }
+  const aligned=alignment(line);
+  if(aligned){
+   result.push('<p style="text-align:'+aligned[1]+'">'+qwRichInline(aligned[2])+'</p>');i++;continue;
   }
   if(ruler(line)){result.push('<hr>');i++;continue;}
   if(quote(line)){
@@ -25289,6 +25328,18 @@ function qwMathBox(ctx,n,size=12,upright=false,unary=false){
  if(n.t==='row'){const bs=n.list.map((v,i)=>qwMathBox(ctx,v,size,upright,qwMathIsUnary(n.list,i)));return {w:bs.reduce((s,b)=>s+b.w,0),a:Math.max(size*.8,...bs.map(b=>b.a)),d:Math.max(size*.24,...bs.map(b=>b.d)),draw:(x,y)=>{for(const b of bs){b.draw(x,y);x+=b.w;}}};}
  if(n.t==='frac'){const a=qwMathBox(ctx,n.a,size*.78,upright),b=qwMathBox(ctx,n.b,size*.78,upright),w=Math.max(a.w,b.w)+8;return {w,a:a.a+a.d+size*.35,d:b.a+b.d+size*.25,draw:(x,y)=>{a.draw(x+(w-a.w)/2,y-size*.35-a.d);ctx.beginPath();ctx.lineWidth=.7;ctx.moveTo(x,y-size*.18);ctx.lineTo(x+w,y-size*.18);ctx.stroke();b.draw(x+(w-b.w)/2,y+b.a+2);}};}
  if(n.t==='sqrt'){const a=qwMathBox(ctx,n.a,size,upright);return {w:a.w+size*.8,a:a.a+3,d:a.d,draw:(x,y)=>{ctx.font=(size*1.2)+'px "Times New Roman",serif';ctx.fillText('√',x,y+1);a.draw(x+size*.8,y);ctx.beginPath();ctx.lineWidth=.6;ctx.moveTo(x+size*.7,y-a.a-1);ctx.lineTo(x+a.w+size*.8,y-a.a-1);ctx.stroke();}};}
+ if(n.t==='cases'){
+  const rows=n.rows.map(row=>qwMathBox(ctx,row,size,upright));
+  const gap=size*.15,height=rows.reduce((sum,row)=>sum+row.a+row.d+gap,-gap);
+  const a=height/2+size*.25,d=height-a,brace=size*.8;
+  return {w:brace+Math.max(...rows.map(row=>row.w)),a,d,draw:(x,y)=>{
+   ctx.font=height+'px "Times New Roman",serif';
+   ctx.save();ctx.translate(x,y+(d-a)/2);ctx.scale(brace/Math.max(1,ctx.measureText('{').width),1);
+   ctx.textBaseline='middle';ctx.fillText('{',0,0);ctx.restore();
+   let top=y-a;
+   for(const row of rows){row.draw(x+brace,top+row.a);top+=row.a+row.d+gap;}
+  }};
+ }
  const a=qwMathBox(ctx,n.a,size,upright),b=qwMathBox(ctx,n.b,size*.66,upright),dy=n.t==='sup'?-size*.58:size*.34;return {w:a.w+b.w,a:Math.max(a.a,b.a-dy),d:Math.max(a.d,b.d+dy),draw:(x,y)=>{a.draw(x,y);b.draw(x+a.w,y+dy);}};
 }
 async function qwImage(source){const img=new Image();img.src=source;await img.decode();return img;}
@@ -26152,7 +26203,7 @@ try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.pars
 
 // TASK167.3: view preferences only; never include these in QWORK/QWBANK.
 const QW_PANELS_KEY='quantum-office.education-panels.v1';
-const qwPanelDefaults={work:{left:228,right:260,hideLeft:false,hideRight:false},visual:{left:254,right:278,hideLeft:false,hideRight:false},pdf:{left:254,hideLeft:false},diagnostics:{left:208,right:260,hideLeft:false,hideRight:false},bank:{left:208,right:350,hideLeft:false,hideRight:false}};
+const qwPanelDefaults={work:{left:228,right:260,hideLeft:false,hideRight:false},visual:{left:254,right:278,hideLeft:false,hideRight:false},pdf:{left:254,hideLeft:false},diagnostics:{left:208,right:260,hideLeft:false,hideRight:false},bank:{left:208,right:350,hideLeft:false,hideRight:false},bankEdit:{right:282,hideRight:false}};
 function qwPanelPreference(key){let saved={};try{saved=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}')[key]||{};}catch{}const result={...qwPanelDefaults[key]};for(const side of ['left','right'])if(side in result){const n=saved[side];if(typeof n==='number'&&Number.isFinite(n))result[side]=Math.max(180,Math.min(440,n));result[side==='left'?'hideLeft':'hideRight']=saved[side==='left'?'hideLeft':'hideRight']===true;}return result;}
 function qwSavePanelPreference(key,value){
  try{
@@ -26246,9 +26297,9 @@ function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=
  const bankLabel=layout==='booklet'&&q.source?.kind==='bank'&&qwBankNumber(q.source.number)?
   '<span class="qw-booklet-bank-id" data-qw-bank-number="'+q.source.number+'">'+
   (q.source.slot?'Тип '+qwEsc(q.source.slot)+' ':'')+'№ '+String(q.source.number).padStart(5,'0')+'</span> ':'';
- const richText=rich||(printing&&qwHasRichSyntax(q.prompt||''));
+ const richText=rich||qwHasRichSyntax(q.prompt||'');
  const format=richText?qwRichMarkdownHTML:qwContentHTML;
- const text='<div class="qw-task-text'+(richText?' qw-rich qw-print-rich':'')+'">'+bankLabel+format(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+(printing?qwPrintFieldHTML(c):format(c))+'</li>').join('')+'</ol>':'')+'</div>';
+ const text='<div class="qw-task-text'+(richText?' qw-rich qw-print-rich':'')+'">'+bankLabel+format(q.prompt||'Условие не заполнено')+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+qwPrintFieldHTML(c)+'</li>').join('')+'</ol>':'')+'</div>';
  const effectivePreferences=preferences||(printing?null:qwDoc.printSettings);
  const position=effectivePreferences?.figurePosition&&effectivePreferences.figurePosition!=='auto'?effectivePreferences.figurePosition:q.position;
  const flow='<div class="qw-task-flow qw-figure-'+(!printing&&position==='auto'?'right':position)+'">'+(printing?text+figure:figure+text)+'</div>';
@@ -26554,35 +26605,75 @@ function qwBankSave(){
  };
 }
 /* TASK164: Markdown editing of existing bank fields; QWBANK schema stays unchanged. */
-function qwBankRichField(key,title,value,rows=5){
- const tools=[['bold','Ж','Жирный'],['italic','К','Курсив'],['heading','H3','Заголовок'],['list','•','Список'],['numbered','1.','Нумерация'],['quote','❝','Цитата'],['math','ƒx','Формула'],['table','▦','Таблица']];
- const buttons=tools.map(([cmd,label,hint])=>'<button type="button" data-bank-format="'+cmd+'" data-bank-format-field="'+key+'" title="'+hint+'" aria-label="'+hint+'">'+label+'</button>').join('');
- const extra=key==='comment'?'<button type="button" data-bank-format="ege" data-bank-format-field="comment">Шаблон решения</button>':key==='criteria'?'<button type="button" data-bank-format="rubric" data-bank-format-field="criteria">Шаблон критериев</button>':'';
- return '<div class="qw-bank-rich-editor" data-bank-rich="'+key+'">'+
- '<div class="qw-bank-rich-head"><strong>'+title+'</strong><button type="button" data-bank-preview-toggle="'+key+'" aria-pressed="false">Предпросмотр</button></div>'+
- '<div class="qw-bank-rich-tools">'+buttons+extra+'</div>'+
- '<textarea data-bank-task-field="'+key+'" rows="'+rows+'" maxlength="16000" spellcheck="true" aria-label="'+title+'">'+qwEsc(value)+'</textarea>'+
- '<div class="qw-bank-rich-render qw-rich" data-bank-render="'+key+'" hidden></div>'+
- '<small class="qw-bank-rich-hint">Markdown: **жирный**, *курсив*, заголовки, списки, таблицы, формулы.</small></div>';
+const QW_BANK_SECTIONS=[
+ ['prompt','Условие'],['answer','Ответ'],['comment','Подробное решение'],['criteria','Критерии оценивания']
+];
+function qwBankFormatButton(kind,label,title=label){
+ return '<button type="button" data-bank-format="'+kind+'" aria-label="'+title+'" title="'+title+'">'+label+'</button>';
 }
-function qwBankInsertMarkup(input,kind){
- if(!input||input.disabled)return;
- const from=input.selectionStart,to=input.selectionEnd,selected=input.value.slice(from,to),value=selected||'текст';
- let content='';
- if(kind==='bold')content='**'+value+'**';
- else if(kind==='italic')content='*'+value+'*';
- else if(kind==='math')content='\\('+ (selected||'F=ma') +'\\)';
- else if(kind==='heading')content='### '+(selected||'Название раздела');
- else if(kind==='quote')content='> '+(selected||'Пояснение');
- else if(kind==='list')content=(selected||'Первый пункт').split('\n').map(x=>'- '+x).join('\n');
- else if(kind==='numbered')content=(selected||'Первый шаг').split('\n').map((x,i)=>(i+1)+'. '+x).join('\n');
- else if(kind==='table')content='| Величина | Значение |\n| --- | --- |\n| '+(selected||'Название')+' | Значение |';
- else if(kind==='ege')content='### Физическая модель и обоснование\n[Объясните применимость физических законов.]\n\n### Решение\n1. [Запишите законы и формулы.]\n2. [Выполните преобразования.]\n3. [Подставьте значения с единицами.]';
- else if(kind==='rubric')content='### Критерии для этой задачи\n| Элемент решения | Баллы |\n| --- | --- |\n| Обоснование физических законов | — |\n| Преобразования и вычисления | — |\n| Результат и единица измерения | — |\n\n> Сверьте с критериями конкретного задания ЕГЭ.';
- else return;
- if((kind==='ege'||kind==='rubric')&&input.value.trim())content='\n\n'+content;
- input.setRangeText(content,from,to,'end');input.focus();
- input.dispatchEvent(new Event('input',{bubbles:true}));
+function qwBankFormatSelect(kind,title,options){
+ return '<select data-bank-format-select="'+kind+'" aria-label="'+title+'" title="'+title+'"><option value="" selected>'+title+'</option>'+
+  options.map(([value,label])=>'<option value="'+qwEsc(value)+'">'+qwEsc(label)+'</option>').join('')+'</select>';
+}
+function qwBankRichField(key,title,value,extra=''){
+ return '<section id="qw-bank-field-'+key+'" class="qw-bank-rich-editor" role="tabpanel" aria-labelledby="qw-bank-tab-'+key+'" data-bank-rich="'+key+'" hidden>'+
+  '<textarea data-bank-task-field="'+key+'" maxlength="'+QW_LIMITS.text+'" spellcheck="true" aria-label="'+title+'">'+qwEsc(value)+'</textarea>'+
+  extra+'<div '+(key==='prompt'?'id="qw-bank-edit-preview" ':'')+'class="qw-bank-rich-render qw-rich" data-bank-render="'+key+'" aria-label="Предпросмотр: '+title+'" hidden></div></section>';
+}
+function qwBankMarkup(source,start,end,kind,argument=''){
+ const selected=source.slice(start,end);
+ const inline={
+  bold:['**','**','текст'],italic:['*','*','текст'],underline:['++','++','текст'],
+  sup:['^{','}','2'],sub:['~{','}','0'],math:['\\(','\\)','F=ma'],
+  fraction:['\\(\\frac{','}{b}\\)','a'],root:['\\(\\sqrt{','}\\)','x'],
+  power:['\\(','^{2}\\)','x']
+ };
+ if(Object.hasOwn(inline,kind)){
+  const [left,right,fallback]=inline[kind];
+  const wrapped=line=>line.startsWith(left)&&line.endsWith(right)&&line.length>left.length+right.length;
+  if(selected.includes('\n')&&['bold','italic','underline'].includes(kind)){
+   const lines=selected.split('\n');
+   const remove=lines.filter(line=>line.trim()).every(wrapped);
+   const formatted=lines.map(line=>{
+    if(!line.trim())return line;
+    if(remove)return line.slice(left.length,-right.length);
+    return wrapped(line)?line:left+line+right;
+   }).join('\n');
+   return {start,end,text:formatted,select:[0,formatted.length]};
+  }
+  if(wrapped(selected))
+   return {start,end,text:selected.slice(left.length,-right.length),select:[0,selected.length-left.length-right.length]};
+  if(selected&&start>=left.length&&source.slice(start-left.length,start)===left&&source.slice(end,end+right.length)===right)
+   return {start:start-left.length,end:end+right.length,text:selected,select:[0,selected.length]};
+  const text=selected||fallback;
+  return {start,end,text:left+text+right,select:[left.length,left.length+text.length]};
+ }
+ if(kind==='symbol')return {start,end,text:argument};
+ if(['heading','align','list','numbered','quote'].includes(kind)){
+  const first=start?source.lastIndexOf('\n',start-1)+1:0;
+  const last=source.indexOf('\n',Math.max(start,end-1));
+  const stop=last===-1?source.length:last;
+  const text=source.slice(first,stop).split('\n').map((line,i)=>{
+   if(kind==='align')return '::'+argument+' '+(line.replace(/^\s{0,3}::(?:left|center|right|justify)[ \t]+/,'')||'Текст');
+   if(kind==='heading')return '#'.repeat(Number(argument)||3)+' '+(line.replace(/^\s{0,3}#{1,4}\s+/,'')||'Название раздела');
+   if(kind==='quote')return '> '+(line.replace(/^\s{0,3}>\s?/,'')||'Пояснение');
+   return (kind==='list'?'- ':(i+1)+'. ')+(line.replace(/^\s{0,3}(?:[-*+]|\d{1,3}[.)])\s+/,'')||'Пункт');
+  }).join('\n');
+  return {start:first,end:stop,text,select:[0,text.length]};
+ }
+ const snippets={
+  table:'| Величина | Значение |\n| --- | --- |\n| '+(selected.trim()||'Название').replace(/[\n|]/g,' ')+' | Значение |',
+  cases:'$$\n\\begin{cases}\nx+y=5 \\\\\nx-y=1\n\\end{cases}\n$$',
+  ege:'### Физическая модель и обоснование\n[Объясните применимость физических законов.]\n\n### Решение\n1. [Запишите законы и формулы.]\n2. [Выполните преобразования.]\n3. [Подставьте значения с единицами.]',
+  rubric:'### Критерии для этой задачи\n| Элемент решения | Баллы |\n| --- | --- |\n| Обоснование физических законов | — |\n| Преобразования и вычисления | — |\n| Результат и единица измерения | — |\n\n> Сверьте с критериями конкретного задания ЕГЭ.'
+ };
+ if(!Object.hasOwn(snippets,kind))return null;
+ const before=source.slice(0,start),after=source.slice(end);
+ return {start,end,text:(before&&!before.endsWith('\n\n')?(before.endsWith('\n')?'\n':'\n\n'):'')+
+  snippets[kind]+(after&&!after.startsWith('\n\n')?(after.startsWith('\n')?'\n':'\n\n'):'')};
+}
+function qwBankTextState(input){
+ return {value:input.value,start:input.selectionStart,end:input.selectionEnd};
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
@@ -26604,42 +26695,66 @@ async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
  const opts=(k,items)=>'<label>'+(titles[k]||k)+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
  const task=draft.task;
- const taskFields='<div class="qw-bank-edit-fields">'+
-  '<label>Тип<select data-bank-task-field="type">'+qwOptions(Object.entries(QW_TYPES),task.type)+'</select></label>'+
-  qwBankRichField('prompt','Условие задачи',task.prompt,7)+
-  '<label data-bank-choices-wrap '+(task.type==='choice'?'':'hidden')+'>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>'+ 
-  '<label>Ответ<textarea data-bank-task-field="answer" rows="2" maxlength="8000">'+qwEsc(task.answer)+'</textarea></label>'+
-  qwBankRichField('criteria','Критерии оценивания',task.criteria,4)+
-  qwBankRichField('comment','Подробное решение',task.comment,8)+
-  '<label class="qw-bank-choice-field">Иллюстрация<select data-bank-task-field="figure">'+qwOptions([['none','Без рисунка'],['graph','График (редактируемый)'],['diagram','Схема (редактируемая)'],['image','Изображение']],task.figure)+'</select></label>'+
-  '<label class="qw-check"><input type="checkbox" data-bank-task-field="answerVisible" '+(task.answerVisible?'checked':'')+'>Поле для краткого ответа в PDF</label>'+
-  '<div class="qw-bank-edit-visual-actions">'+
-    '<button type="button" data-bank-visual="graph">Редактировать график</button>'+
-    '<button type="button" data-bank-visual="diagram">Редактировать схему</button>'+
-    '<button type="button" data-bank-visual="image">Заменить изображение</button>'+
-    '<input type="file" id="qw-bank-edit-image" accept="image/png,image/jpeg,image/webp" hidden>'+
-  '</div>'+
-
- '</div>';
+ const choices='<label data-bank-choices-wrap>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>';
+ const fields=QW_BANK_SECTIONS.map(([key,title])=>qwBankRichField(key,title,task[key],key==='prompt'?choices:'')).join('');
+ const tabs='<div class="qw-bank-edit-tabs" role="tablist" aria-label="Содержание задания">'+
+  QW_BANK_SECTIONS.map(([key,title])=>'<button type="button" role="tab" id="qw-bank-tab-'+key+'" data-bank-tab="'+key+'" aria-controls="qw-bank-field-'+key+'">'+title+'</button>').join('')+'</div>';
+ const formatButtons=[
+  ['bold','<b>Ж</b>','Жирный (Ctrl+B)'],['italic','<i>К</i>','Курсив (Ctrl+I)'],
+  ['underline','<u>Ч</u>','Подчёркивание (Ctrl+U)'],['list','•','Маркированный список'],['numbered','1.','Нумерованный список'],
+  ['sup','x²','Верхний индекс'],['sub','x₀','Нижний индекс'],['table','Таблица','Вставить таблицу']
+ ];
+ const textTools='<div class="qw-bank-rich-tools" role="group" aria-label="Форматирование">'+
+  '<div class="qw-bank-tool-group">'+qwBankFormatButton('undo',qoWorkIcon('undo'),'Отменить (Ctrl+Z)')+
+  qwBankFormatButton('redo',qoWorkIcon('redo'),'Повторить (Ctrl+Y)')+'</div>'+
+  qwBankFormatSelect('heading','Заголовок',[['1','Заголовок 1'],['2','Заголовок 2'],['3','Заголовок 3'],['4','Заголовок 4']])+
+  '<div class="qw-bank-tool-group">'+formatButtons.slice(0,5).map(item=>qwBankFormatButton(...item)).join('')+'</div>'+
+  qwBankFormatSelect('align','Выравнивание',[['left','Слева'],['center','По центру'],['right','Справа'],['justify','По ширине']])+
+  '<div class="qw-bank-tool-group">'+formatButtons.slice(5,7).map(item=>qwBankFormatButton(...item)).join('')+'</div>'+
+  qwBankFormatSelect('formula','Формула',[['math','Выражение'],['fraction','Дробь'],['power','Степень'],['root','Корень'],['cases','Система уравнений']])+
+  qwBankFormatSelect('symbol','Символы',['α','β','γ','Δ','θ','λ','μ','π','ρ','σ','φ','ω','Ω','±','×','·','÷','≤','≥','≠','≈','∞','→','∠','°','√','∑','∫'].map(symbol=>[symbol,symbol]))+
+  qwBankFormatButton(...formatButtons[7])+qwBankFormatButton('quote','❝','Цитата')+
+  '<span data-bank-template="comment" hidden>'+qwBankFormatButton('ege','Шаблон решения')+'</span>'+
+  '<span data-bank-template="criteria" hidden>'+qwBankFormatButton('rubric','Шаблон критериев')+'</span>'+
+  '</div>';
+ const visualTools='<div class="qw-bank-edit-visual-actions" role="group" aria-label="Иллюстрации">'+
+  '<button type="button" data-bank-visual="graph">График</button>'+
+  '<button type="button" data-bank-visual="diagram">Схема</button>'+
+  '<button type="button" data-bank-visual="image">Изображение</button>'+
+  '<input type="file" id="qw-bank-edit-image" accept="image/png,image/jpeg,image/webp" hidden>'+
+  '</div>';
  const category='<div class="qw-bank-edit-categories">'+
-  opts('subject',Object.entries(QW_SUBJECTS))+
+  '<label>Тип<select data-bank-task-field="type">'+qwOptions(Object.entries(QW_TYPES),task.type)+'</select></label>'+
+  '<label>Иллюстрация<select data-bank-task-field="figure">'+qwOptions([['none','Без рисунка'],['graph','График'],['diagram','Схема'],['image','Изображение']],task.figure)+'</select></label>'+
+  '<label class="qw-check"><input type="checkbox" data-bank-task-field="answerVisible" '+(task.answerVisible?'checked':'')+'>Поле ответа в PDF</label>'+
+  opts('subject',Object.entries(QW_SUBJECTS).filter(([key])=>['physics','math','geometry','algebra'].includes(key)))+
   field('grade','Класс',24)+
   opts('exam',[['general','Практика'],['oge','ОГЭ'],['ege','ЕГЭ']])+
   field('year','Год',4)+
   opts('part',[['','Без части'],['1','Часть 1'],['2','Часть 2']])+
   field('slot','Номер задания',2)+
-  opts('difficulty',[['','Уровень не задан'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']])+
+  opts('difficulty',[['','Без уровня'],['basic','Базовый'],['advanced','Повышенный'],['high','Высокий']])+
   field('topic','Тема')+field('subtopic','Подтема')+
   opts('origin',[['original','Авторская'],['adapted','Авторский аналог'],['generated','С помощью ИИ']])+
  '</div>';
- const d=qwDialog(creating?'Новое задание в банке':'Редактировать задание в банке',
+ const d=qwDialog(creating?'Новое задание':'Задание № '+String(draft.bankNumber).padStart(5,'0'),
+  '<div class="qw-bank-edit-top">'+tabs+
+   '<button type="button" data-bank-preview-toggle="prompt" aria-pressed="false">'+qoWorkIcon('eye')+' Предпросмотр</button></div>'+
   '<div class="qw-bank-edit-layout">'+
-   '<section class="qw-bank-edit-main"><h3>Содержание</h3>'+taskFields+'</section>'+
-   '<aside class="qw-bank-edit-side"><h3>Категории</h3>'+category+'<div class="qw-bank-edit-preview-side"><h3>Предпросмотр задачи</h3><div id="qw-bank-edit-preview" class="qw-selected-preview" aria-label="Предпросмотр задания"></div></div></aside>'+
+   '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+'</div>'+fields+'</section>'+
+   '<aside class="qw-bank-edit-side" aria-label="Метаданные задания">'+category+'</aside>'+
   '</div><p id="qw-bank-edit-error" role="alert" class="qw-error" hidden></p>',
   qwButton('bank-edit-back','В банк')+qwButton('bank-edit-save','Сохранить изменения','class="qw-primary"'),originPage==='bank'?true:'bank-edit');
  d.classList.add('qw-bank-edit-dialog');
+ const layout=d.querySelector('.qw-bank-edit-layout');
+ const top=d.querySelector('.qw-bank-edit-top');
+ qwInstallPanels(layout,'bankEdit',top,{right:['.qw-bank-edit-side','Метаданные']});
  const error=d.querySelector('#qw-bank-edit-error');
+ const save=d.querySelector('[data-qw-action="bank-edit-save"]');
+ const previewButton=top.querySelector('[data-bank-preview-toggle]');
+ const editors=[...d.querySelectorAll('[data-bank-rich]')];
+ const tabsList=[...d.querySelectorAll('[data-bank-tab]')];
+ let saving=false,imagePending=false;
  function showError(message){error.hidden=!message;error.textContent=message||'';}
  function collect(){
   for(const el of d.querySelectorAll('[data-bank-edit-field]'))draft[el.dataset.bankEditField]=el.value.trim();
@@ -26649,47 +26764,135 @@ async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
   }
   const choicesControl=d.querySelector('[data-bank-choices]'),choicesWrap=d.querySelector('[data-bank-choices-wrap]');
   const isChoice=task.type==='choice';
-  choicesWrap.hidden=!isChoice;
+  choicesWrap.hidden=!isChoice||transaction?.view.preview===true;
   if(isChoice)task.choices=choicesControl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   task.grade=draft.grade;task.exam=draft.exam;task.topic=draft.topic;
   task.subtopic=draft.subtopic;task.origin=draft.origin;
   if(draft.part)task.part='Часть '+draft.part;
  }
  function preview(){
+  if(!transaction.view.preview)return;
+  const key=transaction.view.tab,area=d.querySelector('[data-bank-render="'+key+'"]');
   try{
-   d.querySelector('#qw-bank-edit-preview').innerHTML=qwTaskPreview({...task,answerVisible:false,solutionVisible:false},Number(draft.slot||1)-1,'worksheet',false,null,true);
-   qwRefreshLiveGraphText(d.querySelector('#qw-bank-edit-preview'));
-   for(const key of ['prompt','comment','criteria']){
-    const area=d.querySelector('[data-bank-render="'+key+'"]');
-    if(area)area.innerHTML=qwRichMarkdownHTML(task[key]||'');
-   }
-  }
-  catch(e){d.querySelector('#qw-bank-edit-preview').textContent='Предпросмотр: '+e.message;}
+   area.innerHTML=key==='prompt'?
+    qwTaskPreview({...task,answerVisible:false,solutionVisible:false},Number(draft.slot||1)-1,'worksheet',false,null,true):
+    qwPrintFieldHTML(task[key]||'');
+   if(key==='prompt')qwRefreshLiveGraphText(area);
+  }catch(e){area.textContent='Предпросмотр: '+e.message;}
  }
+ const fieldInput=key=>d.querySelector('[data-bank-task-field="'+key+'"]');
+ const historyFor=input=>transaction.history[input.dataset.bankTaskField];
+ function updateHistoryButtons(){
+  const history=historyFor(fieldInput(transaction.view.tab));
+  d.querySelector('[data-bank-format="undo"]').disabled=!history.undo.length;
+  d.querySelector('[data-bank-format="redo"]').disabled=!history.redo.length;
+ }
+ function selectSection(key,focus=false){
+  transaction.view.tab=key;
+  for(const btn of tabsList){
+   const selected=btn.dataset.bankTab===key;
+   btn.setAttribute('aria-selected',String(selected));btn.tabIndex=selected?0:-1;
+   if(selected&&focus)btn.focus();
+  }
+  renderEditor();
+ }
+ function renderEditor(){
+  const {tab,preview:show}=transaction.view;
+  previewButton.dataset.bankPreviewToggle=tab;
+  previewButton.innerHTML=qoWorkIcon(show?'eye-off':'eye')+(show?' Редактировать':' Предпросмотр');
+  previewButton.setAttribute('aria-pressed',String(show));
+  d.querySelector('.qw-bank-rich-tools').hidden=show;
+  d.querySelectorAll('[data-bank-template]').forEach(el=>{el.hidden=el.dataset.bankTemplate!==tab;});
+  for(const pane of editors){
+   const key=pane.dataset.bankRich;
+   pane.hidden=key!==tab;
+   fieldInput(key).hidden=show;
+   pane.querySelector('[data-bank-render]').hidden=!show;
+  }
+  d.querySelector('[data-bank-choices-wrap]').hidden=show||task.type!=='choice';
+  updateHistoryButtons();preview();
+ }
+ function historyStep(input,redo){
+  const history=historyFor(input);
+  const from=redo?history.redo:history.undo,to=redo?history.undo:history.redo;
+  if(!from.length)return;
+  to.push(qwBankTextState(input));
+  const restored=from.pop();
+  input.value=restored.value;input.focus();input.setSelectionRange(restored.start,restored.end);
+  history.current=restored;history.before=null;
+  collect();updateHistoryButtons();preview();
+ }
+ function format(kind,argument){
+  const input=fieldInput(transaction.view.tab);
+  if(transaction.view.preview||saving)return;
+  if(kind==='undo'||kind==='redo'){historyStep(input,kind==='redo');return;}
+  const before=qwBankTextState(input);
+  const change=qwBankMarkup(before.value,before.start,before.end,kind,argument);
+  if(!change)return;
+  if(before.value.length-change.end+change.start+change.text.length>input.maxLength){
+   showError('Форматирование превышает допустимую длину поля');return;
+  }
+  historyFor(input).before=before;
+  input.setRangeText(change.text,change.start,change.end,'end');input.focus();
+  if(change.select)input.setSelectionRange(change.start+change.select[0],change.start+change.select[1]);
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+  showError('');
+ }
+ d.addEventListener('beforeinput',event=>{
+  const history=historyFor(event.target);
+  if(!history)return;
+  if(event.inputType==='historyUndo'||event.inputType==='historyRedo'){
+   if(event.cancelable){event.preventDefault();historyStep(event.target,event.inputType==='historyRedo');}
+  }else history.before=qwBankTextState(event.target);
+ });
  d.addEventListener('input',event=>{
-  if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
+  const input=event.target,history=historyFor(input);
+  if(history){
+   const current=qwBankTextState(input),before=history.before||history.current;
+   if(current.value!==before.value){
+    history.undo.push(before);if(history.undo.length>60)history.undo.shift();
+    history.redo.length=0;
+   }
+   history.current=current;history.before=null;
+   updateHistoryButtons();
+  }
+  if(input.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('change',event=>{
+  const select=event.target.closest('[data-bank-format-select]');
+  if(select&&select.value){
+   format(select.dataset.bankFormatSelect==='formula'?select.value:select.dataset.bankFormatSelect,select.value);
+   select.value='';return;
+  }
   if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('click',event=>{
+  const tab=event.target.closest('[data-bank-tab]');
+  if(tab){selectSection(tab.dataset.bankTab);return;}
   const action=event.target.closest('[data-bank-format]');
-  if(action){qwBankInsertMarkup(d.querySelector('[data-bank-task-field="'+action.dataset.bankFormatField+'"]'),action.dataset.bankFormat);return;}
-  const toggle=event.target.closest('[data-bank-preview-toggle]');
-  if(!toggle)return;
-  collect();preview();
-  const key=toggle.dataset.bankPreviewToggle,block=d.querySelector('[data-bank-rich="'+key+'"]');
-  const editing=block.dataset.mode==='preview';
-  block.dataset.mode=editing?'edit':'preview';
-  block.querySelector('textarea').hidden=!editing;
-  block.querySelector('.qw-bank-rich-tools').hidden=!editing;
-  block.querySelector('[data-bank-render]').hidden=editing;
-  toggle.textContent=editing?'Предпросмотр':'Редактировать';
-  toggle.setAttribute('aria-pressed',String(!editing));
+  if(action){format(action.dataset.bankFormat);return;}
+  if(event.target.closest('[data-bank-preview-toggle]')){
+   collect();transaction.view.preview=!transaction.view.preview;renderEditor();
+  }
+ });
+ d.addEventListener('keydown',event=>{
+  const tab=event.target.closest('[data-bank-tab]');
+  if(tab&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){
+   event.preventDefault();
+   const index=tabsList.indexOf(tab),last=tabsList.length-1;
+   const next=event.key==='Home'?0:event.key==='End'?last:(index+(event.key==='ArrowLeft'?last:1))%tabsList.length;
+   selectSection(tabsList[next].dataset.bankTab,true);return;
+  }
+  if(!(event.ctrlKey||event.metaKey)||event.altKey||event.isComposing)return;
+  if(event.code==='KeyS'){event.preventDefault();save.click();return;}
+  if(!event.target.closest('.qw-bank-rich-editor textarea[data-bank-task-field],.qw-bank-rich-tools'))return;
+  const commands={KeyB:'bold',KeyI:'italic',KeyU:'underline',KeyZ:event.shiftKey?'redo':'undo',KeyY:'redo'};
+  if(commands[event.code]){event.preventDefault();format(commands[event.code]);}
  });
  d.querySelectorAll('[data-bank-visual]').forEach(button=>button.onclick=()=>{
   collect();
   const kind=button.dataset.bankVisual;
+  if(saving||imagePending)return;
   if(kind==='image'){d.querySelector('#qw-bank-edit-image').click();return;}
   qwVisualEditor(kind,task,(updatedKind,validated)=>{
    if(!active())return;
@@ -26698,31 +26901,39 @@ async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
   },()=>{if(active())qwBankEdit(id,draft,returnFilters,transaction);},()=>JSON.stringify(draft)!==transaction.initialDraft);
  });
  d.querySelector('#qw-bank-edit-image').onchange=async(event)=>{
-  const file=event.target.files?.[0];event.target.value='';if(!file)return;
+  const file=event.target.files?.[0];event.target.value='';if(!file||saving||imagePending)return;
+  imagePending=true;save.disabled=true;
   try{
    if(!['image/png','image/jpeg','image/webp'].includes(file.type)||file.size>4_000_000)throw Error('Изображение: PNG/JPEG/WebP, не более 4 МБ');
    const data=await new Promise((resolve,reject)=>{
     const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Файл не прочитан'));reader.readAsDataURL(file);
    });
    if(typeof data!=='string'||data.length>6_000_000)throw Error('Изображение слишком велико');
-   await qwImage(data);task.image=data;task.figure='image';d.querySelector('[data-bank-task-field="figure"]').value='image';preview();showError('');
+   await qwImage(data);if(!active()||!d.isConnected)return;
+   task.image=data;task.figure='image';fieldInput('figure').value='image';preview();showError('');
   }catch(e){showError(e.message);}
+  finally{imagePending=false;save.disabled=false;}
  };
- collect();transaction??={initialDraft:JSON.stringify(draft),stored};d.qwDirty=()=>{collect();return JSON.stringify(draft)!==transaction.initialDraft;};d.qwCanLeave=()=>!d.qwDirty()||confirm('Отменить несохранённые изменения задания?');
+ collect();
+ transaction??={initialDraft:JSON.stringify(draft),stored,view:{tab:'prompt',preview:false},
+  history:Object.fromEntries(QW_BANK_SECTIONS.map(([key])=>[key,{undo:[],redo:[],before:null,current:qwBankTextState(fieldInput(key))}]))};
+ d.qwDirty=()=>{collect();return JSON.stringify(draft)!==transaction.initialDraft;};
+ d.qwCanLeave=()=>!saving&&(!d.qwDirty()||confirm('Отменить несохранённые изменения задания?'));
  const back=()=>{if(!d.qwCanLeave())return;d.close();if(active())void qwBank(returnFilters);};
  d.addEventListener('cancel',event=>{event.preventDefault();back();});
  d.addEventListener('keydown',event=>{if(event.key==='Escape'){event.preventDefault();back();}});
  d.querySelector('[data-qw-close]').onclick=back;
  d.querySelector('[data-qw-action="bank-edit-back"]').onclick=back;
- d.querySelector('[data-qw-action="bank-edit-save"]').onclick=async()=>{
-  if(!active()||!d.isConnected)return;
+ save.onclick=async()=>{
+  if(!active()||!d.isConnected||saving||imagePending)return;
+  saving=true;save.disabled=true;layout.inert=true;top.inert=true;
   try{
-   await qwBankOpen();
-   if(!active()||!d.isConnected)return;
    collect();if(!task.prompt.trim())throw Error('Условие задания не может быть пустым');
    if(draft.year&&!/^(19|20)\d{2}$/.test(draft.year))throw Error('Введите год из четырёх цифр');
    if(draft.slot&&!/^([1-9]|[1-3]\d|40)$/.test(draft.slot))throw Error('Номер задания: от 1 до 40');
    const candidate=qwBankNormalize({...draft,id:creating?draft.id:id,task});
+   await qwBankOpen();
+   if(!active()||!d.isConnected)return;
    const saved=creating?
     await qwBankRepository.createTask(candidate):
     await qwBankRepository.updateTask(id,candidate,stored.revision);
@@ -26731,8 +26942,9 @@ async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
    d.close();qwBank({...returnFilters,__view:saved.id});
    status(creating?'Задание добавлено в '+qwBankStorageName:'Изменения сохранены в '+qwBankStorageName);
   }catch(e){showError('Не удалось сохранить: '+e.message);}
+  finally{saving=false;save.disabled=false;layout.inert=false;top.inert=false;}
  };
- preview();
+ selectSection(transaction.view.tab);
 }
 let qwBankRequest=0;
 async function qwBank(previousFilters={}){
@@ -26838,7 +27050,7 @@ async function qwBank(previousFilters={}){
  const results=list.parentElement;
  const previousPage=d.querySelector('[data-bank-page="prev"]');
  const nextPage=d.querySelector('[data-bank-page="next"]');
- let previewSequence=0,previewId='',catalogueScroll=0,searchTimer,queryError='';
+ let previewSequence=0,previewId='',catalogueScroll=0,searchTimer,queryError='',paperView=false,zoom=100;
  function setQueryPending(on){
   results.setAttribute('aria-busy',String(on));
   workspace.classList.toggle('qw-bank-query-pending',on);
@@ -26879,6 +27091,24 @@ async function qwBank(previousFilters={}){
   if(!on)list.scrollTop=catalogueScroll;
   qwRefreshLiveGraphText(preview);
  }
+ function setPaperView(on){
+  paperView=on;
+  previewPane.classList.toggle('qw-bank-paper-view',on);
+  const button=preview.querySelector('[data-bank-paper]');
+  if(button)button.setAttribute('aria-pressed',String(on));
+ }
+ function setPreviewZoom(value){
+  zoom=value;
+  preview.style.setProperty('--qw-bank-preview-zoom',String(value/100));
+  const output=preview.querySelector('[data-bank-zoom-value]');
+  if(output)output.textContent=value+'%';
+ }
+ preview.addEventListener('input',event=>{
+  if(event.target.matches('[data-bank-zoom]'))setPreviewZoom(Number(event.target.value));
+ });
+ preview.addEventListener('change',event=>{
+  if(event.target.matches('[data-bank-zoom]'))qwRefreshLiveGraphText(preview);
+ });
  async function showPreview(){
   const token=++previewSequence,id=activeId;
   for(const row of list.querySelectorAll('[data-bank-entry]')){
@@ -26906,22 +27136,25 @@ async function qwBank(previousFilters={}){
   const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
    (entry.grade?' · '+entry.grade+' класс':'')+(entry.year?' · '+entry.year:'')+(entry.slot?' · № '+entry.slot:'');
   const paper=qwTaskPreview(task,Math.max(0,(Number(entry.slot)||1)-1),'worksheet',false,null,true);
-  const answer=entry.task.answer?.trim()?qwRichMarkdownHTML(entry.task.answer):'<p>Ответ не указан.</p>';
-  const details=entry.task.comment?.trim()?qwRichMarkdownHTML(entry.task.comment):'<p>Решение ещё не записано.</p>';
-  const criteria=entry.task.criteria?.trim()?qwRichMarkdownHTML(entry.task.criteria):'<p>Критерии ещё не указаны.</p>';
+  const answer=entry.task.answer?.trim()?qwPrintFieldHTML(entry.task.answer):'<p>Ответ не указан.</p>';
+  const details=entry.task.comment?.trim()?qwPrintFieldHTML(entry.task.comment):'<p>Решение ещё не записано.</p>';
+  const criteria=entry.task.criteria?.trim()?qwPrintFieldHTML(entry.task.criteria):'<p>Критерии ещё не указаны.</p>';
   const solutionTitle=/(^|\n)\s*#{1,4}\s*Решение(?=\s|$)/i.test(entry.task.comment||'')?'':'<h3>Решение</h3>';
   preview.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
    '<strong>№ '+number+'</strong><span>'+qwEsc(subject+' · '+designation)+'</span>'+
    (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+
    '<div class="qw-bank-preview-actions"><button type="button" class="qw-primary" data-bank-add="'+qwEsc(entry.id)+'">Добавить в работу</button>'+
    '<button type="button" data-bank-edit="'+qwEsc(entry.id)+'">Редактировать</button>'+
+   '<button type="button" data-bank-paper aria-pressed="false">Белый лист</button>'+
    '<button type="button" data-bank-enlarge aria-pressed="false">Увеличить</button>'+
+   '<label class="qw-bank-zoom">Масштаб<input type="range" data-bank-zoom min="75" max="160" step="5" value="'+zoom+'"><output data-bank-zoom-value>'+zoom+'%</output></label>'+
    '<button type="button" data-bank-delete="'+qwEsc(entry.id)+'" aria-label="Удалить из банка" title="Удалить из банка">'+qoWorkIcon('trash-2')+'</button></div></div>'+
    '<div class="qw-bank-video-canvas" aria-label="Просмотр условия задачи">'+paper+'</div>'+
    '<details class="qw-bank-solution"><summary>Ответ и решение</summary>'+
     '<div class="qw-bank-solution-body qw-rich"><section>'+solutionTitle+details+'</section>'+
     '<section><h3>Ответ</h3>'+answer+'</section>'+
     '<section><h3>Критерии оценивания</h3>'+criteria+'</section></div></details>';
+  setPaperView(paperView);setPreviewZoom(zoom);
   qwRefreshLiveGraphText(preview);
   const illustration=preview.querySelector('img[alt="Иллюстрация задания"]');
   if(illustration){const failed=()=>{if(token===previewSequence&&d.isConnected)reportStatus('Изображение повреждено. Исходные данные сохранены; можно заменить рисунок через редактирование.',true);};illustration.addEventListener('error',failed,{once:true});if(illustration.complete&&!illustration.naturalWidth)failed();}
@@ -26964,7 +27197,7 @@ async function qwBank(previousFilters={}){
    return '<div class="qw-bank-item qw-bank-choice" data-bank-entry="'+id+'">'+
     '<input type="checkbox" data-bank-select="'+id+'" '+(selected.has(x.id)?'checked':'')+' aria-label="Выбрать задание № '+number+'">'+
     '<button type="button" data-bank-view="'+id+'" title="'+qwEsc(label)+'">'+
-     '<strong><span class="qw-bank-number">№ '+number+'</span><span>'+qwEsc(label)+'</span></strong><small>'+qwEsc(tags)+'</small></button></div>';
+     '<span class="qw-bank-row-main"><b class="qw-bank-number">№ '+number+'</b><span class="qw-bank-summary">'+qwEsc(label)+'</span></span><small>'+qwEsc(tags)+'</small></button></div>';
   }).join('');
   const applicable=['subject','grade','topic','type'];
   const diagnosticExtra=['exam','year','part','slot','difficulty','subtopic','origin'];
@@ -27249,6 +27482,7 @@ async function qwBank(previousFilters={}){
    activeId=row.dataset.bankEntry;void showPreview();return;
   }
   if(e.target.closest('[data-bank-enlarge]')){setEnlarged(!d.classList.contains('qw-bank-expanded'));return;}
+  if(e.target.closest('[data-bank-paper]')){setPaperView(!paperView);return;}
   if(action==='bank-assemble'){void loadAndAdd([...selected.keys()],{replace:true});return;}
   if(action==='bank-add-selection'){void loadAndAdd([...selected.keys()]);return;}
   const edit=e.target.closest('[data-bank-edit]');

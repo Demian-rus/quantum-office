@@ -62,7 +62,9 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await p.waitForFunction(()=>qwBankRead().find(x=>x.id==='bank-kinematics')?.task.prompt==='Изменённая задача о движении.');
   await p.locator('#qw-dialog [data-qw-action="bank-new"]').click();
   await p.locator('#qw-dialog [data-bank-task-field="prompt"]').fill('Авторский аналог о тепловом равновесии.');
+  await editor.locator('[data-bank-tab="answer"]').click();
   await p.locator('#qw-dialog [data-bank-task-field="answer"]').fill('24 °C');
+  await editor.locator('[data-bank-tab="comment"]').click();
   await p.locator('#qw-dialog [data-bank-task-field="comment"]').fill('Составить уравнение теплового баланса.');
   await p.locator('#qw-dialog [data-bank-edit-field="topic"]').fill('Тепловые явления');
   await p.locator('#qw-dialog [data-qw-action="bank-edit-save"]').click();

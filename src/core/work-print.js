@@ -8,6 +8,18 @@ function qwMathBox(ctx,n,size=12,upright=false,unary=false){
  if(n.t==='row'){const bs=n.list.map((v,i)=>qwMathBox(ctx,v,size,upright,qwMathIsUnary(n.list,i)));return {w:bs.reduce((s,b)=>s+b.w,0),a:Math.max(size*.8,...bs.map(b=>b.a)),d:Math.max(size*.24,...bs.map(b=>b.d)),draw:(x,y)=>{for(const b of bs){b.draw(x,y);x+=b.w;}}};}
  if(n.t==='frac'){const a=qwMathBox(ctx,n.a,size*.78,upright),b=qwMathBox(ctx,n.b,size*.78,upright),w=Math.max(a.w,b.w)+8;return {w,a:a.a+a.d+size*.35,d:b.a+b.d+size*.25,draw:(x,y)=>{a.draw(x+(w-a.w)/2,y-size*.35-a.d);ctx.beginPath();ctx.lineWidth=.7;ctx.moveTo(x,y-size*.18);ctx.lineTo(x+w,y-size*.18);ctx.stroke();b.draw(x+(w-b.w)/2,y+b.a+2);}};}
  if(n.t==='sqrt'){const a=qwMathBox(ctx,n.a,size,upright);return {w:a.w+size*.8,a:a.a+3,d:a.d,draw:(x,y)=>{ctx.font=(size*1.2)+'px "Times New Roman",serif';ctx.fillText('√',x,y+1);a.draw(x+size*.8,y);ctx.beginPath();ctx.lineWidth=.6;ctx.moveTo(x+size*.7,y-a.a-1);ctx.lineTo(x+a.w+size*.8,y-a.a-1);ctx.stroke();}};}
+ if(n.t==='cases'){
+  const rows=n.rows.map(row=>qwMathBox(ctx,row,size,upright));
+  const gap=size*.15,height=rows.reduce((sum,row)=>sum+row.a+row.d+gap,-gap);
+  const a=height/2+size*.25,d=height-a,brace=size*.8;
+  return {w:brace+Math.max(...rows.map(row=>row.w)),a,d,draw:(x,y)=>{
+   ctx.font=height+'px "Times New Roman",serif';
+   ctx.save();ctx.translate(x,y+(d-a)/2);ctx.scale(brace/Math.max(1,ctx.measureText('{').width),1);
+   ctx.textBaseline='middle';ctx.fillText('{',0,0);ctx.restore();
+   let top=y-a;
+   for(const row of rows){row.draw(x+brace,top+row.a);top+=row.a+row.d+gap;}
+  }};
+ }
  const a=qwMathBox(ctx,n.a,size,upright),b=qwMathBox(ctx,n.b,size*.66,upright),dy=n.t==='sup'?-size*.58:size*.34;return {w:a.w+b.w,a:Math.max(a.a,b.a-dy),d:Math.max(a.d,b.d+dy),draw:(x,y)=>{a.draw(x,y);b.draw(x+a.w,y+dy);}};
 }
 async function qwImage(source){const img=new Image();img.src=source;await img.decode();return img;}

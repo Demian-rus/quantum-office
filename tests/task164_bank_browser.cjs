@@ -19,14 +19,16 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await p.locator('#qw-dialog [data-bank-edit="task164"]').last().click();
   const editor=p.locator('.qw-bank-edit-dialog');
   await editor.locator('.qw-bank-rich-editor').first().waitFor({state:'visible'});
-  assert.equal(await editor.locator('.qw-bank-rich-editor').count(),3);
-  assert.equal(await editor.locator('.qw-bank-edit-preview-side #qw-bank-edit-preview').count(),1,'live task preview appears beside input fields');
+  assert.equal(await editor.locator('.qw-bank-rich-editor').count(),4);
+  assert.equal(await editor.locator('.qw-bank-rich-tools').count(),1,'one formatting toolbar for all fields');
   const prompt=editor.locator('[data-bank-task-field="prompt"]');
   await prompt.fill('Дано: тело **массой 2 кг** имеет ускорение \\(a=3\\). Найдите силу.');
   await editor.locator('[data-bank-preview-toggle="prompt"]').click();
+  assert.ok(await editor.locator('#qw-bank-edit-preview').isVisible(),'task preview opens in the editor');
   assert.equal(await editor.locator('[data-bank-render="prompt"] strong').count(),1);
   assert.equal(await editor.locator('[data-bank-render="prompt"] math').count(),1);
   await editor.locator('[data-bank-preview-toggle="prompt"]').click();
+  await editor.locator('[data-bank-tab="comment"]').click();
   const solution=editor.locator('[data-bank-task-field="comment"]');
   await solution.fill('');
   await editor.locator('[data-bank-format="ege"]').click();
@@ -37,6 +39,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   assert.equal(await editor.locator('[data-bank-render="comment"] ol li').count(),2);
   assert.equal(await editor.locator('[data-bank-render="comment"] math').count(),2);
   await editor.locator('[data-bank-preview-toggle="comment"]').click();
+  await editor.locator('[data-bank-tab="criteria"]').click();
   const criteria=editor.locator('[data-bank-task-field="criteria"]');
   await criteria.fill('');
   await editor.locator('[data-bank-format="rubric"]').click();
