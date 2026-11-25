@@ -8,6 +8,6 @@ test('TASK147 right-angle marker exports valid SVG attributes for PDF image deco
  for(const interactive of [false,true]){
   const svg=qwDiagramSVG(diagram,interactive);
   assert.doesNotMatch(svg,/\[object Object\]/);
-  assert.match(svg,/<path d="M112 260L112 248L100 248" stroke="#162735" stroke-width="2" fill="none"\/>/);
+  assert.match(svg,/<path d="M112 260L112 248L100 248" stroke="#222222" stroke-width="2" fill="none"\/>/);
  }
 });

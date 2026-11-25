@@ -21,7 +21,7 @@ test('BANK-02 safe markup is interpreted consistently in rich content and print'
  assert.equal(qwPrintFieldHTML(text),html);
  for(const part of ['<h3>Движение</h3>','<h4>Параметры</h4>','<p style="text-align:center">',
   '<u>постоянна</u>','<strong>с формулой <math','<mfrac>','<em>пояснение</em>',
-  'x<sub>0</sub>','t<sup>2</sup>','<ul>','<ol>','<table>','<msqrt>'])assert.ok(html.includes(part),part);
+  'x<sub>0</sub>','t<sup>2</sup>','<ul>','<ol>','<table>','<msqrt class="qw-radical">'])assert.ok(html.includes(part),part);
  assert.equal(qwHasRichSyntax(String.raw`\(t^{2}\)`),false);
  assert.match(qwRichMarkdownHTML('++<span>Текст</span>++'),/<u>&lt;span&gt;/);
  assert.doesNotMatch(qwRichMarkdownHTML('::url текст'),/style=/);

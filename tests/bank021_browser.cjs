@@ -366,7 +366,7 @@ async function main() {
         diagnosticsMath: !!template.content.querySelector('.qw-study-text math'), teacherInitiallyHidden,
         teacherRevealed: template.content.textContent.includes('Критерий диагноста') };
     }, project);
-    assert.deepEqual(surfaces, { constructorMath: true, permanent: '№ 00801', diagnosticsMath: true,
+    assert.deepEqual(surfaces, { constructorMath: true, permanent: '№ 00801.', diagnosticsMath: true,
       teacherInitiallyHidden: true, teacherRevealed: true });
     const print = [];
     for (const orientation of ['portrait', 'landscape']) print.push(await renderPdf(context, page, project, orientation, 'booklet', errors));

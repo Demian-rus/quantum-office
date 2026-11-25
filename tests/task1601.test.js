@@ -28,7 +28,8 @@ test('TASK160.1 graph axis shafts stop at filled arrowhead base',()=>{
 test('TASK160.1 booklet answer is not an absolutely positioned overlay',()=>{
  const css=qwPrintStyles('landscape','spread');
  assert.match(css,/\.qw-booklet-answer-by-figure/);
- assert.match(css,/\.qw-booklet-answer\{grid-column:2;grid-row:2/);
+ assert.match(css,/\.qw-standard-task>:not\(\.qw-task-heading\)\{grid-column:2;grid-row:auto/);
+ assert.match(css,/\.qw-booklet-answer\{display:flex;align-items:baseline/);
  assert.match(css,/\.qw-task-tables table/);
  assert.match(css,/\.qw-figure-below figure\{float:none!important/);
 });

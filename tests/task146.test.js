@@ -12,7 +12,7 @@ test('TASK146 all grid divisions remain while small axis numbers avoid duplicate
  assert.deepEqual(yAxisLabels(svg),['1','2','3','4','5','6','7','8','9','10']);
  assert.equal((svg.match(/data-value="0"/g)||[]).length,1);
  assert.match(svg, /data-axis="y" data-value="10"/);
- const gridlines=(svg.match(/stroke="#d9dee4"/g)||[]).length;
+ const gridlines=(svg.match(/data-qw-grid-line="true" stroke="#dddddd"/g)||[]).length;
  assert.ok(gridlines>=20,'labels must not change the underlying grid step');
 });
 test('TASK146 vertex names stay outside triangle edges',()=>{

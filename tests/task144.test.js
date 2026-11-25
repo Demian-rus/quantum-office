@@ -18,7 +18,7 @@ test('TASK144 untrusted image URLs and script-like figures are rejected',()=>{
 });
 test('TASK144 math fraction, root, powers, subscripts and Greek render structurally',()=>{
  const html=qwMathML(qwMath('\\frac{\\Delta t^{2}}{\\sqrt{x_{1}}}'));
- for(const tag of ['mfrac','msqrt','msup','msub'])assert.ok(html.includes('<'+tag+'>'));
+ for(const tag of ['mfrac','msqrt','msup','msub'])assert.match(html,new RegExp('<'+tag+'(?:\\s|>)'));
  assert.match(html,/Δ/);assert.match(qwMathML(qwMath('\\rho+\\epsilon+\\tau')),/ρ/);assert.match(qwMathML(qwMath('\\rho+\\epsilon+\\tau')),/ε/);
 });
 test('TASK144 invalid and deeply nested formulas fail explicitly',()=>{

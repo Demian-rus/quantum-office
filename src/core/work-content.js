@@ -60,7 +60,8 @@ function qwMathML(n,upright=false,unary=false){
  }
  if(n.t==='upright')return '<mstyle mathvariant="normal">'+qwMathML(n.a,true)+'</mstyle>';
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
- if(n.t==='sqrt')return tag('msqrt',qwMathML(n.a,upright));
+ // Keep MathML semantics and use the measured radicand for the outline.
+ if(n.t==='sqrt')return '<msqrt class="qw-radical"><mrow class="qw-radicand"><mrow>'+qwMathML(n.a,upright)+'</mrow><mspace class="qw-radical-ink" aria-hidden="true"></mspace></mrow></msqrt>';
  if(n.t==='cases')return tag('mrow','<mo fence="true" stretchy="true">{</mo><mtable columnalign="left">'+
   n.rows.map(row=>tag('mtr',tag('mtd',qwMathML(row,upright)))).join('')+'</mtable>');
  if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a,upright)+qwMathML(n.b,upright));
@@ -226,7 +227,7 @@ function qwRichMarkdownHTML(value,onBlock){
 
 /* Axes use true coordinate positions. Tick marks and labels have independent
    density: labels never determine the grid spacing or collide at the origin. */
-const QW_GRAPH_STANDARD={axis:1.7,line:2.4,tick:3,head:11,headHalf:4.2,point:3.5,grid:'#d9dee4',gridWeight:.8,title:16};
+const QW_GRAPH_STANDARD={axis:1.7,line:2.4,tick:3,head:11,headHalf:4.2,point:3.5,grid:'#dddddd',gridWeight:.8,title:16};
 function qwAxisLayout(g,axisFont,russian=false){
  const b=QW_PLOT;
  const axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x;
@@ -273,11 +274,11 @@ function qwGraphSVG(g,interactive=false,typography={}){
  parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
  // Every grid line and small tick is retained even when a number is omitted.
  for(const t of ticks.x){
-  if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
+  if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'data-qw-grid-line="true" stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
   parts.push(line(t.pos,axisY-style.tick,t.pos,axisY+style.tick,'stroke="#333"'));
  }
  for(const t of ticks.y){
-  if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
+  if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'data-qw-grid-line="true" stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
   parts.push(line(axisX-style.tick,t.pos,axisX+style.tick,t.pos,'stroke="#333"'));
  }
  // Draw arrowheads separately: the visible shaft ends at the head's base,
@@ -301,7 +302,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
   const box={x:x-t.w/2,y:xBaseline-font,w:t.w,h:font+2};
   if(numberBoxes.some(v=>overlap(v,box)>0))continue;
   numberBoxes.push(box);occupied.push(box);
-  parts.push('<text class="qw-axis-number" data-axis="x" data-value="'+t.value+'" x="'+x+'" y="'+xBaseline+'" font-size="'+font+'" text-anchor="middle" fill="#263746">'+t.label+'</text>');
+  parts.push('<text class="qw-axis-number" data-axis="x" data-value="'+t.value+'" x="'+x+'" y="'+xBaseline+'" font-size="'+font+'" text-anchor="middle" fill="#222222">'+t.label+'</text>');
  }
  for(const t of ticks.y){
   if(!t.numbered)continue;
@@ -310,7 +311,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
   const box={x:yLabelX-t.w,y:y-font,w:t.w,h:font+2};
   if(numberBoxes.some(v=>overlap(v,box)>0))continue;
   numberBoxes.push(box);occupied.push(box);
-  parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#263746">'+t.label+'</text>');
+  parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#222222">'+t.label+'</text>');
  }
  const titleFont=typography.titleFont||style.title,gap=6;
  const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#111">'+qwEsc(text)+'</text>';
@@ -325,7 +326,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const p=qwPlotXY(g,{x,y});
    d+=(drawing?' L':' M')+p.x.toFixed(2)+','+p.y.toFixed(2);drawing=true;
   }
-  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+(g.curveStyle?.stroke||'#186ba3')+'" stroke-width="'+(g.curveStyle?.width||style.line)+'" stroke-linecap="round"/>');
+  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+(g.curveStyle?.stroke||(typography.publishing?'#222222':'#186ba3'))+'" stroke-width="'+(g.curveStyle?.width||style.line)+'" stroke-linecap="round"/>');
  }
  const ps=g.points.map(p=>qwPlotXY(g,p));
  if(g.curveFamily==='points'&&g.connected&&ps.length>1){
@@ -334,10 +335,10 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const a=ps[i-1],p=ps[i];
    d+=g.smooth?' C'+((a.x+p.x)/2)+','+a.y+' '+((a.x+p.x)/2)+','+p.y+' '+p.x+','+p.y:' L'+p.x+','+p.y;
   }
-  parts.push('<path d="'+d+'" fill="none" stroke="'+(g.lineStyle?.stroke||'#142b42')+'" stroke-width="'+(g.lineStyle?.width||style.line)+'"/>');
+  parts.push('<path d="'+d+'" fill="none" stroke="'+(g.lineStyle?.stroke||'#222222')+'" stroke-width="'+(g.lineStyle?.width||style.line)+'"/>');
  }
  ps.forEach((p,i)=>{
-  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:style.point)+'" fill="'+(g.points[i].style?.stroke||'#142b42')+'"/></g>');
+  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:style.point)+'" fill="'+(g.points[i].style?.stroke||'#222222')+'"/></g>');
  });
  const contour=g.connected&&g.curveFamily==='points'&&!g.smooth?qwClosedContour(ps):null;
  ps.forEach((p,i)=>{
@@ -364,7 +365,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const gap=10;best={x:p.x+(outward.x<-.1?-w-gap:outward.x>.1?gap:-w/2),y:p.y+(outward.y<-.1?-h-gap/2:outward.y>.1?gap:-h/2),w,h};
   }
   occupied.push(best);
-  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#142b42')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
+  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#222222')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
  });
  parts.push(qwGraphElementsSVG(g,interactive));
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
@@ -373,7 +374,7 @@ function qwSVGKey(value){let hash=2166136261;for(const c of JSON.stringify(value
 function qwGraphElementsSVG(g,interactive=false){
  const key=qwSVGKey(g),b=QW_PLOT,clip='<defs><clipPath id="qw-plot-clip"><rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'"/></clipPath></defs>';
  return clip+(g.elements||[]).map((o,i)=>{
-  const style=o.style?qwValidateStyle(o.style):{},color=style.stroke||'#186ba3',width=style.width||2.5,text=style.text||color;
+  const style=o.style?qwValidateStyle(o.style):{},color=style.stroke||'#222222',width=style.width||2.5,text=style.text||color;
   let shape='',label='',ps=[];
   if(o.kind==='function'){
    for(let n=0;n<=400;n++){const x=g.xmin+(g.xmax-g.xmin)*n/400,y=qwEvaluateCurve({curveFamily:o.family,curve:o.curve},x);ps.push(qwPlotXY(g,{x,y}));}
@@ -457,9 +458,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle')=>
   '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
-  '" fill="#162735" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
+  '" fill="#222222" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
  return qwPlaceSVGLabels(qwSVG(guides+objects.map((o,i)=>{
-  const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#162735',width=paint.width||2,fill=paint.fill||'none';
+  const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#222222',width=paint.width||2,fill=paint.fill||'none';
   const a=' stroke="'+stroke+'" stroke-width="'+width+'" fill="none"',
    vertices=['triangle','rightTriangle','quadrilateral','regularPolygon'].includes(o.kind)?qwGeometryVertices(o):null;
   const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
@@ -478,7 +479,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
     for(let distance=10;distance<=length-8;distance+=14){
      const ux=dx/length,uy=dy/length,x=o.x+ux*distance,y=o.y+uy*distance;
-     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-ux*6-uy*9)+'" y2="'+numeric(y-uy*6+ux*9)+'" stroke="#687889" stroke-width="1.1" stroke-linecap="round"/>';
+     shape+='<line x1="'+numeric(x)+'" y1="'+numeric(y)+'" x2="'+numeric(x-ux*6-uy*9)+'" y2="'+numeric(y-uy*6+ux*9)+'" stroke="#777777" stroke-width="1.1" stroke-linecap="round"/>';
     }
    }
   }
@@ -506,21 +507,21 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    shape=qwPhysicsShape(o,interactive);
   }
   if(o.kind==='block'){
-   shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f6f8" stroke="#162735" stroke-width="2"/>';
+   shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,3)+'" height="'+Math.max(h,3)+'" fill="#f2f2f2" stroke="#222222" stroke-width="2"/>';
   }
-  if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eef3f5" stroke="#162735" stroke-width="2"/>';
+  if(o.kind==='incline')shape='<polygon points="'+minX+','+maxY+' '+maxX+','+maxY+' '+maxX+','+minY+'" fill="#eeeeee" stroke="#222222" stroke-width="2"/>';
   if(['pulley','fixedPulley','movablePulley'].includes(o.kind)){
    const rad=Math.max(8,Math.min(w,h)/2),cx=minX+w/2,cy=minY+h/2;
-   shape='<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="'+numeric(rad)+'" fill="white" stroke="#162735" stroke-width="2"/>'+
-    '<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="3.5" fill="#162735"/>'+
+   shape='<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="'+numeric(rad)+'" fill="white" stroke="#222222" stroke-width="2"/>'+
+    '<circle cx="'+numeric(cx)+'" cy="'+numeric(cy)+'" r="3.5" fill="#222222"/>'+
     (o.kind==='movablePulley'?
-     '<path d="M'+numeric(cx-rad)+' '+numeric(cy-rad-32)+'V'+numeric(cy)+' A'+rad+' '+rad+' 0 0 0 '+numeric(cx+rad)+' '+numeric(cy)+'V'+numeric(cy-rad-32)+'" fill="none" stroke="#162735" stroke-width="2"/>'+
-     '<path d="M'+numeric(cx)+' '+numeric(cy)+'V'+numeric(cy+rad+14)+'q0 8 7 4" fill="none" stroke="#162735" stroke-width="2"/>':
-     '<line x1="'+numeric(cx)+'" y1="'+numeric(cy)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-14)+'" stroke="#162735" stroke-width="2"/>');
+     '<path d="M'+numeric(cx-rad)+' '+numeric(cy-rad-32)+'V'+numeric(cy)+' A'+rad+' '+rad+' 0 0 0 '+numeric(cx+rad)+' '+numeric(cy)+'V'+numeric(cy-rad-32)+'" fill="none" stroke="#222222" stroke-width="2"/>'+
+     '<path d="M'+numeric(cx)+' '+numeric(cy)+'V'+numeric(cy+rad+14)+'q0 8 7 4" fill="none" stroke="#222222" stroke-width="2"/>':
+     '<line x1="'+numeric(cx)+'" y1="'+numeric(cy)+'" x2="'+numeric(cx)+'" y2="'+numeric(cy-rad-14)+'" stroke="#222222" stroke-width="2"/>');
   }
   if(o.kind==='rect')shape='<rect x="'+minX+'" y="'+minY+'" width="'+Math.max(w,1)+'" height="'+Math.max(h,1)+'"'+a+'/>';
   if(o.kind==='circle'||o.kind==='ellipse')shape='<ellipse cx="'+(minX+w/2)+'" cy="'+(minY+h/2)+'" rx="'+Math.max(w/2,1)+'" ry="'+Math.max(h/2,1)+'"'+a+'/>';
-  if(o.kind==='point')shape='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#162735"/>';
+  if(o.kind==='point')shape='<circle cx="'+o.x+'" cy="'+o.y+'" r="3" fill="#222222"/>';
   if(o.kind==='angle'){
    const angle=Math.atan2(o.y2-o.y,o.x2-o.x),start=o.x2>=o.x?0:Math.PI,r=25;
    let delta=angle-start;while(delta>Math.PI)delta-=2*Math.PI;while(delta< -Math.PI)delta+=2*Math.PI;
@@ -534,7 +535,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
     cy=vertices.reduce((v,p)=>v+p.y,0)/vertices.length;
    const polygonEdges=vertices.map((p,i)=>[p,vertices[(i+1)%vertices.length]]);
    vertices.forEach((p,j)=>{
-    shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#162735"/>';
+    shape+='<circle cx="'+p.x+'" cy="'+p.y+'" r="2.5" fill="#222222"/>';
     if(interactive&&o.kind!=='regularPolygon')shape+='<circle data-qw-vertex="'+j+'" cx="'+p.x+'" cy="'+p.y+'" r="7" fill="#fff" stroke="#136bb1" stroke-width="2"/>';
     if(p.label){
      const at=qwGeometryCaptionLocation(p.label,p,{x:p.x-cx,y:p.y-cy},allSegments,allPoints,placedLabels,20);
@@ -594,9 +595,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   }
   // Styling applies only to the printable object; editor handles keep their own colors.
   if(o.ticks){const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1;for(let n=0;n<o.ticks;n++){const shift=(n-(o.ticks-1)/2)*6,cx=(o.x+o.x2)/2+dx/len*shift,cy=(o.y+o.y2)/2+dy/len*shift;shape+='<line data-qw-equal-mark="'+(n+1)+'" x1="'+(cx-dy/len*6)+'" y1="'+(cy+dx/len*6)+'" x2="'+(cx+dy/len*6)+'" y2="'+(cy-dx/len*6)+'"'+a+'/>';}}
-  if(paint.stroke||paint.width)shape=shape.replace(/stroke="#162735"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#162735"/g,'fill="'+stroke+'"');
-  if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f6f8|#eef3f5|white)"/g,'fill="'+fill+'"');
-  if(paint.text)captions=captions.replace(/fill="#162735"/g,'fill="'+paint.text+'"');
+  if(paint.stroke||paint.width)shape=shape.replace(/stroke="#222222"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#222222"/g,'fill="'+stroke+'"');
+  if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f2f2|#eeeeee|white)"/g,'fill="'+fill+'"');
+  if(paint.text)captions=captions.replace(/fill="#222222"/g,'fill="'+paint.text+'"');
 
   const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';

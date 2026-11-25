@@ -666,7 +666,7 @@ function qdVariantPaperHTML(variant,kind='student'){
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
-    '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+
+    '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+(typeof QW_MATH_FONT_CSS==='string'?QW_MATH_FONT_CSS:'')+(typeof QW_RADICAL_CSS==='string'?QW_RADICAL_CSS:'')+
     '@page{size:A4;margin:17mm 16mm}'+
     '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#202833;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
     '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
@@ -678,7 +678,7 @@ function qdVariantPaperHTML(variant,kind='student'){
     '.question{margin:0 0 19px;break-inside:avoid-page;page-break-inside:avoid}'+
     '.question-head{display:flex;gap:9px;align-items:baseline;line-height:1.55}'+
     '.question-number{font-weight:700;flex:none}.question-text{flex:1;overflow-wrap:anywhere}'+
-    '.question-text,.answers,.solution{font-family:"QO Print Serif",Georgia,serif;line-height:1.26}'+
+    '.question-text,.answers,.solution{font-family:"QO Print Serif",Georgia,serif;line-height:1.26}math{font-family:"QO Math","DejaVu Math TeX Gyre",serif;font-weight:400;font-synthesis:none}'+
     '.question-text p,.solution p{margin:0 0 .6em}.question-text :is(h3,h4,h5,h6){font-size:1em;margin:.65em 0 .25em}'+
     '.question-text table,.solution table{border-collapse:collapse}.question-text :is(td,th),.solution :is(td,th){border:1px solid #888;padding:.15em .45em}'+
     '.points{flex:none;font-size:11px;color:#526278;white-space:nowrap}'+

@@ -56,7 +56,39 @@ function qwMeasureSVGInk(svg){
   return {x:box.x-pad,y:box.y-pad,width:Math.max(1,box.width+pad*2),height:Math.max(1,box.height+pad*2)};
  }finally{for(const {e,style} of clipped)if(style===null)e.removeAttribute('style');else e.setAttribute('style',style);}
 }
-const QW_PUBLISH_CSS=`
+// Retain MathML sizing and semantics. Paint the hook and rule together because
+// the native glyph and the separately snapped rule can leave a seam in PDF.
+const QW_RADICAL_CSS=`
+@media (forced-colors:none){
+ @supports (clip-path:polygon(0 0,100% 0,100% 100%)){
+  .qw-radical{color:transparent}
+  .qw-radicand{position:relative;padding-block-start:.22em;padding-inline-end:.1em;color:var(--qw-math-ink,var(--qw-bank-ink,var(--qo-text,#111)))}
+  .qw-radical-ink{--qw-root-rule:max(1px,.067em);position:absolute;left:-.52em;top:0;width:calc(100% + .52em);height:100%;background:currentColor;outline:1px solid currentColor;print-color-adjust:exact;pointer-events:none;
+   clip-path:polygon(0 67.5%,.12em 63.5%,.25em 95%,.46em 0,100% 0,100% var(--qw-root-rule),.52em var(--qw-root-rule),.32em 100%,.24em 100%,.09em 69%,.02em 71.5%)}
+ }
+}
+`;
+const QW_PUBLISH_CSS=QW_RADICAL_CSS+`
+:root{--qw-math-family:"QO Math","DejaVu Math TeX Gyre","Cambria Math",serif;--qw-task-marker:7mm;--qw-task-indent:2mm;--qw-task-text-leading:1.27;--qw-task-heading-gap:.8mm;--qw-task-paragraph-gap:.9mm}
+.qw-paper-task.qw-standard-task{display:grid;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);row-gap:0;align-items:start}
+.qw-paper-task.qw-standard-task>.qw-task-heading{display:grid;grid-column:1/-1;grid-row:1;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);align-items:center;margin:0 0 var(--qw-task-heading-gap);padding:0;width:auto;height:auto;border:0;min-width:0}
+.qw-task-heading>.qw-task-marker{display:grid;place-items:center;box-sizing:border-box;width:var(--qw-task-marker);height:var(--qw-task-marker);padding:0;border:.22mm solid currentColor;font:700 10pt/1 "QO Print Serif",Georgia,serif;text-align:center}
+.qw-booklet-bank-id{font:700 9.5pt/1.2 "QO Print Serif",Georgia,serif;white-space:nowrap}
+.qw-task-heading>.qw-booklet-bank-id{display:block;justify-self:start;margin:0;color:inherit;text-box:trim-both cap alphabetic}
+@supports not (text-box:trim-both cap alphabetic){.qw-task-heading>.qw-booklet-bank-id{padding-block-start:1.1pt}}
+.qw-paper-task.qw-standard-task>:not(.qw-task-heading){grid-column:2;grid-row:auto;min-width:0}
+.qw-standard-task :is(.qw-task-text,.qw-key-solutions){line-height:var(--qw-task-text-leading)}
+.qw-standard-task :is(.qw-task-text,.qw-key-solutions) p:not(:last-child){margin:0 0 var(--qw-task-paragraph-gap)}
+.qw-standard-task :is(.qw-task-text,.qw-key-solutions)>:first-child{margin-top:0}
+.qw-standard-task :is(.qw-task-text,.qw-key-solutions)>p:last-child{margin-bottom:0}
+.qw-standard-task :is(.qw-study-answer,.qw-booklet-answer){font-size:inherit;line-height:1.2}
+:is(.qw-study-text,.qw-bank-solution-body,.qw-bank-rich-render,.qw-bank-equation-preview,.qw-paper-task,#qw-formula-preview) math{font-family:var(--qw-math-family);font-weight:400;font-synthesis:none;vertical-align:baseline}
+.qw-answer-columns .qw-answer-item{grid-template-columns:6mm minmax(0,1fr);column-gap:1.2mm;align-items:baseline}
+.qw-answer-item>.qw-print-number{font-weight:700;text-align:right;font-variant-numeric:lining-nums tabular-nums}
+.qw-answer-item>.qw-answer-text{min-width:0;font-weight:400;font-synthesis:none;overflow-wrap:anywhere}
+.qw-answer-item .qw-answer-text :is(b,strong,math,mi,mn,mo,mtext,.qw-booklet-bank-id){font-weight:400;font-synthesis:none}
+.qw-answer-item .qw-answer-text>.qw-booklet-bank-id{margin-inline-end:1mm}
+.qw-answer-item .qw-answer-text p{margin:0}
 .qw-rich-table-scroll[data-publish-fluid]{width:100%}
 .qw-rich-table-scroll[data-publish-fluid]>table{margin-inline:auto}
 :is(.qw-rich,.qw-print-rich,.qw-task-tables,.qw-teacher-notes) table[data-publish-header]{font-size:var(--qw-table-font);max-width:100%;overflow-wrap:anywhere}
@@ -64,7 +96,7 @@ const QW_PUBLISH_CSS=`
 :is(.qw-rich,.qw-print-rich,.qw-task-tables,.qw-teacher-notes) table[data-publish-header]:not([data-publish-header="shade"]) th{background:transparent}
 :is(.qw-rich,.qw-print-rich,.qw-task-tables,.qw-teacher-notes) table[data-publish-header="plain"] th{font-weight:400}
 `;
-function qwPrintStyles(orientation='portrait',landscapeLayout='spread'){return QW_PRINT_FONT_CSS+`
+function qwPrintStyles(orientation='portrait',landscapeLayout='spread',mathFont=typeof QW_MATH_FONT_CSS==='string'?QW_MATH_FONT_CSS:''){return QW_PRINT_FONT_CSS+mathFont+`
 @page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'};margin:0}
 :root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
@@ -113,7 +145,7 @@ body{font:var(--qw-print-size,10.8pt)/1.35 var(--qw-print-family)}
 .qw-teacher-notes{margin:1mm 0 0;padding:1mm 1.5mm;border-left:.5mm solid #777;background:#f7f7f7;font-size:9.3pt;line-height:1.3}
 .qw-print-with-answers .qw-answer-preview{display:none}
 .qw-teacher-notes p{margin:0 0 1mm}.qw-teacher-notes p:last-child{margin-bottom:0}
-math{font-family:"Cambria Math","STIX Two Math","Times New Roman",serif;font-size:1em;line-height:normal;vertical-align:baseline;margin:0;white-space:nowrap}
+math{font-family:var(--qw-math-family);font-size:1em;font-weight:400;font-synthesis:none;line-height:normal;vertical-align:baseline;margin:0;white-space:nowrap}
 math mfrac{font-size:1em}
 .qw-compact-task .qw-paper-task>header,.qw-compact-task .qw-task-flow,.qw-compact-task .qw-task-text{display:inline}
 .qw-compact-task .qw-paper-task>header{margin:0 2mm 0 0}
@@ -167,20 +199,18 @@ body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial
 body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-print-section:before{content:none}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:8mm minmax(0,1fr);column-gap:3mm;row-gap:0}
-body[data-qw-format="booklet"] .qw-booklet-entry>header{grid-column:1;grid-row:1 / span 2;width:8mm;height:7mm;border:.28mm solid #151515;display:flex;align-items:center;justify-content:center;margin:0}
-body[data-qw-format="booklet"] .qw-booklet-entry>header .qw-print-number{font:700 11pt/1 "QO Print Serif",Georgia,serif;text-align:center}
-body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{grid-column:2;grid-row:1;line-height:1.23;min-height:7mm}
+body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{line-height:var(--qw-task-text-leading);min-height:0}
 body[data-qw-format="booklet"] .qw-task-text{overflow-wrap:normal;word-break:normal;hyphens:none;text-align:left}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow figure{margin:0 0 1.2mm 4mm}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{float:none!important;display:block;margin:2mm auto 0!important;max-width:100%}
-body[data-qw-format="booklet"] .qw-booklet-answer{grid-column:2;grid-row:2;display:flex;align-items:baseline;gap:1mm;margin:1.5mm 0 0;font:10.5pt/1.2 "QO Print Serif",Georgia,serif;break-inside:avoid}
+body[data-qw-format="booklet"] .qw-booklet-answer{display:flex;align-items:baseline;gap:1mm;margin:1.5mm 0 0;font:inherit;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;width:52mm;border-bottom:.22mm solid #555;min-width:20mm;height:4.5mm}
 body[data-qw-format="booklet"] .qw-booklet-answer{white-space:nowrap}
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{min-width:0;align-items:baseline}
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer span{width:auto;min-width:12mm;max-width:52mm;flex:1 1 auto}
 body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
 body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
-body[data-qw-format="booklet"] math{font-size:1em;math-style:normal;font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none}
+body[data-qw-format="booklet"] math{math-style:normal}
 body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
 /* The default answer stays in normal flow after the condition and figure.
    Only measured-safe short text uses a two-column grid, allowing the answer
@@ -204,9 +234,6 @@ body[data-qw-format="booklet"] .qw-booklet-entry .qw-booklet-answer{justify-self
 .qw-task-tables{clear:both;display:flex;flex-direction:column;align-items:center;gap:1.5mm;width:100%;margin:1.5mm auto 0}
 .qw-task-tables table{border-collapse:collapse;max-width:100%;width:auto;table-layout:auto;font:inherit;overflow-wrap:anywhere}
 .qw-task-tables :is(th,td){padding:.8mm 1.8mm;vertical-align:middle}
-body[data-qw-format] .qw-booklet-bank-id{font:700 9.5pt/1.2 var(--qw-print-family);color:#222;white-space:nowrap;margin-right:1.5mm}
-.qw-task-text>.qw-booklet-bank-id+p:first-of-type{display:inline}
-.qw-task-text>.qw-booklet-bank-id+p:first-of-type+p{margin-top:.75mm}
 
 
 /* TASK165: author text formatting is shared by bank preview and printed PDF.
@@ -240,11 +267,8 @@ body[data-qw-format="answers"] .qw-answer-long{font:var(--qw-print-size,10pt)/1.
 .qw-answer-caption .qw-rich-equation{display:inline-block;vertical-align:middle;margin:0 .5mm}
 .qw-answer-caption .qw-rich-equation math{display:inline-math}
 .qw-key-solutions{grid-column:2;clear:both;margin:1.4mm 0 0;padding:0;border:0;background:transparent;font:inherit}
-body[data-qw-format="answers"] .qw-answer-long .qw-print-number{display:grid;place-items:center;width:7mm;min-height:6mm;padding:0;border:.2mm solid currentColor;font-weight:700}
-body[data-qw-format="answers"] .qw-answer-long .qw-compact-entry{grid-template-columns:7mm minmax(0,1fr);column-gap:2mm}
-.qw-print-key-id+.qw-print-answer-heading{margin-top:.6mm}
 /* TASK154 — one typographic system for all exported document formats. */
-body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
+body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;--qw-math-ink:var(--qw-body-color,#111);color:var(--qw-math-ink)}
 body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
 body[data-qw-font="serif"]{--qw-print-family:"QO Print Serif",Georgia,serif}
 body[data-qw-title-font="serif"]{--qw-title-family:"QO Print Serif",Georgia,serif}
@@ -252,7 +276,7 @@ body[data-qw-title-font="sans"]{--qw-title-family:"QO Print Sans",Arial,sans-ser
 body[data-qw-title-custom="true"] .qw-print-title{font-family:var(--qw-title-family);font-size:var(--qw-title-size,14pt);font-weight:700;color:var(--qw-title-color,#111);text-align:var(--qw-title-align,center);line-height:1.23;max-width:100%;overflow-wrap:break-word}
 body[data-qw-title-custom="true"] .qw-print-header{text-align:var(--qw-title-align,center)}
 body[data-qw-format] .qw-paper-task{color:var(--qw-body-color,#111)}
-body[data-qw-math-custom="true"] math{font-family:"Cambria Math","DejaVu Math TeX Gyre","Asana Math","STIX Two Math",serif;font-weight:400;font-synthesis:none;math-style:normal}
+body[data-qw-math-custom="true"] math{math-style:normal}
 body[data-qw-math-custom="true"] math :is(mi,mn,mo,mtext){font-weight:400}
 body[data-qw-show-pages="false"] .qw-page-footer{display:none}
 body:not([data-qw-format="booklet"]) .qw-page-footer{font-family:"QO Print Sans",Arial,sans-serif}
@@ -324,9 +348,7 @@ body[data-qw-format="booklet"] .qw-page-content{width:192mm;height:279mm}
 body[data-qw-format="booklet"] .qw-print-header{margin-bottom:4.5mm}
 body[data-qw-format="booklet"] .qw-print-section{margin-bottom:5.25mm}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:7mm minmax(0,1fr);column-gap:2mm}
-body[data-qw-format="booklet"] .qw-booklet-entry>header{width:7mm;height:6mm}
-body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow{line-height:1.24;min-height:6mm}
-body[data-qw-format="booklet"] .qw-task-text.qw-print-rich{line-height:1.24}
+body[data-qw-format="booklet"] .qw-task-text.qw-print-rich{line-height:var(--qw-task-text-leading)}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-task-flow figure{margin:0 0 1mm 3mm}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-left figure{margin:0 3mm 1mm 0}
 body[data-qw-format="booklet"] .qw-booklet-entry .qw-figure-below figure{margin:1.5mm auto 0!important}
@@ -365,13 +387,6 @@ async function qwPreparePrintDocument(){
  // display="block" MathML occupies its entire parent box even when the ink is narrow.
  // Measure the mathematical child, not the full-width display container.
  const mathInkWidth=math=>((math.getAttribute('display')==='block'?math.firstElementChild:null)||math).getBoundingClientRect().width;
- // Booklet-only MathML typographic correction; QWORK source is unchanged.
- if(format==='booklet')for(const sup of source.querySelectorAll('math msup')){
-  const script=sup.children[1];if(!script||script.localName==='mpadded')continue;
-  const padded=document.createElementNS('http://www.w3.org/1998/Math/MathML','mpadded');
-  padded.setAttribute('lspace','0.09em');padded.setAttribute('width','+0.09em');
-  script.replaceWith(padded);padded.append(script);
- }
  // Figure geometry follows the actual A4 printable width, not a portrait-only ruler.
  source.style.width=spread?(format==='booklet'?'136.5mm':'130.5mm'):landscape?(format==='booklet'?'271mm':'267mm'):(format==='booklet'?'192mm':modern?'186mm':'180mm');const contentWidth=source.getBoundingClientRect().width;
  for(const section of originals){
@@ -455,7 +470,7 @@ async function qwPreparePrintDocument(){
    }
    if(custom&&graph&&svg)for(const item of svg.querySelectorAll('[stroke-width]:not(text)')){
     const design=Number(item.getAttribute('stroke-width'));if(!design)continue;
-    const grid=item.getAttribute('stroke')==='#d9dee4',min=grid?.25:.7,max=grid?.45:1.9;
+    const grid=item.hasAttribute('data-qw-grid-line'),min=grid?.25:.7,max=grid?.45:1.9;
     item.setAttribute('stroke-width',Math.max(min,Math.min(max,design*scale))/scale);
    }
    if(graph&&svg)for(const label of svg.querySelectorAll('.qw-axis-title,.qw-axis-number')){

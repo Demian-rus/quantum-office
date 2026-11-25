@@ -7,7 +7,17 @@ function qwMathBox(ctx,n,size=12,upright=false,unary=false){
  if(n.t==='upright')return qwMathBox(ctx,n.a,size,true);
  if(n.t==='row'){const bs=n.list.map((v,i)=>qwMathBox(ctx,v,size,upright,qwMathIsUnary(n.list,i)));return {w:bs.reduce((s,b)=>s+b.w,0),a:Math.max(size*.8,...bs.map(b=>b.a)),d:Math.max(size*.24,...bs.map(b=>b.d)),draw:(x,y)=>{for(const b of bs){b.draw(x,y);x+=b.w;}}};}
  if(n.t==='frac'){const a=qwMathBox(ctx,n.a,size*.78,upright),b=qwMathBox(ctx,n.b,size*.78,upright),w=Math.max(a.w,b.w)+8;return {w,a:a.a+a.d+size*.35,d:b.a+b.d+size*.25,draw:(x,y)=>{a.draw(x+(w-a.w)/2,y-size*.35-a.d);ctx.beginPath();ctx.lineWidth=.7;ctx.moveTo(x,y-size*.18);ctx.lineTo(x+w,y-size*.18);ctx.stroke();b.draw(x+(w-b.w)/2,y+b.a+2);}};}
- if(n.t==='sqrt'){const a=qwMathBox(ctx,n.a,size,upright);return {w:a.w+size*.8,a:a.a+3,d:a.d,draw:(x,y)=>{ctx.font=(size*1.2)+'px "Times New Roman",serif';ctx.fillText('√',x,y+1);a.draw(x+size*.8,y);ctx.beginPath();ctx.lineWidth=.6;ctx.moveTo(x+size*.7,y-a.a-1);ctx.lineTo(x+a.w+size*.8,y-a.a-1);ctx.stroke();}};}
+ if(n.t==='sqrt'){
+  const radicand=qwMathBox(ctx,n.a,size,upright),rule=Math.max(.55,size*.055),lead=size*.79;
+  const bar=radicand.a+size*.12+rule/2,depth=Math.max(size*.14,radicand.d),width=lead+radicand.w+size*.09;
+  return {w:width,a:bar+rule,d:depth+rule,draw:(x,y)=>{
+   radicand.draw(x+lead,y);
+   ctx.save();ctx.beginPath();ctx.lineWidth=rule;ctx.lineJoin='round';ctx.lineCap='butt';
+   ctx.moveTo(x+rule/2,y-size*.08);ctx.lineTo(x+size*.16,y-size*.16);
+   ctx.lineTo(x+size*.35,y+depth);ctx.lineTo(x+size*.67,y-bar);ctx.lineTo(x+width,y-bar);
+   ctx.stroke();ctx.restore();
+  }};
+ }
  if(n.t==='cases'){
   const rows=n.rows.map(row=>qwMathBox(ctx,row,size,upright));
   const gap=size*.15,height=rows.reduce((sum,row)=>sum+row.a+row.d+gap,-gap);

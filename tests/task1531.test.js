@@ -19,7 +19,7 @@ test('TASK152.1: the block has no decorative internal stripe',()=>{
 
 test('TASK152.1: support hatch marks have equal length, spacing and no edge tails',()=>{
  const svg=qwDiagramSVG([{kind:'ground',x:100,y:190,x2:380,y2:190,label:''}]);
- const rx=/<line x1="([\d.]+)" y1="190" x2="([\d.]+)" y2="199" stroke="#687889"/g;
+ const rx=/<line x1="([\d.]+)" y1="190" x2="([\d.]+)" y2="199" stroke="#777777"/g;
  const marks=[...svg.matchAll(rx)];
  assert.ok(marks.length>=15);
  assert.ok(marks.every(m=>Math.abs(Number(m[1])-Number(m[2])-6)<1e-8));

@@ -219,7 +219,7 @@ function qwStylePublishedTables(scope,settings){
 }
 function qwStudyFonts(){
  if(qoNativeDesktop||document.getElementById('qw-study-fonts'))return;
- const style=document.createElement('style');style.id='qw-study-fonts';style.textContent=QW_PRINT_FONT_CSS;
+ const style=document.createElement('style');style.id='qw-study-fonts';style.textContent=QW_PRINT_FONT_CSS+QW_MATH_FONT_CSS;
  document.head.append(style);
 }
 function qwStudySolution(q){
@@ -233,10 +233,12 @@ function qwStudySolution(q){
 function qwConstructorStudyTask(q,index){
  return qwTaskPreview(q,index)+([q.comment,q.answer,q.criteria].some(value=>value?.trim())?qwStudySolution(q):'');
 }
-function qwPrintBankLabel(q,showSlot=false){
- if(q.source?.kind!=='bank'||!qwBankNumber(q.source.number))return '';
- return '<span class="qw-booklet-bank-id" data-qw-bank-number="'+q.source.number+'">'+
-  (showSlot&&q.source.slot?'Тип '+qwEsc(q.source.slot)+' ':'')+'№ '+String(q.source.number).padStart(5,'0')+'</span> ';
+function qwPrintBankLabel(number){
+ if(!qwBankNumber(number))return '';
+ return '<span class="qw-booklet-bank-id qw-study-id" data-qw-bank-number="'+number+'">№ '+String(number).padStart(5,'0')+'.</span>';
+}
+function qwTaskHeading(index,bankNumber){
+ return '<header class="qw-task-heading"><b class="qw-task-number qw-print-number qw-task-marker">'+(index+1)+'</b>'+qwPrintBankLabel(bankNumber)+'</header>';
 }
 function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace){
  qwStudyFonts();
@@ -247,17 +249,14 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace){
  const figure=qwStudyFigureHTML(q);
  const settings=q.publishing?.figure;
  const position=settings?.position||(preferences?.figurePosition&&preferences.figurePosition!=='auto'?preferences.figurePosition:q.position);
- const placement=!figure?'none':position==='below'||tables.length||position==='auto'&&(settings?settings.width>46:q.figureWidth>300)?'below':position==='left'?'left':'right';
+ const placement=!figure?'none':position==='below'||position==='left'||tables.length||position==='auto'&&(settings?settings.width>46:q.figureWidth>300)?'below':'right';
  const permanent=bankNumber||q.source?.number;
- const id=permanent?'№ '+String(permanent).padStart(5,'0'):'';
- const ordinal=Number.isInteger(index)?index+1:null;
- const number=ordinal||id;
- const answer=q.answerVisible?'<div class="qw-study-answer">Ответ '+(q.answerStyle==='boxes'?
+ const answer=q.answerVisible?'<div class="qw-study-answer">Ответ: '+(q.answerStyle==='boxes'?
   '<span class="qw-study-boxes">'+Array.from({length:q.boxes},()=>'<i></i>').join('')+'</span>':
   '<span class="'+(q.answerStyle==='box'?'qw-study-box':'qw-study-line')+'"></span>')+'</div>':'';
- return '<article class="qw-paper-task qw-study-task" data-qw-study-figure="'+placement+'">'+
-  (number?'<header><b class="qw-study-number">'+number+'</b></header>':'')+
-  '<div class="qw-study-flow"><div class="qw-study-condition qw-study-text qw-task-text qw-rich">'+(ordinal&&id?'<span class="qw-study-id">'+id+'</span> ':'')+template.innerHTML+
+ return '<article class="qw-paper-task qw-study-task qw-standard-task" data-qw-study-figure="'+placement+'">'+
+  qwTaskHeading(Number.isInteger(index)?index:0,permanent)+
+  '<div class="qw-study-flow"><div class="qw-study-condition qw-study-text qw-task-text qw-rich">'+template.innerHTML+
   (q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+qwPrintFieldHTML(c)+'</li>').join('')+'</ol>':'')+'</div>'+
   figure+(tables.length?'<div class="qw-study-tables qw-study-text qw-rich">'+tables.map(table=>table.outerHTML).join('')+'</div>':'')+
   answer+'</div>'+(showWritingSpace&&q.solutionVisible?'<div aria-label="Место для решения" class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
@@ -265,18 +264,20 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace){
 function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false,bankNumber=null){
  if(!printing)return qwStudyTask(q,index,preferences||(rich?null:qwDoc.printSettings),bankNumber,!rich&&layout==='worksheet');
  const figure=qwStudyFigureHTML(q,true);
- const bankLabel=layout==='booklet'?qwPrintBankLabel(q,true):'';
+ const permanent=q.source?.kind==='bank'?qwBankNumber(q.source.number):0;
+ const standardized=layout==='booklet'||!!permanent;
  const richText=rich||qwHasRichSyntax(q.prompt||'');
  const format=richText?qwRichMarkdownHTML:qwContentHTML;
- const text='<div class="qw-task-text'+(richText?' qw-rich qw-print-rich':'')+'">'+bankLabel+(q.prompt?qwPublishedFieldHTML(q,'prompt',format):format('Условие не заполнено'))+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+qwPrintFieldHTML(c)+'</li>').join('')+'</ol>':'')+'</div>';
- const effectivePreferences=preferences||(printing?null:qwDoc.printSettings);
- const position=q.publishing?.figure?.position||(effectivePreferences?.figurePosition&&effectivePreferences.figurePosition!=='auto'?effectivePreferences.figurePosition:q.position);
- const flow='<div class="qw-task-flow qw-figure-'+(!printing&&position==='auto'?'right':position)+'">'+(printing?text+figure:figure+text)+'</div>';
- if(layout==='booklet')return '<article class="qw-paper-task qw-compact-entry qw-booklet-entry"><header><b class="qw-task-number qw-print-number">'+(index+1)+'</b></header>'+flow+
+ const text='<div class="qw-task-text'+(richText?' qw-rich qw-print-rich':'')+'">'+(q.prompt?qwPublishedFieldHTML(q,'prompt',format):format('Условие не заполнено'))+(q.type==='choice'?'<ol class="qw-choice-list">'+q.choices.map(c=>'<li>'+qwPrintFieldHTML(c)+'</li>').join('')+'</ol>':'')+'</div>';
+ const position=q.publishing?.figure?.position||(preferences?.figurePosition&&preferences.figurePosition!=='auto'?preferences.figurePosition:q.position);
+ const flow='<div class="qw-task-flow qw-figure-'+(standardized&&position==='left'?'below':position)+'">'+text+figure+'</div>';
+ const heading=standardized?qwTaskHeading(index,permanent):'';
+ if(layout==='booklet')return '<article class="qw-paper-task qw-compact-entry qw-booklet-entry qw-standard-task">'+heading+flow+
   (q.answerVisible?'<div class="qw-booklet-answer">Ответ: <span></span></div>':'')+'</article>';
- if(layout==='compact'||layout==='practice')return '<article class="qw-paper-task qw-compact-entry"><header><b class="qw-task-number qw-print-number">'+(index+1)+'.</b></header>'+flow+'</article>';
- if(layout==='exam')return '<article class="qw-paper-task qw-exam-task"><div class="qw-exam-grid"><b class="qw-exam-number qw-print-number">'+(index+1)+'.</b><div class="qw-exam-body">'+flow+'</div></div></article>';
- return '<article class="qw-paper-task qw-worksheet-task"><header><b class="qw-print-number">Задание '+(index+1)+'</b>'+(printing?'':'<span>'+qwEsc(QW_TYPES[q.type])+' · '+q.points+' б.</span>')+'</header>'+flow+
+ const standardClass=standardized?' qw-standard-task':'';
+ if(layout==='compact'||layout==='practice')return '<article class="qw-paper-task qw-compact-entry'+standardClass+'">'+(heading||'<header><b class="qw-task-number qw-print-number">'+(index+1)+'.</b></header>')+flow+'</article>';
+ if(layout==='exam')return standardized?'<article class="qw-paper-task qw-exam-task qw-standard-task">'+heading+flow+'</article>':'<article class="qw-paper-task qw-exam-task"><div class="qw-exam-grid"><b class="qw-exam-number qw-print-number">'+(index+1)+'.</b><div class="qw-exam-body">'+flow+'</div></div></article>';
+ return '<article class="qw-paper-task qw-worksheet-task'+standardClass+'">'+(heading||'<header><b class="qw-print-number">Задание '+(index+1)+'</b></header>')+flow+
   (q.answerVisible?'<div class="qw-answer-preview">Ответ: '+(q.answerStyle==='boxes'?Array.from({length:q.boxes},()=>'<i></i>').join(''):q.answerStyle==='box'?'<i class="qw-answer-box"></i>':'<span></span>')+'</div>':'')+
   (q.solutionVisible?'<div class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
@@ -321,33 +322,46 @@ function qwSymbols(){const groups={...(typeof QO_WRITER_SYMBOLS==='object'?QO_WR
    The older one-click raster PDF exporter remains available as a compatibility fallback. */
 /* Unified high-quality browser PDF. Native font shaping and vector SVG are kept. */
 function qwAnswerSections(d,options={}){
- const columns=d.tasks.length>=12?3:d.tasks.length>=6?2:1,sections=[];let short=[];
- const mode=options.keyMode,permanent=q=>options.includeNumbers===false?'':qwPrintBankLabel(q);
- const flush=()=>{if(!short.length)return;sections.push('<section class="qw-print-section qw-answer-row" data-task="'+short[0].number+'"><article class="qw-paper-task"><div class="qw-task-flow"><div class="qw-task-text qw-answer-columns" style="--qw-answer-columns:'+columns+'">'+short.map(({q,number})=>'<div class="qw-answer-item" data-answer-number="'+number+'"><b class="qw-print-number">'+number+'.</b><span class="qw-answer-text">'+permanent(q)+qwContentHTML(q.answer.trim()||'—')+'</span></div>').join('')+'</div></div></article></section>');short=[];};
+ const mode=options.keyMode,detailed=mode==='detailed'||(!mode&&(options.includeComments===true||options.includeCriteria===true));
+ const permanent=q=>options.includeNumbers!==false&&q.source?.kind==='bank'?qwBankNumber(q.source.number):0;
+ const answerSource=q=>q.answer.trim().replace(/^\s*(?:\*\*|__)?Ответ\s*:\s*(?:\*\*|__)?\s*/i,'');
+ const field=(q,key,value)=>qwPublishedFieldHTML({...q,[key]:value},key);
+ if(!detailed){
+  const columns=d.tasks.length>=12?3:d.tasks.length>=6?2:1,rows=[];
+  for(let i=0;i<d.tasks.length;i+=columns){
+   const entries=d.tasks.slice(i,i+columns).map((q,j)=>{
+    const number=i+j+1;
+    return '<div class="qw-answer-item" data-answer-number="'+number+'"><b class="qw-print-number">'+number+'.</b><div class="qw-answer-text qw-print-rich">'+qwPrintBankLabel(permanent(q))+field(q,'answer',answerSource(q)||'—')+'</div></div>';
+   }).join('');
+   rows.push('<section class="qw-print-section qw-answer-row" data-task="'+(i+1)+'"><article class="qw-paper-task"><div class="qw-task-flow"><div class="qw-task-text qw-answer-columns" style="--qw-answer-columns:'+columns+'">'+entries+'</div></div></article></section>');
+  }
+  return rows.join('');
+ }
+ const showPrompt=options.includePrompt===true,sections=[];
+ const section=(q,key,title,source)=>{
+  const heading=new RegExp('(^|\\n)\\s*#{1,4}\\s+'+title+'\\s*:?\\s*(?=\\n|$)','i');
+  if(heading.test(source))return field(q,key,source);
+  const inlineHeading=new RegExp('^\\s*(?:\\*\\*|__)?'+title+'\\s*:?(?:\\*\\*|__)?[ \\t]*(?:\\n|$)','i');
+  return '<h3 class="qw-print-answer-heading">'+title+'</h3>'+field(q,key,source.replace(inlineHeading,''));
+ };
  d.tasks.forEach((q,i)=>{
-  const number=i+1,detailed=mode==='detailed'||(!mode&&(options.includeComments===true||options.includeCriteria===true));
-  const showPrompt=detailed&&options.includePrompt===true;
-  const showSolution=detailed&&(mode==='detailed'||options.includeComments===true)&&!!q.comment.trim();
-  const showCriteria=detailed&&options.includeCriteria===true&&!!q.criteria.trim();
-  const richAnswer=qwHasRichSyntax(q.answer);
-  if(detailed||q.answer.length>70||q.answer.includes('\n')||richAnswer){
-   flush();
-   const value=q.answer.trim().replace(/^\s*(?:\*\*)?Ответ\s*:\s*(?:\*\*)?\s*/i,'');
-   const answer=qwPublishedFieldHTML({...q,answer:value||'—'},'answer').replace(/<br\s*\/?>/g,' ');
-   const solutionTitle=/(^|\n)\s*#{1,4}\s*Решение(?=\s|$)/i.test(q.comment)?'':'<h3 class="qw-print-answer-heading">Решение</h3>';
-   const criteriaTitle=/^\s*#{1,4}\s*[^\n]*критери/i.test(q.criteria)?'':'<h3 class="qw-print-answer-heading">Критерии оценивания</h3>';
-   const lines=q.comment.trimEnd().split('\n'),last=lines.at(-1)?.match(/^\s*(?:\*\*)?Ответ\s*:\s*(?:\*\*)?\s*(.+)$/i);
-   if(last&&value&&last[1].replace(/\.$/,'').trim()===value.replace(/\.$/,'').trim())lines.pop();
-   const body=(showSolution?solutionTitle+qwPublishedFieldHTML({...q,comment:lines.join('\n')},'comment'):'')+
-    (detailed?'<div class="qw-answer-caption"><b>Ответ:</b> '+answer+'</div>':answer)+
-    (showCriteria?criteriaTitle+qwPublishedFieldHTML(q,'criteria'):'');
-   if(showPrompt){
-    const condition=qwTaskPreview({...q,answerVisible:false,source:options.includeNumbers===false?null:q.source},i,'booklet',true,d.printSettings)
-     .replace('</article>','<div class="qw-teacher-notes qw-key-solutions qw-print-rich" data-answer-number="'+number+'">'+body+'</div></article>');
-    sections.push('<section class="qw-print-section qw-answer-long" data-qw-key-condition data-task="'+number+'">'+condition+'</section>');
-   }else sections.push('<section class="qw-print-section qw-answer-long" data-task="'+number+'"><article class="qw-paper-task qw-compact-entry"><header><b class="qw-print-number">'+number+'</b></header><div class="qw-task-flow"><div class="qw-task-text qw-print-rich" data-answer-number="'+number+'">'+(detailed&&permanent(q)?'<p class="qw-print-key-id">'+permanent(q)+'</p>':permanent(q))+body+'</div></div></article></section>');
-  }else{short.push({q,number});if(short.length===columns)flush();}
- });flush();return sections.join('');
+  const number=i+1,value=answerSource(q);
+  const answer=field(q,'answer',value||'—').replace(/<br\s*\/?>/g,' ');
+  const lines=q.comment.trimEnd().split('\n'),last=lines.at(-1)?.match(/^\s*(?:\*\*|__)?Ответ\s*:\s*(?:\*\*|__)?\s*(.+)$/i);
+  const withoutEnding=text=>text.replace(/(?:\*\*|__)?[.\s]*$/,'').trim();
+  if(last&&value&&withoutEnding(last[1])===withoutEnding(value))lines.pop();
+  const solution=lines.join('\n').trim();
+  const showSolution=(mode==='detailed'||options.includeComments===true)&&!!solution;
+  const showCriteria=options.includeCriteria===true&&!!q.criteria.trim();
+  const body=(showSolution?section(q,'comment','Решение',solution):'')+
+   '<div class="qw-answer-caption"><b>Ответ:</b> '+answer+'</div>'+
+   (showCriteria?section(q,'criteria','Критерии оценивания',q.criteria):'');
+  if(showPrompt){
+   const condition=qwTaskPreview({...q,answerVisible:false,source:options.includeNumbers===false?null:q.source},i,'booklet',true,d.printSettings)
+    .replace('</article>','<div class="qw-teacher-notes qw-key-solutions qw-print-rich" data-answer-number="'+number+'">'+body+'</div></article>');
+   sections.push('<section class="qw-print-section qw-answer-long" data-qw-key-condition data-task="'+number+'">'+condition+'</section>');
+  }else sections.push('<section class="qw-print-section qw-answer-long" data-task="'+number+'"><article class="qw-paper-task qw-compact-entry qw-standard-task">'+qwTaskHeading(i,permanent(q))+'<div class="qw-task-flow"><div class="qw-task-text qw-print-rich" data-answer-number="'+number+'">'+body+'</div></div></article></section>');
+ });return sections.join('');
 }
 function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
  const d=qwValidate(project),format=options.format||(teacher?'answers':d.layout),exam=format==='exam',subject=QW_SUBJECTS[d.subject];
@@ -1386,7 +1400,7 @@ async function qwBank(previousFilters={}){
   const subject=QW_SUBJECTS[entry.subject]||entry.subject;
   const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
    (entry.grade?' · '+entry.grade+' класс':'')+(entry.year?' · '+entry.year:'')+(entry.slot?' · № '+entry.slot:'');
-  const paper=qwTaskPreview(task,entry.slot?Number(entry.slot)-1:null,'worksheet',false,null,true,entry.bankNumber);
+  const paper=qwTaskPreview(task,entry.slot?Number(entry.slot)-1:pageOffset+Math.max(0,xs.findIndex(item=>item.id===entry.id)),'worksheet',false,null,true,entry.bankNumber);
   preview.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
    (task.title?'<strong>'+qwEsc(task.title)+'</strong>':'')+'<span>'+qwEsc(subject+' · '+designation)+'</span>'+
    (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'</div>'+

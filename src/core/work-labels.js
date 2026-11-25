@@ -74,7 +74,7 @@ function qwPlaceSVGLabels(source){
   for(const e of svg.querySelectorAll('path,line,polyline,polygon,rect,circle,ellipse')){
    if(e.closest('defs,[data-qw-label],[data-qw-editor-only]')||e.hasAttribute('data-qw-vertex'))continue;
    const style=getComputedStyle(e),stroke=style.stroke;
-   if(['rgb(217, 222, 228)','rgb(220, 230, 236)'].includes(stroke))continue; // construction/grid lines are background
+   if(e.hasAttribute('data-qw-grid-line')||['rgb(217, 222, 228)','rgb(220, 230, 236)'].includes(stroke))continue; // construction/grid lines are background
    const radius=Number(e.getAttribute('r'))||0,filledPoint=e.tagName==='circle'&&radius<=7&&style.fill!=='none';
    const filledHead=e.hasAttribute('data-qw-arrow-head')&&style.fill!=='none';
    if((stroke==='none'||Number(style.strokeOpacity)===0)&&!filledPoint&&!filledHead)continue;
