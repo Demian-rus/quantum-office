@@ -7,7 +7,7 @@ const KEY='quantum-office.work-builder.v1',WRITER='quantum-office-writer-v1';
 async function harness({legacy={},initial={},write,afterWrite,saveExport,waitForBoot=true}={}){
  const rows=structuredClone(initial),calls=[],nodes=new Map(),events={};let loaded=false,closed=false;
  const app={inert:false,textContent:''};nodes.set('app',app);
- const node=()=>({id:'',hidden:false,textContent:'',children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){nodes.delete(this.id);}});
+ const node=()=>({id:'',hidden:false,disabled:false,textContent:'',children:[],setAttribute(){},append(...items){this.children.push(...items);},remove(){nodes.delete(this.id);}});
  const register=n=>{nodes.set(n.id,n);for(const child of n.children||[])register(child);};
  const context=vm.createContext({TextEncoder,btoa,setTimeout,clearTimeout,document:{getElementById:id=>nodes.get(id),createElement:node,body:{prepend:register,append:()=>{loaded=true;}}},localStorage:{getItem:key=>legacy[key]??null},__TAURI__:{event:{listen:async(name,fn)=>{events[name]=fn;}},core:{invoke:async(command,args)=>{
   calls.push({command,args});
@@ -114,4 +114,52 @@ test('native draft notifications are quiet during pending and ACK, persistent on
  fail=false;retry.onclick();await until(()=>!h.context.qoDraftStorage.pending);
  assert.equal(notice.hidden,true);assert.equal(recovery.hidden,true);assert.equal(retry.hidden,true);
  assert.equal(h.rows[KEY].value,'changed');assert.equal(h.context.qoDraftStatusSummary(),'Черновик сохранён');
+});
+
+test('native editor decline does not flush, destroy, change the working copy or report a storage error',async()=>{
+ const h=await harness();let allow=false,asked=0,flushed=0;
+ h.context.qoCanCloseEditors=()=>{asked++;return allow;};
+ h.context.qoFlushForClose=()=>{flushed++;h.context.qoDraftStorage.setItem(KEY,'confirmed durable edit');};
+ h.events['qo-draft-close']();
+ assert.equal(asked,1);assert.equal(flushed,0);assert.equal(h.app.inert,false);assert.equal(h.closed(),false);assert.equal(h.context.qoDraftStorage.error,'');
+ allow=true;h.events['qo-draft-close']();await until(h.closed);
+ assert.equal(asked,2);assert.equal(flushed,1);assert.equal(h.rows[KEY].value,'confirmed durable edit');
+});
+test('recovery and close checks editor guard before exporting, cancel retains real error and pending data',async()=>{
+ let allow=false,exported=0;
+ const h=await harness({write:()=>{throw Error('real disk failure');},saveExport:()=>{exported++;return true;}});
+ h.context.qoDraftStorage.setItem(KEY,'exact recovery data');await assert.rejects(h.context.qoDraftStorage.flush(),/real disk failure/);
+ h.context.qoCanCloseEditors=()=>allow;
+ const button=h.nodes.get('qo-native-draft-recovery');button.onclick();
+ assert.equal(exported,0);assert.equal(h.closed(),false);assert.equal(h.app.inert,false);assert.equal(button.disabled,false);assert.equal(h.context.qoDraftStorage.error,'real disk failure');assert.equal(h.context.qoDraftStorage.getItem(KEY),'exact recovery data');
+ allow=true;button.onclick();await until(h.closed);assert.equal(exported,1);
+ const copy=JSON.parse(Buffer.from(h.calls.find(c=>c.command==='save_export').args.data,'base64').toString('utf8'));assert.equal(copy.entries[0].value,'exact recovery data');
+});
+
+test('education panel preferences are allowed, migrated only when absent, ACKed and kept separate from QWORK',async()=>{
+ const key='quantum-office.education-panels.v1',legacy={[key]:'{"pdf":{"left":254,"hideLeft":false}}'};
+ const h=await harness({legacy,initial:{[KEY]:{revision:2,value:'existing QWORK'}}});
+ const storage=h.context.qoDraftStorage;assert.equal(h.loaded(),true);assert.equal(storage.getItem(key),legacy[key]);
+ assert.equal(h.rows[key].revision,1);assert.equal(h.calls.find(c=>c.command==='draft_write').args.changes[0].migration,true);
+ const value='{"pdf":{"left":286,"hideLeft":true}}';storage.setItem(key,value);assert.equal(storage.getItem(key),value);assert.equal(storage.pending,true);await storage.flush();
+ assert.equal(storage.pending,false);assert.equal(storage.error,'');assert.deepEqual(h.rows[key],{revision:2,value});assert.equal(h.rows[KEY].value,'existing QWORK');
+ assert.throws(()=>storage.setItem(key+'.unknown','bad'),/Недопустимый ключ/);assert.throws(()=>storage.getItem(key+'.unknown'),/Недопустимый ключ/);assert.throws(()=>storage.removeItem(key+'.unknown'),/Недопустимый ключ/);
+ const reopened=await harness({legacy,initial:h.rows});assert.equal(reopened.context.qoDraftStorage.getItem(key),value);assert.equal(reopened.calls.filter(c=>c.command==='draft_write').length,0);
+ const tombstone=await harness({legacy,initial:{[key]:{revision:3,value:null}}});assert.equal(tombstone.context.qoDraftStorage.getItem(key),null);assert.equal(tombstone.calls.filter(c=>c.command==='draft_write').length,0);
+});
+test('education panel asynchronous write failures remain visible and retryable',async()=>{
+ const key='quantum-office.education-panels.v1';let fail=true;
+ const h=await harness({write:()=>{if(fail)throw Error('settings disk denied');}}),storage=h.context.qoDraftStorage;
+ storage.setItem(key,'{"pdf":{"left":286}}');await assert.rejects(storage.flush(),/settings disk denied/);
+ assert.equal(storage.pending,true);assert.match(storage.error,/settings disk denied/);assert.equal(h.nodes.get('qo-native-draft-notice').hidden,false);
+ fail=false;await storage.flush();assert.equal(storage.pending,false);assert.equal(storage.error,'');assert.equal(h.rows[key].value,'{"pdf":{"left":286}}');
+});
+test('panel preference synchronous write rejection is observable, not a success',()=>{
+ const source=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
+ const block=source.slice(source.indexOf('const QW_PANELS_KEY='),source.indexOf('function qwInstallPanels('));
+ let warnings=[],messages=[],raw=null,fail=true;
+ const context=vm.createContext({console:{warn:(...v)=>warnings.push(v)},status:(...v)=>messages.push(v),localStorage:{getItem:()=>raw,setItem:(k,v)=>{if(fail)throw Error('denied');raw=v;}}});
+ vm.runInContext(block,context);
+ assert.equal(vm.runInContext("qwSavePanelPreference('pdf',{left:286,hideLeft:true})",context),false);assert.equal(messages.length,1);assert.equal(messages[0][1],true);assert.equal(warnings.length,1);assert.equal(raw,null);
+ fail=false;assert.equal(vm.runInContext("qwSavePanelPreference('pdf',{left:286,hideLeft:true})",context),true);assert.equal(JSON.parse(raw).pdf.left,286);
 });

@@ -119,3 +119,7 @@ TASK 096. База: TASK 095, `6927b7b6918f3f25365e383604c0ffb092aa6afc`.
 5. Обновите документацию и приложите осмысленные снимки.
 
 Запрещены: дописывание тематических заплаток в конец монолитного файла; новый `!important` для цвета; исключения тёмной темы по отдельным компонентам; жёстко заданный зелёный для общего состояния; глобальное перекрашивание содержимого; сокрытие единственного пути к команде; перестройка документа при смене темы.
+
+
+### TASK167.3 candidate
+Internal PDF and scientific editing modes occupy the existing education body rather than the modal top layer. Underlying route DOM stays mounted and inert; returning restores document scroll and selection. Dock controls expose keyboard separators and collapse/reset, with view-only profile preferences. A4 and scientific SVG models are unchanged. Narrow layouts reuse existing adaptive panels. Acceptance pending.

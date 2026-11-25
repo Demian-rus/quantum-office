@@ -4,7 +4,7 @@ use rusqlite::{params,Connection,OpenFlags,OptionalExtension,TransactionBehavior
 use serde_json::{json,Value};
 use sha2::{Digest,Sha256};
 use std::{fs,path::Path,time::Duration,collections::HashSet};
-const KEYS:&[&str]=&["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2"];
+const KEYS:&[&str]=&["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2","quantum-office.education-panels.v1"];
 const LIMIT:usize=64*1024*1024;
 const TOTAL:usize=192*1024*1024;
 fn hash(v:&str)->String{format!("{:x}",Sha256::digest(v.as_bytes()))}
@@ -96,6 +96,21 @@ pub fn write(path:&Path,changes:&Value)->Result<Value>{
   write(&p,&json!([{"key":k,"revision":1,"value":null}]))?;assert_eq!(load(&p)?[k]["revision"],2);assert!(load(&p)?[k]["value"].is_null());assert_eq!(load(&p)?[k]["legacySha256"],before[k]["sha256"]);
   assert!(write(&p,&json!([{"key":"unknown","revision":0,"value":"bad"}])).is_err());
   let c=open(&p)?;c.execute("UPDATE drafts SET value='damaged' WHERE key=?1",[w])?;assert!(load(&p).is_err());Ok(())
+ }
+ #[test]fn education_panel_preferences_migrate_and_persist_in_existing_database()->Result<()>{
+  let d=tempfile::tempdir()?;let p=d.path().join("drafts.sqlite3");let k="quantum-office.education-panels.v1";let w=KEYS[5];
+  write(&p,&json!([{"key":w,"revision":0,"value":"existing QWORK"}]))?;
+  let before=load(&p)?;assert!(before.get(k).is_none());
+  let legacy=r#"{"pdf":{"left":254,"hideLeft":false}}"#;
+  let ack=write(&p,&json!([{"key":k,"revision":0,"value":legacy,"migration":true}]))?;
+  assert_eq!(ack[k]["revision"],1);assert_eq!(ack[k]["sha256"],hash(legacy));
+  let migrated=load(&p)?;assert_eq!(migrated[k]["value"],legacy);assert_eq!(migrated[k]["legacySha256"],hash(legacy));
+  let next=r#"{"pdf":{"left":286,"hideLeft":true}}"#;
+  let ack=write(&p,&json!([{"key":k,"revision":1,"value":next}]))?;
+  let after=load(&p)?;assert_eq!(ack[k]["revision"],2);assert_eq!(after[k]["revision"],2);assert_eq!(after[k]["value"],next);assert_eq!(after[k]["sha256"],hash(next));assert_eq!(after[k]["legacySha256"],hash(legacy));assert_eq!(after[w],before[w]);
+  assert!(write(&p,&json!([{"key":"quantum-office.education-panels.unknown","revision":0,"value":"bad"}])).is_err());assert_eq!(load(&p)?,after);
+  let c=open(&p)?;let version:i64=c.pragma_query_value(None,"user_version",|r|r.get(0))?;assert_eq!(version,2);
+  let original:String=c.query_row("SELECT value FROM legacy_sources WHERE key=?1",[k],|r|r.get(0))?;assert_eq!(original,legacy);Ok(())
  }
  #[test]fn concurrent_draft_open_and_cas()->Result<()>{
   let d=tempfile::tempdir()?;let p=d.path().join("drafts.sqlite3");let gate=std::sync::Arc::new(std::sync::Barrier::new(4));let mut jobs=vec![];

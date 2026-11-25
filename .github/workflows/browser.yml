@@ -852,3 +852,36 @@ jobs:
             evidence/task1672/
             Quantum-Office.html
           if-no-files-found: warn
+
+  task1673-workspace-ux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - name: Install Chromium and system dependencies
+        run: |
+          for attempt in 1 2 3; do
+            if sudo apt-get update -o Acquire::Retries=3 && npx playwright install --with-deps chromium; then exit 0; fi
+            sleep 5
+          done
+          exit 1
+      - uses: actions/checkout@v4
+        with:
+          ref: 7be748bbd93661cf9df7149ae9ad81652944a0dc
+          path: task1673-baseline
+      - run: node scripts/build.mjs
+        working-directory: task1673-baseline
+      - run: node tests/task1673_browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: task1673-workspace-ux
+          path: |
+            evidence/task1673/
+            Quantum-Office.html
+          if-no-files-found: warn

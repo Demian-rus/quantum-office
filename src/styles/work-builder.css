@@ -625,3 +625,59 @@
 
 .qw-figure-layout output{font-size:11px;color:var(--qo-muted);min-height:16px}
 :is([data-qd-action],.qd-drag-handle,[data-qd-media-dismiss],[data-draw-close])>.qo-work-icon{width:16px;height:16px;display:inline-block;vertical-align:middle;flex:none}
+
+/* TASK167.3: persistent dock preferences and real shell-owned internal modes. */
+.qo-education-body.qw-mode-active > :not(.qw-mode-host){display:none!important}
+.qo-education-workspace:has(.qw-mode-host)>.qo-office-toolbar{display:none}
+.qw-mode-host{display:flex;flex:1;min-width:0;min-height:0;overflow:hidden}
+.qw-mode-host>.qw-dialog.qw-workspace-mode{position:relative;inset:auto;margin:0;display:flex;flex-direction:column;flex:1;width:100%;height:100%;max-width:none;max-height:none;min-width:0;min-height:0;border:0;border-radius:0;box-shadow:none;overflow:hidden}
+.qw-mode-host>.qw-dialog>header,.qw-mode-host>.qw-dialog>footer{position:relative;flex:none;padding:6px 10px;flex-wrap:wrap;gap:6px}
+.qw-mode-host>.qw-dialog>header>strong{margin-right:auto}
+.qw-mode-host>.qw-dialog>.qw-dialog-body{flex:1;min-height:0}
+.qw-mode-host .qw-bank-assemble-dialog>.qw-dialog-body{padding:6px}
+#qo-work-workspace{padding:0}
+.qw-frame{gap:0;position:relative}
+.qw-frame .qw-center{max-width:none;padding:6px 12px 16px}
+.qw-frame .qw-center-head{gap:5px;margin-bottom:6px;padding-bottom:6px}
+.qw-frame .qw-center-head h1{font-size:16px}
+.qw-frame .qw-editor{border:0;border-radius:0;padding:8px 0;background:transparent}
+.qw-frame .qw-left,.qw-frame .qw-right{border-radius:0;border-block:0;padding:8px;gap:8px}
+.qw-frame .qw-left{border-left:0}.qw-frame .qw-right{border-right:0}
+.qw-frame .qw-selected-preview{margin-top:8px;overflow:visible}
+.qw-dock-layout{position:relative;--qw-dock-left-size:clamp(180px,var(--qw-dock-left,228px),29vw);--qw-dock-right-size:clamp(180px,var(--qw-dock-right,260px),29vw)}
+.qw-dock-controls{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
+.qw-dock-controls button{min-height:26px;padding:3px 7px}
+.qw-dock-controls button[aria-expanded=false]{color:var(--qo-muted)}
+.qw-dock-divider{position:absolute;top:0;bottom:0;width:9px;z-index:5;cursor:col-resize;touch-action:none;background:transparent}
+.qw-dock-divider:hover,.qw-dock-divider:focus-visible{background:var(--qo-accent);outline:0}
+.qw-dock-left{left:calc(var(--qw-dock-left-size) - 4px)}
+.qw-dock-right{right:calc(var(--qw-dock-right-size) - 4px)}
+.qw-dock-hide-left{--qw-dock-left-size:0px}.qw-dock-hide-right{--qw-dock-right-size:0px}
+@media(min-width:1200px){
+ .qw-frame.qw-dock-layout{grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr) var(--qw-dock-right-size)}
+ .qw-frame>.qw-left{grid-column:1}.qw-frame>.qw-center{grid-column:2}.qw-frame>.qw-right{grid-column:3}
+ .qw-frame.qw-dock-hide-left>.qw-left,.qw-frame.qw-dock-hide-right>.qw-right{display:none}
+}
+@media(max-width:1199px){.qw-frame>.qw-dock-divider,.qw-frame .qw-dock-controls{display:none}.qw-frame.qw-left-open>.qw-left,.qw-frame.qw-right-open>.qw-right{top:124px}}
+.qw-workspace-mode.qw-print-design-dialog>.qw-dialog-body{padding:0}
+.qw-workspace-mode .qw-pdf-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;border-bottom:1px solid var(--qo-border)}
+.qw-workspace-mode .qw-pdf-workspace{--qw-dock-left-size:clamp(180px,var(--qw-dock-left,254px),40vw);display:grid;grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr);gap:0;overflow:hidden;min-height:0}
+.qw-workspace-mode .qw-pdf-workspace.qw-dock-hide-left{--qw-dock-left-size:0px}
+.qw-workspace-mode .qw-pdf-design{display:flex;grid-column:1;overflow:auto;flex-direction:column;border-radius:0;border-block:0;border-left:0;padding:8px;gap:6px}
+.qw-workspace-mode .qw-design-fields{display:flex;flex-direction:column}
+.qw-workspace-mode .qw-pdf-workspace.qw-dock-hide-left>.qw-pdf-design{display:none}
+.qw-workspace-mode #qw-pages{grid-column:2;min-height:0;min-width:0;height:100%;flex-basis:auto}
+.qw-workspace-mode.qw-visual-dialog>.qw-visual-body{gap:0;padding:0}
+.qw-workspace-mode .qw-visual-canvas{border-radius:0;padding:4px}
+@media(min-width:1001px){
+ .qw-workspace-mode.qw-visual-dialog>.qw-visual-body{grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr) var(--qw-dock-right-size)}
+ .qw-workspace-mode .qw-visual-tools{grid-column:1}.qw-workspace-mode .qw-visual-canvas{grid-column:2}.qw-workspace-mode .qw-visual-inspector{grid-column:3}
+ .qw-workspace-mode .qw-dock-hide-left>.qw-visual-tools,.qw-workspace-mode .qw-dock-hide-right>.qw-visual-inspector{display:none}
+}
+@media(max-width:1000px){.qw-workspace-mode.qw-visual-dialog>header>.qw-dock-controls,.qw-workspace-mode .qw-visual-body>.qw-dock-divider{display:none}}
+.qw-bank-inline.qw-bank-assemble-dialog>.qw-dialog-body{padding:6px}
+.qw-bank-catalogue{gap:8px;grid-template-columns:minmax(320px,.9fr) minmax(0,1.1fr)}
+.qw-bank-catalogue-preview{border:0;border-radius:0;padding:8px}
+.qw-bank-catalogue .qw-bank-item{border-radius:0;padding:6px 4px}
+.qw-bank-expanded .qw-bank-catalogue-preview{padding:8px}
+@media(max-width:980px){.qw-bank-catalogue{grid-template-columns:1fr;grid-template-rows:minmax(170px,38%) minmax(0,1fr)}}

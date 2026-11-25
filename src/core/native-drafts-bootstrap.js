@@ -1,7 +1,7 @@
 /* Desktop only. Initialize before editor scripts; never replace a failed native read with an empty browser draft. */
 (() => {
  'use strict';
- const keys=["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2"],allowed=new Set(keys),limit=64*1024*1024;
+ const keys=["quantum-office.workspace.v3","quantum-office.workspace.v3.previous","quantum-office-writer-v1","quantum-office-slides-v1","quantum-studio-task093","quantum-office.work-builder.v1","quantum-office.diagnostic-question-bank.v1","quantum-office.diagnostic-templates.v1","quantum-office.diagnostic-template-versions.v1","quantum-office.diagnostic-workbench.v1","quantum-office.student-hub.source.v1","quantum-office.student-hub.results.v1","quantum-office-theme-v1","quantum-office-accent-v1","qo-studio-colors-v1","quantum-office-last-font-v2","quantum-office-recent-colors-v2","quantum-office.education-panels.v1"],allowed=new Set(keys),limit=64*1024*1024;
  const invoke=(command,args={})=>globalThis.__TAURI__.core.invoke(command,args);
  const errText=e=>typeof e==='string'?e:e?.message||String(e);
  const records=new Map(),dirty=new Map(),migration=new Set(),rejected=new Map(),rejectedValues=new Map();let running=null,timer=null,error='',closing=false,ready=false,bootTask;
@@ -68,9 +68,16 @@
   get pending(){return dirty.size>0||!!running;},
   get error(){return error||[...rejected.values()][0]||'';},
  };
+ // A declined editor exit is not a failed durable write. Do not modify
+ // storage state, remove the editor, or disable the window before asking.
+ function editorAllowsClose(){
+  try{return globalThis.qoCanCloseEditors?.()!==false;}
+  catch(e){console.error('Editor close guard failed:',e);return false;}
+ }
  async function onClose(){
   if(closing)return;closing=true;
   const app=document.getElementById('app');
+  if(ready&&!editorAllowsClose()){closing=false;return;}
   try{
    if(app)app.inert=true;
    // Do not destroy the WebView while startup is loading or migrating drafts.
@@ -89,6 +96,7 @@
  async function recoverAndClose(){
   if(closing||!ready)return;closing=true;
   const app=document.getElementById('app'),button=document.getElementById('qo-native-draft-recovery');
+  if(!editorAllowsClose()){closing=false;return;}
   if(app)app.inert=true;if(button)button.disabled=true;
   try{
    globalThis.qoFlushForClose?.();

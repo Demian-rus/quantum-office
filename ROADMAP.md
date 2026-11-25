@@ -1,5 +1,8 @@
 # Quantum Office — roadmap and acceptance gates
 
+## Приоритет владельца и передача — 25.11.2026
+TASK167.3 PR #161 — завершение текущей приёмки, Draft; не начинать новую разработку до архитектурного merge и проверки main. Далее локальный Codex: сначала отдельное задание на улучшение банка (UX, категоризация/фильтры, редактирование, оформление, иллюстрации, авторский контент). Ранее предложенная последовательность TASK168+ — ориентир, не обязательный порядок и не начатые работы. PR #158 лекций изолирован. См. [handoff](docs/LOCAL_CODEX_HANDOFF.md) и [образовательный план](docs/EDUCATION_ROADMAP.md).
+
 ## TASK167.1 — candidate PR #159
 Routing and launcher separation, fixed notifications; not accepted until full CI and review. Future «Учебные материалы» remains separate, PR #158 not integrated.
 
@@ -115,3 +118,6 @@ One issue → one measurable change → tests and independent evidence. Do not d
 
 - Done in alpha: in-app color palettes (preset + custom), distinct toolbar icon paths, side-specific border menu, actual merged-cell model/display, `.qbook` and partial XLSX merged-cell/border roundtrip, safe rejection of overlapping/data-losing merges.
 - NEXT: improved merge-aware keyboard selection, clipboard/paste/fill behavior, structural edits around merged regions, full number/date styles, broad OOXML fidelity, performance profiling, robust native desktop saving/reopening and signed updates. No full Excel compatibility claim yet.
+
+
+TASK167.1 and TASK167.2 accepted (PR #159/#160). TASK167.3 workspace UX candidate in feat/task167-3-workspace-ux; acceptance and release pending architect. TASK168 not started.

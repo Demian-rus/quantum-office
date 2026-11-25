@@ -1,5 +1,9 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## Передача разработки локальному Codex — 25.11.2026
+TASK167.1/#159 и TASK167.2/#160 объединены. TASK167.3/#161 остаётся Draft до шести PASS на одном HEAD и решения архитектора; принятые компоненты не переделывать. После merge и проверки main дальнейшая разработка локальным Codex. Текущий main при подготовке передачи: `7be748bbd93661cf9df7149ae9ad81652944a0dc`. Источник актуального состояния: [LOCAL_CODEX_HANDOFF.md](LOCAL_CODEX_HANDOFF.md).
+Следующий приоритет владельца: банк заданий — интерфейс, навигация, категории/фильтры, редактирование условия и решения, научные изображения, авторское наполнение. Номер новой задачи определяет владелец; TASK168 не начат. Лекции PR #158 отдельно. Путь Z:\Progr\Programming\quantum-office. Исторические candidate-статусы ниже не отменяют этот раздел.
+
 ## TASK167.1 — candidate (not merged)
 Independent diagnostics/work/bank routes, office and education launcher groups, fixed native draft notices, and legacy diagnostic preservation are under review in PR #159. Do not treat the candidate as accepted until full browser/native CI. PR #158 remains separate. Future «Учебные материалы»: one editable theory/scenario document, catalogue and scientific objects; not implemented here.
 
@@ -918,3 +922,7 @@ Undo/Redo и native Undo текста сохранены. DnD проверен �
 пути — `docs/TASK149.6.md`, `evidence/task149.6/result.json`.
 Реальный OS DPI, другие браузеры, полный исторический/удалённый CI, установщики,
 физическая печать и ручной системный PDF-диалог не проверялись. ОГЭ/ЕГЭ — позже.
+
+
+## TASK167.3 — workspace UX candidate
+TASK167.1/#159 and TASK167.2/#160 accepted; main 7be748bb. TASK167.3 internal modes preserve current document and reuse shell, print and scientific renderers. Separate profile-only dock preference key; no SQLite/QWORK/QWBANK changes. Pending browser/Windows acceptance. No integration of PR #158, no release before architect.
