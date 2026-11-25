@@ -1,9 +1,10 @@
 /* Compare real SQLite IPC and IndexedDB in the same release WebView2 on disposable Windows CI. */
 const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:path');
+let connection;
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable CI only');
  const out=path.join(__dirname,'..','evidence','native','scale-report.json');
- const {page}=await require('./task1664_cdp.cjs').connectNative('scale');
+ connection=await require('./task1664_cdp.cjs').connectNative('scale');const {page}=connection;
  const results=[];const save=status=>fs.writeFileSync(out,JSON.stringify({status,results,method:'Actual WebView2; same generated fixtures; SQLite IPC end-to-end vs IndexedDB; origin usage is not physical SQLite file size.'},null,2));
  // A separate archive preserves the smoke fixtures while the CI-only bank is reused.
  const initial=await page.evaluate(async()=>JSON.stringify(await qwBankRepository.createVerifiedBackup()));
@@ -39,5 +40,5 @@ const {chromium}=require('playwright'),fs=require('node:fs'),path=require('node:
   results.push(result);console.log('TASK1664_SCALE '+JSON.stringify(result));save('RUNNING');
  }
  await page.evaluate(async text=>{const plan=await qwBankRepository.inspectRestore(text);const result=await qwBankRepository.restoreVerifiedBackup({token:plan.token,mode:plan.currentCount?'replace':'empty'});if(!result.verified)throw Error('fixture restore');},initial);
- if(results.length!==24)throw Error('missing benchmark results');save('PASS');process.exit(0);
-})().catch(e=>{console.error(e);process.exit(1);});
+ if(results.length!==24)throw Error('missing benchmark results');await connection.browser.close();connection=null;save('PASS');
+})().catch(async e=>{console.error(e);process.exitCode=1;try{if(connection?.browser.isConnected())await connection.browser.close();}catch(error){console.error(error);}});

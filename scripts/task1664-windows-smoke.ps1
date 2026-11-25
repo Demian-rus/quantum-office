@@ -149,6 +149,8 @@ try {
       elseif ($i -eq 3 -and $failures.Count -eq 0) { node tests/task1664_scale.cjs; if ($LASTEXITCODE -ne 0) { $failures += 'scale' } }
       if ($i -eq 0) {
         if (!(Test-Path evidence/native/native-editor-close-confirmed.json)) { throw 'Missing native editor close confirmation' }
+        $confirmed = Get-Content evidence/native/native-editor-close-confirmed.json -Raw | ConvertFrom-Json
+        if ($confirmed.status -ne 'PASS' -or !$confirmed.processExited -or $confirmed.decision.status -ne 'handled' -or $confirmed.pid -ne $p.Id) { throw 'Native close not fully acknowledged' }
       } else {
         if (!$p.CloseMainWindow()) { throw 'Window close failed' }
       }

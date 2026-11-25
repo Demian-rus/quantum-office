@@ -57,9 +57,11 @@ async function inspectEditors(page){
  });
 }
 function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.json'),JSON.stringify(d,null,2));console.log('TASK1664_DRAFT '+stage+' '+JSON.stringify(d));}
+let connection,dialogs;
 (async()=>{
  if(process.env.GITHUB_ACTIONS!=='true'||process.platform!=='win32')throw Error('Disposable Windows CI only');
- const {page}=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);
+ connection=await require('./task1664_cdp.cjs').connectNative(process.argv[2]);const {page}=connection;
+ dialogs=require('./task1673_native_dialogs.cjs').createDialogOwner(page.context(),path.join(out,'native-dialogs-'+process.argv[2]+'.json'));
  const errors=[],messages=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(['error','warning'].includes(m.type()))messages.push({type:m.type(),text:m.text()});});
  process.on('exit',()=>fs.writeFileSync(path.join(out,'console-'+process.argv[2]+'.json'),JSON.stringify({errors,messages},null,2)));
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository instanceof SQLiteBankRepository&&qwBankRepository.db===true,{},{timeout:60000});
@@ -303,34 +305,46 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const editors=await inspectEditors(page);recordDraft('editors-before-close',editors);assert.ok(Object.values(editors.fixtures).every(Boolean),'Meaningful editor fixtures missing: '+JSON.stringify(editors.fixtures));
  // Stage a real final edit without waiting for the debounce. OS close must flush it.
  // TASK167.3: verify actual Windows CloseRequested leaves a dirty child intact.
- const decision={accept:false,count:0};const onDialog=dialog=>{decision.count++;return decision.accept?dialog.accept():dialog.dismiss();};page.on('dialog',onDialog);
- const requestClose=()=>{const r=require('node:child_process').spawnSync('powershell.exe',['-NoProfile','-NonInteractive','-Command',"(Get-Process -Id "+Number(process.env.QO_NATIVE_PID)+").CloseMainWindow()"],{encoding:'utf8'});assert.equal(r.status,0,r.stderr);assert.match(r.stdout,/True/i);};
- const declineClose=async()=>{decision.accept=false;const count=decision.count,dialog=page.waitForEvent('dialog',{timeout:15000});requestClose();await dialog;await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);assert.equal(decision.count,count+1,'actual CloseRequested must ask before discarding');};
+ dialogs.enable();const decision=dialogs.decision;
+ const pid=Number(process.env.QO_NATIVE_PID);assert.ok(Number.isSafeInteger(pid)&&pid>0);
+ const ps=command=>new Promise((resolve,reject)=>require('node:child_process').execFile('powershell.exe',['-NoProfile','-NonInteractive','-Command',command],{encoding:'utf8',timeout:20000},(error,stdout,stderr)=>error?reject(Error(String(error)+' '+stderr)):resolve(stdout.trim())));
+ const requestClose=async(scenario,accept,pattern)=>{
+  await dialogs.drain();const count=decision.count,completion=dialogs.expect(scenario,accept,pattern);
+  const request=ps("(Get-Process -Id "+pid+" -ErrorAction Stop).CloseMainWindow()").then(result=>{assert.match(result,/^True$/i);}).catch(e=>{dialogs.cancel(e);throw e;});
+  const [,handled]=await Promise.all([request,completion]);await dialogs.drain();assert.equal(decision.count,count+1,'one actual CloseRequested must produce one handled dialog');return handled;
+ };
+ const declineClose=async(scenario,pattern)=>{
+  decision.accept=false;const handled=await requestClose(scenario,false,pattern);assert.equal(handled.decision,'dismiss');assert.equal(handled.status,'handled');
+  await page.waitForFunction(()=>!document.getElementById('app').inert&&qwActiveEditorDirty()&&!qoDraftStorage.error);
+  assert.equal(await ps("if(Get-Process -Id "+pid+" -ErrorAction SilentlyContinue){'alive'}else{'exited'}"),'alive');
+  return handled;
+ };
+ const drawingPrompt=/^Отменить несохранённые изменения рисунка\?$/,bankPrompt=/^Отменить несохранённые изменения задания и рисунка\?$/;
  await page.evaluate(()=>{route('work');qwSelected=qwDoc.tasks[0].id;qwRender();qwVisualEditor('graph');});
  if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
  await page.locator('#qw-graph-preset').selectOption('v');
  assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));const originalGraph=await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph));
- await declineClose();assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph)),originalGraph);
+ const graphDecline=await declineClose('dirty graph',drawingPrompt);assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph)),originalGraph);
  await page.screenshot({path:path.join(out,'native-close-declined-graph.png')});
  // A second edit and undo prove the editor still works after decline.
  await page.locator('#qw-graph-preset').selectOption('x');await page.locator('#qw-visual-undo').click();
  decision.accept=true;await page.locator('[data-qw-action="visual-cancel"]').click();await page.locator('#qw-dialog').waitFor({state:'detached'});assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc.tasks[0].graph)),originalGraph);
  // A separate record avoids changing the historical native-0 revision fixture.
  await page.evaluate(async()=>{await qwBankOpen();const task=qwTask('graph');task.prompt='Native lifecycle fixture';await qwBankRepository.createTask({id:'task1673-native-lifecycle',subject:'physics',task});});
- const bankLifecycle=await require('./task1673_bank_lifecycle.cjs').checkBankLifecycle(page,'task1673-native-lifecycle',decision);
+ const bankLifecycle=await require('./task1673_bank_lifecycle.cjs').checkBankLifecycle(page,'task1673-native-lifecycle',decision);await dialogs.drain();
  await page.evaluate(()=>route('work'));await page.evaluate(()=>{qwSelected=qwDoc.tasks[0].id;qwVisualEditor('diagram');});
  if(!await page.locator('#qw-diagram-preset').isVisible())await page.locator('[data-visual-panel="properties"]').click();
  await page.locator('#qw-diagram-preset').selectOption('surface');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
- await declineClose();
+ const diagramDecline=await declineClose('dirty diagram',drawingPrompt);
  await page.screenshot({path:path.join(out,'native-close-declined-diagram.png')});
  decision.accept=true;await page.locator('[data-qw-action="visual-cancel"]').click();await page.locator('#qw-dialog').waitFor({state:'detached'});
  // Native close with an unchanged child and dirty parent must also ask.
  await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-native-lifecycle"]').click();await page.locator('.qw-bank-preview-actions [data-bank-edit="task1673-native-lifecycle"]').click();await page.locator('[data-bank-task-field="prompt"]').fill('Native unsaved parent');await page.locator('[data-bank-visual="graph"]').click();await page.locator('#qw-visual-stage').waitFor();
- await declineClose();await page.screenshot({path:path.join(out,'native-close-declined-bank.png')});
+ const bankDecline=await declineClose('dirty bank parent',bankPrompt);await page.screenshot({path:path.join(out,'native-close-declined-bank.png')});
  assert.equal(await page.evaluate(async()=>(await qwBankRepository.getTask('task1673-native-lifecycle')).task.prompt),'TASK167.3 explicitly saved bank condition');
  await page.locator('[data-qw-action="visual-cancel"]').click();assert.equal(await page.locator('[data-bank-task-field="prompt"]').inputValue(),'Native unsaved parent');
  decision.accept=true;await page.locator('[data-qw-action="bank-edit-back"]').click();await page.locator('[data-bank-view="task1673-native-lifecycle"]').waitFor();await page.evaluate(()=>route('work'));
- fs.writeFileSync(path.join(out,'native-editor-close.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,graph:true,diagram:true,bank:true,bankLifecycle},null,2));
+ await dialogs.drain();fs.writeFileSync(path.join(out,'native-editor-close.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,graph:true,diagram:true,bank:true,bankLifecycle,decisions:[graphDecline,diagramDecline,bankDecline]},null,2));
  // Prepare the local graphic before staging the final durable edit.
  await page.evaluate(()=>qwVisualEditor('graph'));if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
  await page.locator('#qw-graph-preset').selectOption('v');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
@@ -339,8 +353,12 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  fs.writeFileSync(path.join(out,'draft-close-pending.json'),JSON.stringify(pending,null,2));
  // Confirm a real close while a local graphic is dirty. The PowerShell
  // parent waits for actual process exit; restart checks verify the durable hash.
- decision.accept=true;const closingDialog=page.waitForEvent('dialog',{timeout:15000});requestClose();await closingDialog;
- fs.writeFileSync(path.join(out,'native-editor-close-confirmed.json'),JSON.stringify({status:'confirmation received',actualCloseRequested:true},null,2));
+ decision.accept=true;const confirmed=await requestClose('confirmed dirty graph close',true,drawingPrompt);
+ assert.equal(confirmed.decision,'accept');assert.equal(confirmed.status,'handled');
+ // Keep Node and the sole dialog owner alive until the real process exits.
+ const exit=await ps("$p=Get-Process -Id "+pid+" -ErrorAction SilentlyContinue;if($null -eq $p){'exited'}elseif($p.WaitForExit(15000)){'exited'}else{throw 'Clean close timed out'}");
+ assert.equal(exit,'exited');
+ fs.writeFileSync(path.join(out,'native-editor-close-confirmed.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,decision:confirmed,processExited:true,pid},null,2));
  }else if(['ordinary','reinstall','portable'].includes(stage)){
  const draft=await inspectDraft(page);recordDraft(stage,draft);
  const before=JSON.parse(fs.readFileSync(path.join(out,'draft-before-close.json'),'utf8'));
@@ -371,5 +389,6 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  assert.ok(Object.values(checks).every(Boolean),'Real QWORK draft restart mismatch: '+JSON.stringify(checks));
  await visual.compareSheet(page,stage,out,false);
  }else throw Error('Unknown stage');
- assert.deepEqual(errors,[]);assert.deepEqual(messages.filter(m=>/Applying inline style violates|Refused to apply.*style|Loading the stylesheet.*violates/i.test(m.text)),[],'CSP must not block styles');console.log('TASK1664_NATIVE '+stage+' PASS');process.exit(0);
-})().catch(e=>{console.error(e);process.exit(1);});
+ await dialogs.drain();assert.deepEqual(errors,[]);assert.deepEqual(messages.filter(m=>/Applying inline style violates|Refused to apply.*style|Loading the stylesheet.*violates/i.test(m.text)),[],'CSP must not block styles');
+ dialogs.dispose();dialogs=null;if(connection.browser.isConnected())await connection.browser.close();connection=null;console.log('TASK1664_NATIVE '+stage+' PASS');
+})().catch(async e=>{console.error(e);process.exitCode=1;try{dialogs?.dispose();if(connection?.browser.isConnected())await connection.browser.close();}catch(error){console.error('Native disconnect failed',error);}});
