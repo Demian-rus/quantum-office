@@ -38,8 +38,37 @@ function Wait-Office($p) {
   $deadline = (Get-Date).AddSeconds(60)
   do { Start-Sleep -Milliseconds 500; $p.Refresh() } until ($p.HasExited -or (($p.MainWindowHandle -ne 0) -and (Test-Path $data)) -or (Get-Date) -gt $deadline)
   if ($p.HasExited -or $p.MainWindowHandle -eq 0 -or !(Test-Path $data)) { throw 'Desktop launch/database creation failed' }
-  $header = [IO.File]::ReadAllBytes($data)
-  if ([Text.Encoding]::ASCII.GetString($header,0,15) -ne 'SQLite format 3') { throw 'Not SQLite' }
+  # SQLite may be opening or migrating the database while the test observes it.
+  # Read only the signature with shared read/write access, never the whole live DB.
+  $header = New-Object byte[] 16
+  $signature = $null
+  $lastReadError = $null
+  $readDeadline = (Get-Date).AddSeconds(15)
+  do {
+    $stream = $null
+    try {
+      $stream = [IO.File]::Open($data,[IO.FileMode]::Open,[IO.FileAccess]::Read,([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+      $read = 0
+      while ($read -lt $header.Length) {
+        $n = $stream.Read($header,$read,$header.Length-$read)
+        if ($n -eq 0) { break }
+        $read += $n
+      }
+      if ($read -eq 16) {
+        $signature = [Text.Encoding]::ASCII.GetString($header)
+        if ($signature -eq ("SQLite format 3" + [char]0)) { break }
+      }
+      $lastReadError = "Incomplete or invalid SQLite signature ($read bytes)"
+    } catch [IO.IOException] {
+      $lastReadError = $_.Exception.Message
+    } finally {
+      if ($null -ne $stream) { $stream.Dispose() }
+    }
+    if ($p.HasExited) { throw 'Application exited while waiting for SQLite header' }
+    Start-Sleep -Milliseconds 250
+  } while ((Get-Date) -lt $readDeadline)
+  if ($signature -ne ("SQLite format 3" + [char]0)) { throw "Not SQLite or header unreadable: $lastReadError" }
+  Write-Host "SQLite header confirmed with shared read access (pid=$($p.Id))"
 }
 function Wait-PortClosed {
   $deadline = (Get-Date).AddSeconds(30)
