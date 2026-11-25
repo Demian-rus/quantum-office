@@ -24,6 +24,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===2);
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),2);
   assert.equal(await dialog.locator('.qw-bank-catalogue-preview').count(),1);
+  await dialog.locator('.qw-bank-video-canvas svg').waitFor({state:'visible'});
   assert.equal(await dialog.locator('.qw-bank-video-canvas svg').count()>0,true,'vector graph must be visible');
   assert.equal(await dialog.locator('.qw-bank-solution').evaluate(e=>e.open),false,'solution collapsed by default');
   await dialog.locator('.qw-bank-solution summary').click();
@@ -35,11 +36,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===1);
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'advanced year filter');
   await dialog.locator('#qw-bank-year').selectOption('all');
+  await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===2);
   await dialog.locator('.qw-bank-extra-filters summary').click();
   await dialog.locator('#qw-bank-topic').selectOption('Электричество');
   await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===1);
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'topic filter');
   await dialog.locator('#qw-bank-topic').selectOption('all');
+  await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===2);
   await dialog.locator('#qw-bank-search').fill('Кинематика');
   await p.waitForFunction(()=>document.querySelectorAll('#qw-bank-list [data-bank-entry]').length===1);
   assert.equal(await dialog.locator('#qw-bank-list [data-bank-entry]').count(),1,'search by subtopic');

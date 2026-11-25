@@ -186,12 +186,14 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1662');
   // Real UI path in a nonempty bank: SHA-256 export, file selection, review.
   await ep.evaluate(()=>qwBank());
   await ep.locator('#qw-bank-search').waitFor({state:'visible'});
+  await ep.locator('.qw-bank-operations summary').click();
   const [download]=await Promise.all([
    ep.waitForEvent('download'),ep.locator('[data-qw-action="bank-backup"]').click()
   ]);
   assert.match(download.suggestedFilename(),/\.qwbank$/);
   const exported=JSON.parse(fs.readFileSync(await download.path(),'utf8'));
   assert.equal(exported.version,3);assert.equal(exported.manifest.sha256.length,64);
+  await ep.locator('.qw-bank-operations summary').click();
   await ep.locator('[data-qw-action="bank-restore"]').click();
   await ep.locator('#qw-bank-restore-file').setInputFiles({
    name:'verified.qwbank',mimeType:'application/json',buffer:Buffer.from(raw)});

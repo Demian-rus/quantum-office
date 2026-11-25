@@ -209,6 +209,32 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   assert_eq!(run(&p,"list",&json!({"filters":{"search":"скорость"},"offset":0,"limit":30,"includeImages":false}),&f)?["total"],1);
   let snap=run(&p,"native_backup",&json!({}),&f)?;assert!(Path::new(snap["path"].as_str().unwrap()).is_file());Ok(())
  }
+ #[test]
+ fn filtered_catalogue_pages_follow_permanent_numbers() -> Result<()> {
+  let dir = tempfile::tempdir()?;
+  let path = dir.path().join("bank.sqlite3");
+  let cancel = AtomicBool::new(false);
+  run(&path, "open", &json!({}), &cancel)?;
+  for id in ["z-first", "a-second", "other", "y-fourth", "b-fifth"] {
+   let mut item = record(id);
+   if id == "other" {
+    item["subject"] = json!("math");
+   }
+   run(&path, "create", &json!({"record": item, "now": "2026-11-25"}), &cancel)?;
+  }
+  for (offset, numbers, has_more) in [(0, vec![1, 2], true), (2, vec![4, 5], false), (4, vec![], false)] {
+   let result = run(&path, "list", &json!({
+    "filters": {"subject": "physics", "topic": "Механика", "search": "скорость"},
+    "offset": offset, "limit": 2, "includeImages": false
+   }), &cancel)?;
+   assert_eq!(result["total"], 4);
+   assert_eq!(result["hasMore"], has_more);
+   let actual: Vec<_> = result["items"].as_array().unwrap().iter()
+    .map(|item| item["bankNumber"].as_i64().unwrap()).collect();
+   assert_eq!(actual, numbers);
+  }
+  Ok(())
+ }
  #[test]fn corrupt_file_is_not_replaced()->Result<()>{let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");fs::write(&p,b"not SQLite")?;assert!(open(&p,true).is_err());assert_eq!(fs::read(&p)?,b"not SQLite");Ok(())}
  #[test]fn shared_binary_restore()->Result<()>{
   let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let q=d.path().join("other.sqlite3");let f=AtomicBool::new(false);run(&p,"open",&json!({}),&f)?;run(&q,"open",&json!({}),&f)?;

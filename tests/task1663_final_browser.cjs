@@ -25,6 +25,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1663');
    return {image};
   });
   const button=id=>p.locator('[data-bank-add="'+id+'"]');
+  const select=async id=>{await p.locator('[data-bank-view="'+id+'"]').click();await button(id).waitFor();};
   const bank=async()=>{await p.evaluate(()=>qwBank({__view:'plain'}));await p.locator('#qw-bank-preview .qw-bank-preview-toolbar').waitFor();};
   const count=()=>p.evaluate(()=>qwDoc.tasks.length);
   const snapshot=()=>p.evaluate(()=>JSON.stringify(qwDoc));
@@ -41,7 +42,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1663');
   // A second delivered event, even if an input device bypasses native disabled handling.
   await button('plain').dispatchEvent('click');assert.equal(await p.evaluate(()=>window.__finalGate.calls),1);
   await release();assert.equal(await count(),1);assert.equal(await p.evaluate(()=>qwDoc.tasks[0].prompt),'Bank plain');
-  await bank();await button('picture').click();await p.waitForFunction(()=>qwDoc.tasks.length===2&&!document.querySelector('#qw-dialog[open]'));
+  await bank();await select('picture');await button('picture').click();await p.waitForFunction(()=>qwDoc.tasks.length===2&&!document.querySelector('#qw-dialog[open]'));
   assert.equal(await p.evaluate(()=>qwDoc.tasks.at(-1).image),fixtures.image);
   assert.ok(await p.locator('#qw-task-preview img').evaluate(img=>img.complete&&img.naturalWidth===32));
   // Actual QWORK download and reopen, with the active picture included.
@@ -58,25 +59,26 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1663');
   assert.equal(await count(),4);assert.equal(await p.evaluate(()=>qwDoc.tasks[2].image),fixtures.image);
   assert.deepEqual(await p.evaluate(()=>qwDoc.tasks.slice(2).map(x=>x.source.id)),['picture','second']);
   // Cancel pending single and multi loads by closing or replacing the dialog.
-  await bank();let before=await snapshot();await gate(['picture']);await button('picture').click();await pending();
+  await bank();let before=await snapshot();await select('picture');await gate(['picture']);await button('picture').click();await pending();
   await p.locator('#qw-dialog [data-qw-close]').click();await release();assert.equal(await snapshot(),before);
   await bank();await p.locator('[data-bank-select="picture"]').check();await gate(['picture']);
   await p.locator('[data-qw-action="bank-add-selection"]').click();await pending();await p.evaluate(()=>qwDialog('Другой диалог','<p>Замена</p>'));
   await release();assert.equal(await snapshot(),before);await p.locator('#qw-dialog [data-qw-close]').click();
   // Actually load a different QWORK while a bank read is pending.
-  await bank();await gate(['picture']);await button('picture').click();await pending();
+  await bank();await select('picture');await gate(['picture']);await button('picture').click();await pending();
   const other=await p.evaluate(()=>({...qwProject(),title:'Other document',tasks:[{...qwTask('short'),prompt:'Other task'}]}));
   await p.locator('#qw-file').setInputFiles({name:'other.qwork',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(other))});
   await p.waitForFunction(()=>qwDoc.title==='Other document');const replaced=await snapshot();await release();assert.equal(await snapshot(),replaced);
   if(await p.locator('#qw-dialog[open]').count())await p.locator('#qw-dialog [data-qw-close]').click();
-  // Real corruption: change bytes in the binary store without changing digest.
+  // Corrupt the binary after showing the preview to verify add rereads and validates it.
+  await bank();await select('broken');before=await snapshot();
   await p.evaluate(async()=>{
    const b=qwBankRepository;
    await new Promise((resolve,reject)=>{const tx=b.db.transaction(['tasks','assets'],'readwrite'),q=tx.objectStore('tasks').get('broken');
     q.onsuccess=()=>{const store=tx.objectStore('assets'),a=store.get(q.result.imageAsset.key);a.onsuccess=()=>{const value=a.result;new Uint8Array(value.bytes)[0]^=1;store.put(value);};};
     tx.oncomplete=resolve;tx.onabort=()=>reject(tx.error);});
   });
-  await bank();before=await snapshot();await button('broken').click();
+  await button('broken').click();
   await p.waitForFunction(()=>document.querySelector('#qw-bank-save-status.qw-error')?.textContent.startsWith('Добавление не выполнено:'));
   assert.equal(await snapshot(),before);
   await p.locator('[data-bank-select="picture"]').check();await p.locator('[data-bank-select="missing"]').check();

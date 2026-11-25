@@ -14,7 +14,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1673');
  const geom=()=>page.evaluate(()=>{const rect=s=>{const e=document.querySelector(s);if(!e)return null;const b=e.getBoundingClientRect();return [b.x,b.y,b.width,b.height];};return {header:rect('.global-bar'),body:rect('.qo-education-body'),center:rect('.qw-center'),mode:rect('.qw-mode-host'),dialog:rect('#qw-dialog'),stage:rect('#qw-visual-stage'),overflow:document.documentElement.scrollWidth>innerWidth};});
  async function capture(label){await screenshot(label+'-work');await action('preview').click();await ready();await screenshot(label+'-pdf');await close();await action('graph').click();await screenshot(label+'-graph');await close();await page.locator('.qw-nav-task').nth(1).click();await action('diagram').click();await screenshot(label+'-diagram');await close();await page.locator('.qw-nav-task').first().click();await page.evaluate(()=>{route('diagnostics');qdMode='builder';qdRefresh();});await screenshot(label+'-diagnostics');await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-baseline-view"]').click();await page.locator('[data-bank-add="task1673-baseline-view"]').waitFor();await screenshot(label+'-bank');}
  try{
-  await setup(path.join(root,'task1673-baseline','Quantum-Office.html'));await capture('before');await context.close();
+  const baseline=process.env.QO_TASK1673_BASELINE||path.join(root,'task1673-baseline','Quantum-Office.html');
+  await setup(baseline);await capture('before');await context.close();
   await setup(path.join(root,'Quantum-Office.html'));await capture('after');await page.evaluate(()=>route('work'));
   const before=await snap(),center=await page.locator('.qw-center').boundingBox();
   const left=page.locator('#qo-work-root [data-qw-dock-toggle="left"]'),divider=page.locator('#qo-work-root [data-qw-dock-resize="left"]');

@@ -311,30 +311,59 @@ class BankRepository{
   });
  }
  async listTasks(filters={},pagination={}){
-  const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Number(pagination.limit)||30));
+  const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30)));
   const offset=Math.max(0,Math.floor(Number(pagination.offset)||0));
   const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
    (filters.type&&filters.type!=='all'?'type':null);
   const data=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
-   // A catalogue without category filters is ordered by permanent numeric
-   // bankNumber, not by lexical UUID/ID. This also keeps the initial preview
-   // consistent with the first displayed numbered task.
    const store=tx.objectStore('tasks'),source=key?store.index(key):store.index('bankNumber');
-   const req=source.openCursor(key?IDBKeyRange.only(filters[key]):null);
-   const items=[];let total=0;
-   req.onerror=()=>fail(req.error||Error('Ошибка поиска по банку'));
-   req.onsuccess=()=>{
-    const cursor=req.result;
-    if(!cursor){const result={total,offset,limit,hasMore:offset+items.length<total};
-     if(pagination.includeImages===false){set({...result,items:items.map(bankAssetWithoutImage)});return;}
-     bankAssetCollect(tx,items,assets=>set({...result,records:items,assets}),fail);return;}
-    const e=cursor.value;
-    if(bankSearchMatch(e,filters)){
-     if(total>=offset&&items.length<limit)items.push(e);
+   const done=(items,total)=>{
+    const result={total,offset,limit,hasMore:offset+items.length<total};
+    if(pagination.includeImages===false){set({...result,items:items.map(bankAssetWithoutImage)});return;}
+    bankAssetCollect(tx,items,assets=>set({...result,records:items,assets}),fail);
+   };
+   const read=(request,success)=>{
+    request.onerror=()=>fail(request.error||Error('Ошибка поиска по банку'));
+    request.onsuccess=()=>success(request.result);
+   };
+   const hasSearch=!!String(filters.search||'').trim();
+   if(!key&&!hasSearch){
+    read(source.count(),total=>{
+     if(offset>=total){done([],total);return;}
+     if(!offset){read(source.getAll(null,limit),items=>done(items,total));return;}
+     const items=[];let skip=offset;
+     read(source.openCursor(),cursor=>{
+      if(!cursor){done(items,total);return;}
+      if(skip){cursor.advance(skip);skip=0;return;}
+      items.push(cursor.value);
+      if(items.length===limit)done(items,total);else cursor.continue();
+     });
+    });
+    return;
+   }
+   const items=[],matches=[];let total=0;
+   read(source.openCursor(key?IDBKeyRange.only(filters[key]):null),cursor=>{
+    if(!cursor){
+     if(!key){done(items,total);return;}
+     // Equal category keys are traversed by ID. Order by the permanent number
+     // before paging, retaining only IDs and numbers outside the returned page.
+     matches.sort((a,b)=>a.number-b.number);
+     const page=matches.slice(offset,offset+limit),records=new Array(page.length);
+     let remaining=page.length;
+     if(!remaining){done([],total);return;}
+     page.forEach(({id},index)=>read(store.get(id),record=>{
+      records[index]=record;if(!--remaining)done(records,total);
+     }));
+     return;
+    }
+    const entry=cursor.value;
+    if(bankSearchMatch(entry,filters)){
+     if(key)matches.push({id:entry.id,number:entry.bankNumber});
+     else if(total>=offset&&items.length<limit)items.push(entry);
      total++;
     }
     cursor.continue();
-   };
+   });
   });
   if(data.items)return data;
   const {assets,records,...result}=data;

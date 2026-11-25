@@ -206,7 +206,7 @@ let connection,dialogs;
  }
  fs.writeFileSync(path.join(out,'native-education-draft-layout.json'),JSON.stringify(educationDraftLayout,null,2));
  await page.screenshot({path:path.join(out,'native-workspace.png')});
- await page.evaluate(()=>route('bank'));await page.locator('#qo-bank-root .qw-bank-filter-panel').waitFor();await page.screenshot({path:path.join(out,'native-bank.png')});
+ await page.evaluate(()=>route('bank'));await page.locator('#qo-bank-root .qw-bank-navigation').waitFor();await page.screenshot({path:path.join(out,'native-bank.png')});
  await page.evaluate(()=>route('work'));
  // TASK167.2: exercise actual layout controls on the bank image, then retain the local width for restart stages.
  const originalBankFigure=await page.evaluate(async()=>JSON.stringify((await qwBankRepository.getTask('native-0')).task));

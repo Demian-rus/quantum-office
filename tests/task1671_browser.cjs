@@ -11,7 +11,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1671');
  p.on('pageerror',e=>errors.push(String(e)));p.on('dialog',d=>d.accept());
  const url=pathToFileURL(path.join(root,'Quantum-Office.html')).href;
  const route=async target=>{await p.locator('.global-bar .modules [data-target="'+target+'"]').click();assert.equal(await p.evaluate(()=>page),target);};
- const ready=()=>p.locator('#qo-bank-root .qw-bank-filter-panel').waitFor();
+ const ready=()=>p.locator('#qo-bank-root .qw-bank-navigation').waitFor();
  const snapshot=()=>p.evaluate(()=>JSON.stringify(qwDoc));
  try{
   await p.goto(url);
