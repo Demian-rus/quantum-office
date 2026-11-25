@@ -67,18 +67,19 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  if(stage==='first'){
  // Exercise actual migration before any editor data is created. No mock IPC.
  const seed=await page.evaluate(()=>{
-  if(qoDraftStorage.getItem(QW_KEY)!==null)throw Error('Migration test requires absent native QWORK');
+  if(qoDraftStorage.getItem(QW_KEY)!==null||qoDraftStorage.getItem(QW_PANELS_KEY)!==null)throw Error('Migration test requires absent native QWORK and panel settings');
   const draft=qwProject();draft.title='TASK1664 legacy draft';const task=qwTask('short');task.prompt='Legacy migration question';task.answer='42';draft.tasks=[task];
-  const raw=JSON.stringify(draft);localStorage.setItem(QW_KEY,raw);return raw;
+  const raw=JSON.stringify(draft);localStorage.setItem(QW_KEY,raw);const panels=JSON.stringify({pdf:{left:254,hideLeft:false}});localStorage.setItem(QW_PANELS_KEY,panels);return {raw,panels};
  });
  await page.reload({waitUntil:'load'});
  await page.waitForFunction(()=>typeof qwBankRepository!=='undefined'&&qwBankRepository.db===true,{},{timeout:60000});
- const migration=await page.evaluate(async raw=>{
-  const disk=(await __TAURI__.core.invoke('draft_load'))[QW_KEY];
+ const migration=await page.evaluate(async ({raw,panels})=>{
+  const rows=await __TAURI__.core.invoke('draft_load'),disk=rows[QW_KEY],panel=rows[QW_PANELS_KEY];
+  if(localStorage.getItem(QW_PANELS_KEY)!==panels||qoDraftStorage.getItem(QW_PANELS_KEY)!==panels||panel?.value!==panels||panel.revision!==1||panel.legacySha256!==panel.sha256||qwPanelPreference('pdf').left!==254||qwPanelPreference('pdf').hideLeft)throw Error('Panel preference migration not exact');
   if(localStorage.getItem(QW_KEY)!==raw||disk?.value!==raw||disk.legacySha256!==disk.sha256||qwDoc.title!=='TASK1664 legacy draft'||qwDoc.tasks[0]?.prompt!=='Legacy migration question')throw Error('Legacy migration not exact');
   qwDoc=qwProject();qwDoc.layout='compact';if(!qwPersist())throw Error('Reset disposable fixture failed');await qoDraftStorage.flush();
   if(localStorage.getItem(QW_KEY)!==raw)throw Error('Legacy source overwritten');
-  return {status:'PASS',sourceRetained:true,migrationRevision:disk.revision,migrationSha256:disk.sha256};
+  return {status:'PASS',sourceRetained:true,migrationRevision:disk.revision,migrationSha256:disk.sha256,panelMigration:{revision:panel.revision,sha256:panel.sha256,value:panel.value}};
  },seed);
  fs.writeFileSync(path.join(out,'native-migration.json'),JSON.stringify(migration,null,2));
  const result=await page.evaluate(async()=>{
@@ -346,9 +347,11 @@ function recordDraft(stage,d){fs.writeFileSync(path.join(out,'draft-'+stage+'.js
  const checks={rawPresent:draft.rawPresent,parse:draft.parse?.ok===true,validate:draft.validate?.ok===true,title:draft.live.title===before.live.title,count:draft.live.count===before.live.count,image:JSON.stringify(draft.live.images)===JSON.stringify(before.live.images),diskMatches:draft.diskMatches===true,storageError:!draft.storageError,notCorrupt:!draft.corrupt,noPending:!draft.pending&&!draft.nativeError,finalEdit:await page.evaluate(()=>qwDoc.instructions==='TASK1664 final edit before ordinary close')};
  const manualFigure=JSON.parse(fs.readFileSync(path.join(out,'native-manual-figure.json'),'utf8'));
  checks.manualFigure=await page.evaluate(expected=>{const q=qwDoc.tasks.find(t=>t.id===expected.id);return q?.figureWidth===expected.width&&q.figureWidthMode===expected.mode;},manualFigure);
- // Profile preferences are checked across ordinary and same-profile reinstall; Portable may intentionally use an independent WebView profile.
- const dock=JSON.parse(fs.readFileSync(path.join(out,'native-dock-pref.json'),'utf8'));
- if(stage!=='portable')checks.dockPreference=await page.evaluate(expected=>{const actual=qwPanelPreference('pdf');return Object.keys(expected).every(k=>actual[k]===expected[k]);},dock);
+ // Native preferences are now in SQLite, independent of browser profile.
+ const dock=JSON.parse(fs.readFileSync(path.join(out,'native-dock-pref.json'),'utf8')),dockEvidence=JSON.parse(fs.readFileSync(path.join(out,'native-dock-keyboard.json'),'utf8')).keyboardDisk;
+ const restoredDock=await page.evaluate(async()=>({preference:qwPanelPreference('pdf'),value:qoDraftStorage.getItem(QW_PANELS_KEY),row:(await __TAURI__.core.invoke('draft_load'))[QW_PANELS_KEY],pending:qoDraftStorage.pending,error:qoDraftStorage.error}));
+ checks.dockPreference=Object.keys(dock).every(k=>restoredDock.preference[k]===dock[k])&&restoredDock.value===dockEvidence.value&&restoredDock.row?.value===dockEvidence.value&&restoredDock.row?.revision===dockEvidence.revision&&restoredDock.row?.sha256===dockEvidence.sha256&&!restoredDock.pending&&!restoredDock.error;
+ fs.writeFileSync(path.join(out,'native-dock-restart-'+stage+'.json'),JSON.stringify(restoredDock,null,2));
  const editors=await inspectEditors(page);recordDraft('editors-'+stage,editors);
  const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
  for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];

@@ -8,15 +8,23 @@ async function checkNativePdfDock(page,out){
   const h=document.querySelector(selector),d=h.closest('#qw-dialog'),p=d.querySelector('.qw-pdf-design'),r=h.parentElement,b=d.querySelector('[data-qw-dock-toggle="left"]');
   const box=e=>{const v=e.getBoundingClientRect();return {x:v.x,y:v.y,width:v.width,height:v.height,right:v.right,bottom:v.bottom};};
   const describe=e=>({tag:e?.tagName,id:e?.id,classes:e?.className,resize:e?.dataset?.qwDockResize,insideEditor:!!e?.closest?.('#qw-dialog')});
-  return {preference:qwPanelPreference('pdf'),stored:localStorage.getItem(QW_PANELS_KEY),panel:box(p),divider:box(h),workspace:box(r),active:describe(document.activeElement),dividerFocused:document.activeElement===h,hasFocus:document.hasFocus(),visibility:document.visibilityState,viewport:{width:innerWidth,height:innerHeight,outerWidth,outerHeight,dpr:devicePixelRatio,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,visualScale:visualViewport?.scale},expanded:b.getAttribute('aria-expanded'),valueNow:h.getAttribute('aria-valuenow'),valueMin:h.getAttribute('aria-valuemin'),valueMax:h.getAttribute('aria-valuemax'),track:getComputedStyle(r).gridTemplateColumns,declared:r.style.getPropertyValue('--qw-dock-left'),events:globalThis.__qoNativeDockEvents||[]};
+  return {preference:qwPanelPreference('pdf'),stored:qoDraftStorage.getItem(QW_PANELS_KEY),legacyStored:localStorage.getItem(QW_PANELS_KEY),pending:qoDraftStorage.pending,storageError:qoDraftStorage.error,panel:box(p),divider:box(h),workspace:box(r),active:describe(document.activeElement),dividerFocused:document.activeElement===h,hasFocus:document.hasFocus(),visibility:document.visibilityState,viewport:{width:innerWidth,height:innerHeight,outerWidth,outerHeight,dpr:devicePixelRatio,visualWidth:visualViewport?.width,visualHeight:visualViewport?.height,visualScale:visualViewport?.scale},expanded:b.getAttribute('aria-expanded'),valueNow:h.getAttribute('aria-valuenow'),valueMin:h.getAttribute('aria-valuemin'),valueMax:h.getAttribute('aria-valuemax'),track:getComputedStyle(r).gridTemplateColumns,declared:r.style.getPropertyValue('--qw-dock-left'),events:globalThis.__qoNativeDockEvents||[]};
  },selector);
+ const confirmDisk=async snapshot=>page.evaluate(async raw=>{
+  if(typeof raw!=='string')throw Error('Missing native panel preference value');
+  await qoDraftStorage.flush();if(qoDraftStorage.pending||qoDraftStorage.error)throw Error('Panel ACK not confirmed: '+qoDraftStorage.error);
+  const row=(await __TAURI__.core.invoke('draft_load'))[QW_PANELS_KEY];
+  const digest=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(raw))),b=>b.toString(16).padStart(2,'0')).join('');
+  if(!row||row.value!==raw||row.sha256!==digest||!Number.isInteger(row.revision)||row.revision<1)throw Error('SQLite panel preference row differs from ACKed storage');
+  return {revision:row.revision,sha256:row.sha256,legacySha256:row.legacySha256,value:row.value,acknowledged:true};
+ },snapshot.stored);
  try{
   await divider.waitFor({state:'visible'});
-  report.beforeCollapse=await measure();await toggle.click();assert.equal(await page.locator('#qw-dialog .qw-pdf-design').isVisible(),false);
-  report.collapsed=await measure();assert.equal(report.collapsed.expanded,'false');assert.equal(report.collapsed.preference.hideLeft,true);
+  report.beforeCollapse=await measure();report.beforeDisk=await confirmDisk(report.beforeCollapse);await toggle.click();assert.equal(await page.locator('#qw-dialog .qw-pdf-design').isVisible(),false);
+  report.collapsed=await measure();assert.equal(report.collapsed.expanded,'false');assert.equal(report.collapsed.preference.hideLeft,true);assert.equal(report.collapsed.panel.width,0);report.collapsedDisk=await confirmDisk(report.collapsed);assert.equal(report.collapsedDisk.revision,report.beforeDisk.revision+1);
   await toggle.click();await divider.waitFor({state:'visible'});
   report.restored=await measure();assert.equal(report.restored.expanded,'true');assert.equal(report.restored.preference.hideLeft,false);
-  assert.equal(report.restored.preference.left,report.beforeCollapse.preference.left);
+  assert.equal(report.restored.preference.left,report.beforeCollapse.preference.left);assert.equal(report.restored.panel.width,report.beforeCollapse.panel.width);report.restoredDisk=await confirmDisk(report.restored);assert.equal(report.restoredDisk.revision,report.collapsedDisk.revision+1);
   // Activate the actual installed process, not a replacement page. CDP
   // bringToFront plus locator focus/press address WebView focus separately.
   const pid=Number(process.env.QO_NATIVE_PID);assert.ok(Number.isSafeInteger(pid)&&pid>0);
@@ -51,6 +59,7 @@ async function checkNativePdfDock(page,out){
   assert.ok(direction*(after.panel.width-before.panel.width)>=8,'visible width did not change in the requested direction');
   assert.ok(Math.abs(after.panel.width-report.action.expectedWidth)<=2,'actual width differs from responsive track');
   assert.ok(Math.abs((after.divider.x-before.divider.x)-(after.panel.width-before.panel.width))<=2,'separator must track visible panel edge');
+  report.keyboardDisk=await confirmDisk(after);assert.equal(report.keyboardDisk.revision,report.restoredDisk.revision+1);assert.equal(after.legacyStored,report.beforeCollapse.legacyStored,'legacy browser preference must not be overwritten');
   report.status='PASS';return after.preference;
  }catch(e){report.status='FAIL';report.error=String(e);try{report.failure=await measure();report.events=report.failure.events;}catch{}throw e;}
  finally{save();try{await page.screenshot({path:path.join(out,'native-dock-keyboard-'+report.status.toLowerCase()+'.png')});}catch{}}

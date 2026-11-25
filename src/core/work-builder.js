@@ -9,7 +9,17 @@ try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.pars
 const QW_PANELS_KEY='quantum-office.education-panels.v1';
 const qwPanelDefaults={work:{left:228,right:260,hideLeft:false,hideRight:false},visual:{left:254,right:278,hideLeft:false,hideRight:false},pdf:{left:254,hideLeft:false},diagnostics:{left:208,right:260,hideLeft:false,hideRight:false}};
 function qwPanelPreference(key){let saved={};try{saved=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}')[key]||{};}catch{}const result={...qwPanelDefaults[key]};for(const side of ['left','right'])if(side in result){const n=saved[side];if(typeof n==='number'&&Number.isFinite(n))result[side]=Math.max(180,Math.min(440,n));result[side==='left'?'hideLeft':'hideRight']=saved[side==='left'?'hideLeft':'hideRight']===true;}return result;}
-function qwSavePanelPreference(key,value){try{let all;try{all=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}');}catch{all={};}if(!all||typeof all!=='object'||Array.isArray(all))all={};all[key]=value;localStorage.setItem(QW_PANELS_KEY,JSON.stringify(all));}catch{}}
+function qwSavePanelPreference(key,value){
+ try{
+  const all=JSON.parse(localStorage.getItem(QW_PANELS_KEY)||'{}');
+  if(!all||typeof all!=='object'||Array.isArray(all))throw Error('Некорректные сохранённые настройки панелей');
+  all[key]=value;localStorage.setItem(QW_PANELS_KEY,JSON.stringify(all));return true;
+ }catch(error){
+  // Async native failures are reported by the durable storage retry/recovery UI.
+  console.warn('Настройки панелей не записаны:',error);
+  status('Не удалось сохранить настройки панелей. Изменения действуют до закрытия рабочей области.',true);return false;
+ }
+}
 function qwInstallPanels(root,key,toolbar,panels){
  if(!root||!toolbar)return;let pref=qwPanelPreference(key);
  root.dataset.qwPanelKind=key;root.classList.add('qw-dock-layout');

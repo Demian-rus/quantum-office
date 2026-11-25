@@ -135,3 +135,31 @@ test('recovery and close checks editor guard before exporting, cancel retains re
  allow=true;button.onclick();await until(h.closed);assert.equal(exported,1);
  const copy=JSON.parse(Buffer.from(h.calls.find(c=>c.command==='save_export').args.data,'base64').toString('utf8'));assert.equal(copy.entries[0].value,'exact recovery data');
 });
+
+test('education panel preferences are allowed, migrated only when absent, ACKed and kept separate from QWORK',async()=>{
+ const key='quantum-office.education-panels.v1',legacy={[key]:'{"pdf":{"left":254,"hideLeft":false}}'};
+ const h=await harness({legacy,initial:{[KEY]:{revision:2,value:'existing QWORK'}}});
+ const storage=h.context.qoDraftStorage;assert.equal(h.loaded(),true);assert.equal(storage.getItem(key),legacy[key]);
+ assert.equal(h.rows[key].revision,1);assert.equal(h.calls.find(c=>c.command==='draft_write').args.changes[0].migration,true);
+ const value='{"pdf":{"left":286,"hideLeft":true}}';storage.setItem(key,value);assert.equal(storage.getItem(key),value);assert.equal(storage.pending,true);await storage.flush();
+ assert.equal(storage.pending,false);assert.equal(storage.error,'');assert.deepEqual(h.rows[key],{revision:2,value});assert.equal(h.rows[KEY].value,'existing QWORK');
+ assert.throws(()=>storage.setItem(key+'.unknown','bad'),/Недопустимый ключ/);assert.throws(()=>storage.getItem(key+'.unknown'),/Недопустимый ключ/);assert.throws(()=>storage.removeItem(key+'.unknown'),/Недопустимый ключ/);
+ const reopened=await harness({legacy,initial:h.rows});assert.equal(reopened.context.qoDraftStorage.getItem(key),value);assert.equal(reopened.calls.filter(c=>c.command==='draft_write').length,0);
+ const tombstone=await harness({legacy,initial:{[key]:{revision:3,value:null}}});assert.equal(tombstone.context.qoDraftStorage.getItem(key),null);assert.equal(tombstone.calls.filter(c=>c.command==='draft_write').length,0);
+});
+test('education panel asynchronous write failures remain visible and retryable',async()=>{
+ const key='quantum-office.education-panels.v1';let fail=true;
+ const h=await harness({write:()=>{if(fail)throw Error('settings disk denied');}}),storage=h.context.qoDraftStorage;
+ storage.setItem(key,'{"pdf":{"left":286}}');await assert.rejects(storage.flush(),/settings disk denied/);
+ assert.equal(storage.pending,true);assert.match(storage.error,/settings disk denied/);assert.equal(h.nodes.get('qo-native-draft-notice').hidden,false);
+ fail=false;await storage.flush();assert.equal(storage.pending,false);assert.equal(storage.error,'');assert.equal(h.rows[key].value,'{"pdf":{"left":286}}');
+});
+test('panel preference synchronous write rejection is observable, not a success',()=>{
+ const source=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
+ const block=source.slice(source.indexOf('const QW_PANELS_KEY='),source.indexOf('function qwInstallPanels('));
+ let warnings=[],messages=[],raw=null,fail=true;
+ const context=vm.createContext({console:{warn:(...v)=>warnings.push(v)},status:(...v)=>messages.push(v),localStorage:{getItem:()=>raw,setItem:(k,v)=>{if(fail)throw Error('denied');raw=v;}}});
+ vm.runInContext(block,context);
+ assert.equal(vm.runInContext("qwSavePanelPreference('pdf',{left:286,hideLeft:true})",context),false);assert.equal(messages.length,1);assert.equal(messages[0][1],true);assert.equal(warnings.length,1);assert.equal(raw,null);
+ fail=false;assert.equal(vm.runInContext("qwSavePanelPreference('pdf',{left:286,hideLeft:true})",context),true);assert.equal(JSON.parse(raw).pdf.left,286);
+});
