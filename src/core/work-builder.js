@@ -378,15 +378,14 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  }).join('');
  const printTheme=qwPrintTheme({theme:p.theme??(['booklet','answers'].includes(format)?'academic':''),monochrome:p.monochrome??false,...options}),styles=qwPrintStyles(p.orientation??'portrait','spread');
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
- const brandMarkup=printTheme.id?'<div class="qw-print-brand qw-booklet-brand" title="QX | Квант Икс" aria-label="QX | Квант Икс"><span class="qw-qx-lettering">QX | Квант Икс</span></div>':'';
- const header=brandMarkup+
+ const header=qwPrintBrand()+
   (showTitle&&heading.trim()?'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(heading)+'</h1>':'')+
   (showMeta&&d.topic&&d.topic!==heading?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
   (format==='booklet'&&showVariant&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
   (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
   (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':'');
- const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#111111')+
-  ';--qw-body-color:'+(p.bodyColor??'#111111')+';--qw-title-align:'+(p.titleAlign??'center')+';';
+ const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#000000')+
+  ';--qw-body-color:'+(p.bodyColor??'#000000')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(['booklet','answers'].includes(format)?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
@@ -425,13 +424,13 @@ async function qwPreview(output='tasks'){
    label('Шрифт заголовка','<select data-print-setting="titleFont">'+opt([['sans','Без засечек'],['serif','Книжный']],prefs.titleFont??'sans')+'</select>')+
    label('Размер заголовка, пт','<input type="number" data-print-setting="titlePt" min="11" max="26" step="1" value="'+(prefs.titlePt??14)+'">')+
    label('Выравнивание','<select data-print-setting="titleAlign">'+opt([['left','Слева'],['center','По центру'],['right','Справа']],prefs.titleAlign??'center')+'</select>')+
-   label('Цвет заголовка','<input type="color" data-print-setting="titleColor" value="'+(prefs.titleColor??'#111111')+'">')+
+   label('Цвет заголовка','<input type="color" data-print-setting="titleColor" value="'+(prefs.titleColor??'#000000')+'">')+
   '</div><h3>Текст и страница</h3>'+
   label('Шрифт заданий','<select data-print-setting="bodyFont">'+opt([['serif','Книжный'],['sans','Без засечек']],prefs.bodyFont??(qwDoc.layout==='booklet'?'serif':'sans'))+'</select>')+
   label('Размер текста, пт','<input type="number" data-print-setting="fontPt" min="9" max="12" step="0.5" value="'+prefs.fontPt+'">')+
   label('Ориентация A4','<select data-print-setting="orientation">'+opt([['portrait','Книжная (вертикальная)'],['landscape','Альбомная (горизонтальная)']],prefs.orientation??'portrait')+'</select>')+
 
-  label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#111111')+'">')+
+  label('Цвет текста','<input type="color" data-print-setting="bodyColor" value="'+(prefs.bodyColor??'#000000')+'">')+
   label('Рисунки','<select data-print-setting="figurePosition">'+opt([['auto','Автоматически'],['right','Справа'],['below','Под условием']],prefs.figurePosition)+'</select>')+
   selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
   selected('showVariant',prefs.showVariant!==false)+selected('showPageNumbers',prefs.showPageNumbers!==false)+

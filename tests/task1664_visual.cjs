@@ -81,7 +81,14 @@ function printMetrics(){
  }
  return {error:window.__qwPrintError||null,ready:doc.body.dataset.qwLayoutReady,orientation:doc.body.dataset.qwOrientation,report,bodyFont:getComputedStyle(doc.body).fontFamily,
   sectionGaps:sections.map(s=>parseFloat(getComputedStyle(s).marginBottom)/mm),headerGap:(()=>{const h=doc.querySelector('.qw-print-header');const first=sections[0];return h&&first?(box(first).top-box(h).bottom)/mm:null;})(),taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,images:[...doc.images].map(i=>({task:i.closest('[data-task]')?.dataset.task,width:i.naturalWidth,height:i.naturalHeight})),bounds,overlap,
-  sheets:sheets.map(s=>{const b=box(s),brand=s.querySelector('.qw-qx-lettering'),c=brand&&box(brand);return {w:b.width/mm,h:b.height/mm,columns:s.matches('.qw-print-sheet')?s.querySelectorAll(':scope>.qw-print-page').length:1,brand:s.querySelectorAll('.qw-qx-lettering').length,brandFont:brand?getComputedStyle(brand).fontFamily:null,brandSize:brand?getComputedStyle(brand).fontSize:null,brandColor:brand?getComputedStyle(brand).color:null,brandRight:c?(b.right-c.right)/mm:null,brandBottom:c?(b.bottom-c.bottom)/mm:null,brandCenterDelta:c?Math.abs((c.top+c.bottom)/2-((s.querySelector('.qw-page-footer span:last-child')?.getBoundingClientRect().top||0)+(s.querySelector('.qw-page-footer span:last-child')?.getBoundingClientRect().bottom||0))/2)/mm:null,footers:s.querySelectorAll('.qw-page-footer').length,pageNumber:s.querySelector('.qw-page-footer span:last-child')?.textContent};})};
+  sheets:sheets.map(s=>{
+   const b=box(s),brand=s.querySelector('.qw-qx-lettering'),c=brand&&box(brand),footer=s.querySelector('.qw-page-footer'),f=footer&&box(footer);
+   return {w:b.width/mm,h:b.height/mm,columns:s.matches('.qw-print-sheet')?s.querySelectorAll(':scope>.qw-print-page').length:1,
+    brand:s.querySelectorAll('.qw-qx-lettering').length,brandFont:brand?getComputedStyle(brand).fontFamily:null,brandSize:brand?getComputedStyle(brand).fontSize:null,
+    brandColor:brand?getComputedStyle(brand).color:null,brandRight:c?(b.right-c.right)/mm:null,brandTop:c?(c.top-b.top)/mm:null,
+    footerCenterDelta:f?Math.abs((f.left+f.right-b.left-b.right)/2)/mm:null,
+    footers:s.querySelectorAll('.qw-page-footer').length,pageNumber:footer?.textContent};
+  })};
 }
 function checkPrint(m,orientation,fixture){
  assert.equal(m.error,null);assert.equal(m.ready,'true');assert.equal(m.orientation,orientation);
@@ -91,8 +98,8 @@ function checkPrint(m,orientation,fixture){
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');
   if(orientation==='portrait')assert.equal(s.columns,1);else if(i<m.sheets.length-1)assert.equal(s.columns,2);
-  assert.equal(s.footers,1);assert.equal(s.pageNumber,String(i+1));assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(17, 17, 17)');assert.equal(s.brandSize,'20px');
-  assert.ok(Math.abs(s.brandRight-9)<.2&&s.brandCenterDelta<.3,'brand not aligned with physical page number '+JSON.stringify(s));
+  assert.equal(s.footers,1);assert.equal(s.pageNumber,String(i+1));assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(0, 0, 0)');assert.equal(s.brandSize,'20px');
+  assert.ok(Math.abs(s.brandRight-9)<.2&&Math.abs(s.brandTop-3)<.2&&s.footerCenterDelta<.3,'incorrect physical-sheet margins '+JSON.stringify(s));
  }
  assert.ok(m.report.pages.every(p=>p.capacityMm>150&&p.freeMm>=-.7),'invalid physical pagination');
 }

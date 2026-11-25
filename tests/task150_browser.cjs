@@ -21,15 +21,20 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
    return {layout:window.__qwPrintLayout,bounds,overlaps,text:document.body.innerText,logoLabels:[...document.querySelectorAll('.qw-qx-lettering')].map(x=>x.textContent.trim()),math:document.querySelectorAll('math').length,svg:document.querySelectorAll('figure svg').length,
     textBoxes:[...document.querySelectorAll('.qw-task-text')].flatMap(e=>{
      const walker=document.createTreeWalker(e,NodeFilter.SHOW_TEXT);let n;while(n=walker.nextNode()){if(n.textContent.trim()&&!n.parentElement.closest('math'))break;}if(!n)return [];
-     const range=document.createRange();range.setStart(n,0);range.setEnd(n,Math.min(12,n.textContent.length));const b=range.getClientRects()[0],p=e.closest('.qw-print-page'),pb=p.getBoundingClientRect(),ctx=document.createElement('canvas').getContext('2d');ctx.font=getComputedStyle(n.parentElement).font;
-     return [{page:pages.indexOf(p),text:n.textContent.slice(0,12),x:(b.x-pb.x)*.75,y:(b.y-pb.y+ctx.measureText(n.textContent).fontBoundingBoxAscent)*.75}];}),
+     const range=document.createRange();range.setStart(n,0);range.setEnd(n,Math.min(12,n.textContent.length));const b=range.getClientRects()[0],p=e.closest('.qw-print-page'),pb=p.getBoundingClientRect();
+     const marker=document.createElement('span');
+     marker.style.cssText='display:inline-block;width:0;height:0;vertical-align:baseline';
+     n.before(marker);
+     const baseline=marker.getBoundingClientRect().top;
+     marker.remove();
+     return [{page:pages.indexOf(p),text:n.textContent.slice(0,12),x:(b.x-pb.x)*.75,y:(baseline-pb.y)*.75}];}),
     tasks:[...document.querySelectorAll('.qw-print-section')].map(e=>Number(e.dataset.task)),bodyPt:parseFloat(getComputedStyle(document.body).fontSize)*.75};
   });assert.deepEqual(r.bounds,[],name+' bounds');assert.deepEqual(r.overlaps,[],name+' overlaps');
   fs.writeFileSync(path.join(out,name+'.html'),await p.content());fs.writeFileSync(path.join(out,name+'.qwork'),JSON.stringify(d,null,2));
   await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
   if(!before){assert.ok(r.layout.pages.every(x=>x.tasks.length),name+' no empty pages');
-   if(options.theme)assert.ok(r.logoLabels.includes('QX | Квант Икс'),'explicit theme must render handwritten QX');
-   else assert.equal(r.logoLabels.length,0,'unchanged standard worksheets must remain unbranded');
+   assert.equal(r.logoLabels.length,r.layout.sheets);
+   assert.ok(r.logoLabels.every(label=>label==='QX / Квант Икс'),'each sheet must render handwritten QX');
    if(options.theme)assert.equal(r.layout.pages.length,options.format==='answers'?1:2,'comparable concept pages');
    const repeat=await browser.newPage();await repeat.setContent(html);await repeat.evaluate(()=>window.qwPrintReady);assert.deepEqual(await repeat.evaluate(()=>window.__qwPrintLayout),r.layout);await repeat.close();
   }

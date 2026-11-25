@@ -4,10 +4,11 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
-const samples = require('./fixtures/bank023-samples.cjs');
+const finalEdition = process.argv.includes('--bank-02.4');
+const samples = finalEdition ? require('./fixtures/bank024-samples.cjs') : require('./fixtures/bank023-samples.cjs');
 
 const root = path.resolve(__dirname, '..');
-const out = path.join(root, 'evidence/bank-02.3');
+const out = path.join(root, finalEdition ? 'evidence/bank-02.4' : 'evidence/bank-02.3');
 const fixtureId = n => `bank023-${String(n).padStart(2, '0')}`;
 const action = (page, name) => page.locator(`[data-qw-action="${name}"]`);
 
@@ -98,6 +99,39 @@ async function screenshot(page,name){
   await page.screenshot({path:path.join(out,'screenshots',name+'.png'),animations:'disabled'});
 }
 
+function inspectEdition(){
+  const box=node=>node.getBoundingClientRect(), css=node=>getComputedStyle(node);
+  const pages=[...document.querySelectorAll('.qw-print-document>:is(.qw-print-sheet,.qw-print-page)')];
+  const issues=[];
+  for(const page of pages){
+    const brand=page.querySelector(':scope>.qw-print-brand'), footer=page.querySelector(':scope>.qw-page-footer');
+    const surface=box(page), top=box(brand), foot=box(footer);
+    if(page.querySelectorAll('.qw-print-brand').length!==1||brand.textContent!=='QX / Квант Икс')issues.push('signature count or text');
+    if(Math.abs(top.top-surface.top-3*96/25.4)>.1||Math.abs(surface.right-top.right-9*96/25.4)>.1)issues.push('signature position');
+    if(css(brand).fontSize!=='20px'||!css(brand).fontFamily.includes('QX Handwritten')||
+       css(brand).color!=='rgb(0, 0, 0)'||css(brand).backgroundColor!=='rgba(0, 0, 0, 0)'||css(brand).transform!=='none')issues.push('signature style');
+    if(Math.abs(foot.x+foot.width/2-surface.x-surface.width/2)>.1||top.bottom>=foot.top)issues.push('centered footer');
+    if([...page.querySelectorAll('.qw-print-header:not(:empty),.qw-print-section')].some(node=>box(node).top<top.bottom))issues.push('signature band overlap');
+  }
+  for(const node of document.querySelectorAll('.qw-task-text,.qw-task-marker,.qw-study-id,.qw-answer-caption,.qw-booklet-answer,math,.qw-radical-ink')){
+    const style=css(node);
+    if(style.color!=='rgb(0, 0, 0)'||style.opacity!=='1'||style.filter!=='none'||style.transform!=='none')issues.push('study ink');
+  }
+  const tasks=[...document.querySelectorAll('.qw-print-section .qw-task-text')];
+  const force=document.querySelector('[data-task="5"] figure svg');
+  const graph=document.querySelector('[data-task="7"] figure svg');
+  const labels=force&&[...force.querySelectorAll('[data-qw-label]')].filter(e=>e.querySelector('text').textContent.startsWith('F')).map(node=>{
+    const owner=node.closest('[data-qw-label-owner]'), text=node.querySelector('text'), letter=text.firstElementChild, index=letter.nextElementSibling;
+    const shaft=owner.querySelector('[data-qw-arrow-shaft]'), head=owner.querySelector('[data-qw-arrow-head]');
+    const translation=node.transform.baseVal.numberOfItems?node.transform.baseVal.getItem(0).matrix.f:0;
+    return { baseline:+text.getAttribute('y')+translation, clear:box(text).bottom<box(shaft).top, conflict:node.dataset.labelConflict,
+      style:letter.getAttribute('font-style'), font:css(letter).fontSize, index:index?.textContent||'', shift:index?.getAttribute('baseline-shift')||'',
+      length:Math.abs(+head.dataset.qwTip.split(',')[0]-shaft.points[0].x), arrowY:+head.dataset.qwTip.split(',')[1] };
+  });
+  return {issues,pages:pages.length,tasks:tasks.map(t=>t.textContent),labels,
+    graph:graph&&[...graph.querySelectorAll('.qw-axis-number')].map(n=>n.dataset.axis+':'+n.dataset.value)};
+}
+
 async function render(context,page,work,name,orientation,options){
   const html=await page.evaluate(({work,orientation,options})=>{
     work.printSettings.orientation=orientation;
@@ -134,6 +168,24 @@ async function render(context,page,work,name,orientation,options){
       assert.equal(features.keyCaptions.length,14);
       assert.ok(features.keyCaptions.every(({text,breaks})=>!breaks&&/^Ответ: [^\n]+$/.test(text)),JSON.stringify(features.keyCaptions));
       assert.ok(features.text.indexOf('За первые 4 с путь')<features.text.indexOf('Ответ: 18 м'));
+    }
+    if(finalEdition){
+      const edition=await surface.evaluate(inspectEdition);
+      assert.deepEqual(edition.issues,[],name);
+      assert.equal(edition.pages,proof.layout.sheets);
+      if(name.startsWith('pupil-')){
+        assert.ok(edition.tasks.every(text=>!/Для первого участка используйте|Проверьте единицы|Используйте все три строки/.test(text)));
+        assert.ok(edition.tasks[12].startsWith('Масса воды равна 250 г, а её объём составляет 250 см³. Выразите обе величины в СИ.'));
+        assert.ok(['x:6','y:20','y:50'].every(tick=>edition.graph.includes(tick)),edition.graph.join(', '));
+        const [applied,friction]=edition.labels;
+        assert.equal(edition.labels.length,2);
+        assert.deepEqual([applied.index,friction.index],['','тр']);
+        assert.equal(friction.shift,'sub');
+        assert.ok(edition.labels.every(label=>label.conflict==='false'&&label.style==='italic'&&label.clear&&label.baseline<label.arrowY));
+        assert.equal(applied.baseline,friction.baseline);
+        assert.equal(applied.font,friction.font);
+        assert.equal(applied.length/friction.length,2.5);
+      }
     }
     await surface.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});
     return {name,...proof};
@@ -217,6 +269,24 @@ async function main(){
     assert.ok(squareSizes.every(pair=>pair.every((size,i)=>Math.abs(size-squareSizes[0][i])<.05)));
     assert.ok(proof.roots.length>=7);
     docs.push(proof);
+    if(finalEdition){
+      const variants=await page.evaluate(()=>{
+        const diagnostic=qdDoc();qdSample();
+        const plan=qdVariantsBuild({...diagnostic,sections:[...diagnostic.sections,...structuredClone(diagnostic.sections)]},{count:2,perSection:0,seed:'publishing'});
+        if(!plan.ok)throw Error(plan.error);
+        const variant=plan.variants[0];
+        return ['student','key'].map(kind=>qdVariantPaperHTML(variant,kind));
+      });
+      for(const [i,html] of variants.entries()){
+        const paper=await context.newPage();
+        try{
+          await paper.setContent(html);
+          await paper.emulateMedia({media:'print'});
+          await paper.evaluate(()=>document.fonts.ready);
+          await paper.pdf({path:path.join(out,'diagnostic-'+['student','key'][i]+'.pdf'),preferCSSPageSize:true,printBackground:true});
+        }finally{await paper.close();}
+      }
+    }
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(out,'geometry.json'),JSON.stringify({card,preview:preview.maxCenterDeltaPt,docs},null,2));
     console.log('PASS numbering row ≤ 0.5 pt, figure/answer separation, MathML bounds, uniform brief key, figure inspector and five vector exports');

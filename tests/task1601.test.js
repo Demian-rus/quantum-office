@@ -37,9 +37,10 @@ test('TASK160.1 booklet answer is not an absolutely positioned overlay',()=>{
 test('TASK160.1 QX is embedded handwritten black type without plaque',()=>{
  const css=qwPrintThemeStyles();
  assert.match(css,/font:700 15pt\/1 "QX Handwritten"/);
- assert.match(css,/color:#111!important/);
- assert.match(css,/background:transparent!important/);
- assert.match(css,/-webkit-text-stroke:0;/);
+ const brand=css.match(/\.qw-print-brand\{([^}]+)\}/)[1];
+ assert.match(brand,/color:#000/);
+ assert.match(brand,/top:3mm;right:9mm/);
+ assert.doesNotMatch(brand,/background|border|filter|transform/);
 });
 
 test('TASK160.1 QWORK bank display identity round-trips and does not depend on position',()=>{

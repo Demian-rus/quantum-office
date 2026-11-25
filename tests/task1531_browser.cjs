@@ -71,7 +71,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1531');
    assert.ok(data.scripts>=2&&data.sqrt===1&&data.figures>=3);
    assert.equal(data.misplacedScripts,0,'superscripts must rise above and extend to the right of their bases');
    assert.equal(data.brands.length,orientation==='landscape'?Math.ceil(data.pages/2):data.pages);
-   assert.equal(data.brands.filter(Boolean).length,theme?data.brands.length:0);
+   assert.ok(data.brands.every(label=>label==='QX / Квант Икс'));
    for(const p of data.report.pages)assert.ok(p.freeMm>=-.7,'page overflow');
    await page.emulateMedia({media:'print'});
    const pdf=path.join(out,name+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});

@@ -263,6 +263,16 @@ function qwAxisLayout(g,axisFont,russian=false){
    }
    ticks[axis].push({value:v,pos:axis==='x'?p.x:p.y,label,numbered,w});
   }
+  if(russian&&axisFont&&g.points.length){
+   const list=ticks[axis],selected=[];
+   const reserve=tick=>{
+    if(selected.every(other=>Math.abs(other.pos-tick.pos)>=desired))selected.push(tick);
+   };
+   for(const tick of list)if(tick.numbered&&(tick===list[0]||tick===list.at(-1)||tick.value===0))reserve(tick);
+   for(const tick of list)if((axis!=='y'||!zeroX||tick.value!==0)&&g.points.some(p=>Math.abs(p[axis]-tick.value)<step*1e-7))reserve(tick);
+   for(const tick of list)if(tick.numbered&&!selected.includes(tick))reserve(tick);
+   for(const tick of list)tick.numbered=selected.includes(tick);
+  }
  }
  return {axisX,axisY,font,ticks,math};
 }
@@ -275,20 +285,20 @@ function qwGraphSVG(g,interactive=false,typography={}){
  // Every grid line and small tick is retained even when a number is omitted.
  for(const t of ticks.x){
   if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'data-qw-grid-line="true" stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
-  parts.push(line(t.pos,axisY-style.tick,t.pos,axisY+style.tick,'stroke="#333"'));
+  parts.push(line(t.pos,axisY-style.tick,t.pos,axisY+style.tick,'stroke="#000"'));
  }
  for(const t of ticks.y){
   if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'data-qw-grid-line="true" stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
-  parts.push(line(axisX-style.tick,t.pos,axisX+style.tick,t.pos,'stroke="#333"'));
+  parts.push(line(axisX-style.tick,t.pos,axisX+style.tick,t.pos,'stroke="#000"'));
  }
  // Draw arrowheads separately: the visible shaft ends at the head's base,
  // not at the tip (marker-end used to leave a line through the arrowhead).
  const xTip=b.right+16,xBase=xTip-style.head,yTip=b.top-16,yBase=yTip+style.head;
- const shaft='stroke="#111" stroke-width="'+style.axis+'" stroke-linecap="butt" ';
+ const shaft='stroke="#000" stroke-width="'+style.axis+'" stroke-linecap="butt" ';
  parts.push(line(b.left,axisY,xBase,axisY,shaft+'data-qw-axis-shaft="x"'),
-  '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-style.headHalf)+' L'+xBase+' '+(axisY+style.headHalf)+' Z" fill="#111"/>',
+  '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-style.headHalf)+' L'+xBase+' '+(axisY+style.headHalf)+' Z" fill="#000"/>',
   line(axisX,b.bottom,axisX,yBase,shaft+'data-qw-axis-shaft="y"'),
-  '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-style.headHalf)+' '+yBase+' L'+(axisX+style.headHalf)+' '+yBase+' Z" fill="#111"/>');
+  '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-style.headHalf)+' '+yBase+' L'+(axisX+style.headHalf)+' '+yBase+' Z" fill="#000"/>');
  const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
  const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
  const numberBoxes=[];
@@ -302,7 +312,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
   const box={x:x-t.w/2,y:xBaseline-font,w:t.w,h:font+2};
   if(numberBoxes.some(v=>overlap(v,box)>0))continue;
   numberBoxes.push(box);occupied.push(box);
-  parts.push('<text class="qw-axis-number" data-axis="x" data-value="'+t.value+'" x="'+x+'" y="'+xBaseline+'" font-size="'+font+'" text-anchor="middle" fill="#222222">'+t.label+'</text>');
+  parts.push('<text class="qw-axis-number" data-axis="x" data-value="'+t.value+'" x="'+x+'" y="'+xBaseline+'" font-size="'+font+'" text-anchor="middle" fill="#000">'+t.label+'</text>');
  }
  for(const t of ticks.y){
   if(!t.numbered)continue;
@@ -311,10 +321,10 @@ function qwGraphSVG(g,interactive=false,typography={}){
   const box={x:yLabelX-t.w,y:y-font,w:t.w,h:font+2};
   if(numberBoxes.some(v=>overlap(v,box)>0))continue;
   numberBoxes.push(box);occupied.push(box);
-  parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#222222">'+t.label+'</text>');
+  parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#000">'+t.label+'</text>');
  }
  const titleFont=typography.titleFont||style.title,gap=6;
- const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#111">'+qwEsc(text)+'</text>';
+ const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#000">'+qwEsc(text)+'</text>';
  // Final placement uses actual glyph bounds (including descenders and subscripts).
  parts.push(title('x',xTip+gap,axisY+titleFont*.35,'start',g.xlabel,xTip,axisY),
   title('y',axisX,yTip-gap,'middle',g.ylabel,axisX,yTip));
@@ -365,7 +375,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const gap=10;best={x:p.x+(outward.x<-.1?-w-gap:outward.x>.1?gap:-w/2),y:p.y+(outward.y<-.1?-h-gap/2:outward.y>.1?gap:-h/2),w,h};
   }
   occupied.push(best);
-  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#222222')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
+  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#000')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
  });
  parts.push(qwGraphElementsSVG(g,interactive));
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
@@ -431,6 +441,13 @@ function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=2
  if(best.box)placed.push(best.box);
  return {x:best.x,y:best.y};
 }
+function qwVectorLabel(value){
+ const symbol=value.match(/^([A-Za-zα-ωΑ-Ω])(?:_\{([^{}]+)\}|_([A-Za-zА-Яа-яЁё0-9]+)|(тр))?$/);
+ if(!symbol)return qwEsc(value);
+ const index=symbol[2]||symbol[3]||symbol[4];
+ return '<tspan font-family="QO Print Serif,Times New Roman,serif" font-style="italic">'+qwEsc(symbol[1])+'</tspan>'+
+  (index?'<tspan font-family="QO Print Serif,Times New Roman,serif" font-size="67%" baseline-shift="sub">'+qwEsc(index)+'</tspan>':'');
+}
 function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  objects=qwResolveDiagram(objects);
  const key=qwSVGKey(objects);
@@ -456,9 +473,9 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   }else if(item.kind==='point')allPoints.push({x:item.x,y:item.y});
  }
  const numeric=v=>Number(v.toFixed(3));
- const label=(value,x,y,size=18,anchor='middle')=>
+ const label=(value,x,y,size=18,anchor='middle',vector=false)=>
   '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
-  '" fill="#222222" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
+  '" fill="#000" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+(vector?qwVectorLabel(value):qwEsc(value))+'</text>';
  return qwPlaceSVGLabels(qwSVG(guides+objects.map((o,i)=>{
   const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#222222',width=paint.width||2,fill=paint.fill||'none';
   const a=' stroke="'+stroke+'" stroke-width="'+width+'" fill="none"',
@@ -563,6 +580,12 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
    if(o.label)captions+=objectLabel(o.label,cx,cy+7,17);
   }else if(o.label){
    if(o.kind==='text')captions+=objectLabel(o.label,o.x,o.y,19,'start');
+   else if(['forceVector','velocityVector','accelerationVector'].includes(o.kind)){
+    const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1;
+    // Use the upper normal in both directions, or the right side for a vertical vector.
+    const nx=dx===0?1:dy*Math.sign(dx)/length,ny=-Math.abs(dx)/length;
+    captions+=objectLabel(o.label,labelAnchor.x+nx*19,labelAnchor.y+ny*17+(dx===0?6:0),18,'middle',true);
+   }
    else if(o.kind==='dimension'){
     const dx=o.x2-o.x,dy=o.y2-o.y,length=Math.hypot(dx,dy)||1,offset=o.labelOffset??18;
     const x=(o.x+o.x2)/2-dy/length*offset,y=(o.y+o.y2)/2+dx/length*offset;
@@ -597,7 +620,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   if(o.ticks){const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1;for(let n=0;n<o.ticks;n++){const shift=(n-(o.ticks-1)/2)*6,cx=(o.x+o.x2)/2+dx/len*shift,cy=(o.y+o.y2)/2+dy/len*shift;shape+='<line data-qw-equal-mark="'+(n+1)+'" x1="'+(cx-dy/len*6)+'" y1="'+(cy+dx/len*6)+'" x2="'+(cx+dy/len*6)+'" y2="'+(cy-dx/len*6)+'"'+a+'/>';}}
   if(paint.stroke||paint.width)shape=shape.replace(/stroke="#222222"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#222222"/g,'fill="'+stroke+'"');
   if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f2f2|#eeeeee|white)"/g,'fill="'+fill+'"');
-  if(paint.text)captions=captions.replace(/fill="#222222"/g,'fill="'+paint.text+'"');
+  if(paint.text)captions=captions.replace(/fill="#000"/g,'fill="'+paint.text+'"');
 
   const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';

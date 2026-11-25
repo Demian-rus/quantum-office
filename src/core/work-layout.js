@@ -100,21 +100,20 @@ function qwPrintStyles(orientation='portrait',landscapeLayout='spread',mathFont=
 @page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'};margin:0}
 :root{--qw-print-family:"QO Print Sans",Arial,"Liberation Sans",sans-serif}
 *{box-sizing:border-box}
-html,body{margin:0;padding:0;background:#fff;color:#111;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{margin:0;padding:0;background:#fff;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 body{font:var(--qw-print-size,10.8pt)/1.35 var(--qw-print-family)}
 .qw-print-document{margin:0;padding:0}
 .qw-print-page{position:relative;width:210mm;height:297mm;padding:14mm 15mm 20mm;break-after:page;background:white}
 .qw-print-page:last-child{break-after:auto}
 .qw-page-content{display:flow-root;width:180mm;height:263mm}
-.qw-page-footer>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.qw-page-footer>span:last-child{flex:none}
-.qw-page-footer{position:absolute;bottom:7mm;left:15mm;right:15mm;display:flex;justify-content:space-between;gap:5mm;font:8pt/1.2 var(--qw-print-family);color:#555}
+.qw-page-footer{position:absolute;bottom:7mm;left:0;right:0;text-align:center;font:8pt/1.2 var(--qw-print-family);color:#000}
 .qw-print-header{margin:0 0 4mm}
 .qw-print-title{font-size:15pt;line-height:1.2;margin:0 0 2mm;font-weight:700}
 .qw-print-topic{font-size:11pt;line-height:1.3;margin:0 0 1.5mm;font-weight:400}
 .qw-print-meta{font-size:9pt;line-height:1.3;margin:0 0 3mm;color:#444}
 .qw-print-intro{font-size:10pt;line-height:1.35;margin:0;white-space:pre-wrap}
 .qw-print-section{display:flow-root;margin:0 0 2.2mm;break-inside:avoid}
-.qw-paper-task{border:0;margin:0;padding:0;background:white;color:#111;overflow-wrap:anywhere}
+.qw-paper-task{border:0;margin:0;padding:0;background:white;color:#000;overflow-wrap:anywhere}
 .qw-paper-task>header{display:block;margin:0 0 1.2mm;font-size:10.5pt;line-height:1.2;break-after:avoid}
 .qw-paper-task>header span{display:none}
 .qw-task-flow{display:block;min-height:0}
@@ -157,11 +156,11 @@ body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-page-content{width:186mm;height:273mm}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-title{font-size:14pt;margin:0 0 1.5mm;line-height:1.2}
 body:is([data-qw-format="compact"],[data-qw-format="practice"],[data-qw-format="answers"]) .qw-print-section{margin-bottom:2mm}
-.qw-topic-title{font-size:12pt;line-height:1.25;margin:3mm 0 1.5mm;font-weight:700;color:#b42318;break-after:avoid}
+.qw-topic-title{font-size:12pt;line-height:1.25;margin:3mm 0 1.5mm;font-weight:700;break-after:avoid}
 body[data-qw-format="compact"]{line-height:1.25}
 body[data-qw-format="compact"] .qw-print-header{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:4mm;row-gap:.7mm;align-items:baseline;margin-bottom:1.2mm}
 body[data-qw-format="compact"] .qw-print-title{font-size:12pt;line-height:1.2;margin:0;grid-column:1;grid-row:1}
-body[data-qw-format="compact"] .qw-print-topic{font-size:10.5pt;line-height:1.2;font-weight:700;color:#b42318;margin:0;grid-column:1/-1;grid-row:2}
+body[data-qw-format="compact"] .qw-print-topic{font-size:10.5pt;line-height:1.2;font-weight:700;margin:0;grid-column:1/-1;grid-row:2}
 body[data-qw-format="compact"] .qw-print-meta{font-size:8.5pt;line-height:1.2;margin:0;grid-column:2;grid-row:1}
 body[data-qw-format="compact"] .qw-print-section{margin-bottom:.2mm;position:relative}
 body[data-qw-format="compact"] .qw-page-content>.qw-print-section~.qw-print-section{padding-top:.4mm}
@@ -193,9 +192,9 @@ body[data-qw-format="booklet"] .qw-print-page{padding:13mm 13mm 17mm}
 body[data-qw-format="booklet"] .qw-page-content{width:184mm;height:267mm}
 body[data-qw-format="booklet"] .qw-print-header{text-align:center;margin:0 0 6mm}
 body[data-qw-format="booklet"] .qw-print-title{font:700 14pt/1.2 "QO Print Sans",Arial,sans-serif;margin:0 0 2mm}
-body[data-qw-format="booklet"] .qw-print-topic{font-size:11pt;line-height:1.25;margin:1mm 0 0;color:#111}
+body[data-qw-format="booklet"] .qw-print-topic{font-size:11pt;line-height:1.25;margin:1mm 0 0}
 body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial,sans-serif;color:#444;margin:0 0 2.5mm}
-.qw-booklet-variant{font:700 13pt/1.25 "QO Print Serif",Georgia,serif;margin:1mm 0 0;color:#111}
+.qw-booklet-variant{font:700 13pt/1.25 "QO Print Serif",Georgia,serif;margin:1mm 0 0}
 body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-print-section:before{content:none}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:8mm minmax(0,1fr);column-gap:3mm;row-gap:0}
@@ -208,8 +207,6 @@ body[data-qw-format="booklet"] .qw-booklet-answer span{display:inline-block;widt
 body[data-qw-format="booklet"] .qw-booklet-answer{white-space:nowrap}
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer{min-width:0;align-items:baseline}
 body[data-qw-format="booklet"] .qw-booklet-answer-by-figure .qw-booklet-answer span{width:auto;min-width:12mm;max-width:52mm;flex:1 1 auto}
-body[data-qw-format="booklet"] .qw-page-footer{bottom:6mm;left:13mm;right:13mm;justify-content:center;font:9.5pt/1.2 "QO Print Serif",Georgia,serif;color:#111}
-body[data-qw-format="booklet"] .qw-page-footer>span:first-child{display:none}
 body[data-qw-format="booklet"] math{math-style:normal}
 body[data-qw-format="booklet"] math :is(mi,mn,mo,mtext){font-weight:400}
 /* The default answer stays in normal flow after the condition and figure.
@@ -268,14 +265,14 @@ body[data-qw-format="answers"] .qw-answer-long{font:var(--qw-print-size,10pt)/1.
 .qw-answer-caption .qw-rich-equation math{display:inline-math}
 .qw-key-solutions{grid-column:2;clear:both;margin:1.4mm 0 0;padding:0;border:0;background:transparent;font:inherit}
 /* TASK154 — one typographic system for all exported document formats. */
-body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;--qw-math-ink:var(--qw-body-color,#111);color:var(--qw-math-ink)}
+body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;--qw-math-ink:var(--qw-body-color,#000);color:var(--qw-math-ink)}
 body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
 body[data-qw-font="serif"]{--qw-print-family:"QO Print Serif",Georgia,serif}
 body[data-qw-title-font="serif"]{--qw-title-family:"QO Print Serif",Georgia,serif}
 body[data-qw-title-font="sans"]{--qw-title-family:"QO Print Sans",Arial,sans-serif}
-body[data-qw-title-custom="true"] .qw-print-title{font-family:var(--qw-title-family);font-size:var(--qw-title-size,14pt);font-weight:700;color:var(--qw-title-color,#111);text-align:var(--qw-title-align,center);line-height:1.23;max-width:100%;overflow-wrap:break-word}
+body[data-qw-title-custom="true"] .qw-print-title{font-family:var(--qw-title-family);font-size:var(--qw-title-size,14pt);font-weight:700;color:var(--qw-title-color,#000);text-align:var(--qw-title-align,center);line-height:1.23;max-width:100%;overflow-wrap:break-word}
 body[data-qw-title-custom="true"] .qw-print-header{text-align:var(--qw-title-align,center)}
-body[data-qw-format] .qw-paper-task{color:var(--qw-body-color,#111)}
+body[data-qw-format] .qw-paper-task{color:var(--qw-math-ink)}
 body[data-qw-math-custom="true"] math{math-style:normal}
 body[data-qw-math-custom="true"] math :is(mi,mn,mo,mtext){font-weight:400}
 body[data-qw-show-pages="false"] .qw-page-footer{display:none}
@@ -310,9 +307,6 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-page-footer{
  bottom:5mm;left:9mm;right:9mm;
 }
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-booklet-brand{
- top:5mm;right:9mm;transform:scale(.83);transform-origin:top right;
-}
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-header{
  margin:0 0 4mm;
 }
@@ -334,17 +328,16 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-pri
 }
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{
  position:absolute;z-index:2;box-sizing:border-box;
- left:42mm;right:42mm;top:6mm;width:auto;margin:0;
+ left:42mm;right:42mm;top:10mm;width:auto;margin:0;
  text-align:center;pointer-events:none;
 }
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header .qw-print-title{
  margin:0 0 1.5mm;line-height:1.15;
 }
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-print-sheet>.qw-print-brand{right:0;top:0}
 
 /* Final print design: portrait one column; landscape two columns with one physical footer. */
-body[data-qw-format="booklet"] .qw-print-page{padding:8mm 9mm 10mm}
-body[data-qw-format="booklet"] .qw-page-content{width:192mm;height:279mm}
+body[data-qw-format="booklet"] .qw-print-page{padding:10mm 9mm 10mm}
+body[data-qw-format="booklet"] .qw-page-content{width:192mm;height:277mm}
 body[data-qw-format="booklet"] .qw-print-header{margin-bottom:4.5mm}
 body[data-qw-format="booklet"] .qw-print-section{margin-bottom:5.25mm}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:7mm minmax(0,1fr);column-gap:2mm}
@@ -359,11 +352,11 @@ body[data-qw-format="booklet"] .qw-booklet-answer-by-figure.qw-booklet-answer-ne
 .qw-task-tables{clear:both;margin:1.2mm auto;break-inside:avoid}
 .qw-task-tables :is(th,td),.qw-print-rich :is(th,td){padding:.5mm 1.2mm;border:.18mm solid #555}
 .qw-print-rich .qw-rich-table-scroll{clear:both;break-inside:avoid}
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page{padding:8mm 3mm 10mm 9mm}
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page+.qw-print-page{padding:8mm 9mm 10mm 3mm}
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{width:136.5mm;height:192mm}
-body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{top:7mm;left:9mm;right:9mm}
-.qw-print-sheet>.qw-page-footer,body[data-qw-format="booklet"] .qw-page-footer{position:absolute;bottom:3mm;left:9mm;right:9mm;justify-content:center;font:7.5pt/1.2 var(--qw-print-family)}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page{padding:10mm 3mm 10mm 9mm}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-print-sheet>.qw-print-page+.qw-print-page{padding:10mm 9mm 10mm 3mm}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{width:136.5mm;height:190mm}
+body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{left:9mm;right:9mm}
+.qw-print-sheet>.qw-page-footer,body[data-qw-format="booklet"] .qw-page-footer{bottom:3mm;left:0;right:0;font:7.5pt/1.2 var(--qw-print-family)}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -523,8 +516,6 @@ async function qwPreparePrintDocument(){
   if([...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
- const meta=header.querySelector('.qw-print-meta')?.textContent||'';
- const footerLabel=format==='booklet'?'':[format!=='answers'&&document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
   const page=document.createElement('section');page.className='qw-print-page';
@@ -679,7 +670,8 @@ async function qwPreparePrintDocument(){
  const physical=spread?[...host.querySelectorAll(':scope>.qw-print-sheet')]:pages.map(p=>p.page);
  for(const [i,sheet] of physical.entries()){
   const footer=document.createElement('footer');footer.className='qw-page-footer';
-  const label=document.createElement('span'),number=document.createElement('span');label.textContent=footerLabel;number.textContent=format==='booklet'?String(i+1):(i+1)+' / '+physical.length;footer.append(label,number);sheet.append(footer);
+  footer.textContent=format==='booklet'?String(i+1):(i+1)+' / '+physical.length;
+  sheet.append(footer);
  }
  // Recenter manually placed text and axis titles in their actual final print
  // viewport, after figure sizing, column moves, and font activation.

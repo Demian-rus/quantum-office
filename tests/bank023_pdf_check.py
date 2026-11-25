@@ -4,6 +4,7 @@ Run after tests/bank023_browser.cjs. Requires PyMuPDF and Pillow.
 """
 import json
 import math
+import sys
 from collections import deque
 from pathlib import Path
 
@@ -11,7 +12,8 @@ import fitz
 from PIL import Image, ImageDraw
 
 
-OUT = Path(__file__).resolve().parent.parent / 'evidence' / 'bank-02.3'
+FINAL_EDITION = '--bank-02.4' in sys.argv
+OUT = Path(__file__).resolve().parent.parent / 'evidence' / ('bank-02.4' if FINAL_EDITION else 'bank-02.3')
 PNG = OUT / 'pdf-pages'
 FRAGMENTS = OUT / 'fragments'
 PNG.mkdir(exist_ok=True)
@@ -110,6 +112,47 @@ def locate(document, number):
     raise AssertionError(f'baseline task {number} not found')
 
 
+def text_spans(page, clip=None):
+    return [span for block in page.get_text('dict',clip=clip)['blocks'] for line in block.get('lines', [])
+            for span in line['spans'] if span['text'].strip()]
+
+
+def verify_page_style(document, page, booklet=False, diagnostic=False):
+    spans=text_spans(page)
+    brands=[s for s in spans if s['text']=='QX / Квант Икс']
+    assert len(brands)==1, ('brand count',page.number,brands)
+    brand=brands[0]
+    assert brand['size']==15 and brand['color']==0 and 'Caveat' in brand['font'],brand
+    assert any('Caveat' in font[3] and document.extract_font(font[0])[3] for font in page.get_fonts()),'missing embedded face'
+    assert brand['bbox'][0]>page.rect.width-150 and brand['bbox'][3]<page.rect.height*.065,brand
+    expected=str(page.number+1) if (booklet or diagnostic) else f'{page.number+1} / {len(document)}'
+    numbers=[s for s in spans if s['text']==expected and s['bbox'][1]>page.rect.height-39]
+    assert len(numbers)==1, ('footer count',page.number,numbers)
+    footer=fitz.Rect(numbers[0]['bbox'])
+    assert abs((footer.x0+footer.x1)/2-page.rect.width/2)<.8,footer
+    assert all(s is brand or s['bbox'][1]>=brand['bbox'][3]-.6 for s in spans),('ink in signature band',page.number)
+    if not diagnostic:
+        assert all(s['color']==0 for s in spans),('colored study text',page.number)
+        assert all(s['opacity']==1 for s in page.get_texttrace()),('transparent study text',page.number)
+
+
+def verify_final_figures(document, report):
+    records={item['number']:item for item in report['tasks']}
+    def spans(number):
+        record=records[number]
+        page=document[record['page']-1]
+        return text_spans(page,fitz.Rect(record['rect']))
+    force=spans(5)
+    base={round(s['origin'][0],3):s for s in force if s['text']=='F'}
+    assert len(base)==2,force
+    left,right=sorted(base.values(),key=lambda s:s['origin'][0])
+    assert abs(left['origin'][1]-right['origin'][1])<.15,left
+    assert abs(left['size']-right['size'])<.02,right
+    assert any(s['text']=='тр' and s['size']<left['size'] and s['origin'][1]>left['origin'][1]+.6 for s in force),force
+    graph=spans(7)
+    assert any(s['text']=='6' and s['origin'][1]>min(s['origin'][1] for s in graph if s['text']=='50') for s in graph),graph
+
+
 def verify():
     geometry=json.loads((OUT/'geometry.json').read_text(encoding='utf-8'))
     results={'numberInkMaxPt':{},'radicals':{}}
@@ -123,8 +166,12 @@ def verify():
                 assert abs(page.rect.width-size[0])<2 and abs(page.rect.height-size[1])<2,(name,page.rect)
                 assert page.get_text().strip(),(name,number,'blank PDF page')
                 assert not page.get_images(), (name,number,'unexpected raster illustration')
+                if FINAL_EDITION:
+                    verify_page_style(document,page,booklet=name.startswith('pupil-') or name=='math-raster-proof')
                 _,image=render(page,scale=1.45)
                 image.save(PNG/f'{name}-{number:02}.png')
+            if FINAL_EDITION and name.startswith('pupil-'):
+                verify_final_figures(document,report)
             deltas=[measure_identifier(document[row['page']-1],row) for row in report['tasks'] if row['permanent']]
             if deltas:
                 results['numberInkMaxPt'][name]=round(max(deltas),4)
@@ -135,20 +182,29 @@ def verify():
             print(f'{name}: {len(document)} pages, max DOM center error {report["maxCenterDeltaPt"]:.3f} pt, max ink center error {max(deltas,default=0):.3f} pt, {len(report["roots"])} radicals')
 
     portrait=next(r for r in geometry['docs'] if r['name']=='pupil-portrait')
-    with fitz.open(OUT/'before/pupil-portrait.pdf') as before, fitz.open(OUT/'pupil-portrait.pdf') as after:
-        for number in (9,12,14):
+    baseline_dir=OUT.parent/'bank-02.3' if FINAL_EDITION else OUT/'before'
+    if FINAL_EDITION:
+        for kind in ('student','key'):
+            with fitz.open(OUT/f'diagnostic-{kind}.pdf') as document:
+                for page in document:
+                    verify_page_style(document,page,diagnostic=True)
+        baseline_geometry=json.loads((baseline_dir/'geometry.json').read_text(encoding='utf-8'))['docs'][0]['tasks']
+        baseline_rows={row['number']:row for row in baseline_geometry}
+    with fitz.open(baseline_dir/'pupil-portrait.pdf') as before, fitz.open(OUT/'pupil-portrait.pdf') as after:
+        for number in ((1,5,7,13) if FINAL_EDITION else (9,12,14)):
             index,match=locate(before,number)
             legacy=before[index]
-            baseline=fitz.Rect(18,max(10,match.y0-22),legacy.rect.width-12,min(legacy.rect.height-28,match.y0+{9:48,12:73,14:130}[number]))
+            baseline=padded(fitz.Rect(baseline_rows[number]['rect']),4) if FINAL_EDITION else fitz.Rect(18,max(10,match.y0-22),legacy.rect.width-12,min(legacy.rect.height-28,match.y0+{9:48,12:73,14:130}[number]))
             row=next(task for task in portrait['tasks'] if task['number']==number)
             page=after[row['page']-1]
             _,old_image=render(legacy,baseline)
             _,new_image=render(page,padded(fitz.Rect(row['rect']),4))
-            montage([old_image,new_image],FRAGMENTS/f'008{number:02}-compare-300.png',['BANK-02.2 · 300%','BANK-02.3 · 300%'])
-    with fitz.open(OUT/'before/key-brief.pdf') as before, fitz.open(OUT/'key-brief.pdf') as after:
+            labels=['BANK-02.3 · 300%','BANK-02.4 · 300%'] if FINAL_EDITION else ['BANK-02.2 · 300%','BANK-02.3 · 300%']
+            montage([old_image,new_image],FRAGMENTS/f'008{number:02}-compare-300.png',labels)
+    with fitz.open(baseline_dir/'key-brief.pdf') as before, fitz.open(OUT/'key-brief.pdf') as after:
         _,original=render(before[0],fitz.Rect(29,37,before[0].rect.width-20,240))
         _,final=render(after[0],fitz.Rect(29,37,after[0].rect.width-20,240))
-        montage([original,final],FRAGMENTS/'brief-key-compare-300.png',['BANK-02.2 · 300%','BANK-02.3 · 300%'])
+        montage([original,final],FRAGMENTS/'brief-key-compare-300.png',labels)
     with fitz.open(OUT/'math-raster-proof.pdf') as maths:
         proof=next(r for r in geometry['docs'] if r['name']=='math-raster-proof')
         for row in proof['tasks'][1:]:
@@ -158,6 +214,8 @@ def verify():
     (OUT/'raster-geometry.json').write_text(json.dumps(results,ensure_ascii=False,indent=2),encoding='utf-8')
     assert all(error<=.5 for error in results['numberInkMaxPt'].values()),results['numberInkMaxPt']
     print('PASS independent PDF raster checks for number alignment, connected radicals, clearance and A4')
+    if FINAL_EDITION:
+        print('PASS black vector text, Caveat 15 pt, clean top band, centered footer, aligned forces and temperature axes')
 
 
 if __name__=='__main__':

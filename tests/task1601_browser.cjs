@@ -93,7 +93,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
    assert.equal(data.tableCentered,true);
    assert.ok(['right','below'].includes(data.graphPosition));
    assert.equal(data.arrowShafts,true);
-   assert.equal(data.stampColor,'rgb(17, 17, 17)');
+   assert.equal(data.stampColor,'rgb(0, 0, 0)');
    assert.match(data.stampFont,/QX Handwritten/);
    await p.emulateMedia({media:'print'});
    const pdf=path.join(out,'synthetic-'+orientation+'.pdf');

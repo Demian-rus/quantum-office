@@ -20,15 +20,13 @@ for stage,report in reports.items():
     spans=[s for b in page.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
     for span in spans:
      x0,y0,x1,y1=span['bbox']
-     if span['text'].strip()=='QX | Квант Икс':
-      assert page.rect.width-115<=x0<x1<=page.rect.width+1 and page.rect.height-35<=y0<y1<=page.rect.height+1,(name,'lower-right QX',span)
+     if span['text'].strip()=='QX / Квант Икс':
+      assert page.rect.width-115<=x0<x1<=page.rect.width-24 and 0<=y0<y1<28,(name,'top-right QX',span)
      else: assert 25<=x0<x1<=page.rect.width-25 and 20<=y0<y1<=page.rect.height-10,(name,span)
     assert f'{i+1} / {len(doc)}' in page.get_text()
     topics=[s for s in spans if 'Углы, площади и координаты' in s['text']]
     if i==0 and name!='Compact':
-     # The PDF ink depends on the selected theme, not the fixture filename.
-     expected=0x222222 if entry.get('monochrome') else 0x111111 if entry.get('theme') else 0xB42318
-     assert topics and all(s['color']==expected for s in topics),(name,'topic ink',expected)
+     assert topics and all(s['color']==0 for s in topics),(name,'black topic ink')
    page.get_pixmap(matrix=fitz.Matrix(1.5,1.5),alpha=False).save(base/stage/(name+f'-page-{i+1:02}.png'))
   assert numbers==list(range(1,49 if name=='Dense-48' else 25)),(stage,name,numbers)
   if name.endswith('-Answers'):assert 'Найдите третий угол' not in text and 'Ответы' in text
@@ -61,4 +59,4 @@ page=fitz.open(base/'after/QX-academic.pdf')[page_no-1]
 spans=[s for block in page.get_text('dict',clip=region)['blocks'] for line in block.get('lines',[]) for s in line['spans']]
 assert any(s['text'].strip()=='2' and abs(s['size']-10)<.02 for s in spans),'full-size native denominator glyph'
 (base/'pdf-result.json').write_text(json.dumps({'status':'PASS','documents':results,'nativeFractionBodyPt':10},ensure_ascii=False,indent=2))
-print('PASS TASK150.2 PDF: full native text/vectors, exact task/key content and QWORK, unchanged figure dimensions, red topic, service branding, full-size fraction and page PNGs')
+print('PASS TASK150.2 PDF: native text/vectors, exact task and key content, QWORK, stable figures, black topic, top branding, full-size fraction')

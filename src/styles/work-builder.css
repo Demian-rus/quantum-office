@@ -640,10 +640,10 @@
 }
 :is(.qw-study-flow,.qw-bank-live-figure) figure svg {background:transparent!important}
 :is(.qw-study-flow,.qw-bank-live-figure) figure[data-figure-kind=graph] svg>rect[fill=white] {fill:transparent}
-:is(.qw-study-flow,.qw-bank-live-figure) figure svg :is([stroke="#111"],[stroke="#333"],[stroke="#222222"]) {stroke:var(--qw-bank-ink,var(--qo-text))}
+:is(.qw-study-flow,.qw-bank-live-figure) figure svg :is([stroke="#000"],[stroke="#111"],[stroke="#333"],[stroke="#222222"]) {stroke:var(--qw-bank-ink,var(--qo-text))}
 :is(.qw-study-flow,.qw-bank-live-figure) figure svg [stroke="#dddddd"] {stroke:var(--qw-bank-table-border,var(--qo-border-strong))}
 :is(.qw-study-flow,.qw-bank-live-figure) figure svg [stroke=white] {stroke:var(--qw-bank-page,var(--qo-surface))}
-:is(.qw-study-flow,.qw-bank-live-figure) figure svg :is([fill="#111"],[fill="#222222"]) {fill:var(--qw-bank-ink,var(--qo-text))}
+:is(.qw-study-flow,.qw-bank-live-figure) figure svg :is([fill="#000"],[fill="#111"],[fill="#222222"]) {fill:var(--qw-bank-ink,var(--qo-text))}
 [data-qo-theme=dark] :is(.qw-study-flow,.qw-bank-live-figure) figure[data-figure-kind=diagram] svg :is([fill="#eeeeee"],[fill="#f2f2f2"],[fill="#f5f5f5"]) {fill:var(--qw-bank-page,var(--qo-surface-alt))}
 .qw-bank-study-page {
  --qw-study-inset:clamp(10px,1.6vw,21px);

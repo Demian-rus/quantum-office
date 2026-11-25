@@ -667,8 +667,8 @@ function qdVariantPaperHTML(variant,kind='student'){
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
     '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+(typeof QW_MATH_FONT_CSS==='string'?QW_MATH_FONT_CSS:'')+(typeof QW_RADICAL_CSS==='string'?QW_RADICAL_CSS:'')+
-    '@page{size:A4;margin:17mm 16mm}'+
-    '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#202833;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
+    (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('17mm 16mm'):'@page{size:A4;margin:17mm 16mm}')+
+    '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#000;--qw-math-ink:#000;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
     '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
     '.eyebrow{color:#55667d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}'+
     'h1{font-size:23px;line-height:1.25;margin:5px 0 8px}'+
@@ -681,9 +681,9 @@ function qdVariantPaperHTML(variant,kind='student'){
     '.question-text,.answers,.solution{font-family:"QO Print Serif",Georgia,serif;line-height:1.26}math{font-family:"QO Math","DejaVu Math TeX Gyre",serif;font-weight:400;font-synthesis:none}'+
     '.question-text p,.solution p{margin:0 0 .6em}.question-text :is(h3,h4,h5,h6){font-size:1em;margin:.65em 0 .25em}'+
     '.question-text table,.solution table{border-collapse:collapse}.question-text :is(td,th),.solution :is(td,th){border:1px solid #888;padding:.15em .45em}'+
-    '.points{flex:none;font-size:11px;color:#526278;white-space:nowrap}'+
+    '.points{flex:none;font-size:11px;white-space:nowrap}'+
     '.answers{margin:8px 0 0 25px;padding-left:15px;display:grid;gap:6px}'+
-    '.choice-box{display:inline-block;width:16px;color:#2d3e55}'+
+    '.choice-box{display:inline-block;width:16px}'+
     '.write-line{margin:12px 0 0 25px;min-height:32px}'+
     '.write-lines{display:grid;margin:9px 0 0 25px;gap:7px}'+
     '.write-lines span{border-bottom:1px solid #cbd3de;min-height:21px}'+
@@ -692,7 +692,7 @@ function qdVariantPaperHTML(variant,kind='student'){
     '.solution small{display:block;margin-top:7px;color:#57687f;font-size:10px}'+
     '.page-footer{border-top:1px solid #d1d8e0;margin-top:25px;padding-top:8px;color:#536279;font-size:10px}'+
     '@media print{body{padding:0;max-width:none}.question{break-inside:avoid-page}.solution{print-color-adjust:exact;-webkit-print-color-adjust:exact}}'+
-    '</style></head><body><header class="doc-head"><div class="eyebrow">'+qdEsc(purpose)+'</div>'+
+    '</style>'+(typeof qwPrimePrintBrand==='function'?qwPrimePrintBrand():'')+'</head><body><header class="doc-head"><div class="eyebrow">'+qdEsc(purpose)+'</div>'+
     '<h1>'+title+'</h1><div class="byline"><span>Вариант '+qdEsc(label)+'</span>'+
     '<span>Вопросов: '+count+'</span><span>Максимум: '+points+' баллов</span></div>'+
     (teacher?'':'<div class="pupil"><span>ФИО: __________________________________</span>'+
@@ -1481,10 +1481,13 @@ function qdReportHTML(entry){
   const title=qdEsc(current?doc.title:(entry.title||doc.title));
   const rows=topics.map(t=>'<tr><td>'+qdEsc(t.name)+'</td><td>'+t.rated+' / '+t.total+'</td><td>'+t.percent+'%</td></tr>').join('');
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Отчёт · '+title+'</title>'+
-   '<style>@page{size:A4;margin:20mm}body{font:15px/1.5 Arial,sans-serif;color:#192d27;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
+   '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+
+   (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('20mm'):'@page{size:A4;margin:20mm}')+
+   'body{font:15px/1.5 Arial,sans-serif;color:#000;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
    '.muted{color:#60746a}.score{display:flex;align-items:baseline;gap:14px;padding:20px;background:#f0f7f3;border-radius:12px}.score strong{font-size:36px;color:#1c684a}'+
    'table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #cbd9d1}th{background:#eaf2ed}'+
-   '@media print{body{margin:0;padding:0}.score{print-color-adjust:exact}}'+'</style></head><body>'+
+   '@media print{body{margin:0;padding:0}.score{print-color-adjust:exact}}</style>'+
+   (typeof qwPrimePrintBrand==='function'?qwPrimePrintBrand():'')+'</head><body>'+
    '<p class="muted">QUANTUM WRITER · ОТЧЁТ ДИАГНОСТИКИ</p><h1>'+title+'</h1>'+
    '<p><b>Ученик:</b> '+pupil+'<br><b>Дата:</b> '+stamp+'</p>'+
    '<div class="score"><strong>'+s.percent+'%</strong><span>Проверено '+s.rated+' из '+s.total+' заданий</span></div>'+

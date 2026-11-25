@@ -242,17 +242,23 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   let path=temp.path().join("bank.sqlite3");
   let cancel=AtomicBool::new(false);
   run(&path,"open",&json!({}),&cancel)?;
+  let legacy=run(&path,"create",&json!({"record":record("legacy"),"now":"2026-11-25"}),&cancel)?;
   let mut item=record("layout");
   item["task"]["title"]=json!("Наклонная плоскость");
   item["task"]["tags"]=json!(["сила трения"]);
   item["task"]["publishing"]=json!({"figure":{"width":38,"position":"below"}});
   let saved=run(&path,"create",&json!({"record":item,"now":"2026-11-25"}),&cancel)?;
   assert_eq!(saved["task"],item["task"]);
+  assert_ne!(legacy["bankNumber"],saved["bankNumber"]);
   for term in ["НАКЛОННАЯ ПЛОСКОСТЬ","СИЛА ТРЕНИЯ"] {
    let result=run(&path,"list",&json!({"filters":{"search":term},"offset":0,"limit":10}),&cancel)?;
    assert_eq!(result["items"][0]["task"],item["task"]);
   }
   assert_eq!(run(&path,"get",&json!({"id":"layout"}),&cancel)?,saved);
+  assert_eq!(run(&path,"get",&json!({"id":"legacy"}),&cancel)?,legacy);
+  for field in ["title","tags","publishing"] {
+   assert!(legacy["task"].get(field).is_none(),"{field} must remain optional in existing records");
+  }
   Ok(())
  }
  #[test]fn corrupt_file_is_not_replaced()->Result<()>{let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");fs::write(&p,b"not SQLite")?;assert!(open(&p,true).is_err());assert_eq!(fs::read(&p)?,b"not SQLite");Ok(())}
