@@ -345,8 +345,16 @@ let connection,dialogs;
  await page.locator('[data-qw-action="visual-cancel"]').click();assert.equal(await page.locator('[data-bank-task-field="prompt"]').inputValue(),'Native unsaved parent');
  decision.accept=true;await page.locator('[data-qw-action="bank-edit-back"]').click();await page.locator('[data-bank-view="task1673-native-lifecycle"]').waitFor();await page.evaluate(()=>route('work'));
  await dialogs.drain();fs.writeFileSync(path.join(out,'native-editor-close.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,graph:true,diagram:true,bank:true,bankLifecycle,decisions:[graphDecline,diagramDecline,bankDecline]},null,2));
+ // Witness the unchanged model and full logical bank before discarding the final drawing.
+ const retained=await page.evaluate(async()=>{
+  await qoDraftStorage.flush();const row=(await __TAURI__.core.invoke('draft_load'))[QW_KEY];
+  const snap=await qwBankRepository._captureBackupSnapshot(),value=bankStableJSON({records:snap.records.slice().sort((a,b)=>a.id.localeCompare(b.id)),meta:snap.meta});
+  const hash=async text=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))),b=>b.toString(16).padStart(2,'0')).join('');
+  return {qworkRevision:row.revision,taskId:qwDoc.tasks[0].id,graph:bankStableJSON(qwDoc.tasks[0].graph),diagram:bankStableJSON(qwDoc.tasks[0].diagram),bankSha256:await hash(value),bankCount:snap.records.length,bankRevision:(await qwBankRepository.getTask('task1673-native-lifecycle')).revision};
+ });
+ fs.writeFileSync(path.join(out,'native-close-retained.json'),JSON.stringify(retained,null,2));
  // Prepare the local graphic before staging the final durable edit.
- await page.evaluate(()=>qwVisualEditor('graph'));if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
+ await page.evaluate(()=>{qwSelected=qwDoc.tasks[0].id;qwVisualEditor('graph');});if(!await page.locator('#qw-graph-preset').isVisible())await page.locator('[data-visual-panel="tools"]').click();
  await page.locator('#qw-graph-preset').selectOption('v');assert.ok(await page.evaluate(()=>qwActiveEditorDirty()));
  const pending=await page.evaluate(async()=>{qwDoc.instructions='TASK1664 final edit before ordinary close';if(!qwPersist())throw Error('Pending draft not queued');const queued=qoDraftStorage.pending;const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(qoDraftStorage.getItem(QW_KEY)))),b=>b.toString(16).padStart(2,'0')).join('');return {queued,sha256:hash};});
  assert.equal(pending.queued,true);
@@ -358,7 +366,11 @@ let connection,dialogs;
  // Keep Node and the sole dialog owner alive until the real process exits.
  const exit=await ps("$p=Get-Process -Id "+pid+" -ErrorAction SilentlyContinue;if($null -eq $p){'exited'}elseif($p.WaitForExit(15000)){'exited'}else{throw 'Clean close timed out'}");
  assert.equal(exit,'exited');
- fs.writeFileSync(path.join(out,'native-editor-close-confirmed.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,decision:confirmed,processExited:true,pid},null,2));
+ // Read the actual SQLite row after exit, before any next launch.
+ const verify=require('node:child_process').spawnSync('python',['-c','import sqlite3,sys,json,hashlib,pathlib; p=pathlib.Path(sys.argv[1]); c=sqlite3.connect(p.as_uri()+"?mode=ro",uri=True); r=c.execute("SELECT revision,value,sha256 FROM drafts WHERE key=?",("quantum-office.work-builder.v1",)).fetchone(); c.close(); print(json.dumps({"revision":r[0],"sha256":r[2],"actualSha256":hashlib.sha256(r[1].encode("utf-8")).hexdigest()}))',path.join(process.env.APPDATA,'com.quantumoffice.desktop','drafts.sqlite3')],{encoding:'utf8'});
+ assert.equal(verify.status,0,verify.stderr);const durable=JSON.parse(verify.stdout);
+ assert.equal(durable.sha256,pending.sha256);assert.equal(durable.actualSha256,pending.sha256);assert.equal(durable.revision,retained.qworkRevision+1);
+ fs.writeFileSync(path.join(out,'native-editor-close-confirmed.json'),JSON.stringify({status:'PASS',actualCloseRequested:true,decision:confirmed,processExited:true,pid,durable},null,2));
  }else if(['ordinary','reinstall','portable'].includes(stage)){
  const draft=await inspectDraft(page);recordDraft(stage,draft);
  const before=JSON.parse(fs.readFileSync(path.join(out,'draft-before-close.json'),'utf8'));
@@ -370,6 +382,14 @@ let connection,dialogs;
  const restoredDock=await page.evaluate(async()=>({preference:qwPanelPreference('pdf'),value:qoDraftStorage.getItem(QW_PANELS_KEY),row:(await __TAURI__.core.invoke('draft_load'))[QW_PANELS_KEY],pending:qoDraftStorage.pending,error:qoDraftStorage.error}));
  checks.dockPreference=Object.keys(dock).every(k=>restoredDock.preference[k]===dock[k])&&restoredDock.value===dockEvidence.value&&restoredDock.row?.value===dockEvidence.value&&restoredDock.row?.revision===dockEvidence.revision&&restoredDock.row?.sha256===dockEvidence.sha256&&!restoredDock.pending&&!restoredDock.error;
  fs.writeFileSync(path.join(out,'native-dock-restart-'+stage+'.json'),JSON.stringify(restoredDock,null,2));
+ const retained=JSON.parse(fs.readFileSync(path.join(out,'native-close-retained.json'),'utf8')),confirmed=JSON.parse(fs.readFileSync(path.join(out,'native-editor-close-confirmed.json'),'utf8'));
+ const restored=await page.evaluate(async expected=>{
+  const q=qwDoc.tasks.find(t=>t.id===expected.taskId),snap=await qwBankRepository._captureBackupSnapshot(),value=bankStableJSON({records:snap.records.slice().sort((a,b)=>a.id.localeCompare(b.id)),meta:snap.meta});
+  const bankSha256=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value))),b=>b.toString(16).padStart(2,'0')).join('');
+  return {graph:bankStableJSON(q?.graph??null),diagram:bankStableJSON(q?.diagram??null),bankSha256,bankCount:snap.records.length,bankRevision:(await qwBankRepository.getTask('task1673-native-lifecycle'))?.revision};
+ },retained);
+ checks.discardedGraphic=restored.graph===retained.graph&&restored.diagram===retained.diagram;checks.bankExact=restored.bankSha256===retained.bankSha256&&restored.bankCount===retained.bankCount&&restored.bankRevision===retained.bankRevision;checks.closeRevision=draft.nativeRevision===confirmed.durable.revision&&draft.nativeSha256===confirmed.durable.sha256;
+ fs.writeFileSync(path.join(out,'native-close-restart-'+stage+'.json'),JSON.stringify({expected:retained,actual:restored,revision:draft.nativeRevision,sha256:draft.nativeSha256},null,2));
  const editors=await inspectEditors(page);recordDraft('editors-'+stage,editors);
  const oldEditors=JSON.parse(fs.readFileSync(path.join(out,'draft-editors-before-close.json'),'utf8'));
  for(const name of Object.keys(oldEditors.signatures))checks['editor_'+name]=editors.fixtures[name]&&editors.signatures[name]===oldEditors.signatures[name];
