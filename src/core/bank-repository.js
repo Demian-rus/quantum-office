@@ -79,7 +79,7 @@ function bankSearchMatch(e,filters={}){
  }
  const term=String(filters.search||'').trim().toLocaleLowerCase('ru-RU');
  if(term&&!([String(e.bankNumber),String(e.bankNumber).padStart(5,'0'),
-  e.task?.prompt,e.task?.answer,e.task?.comment,e.task?.criteria,
+  e.task?.title,e.task?.tags?.join(' '),e.task?.prompt,e.task?.answer,e.task?.comment,e.task?.criteria,
   e.topic,e.subtopic,e.grade].some(x=>String(x||'').toLocaleLowerCase('ru-RU').includes(term))))return false;
  return true;
 }

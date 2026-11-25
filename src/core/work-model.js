@@ -42,6 +42,47 @@ function qwSetFigureWidth(task,mode,width=task.figureWidth){
  if(mode!=='manual'||width===null||width===undefined||String(width).trim()===''||!Number.isFinite(Number(width))||Number(width)<=0)return false;
  task.figureWidth=qwNum(width,120,470,220);task.figureWidthMode='manual';return true;
 }
+const QW_FIGURE_PUBLISH={width:40,maxMm:95,position:'auto',align:'center',gapMm:2};
+const QW_TABLE_PUBLISH={width:0,columns:[],align:'left',fontPt:9,padMm:1,borderPt:.5,header:'shade'};
+function qwPublishStyle(raw,kind){
+ const defaults=kind==='figure'?QW_FIGURE_PUBLISH:QW_TABLE_PUBLISH;
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректное оформление объекта');
+ const normalized={...defaults};
+ const ranges=kind==='figure'?{width:[15,100],maxMm:[20,190],gapMm:[0,8]}:
+  {width:[0,100],fontPt:[7,14],padMm:[0,4],borderPt:[.25,2]};
+ for(const [key,[min,max]] of Object.entries(ranges))if(raw[key]!==undefined){
+  if(!Number.isFinite(raw[key])||raw[key]<min||raw[key]>max)throw Error('Некорректный размер оформления');
+  normalized[key]=raw[key];
+ }
+ const choices={align:['left','center','right'],...(kind==='figure'?{position:['auto','right','below']}:{header:['plain','bold','shade']})};
+ for(const [key,options] of Object.entries(choices))if(raw[key]!==undefined){
+  if(!options.includes(raw[key]))throw Error('Некорректное выравнивание или стиль');
+  normalized[key]=raw[key];
+ }
+ if(kind==='table'&&raw.columns!==undefined){
+  if(!Array.isArray(raw.columns)||raw.columns.length>12||raw.columns.some(n=>!Number.isFinite(n)||n<1||n>100))throw Error('Не более 12 положительных ширин столбцов');
+  normalized.columns=raw.columns.slice();
+ }
+ return normalized;
+}
+function qwPublishSettings(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректное издательское оформление');
+ const result={};
+ if(raw.figure!==undefined)result.figure=qwPublishStyle(raw.figure,'figure');
+ if(raw.tables!==undefined){
+  if(!raw.tables||typeof raw.tables!=='object'||Array.isArray(raw.tables))throw Error('Некорректное оформление таблиц');
+  const styled={};
+  for(const key of ['prompt','comment','answer','criteria'])if(raw.tables[key]!==undefined){
+   const list=raw.tables[key];
+   if(!Array.isArray(list)||list.length>40)throw Error('Не более 40 настроек таблиц в разделе');
+   const tables=list.map(style=>style===null?null:qwPublishStyle(style,'table'));
+   while(tables.length&&tables.at(-1)===null)tables.pop();
+   if(tables.length)styled[key]=tables;
+  }
+  if(Object.keys(styled).length)result.tables=styled;
+ }
+ return result;
+}
 function qwNum(v,min,max,fallback){return Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;}
 function qwGraphDefault(){return {xmin:0,xmax:10,ymin:0,ymax:10,step:1,xlabel:'t, с',ylabel:'v, м/с',coordinateMode:'first',grid:true,connected:true,smooth:false,snapToGrid:true,curveFamily:'points',curve:{a:1,b:0,c:0,amplitude:3,frequency:1,phase:0,offset:0,trig:'sin'},points:[],elements:[]};}
 function qwTask(type='short'){
@@ -64,6 +105,15 @@ function qwValidate(raw){
   const q=qwTask(raw.type);q.id=qwText(raw.id,80)||qwId();if(ids.has(q.id))throw Error('Повторяющийся ID задания');ids.add(q.id);
   if(q.type==='choice'){if(!Array.isArray(raw.choices)||raw.choices.length<2||raw.choices.length>12||raw.choices.some(s=>typeof s!=='string'||!s.trim()||s.length>300))throw Error('Тест: от 2 до 12 непустых вариантов, до 300 символов');q.choices=raw.choices.map(s=>s.trim());}
   for(const key of ['part','prompt','answer','criteria','comment'])q[key]=qwText(raw[key],key==='part'?120:QW_LIMITS.text);
+  if(raw.title!==undefined){
+   if(typeof raw.title!=='string'||raw.title.length>120)throw Error('Название задания: до 120 символов');
+   if(raw.title.trim())q.title=raw.title.trim();
+  }
+  if(raw.tags!==undefined){
+   if(!Array.isArray(raw.tags)||raw.tags.length>10||raw.tags.some(tag=>typeof tag!=='string'||tag.length>40))throw Error('До 10 тегов длиной до 40 символов');
+   const tags=[...new Set(raw.tags.map(tag=>tag.trim()).filter(Boolean))];if(tags.length)q.tags=tags;
+  }
+  if(raw.publishing!==undefined){const layout=qwPublishSettings(raw.publishing);if(Object.keys(layout).length)q.publishing=layout;}
    for(const key of ['grade','topic','subtopic'])q[key]=qwText(raw[key],key==='grade'?24:120).trim();
    q.exam=['general','oge','ege'].includes(raw.exam)?raw.exam:'general';q.origin=['original','adapted','generated'].includes(raw.origin)?raw.origin:'original';
   q.points=qwNum(raw.points,0,100,2);q.answerVisible=raw.answerVisible!==false;q.solutionVisible=raw.solutionVisible===true;q.pageBreak=raw.pageBreak===true;
@@ -383,4 +433,4 @@ function qwReorder(d,id,gap,part){const i=d.tasks.findIndex(q=>q.id===id);if(i<0
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;return qwReorder(d,id,delta>0?j+1:j,d.tasks[j].part);}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {qwSetFigureWidth,qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};
+export {qwSetFigureWidth,qwPublishSettings,qwPublishStyle,qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};

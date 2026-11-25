@@ -93,8 +93,9 @@ fn write(c:&Connection,r:&Value,a:Option<&Asset>,update:bool)->Result<()>{
  let id=s(r,"id")?;let number=n(r,"bankNumber")?;let rev=n(r,"revision")?;
  ensure!((1..=99999).contains(&number)&&rev>0,"INVALID_RECORD: allocation");
  let created=s(r,"createdAt")?;let updated=s(r,"updatedAt")?;ensure!(created.len()<=80&&updated.len()<=80,"INVALID_RECORD: timestamp");
- let fields=[format!("{number:05}"),number.to_string(),s(&r["task"],"prompt")?.into(),s(&r["task"],"answer")?.into(),s(&r["task"],"comment")?.into(),s(&r["task"],"criteria")?.into(),s(r,"topic")?.into(),s(r,"subtopic")?.into(),s(r,"grade")?.into()];
- let search=fields.join("\n").to_lowercase();let sig=signature(r,a);if let Some(a)=a{store(c,a)?;}
+ let fields=[format!("{number:05}"),number.to_string(),r["task"]["title"].as_str().unwrap_or_default().into(),s(&r["task"],"prompt")?.into(),s(&r["task"],"answer")?.into(),s(&r["task"],"comment")?.into(),s(&r["task"],"criteria")?.into(),s(r,"topic")?.into(),s(r,"subtopic")?.into(),s(r,"grade")?.into()];
+ let mut search=fields.join("\n");if let Some(tags)=r["task"]["tags"].as_array(){for tag in tags.iter().filter_map(Value::as_str){search.push('\n');search.push_str(tag);}}
+ let search=search.to_lowercase();let sig=signature(r,a);if let Some(a)=a{store(c,a)?;}
  if update{
   c.execute("UPDATE tasks SET number=?2,revision=?3,created_at=?4,updated_at=?5,body=?6,search_text=?7,signature=?8 WHERE id=?1",params![id,number,rev,created,updated,r.to_string(),search,sig])?;
   c.execute("DELETE FROM task_assets WHERE task_id=?1",[id])?;
@@ -233,6 +234,25 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
     .map(|item| item["bankNumber"].as_i64().unwrap()).collect();
    assert_eq!(actual, numbers);
   }
+  Ok(())
+ }
+ #[test]
+ fn catalogue_metadata_and_publishing_round_trip()->Result<()> {
+  let temp=tempfile::tempdir()?;
+  let path=temp.path().join("bank.sqlite3");
+  let cancel=AtomicBool::new(false);
+  run(&path,"open",&json!({}),&cancel)?;
+  let mut item=record("layout");
+  item["task"]["title"]=json!("Наклонная плоскость");
+  item["task"]["tags"]=json!(["сила трения"]);
+  item["task"]["publishing"]=json!({"figure":{"width":38,"position":"below"}});
+  let saved=run(&path,"create",&json!({"record":item,"now":"2026-11-25"}),&cancel)?;
+  assert_eq!(saved["task"],item["task"]);
+  for term in ["НАКЛОННАЯ ПЛОСКОСТЬ","СИЛА ТРЕНИЯ"] {
+   let result=run(&path,"list",&json!({"filters":{"search":term},"offset":0,"limit":10}),&cancel)?;
+   assert_eq!(result["items"][0]["task"],item["task"]);
+  }
+  assert_eq!(run(&path,"get",&json!({"id":"layout"}),&cancel)?,saved);
   Ok(())
  }
  #[test]fn corrupt_file_is_not_replaced()->Result<()>{let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");fs::write(&p,b"not SQLite")?;assert!(open(&p,true).is_err());assert_eq!(fs::read(&p)?,b"not SQLite");Ok(())}

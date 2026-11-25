@@ -226,7 +226,8 @@ function qwRichMarkdownHTML(value,onBlock){
 
 /* Axes use true coordinate positions. Tick marks and labels have independent
    density: labels never determine the grid spacing or collide at the origin. */
-function qwAxisLayout(g,axisFont){
+const QW_GRAPH_STANDARD={axis:1.7,line:2.4,tick:3,head:11,headHalf:4.2,point:3.5,grid:'#d9dee4',gridWeight:.8,title:16};
+function qwAxisLayout(g,axisFont,russian=false){
  const b=QW_PLOT;
  const axisX=qwPlotXY(g,{x:Math.max(g.xmin,Math.min(g.xmax,0)),y:0}).x;
  const axisY=qwPlotXY(g,{x:0,y:Math.max(g.ymin,Math.min(g.ymax,0))}).y;
@@ -237,7 +238,8 @@ function qwAxisLayout(g,axisFont){
  for(const axis of ['x','y']){
   const min=g[axis+'min'],max=g[axis+'max'],step=qwGraphGridStep(g,axis);
   const span=max-min,pixels=axis==='x'?b.right-b.left:b.bottom-b.top;
-  const longest=Math.max(String(Number(min.toPrecision(6))).length,String(Number(max.toPrecision(6))).length);
+  const format=value=>russian?String(value===0?0:value).replace('.',',').replace(/^-/,'−'):String(value===0?0:value);
+  const longest=Math.max(format(Number(min.toPrecision(6))).length,format(Number(max.toPrecision(6))).length);
   const gap=pixels*step/span;
   const desired=axis==='x'?Math.max(17,longest*font*.59+5):font+6;
   const stride=Math.max(1,Math.ceil(desired/Math.max(1,gap)));
@@ -250,7 +252,7 @@ function qwAxisLayout(g,axisFont){
    // The shared origin receives exactly one 0, on X.
    if(axis==='y'&&isZero&&zeroX)numbered=false;
    if(axis==='x'&&isZero&&zeroY)numbered=true;
-   const label=Object.is(v,-0)?'0':String(v);
+   const label=format(v);
    const w=Math.max(8,label.length*font*.63);
    if(axisFont&&!isZero){
     const first=Math.ceil((min-1e-8)/step),last=Math.floor((max+step*.00001)/step),edge=n===first||n===last;
@@ -264,27 +266,28 @@ function qwAxisLayout(g,axisFont){
  return {axisX,axisY,font,ticks,math};
 }
 function qwGraphSVG(g,interactive=false,typography={}){
- const b=QW_PLOT,parts=[],occupied=[],layout=qwAxisLayout(g,typography.axisFont),
+ const b=QW_PLOT,style=QW_GRAPH_STANDARD,parts=[],occupied=[],layout=qwAxisLayout(g,typography.axisFont,typography.publishing===true),
   {axisX,axisY,font,ticks}=layout;
  const line=(x,y,x2,y2,extra='')=>'<line x1="'+x+'" y1="'+y+'" x2="'+x2+'" y2="'+y2+'" '+extra+'/>';
  const overlap=(a,v)=>Math.max(0,Math.min(a.x+a.w,v.x+v.w)-Math.max(a.x,v.x))*Math.max(0,Math.min(a.y+a.h,v.y+v.h)-Math.max(a.y,v.y));
  parts.push('<rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'" fill="white"/>');
  // Every grid line and small tick is retained even when a number is omitted.
  for(const t of ticks.x){
-  if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'stroke="#d9dee4" stroke-width="0.8"'));
-  parts.push(line(t.pos,axisY-3,t.pos,axisY+3,'stroke="#333"'));
+  if(g.grid)parts.push(line(t.pos,b.top,t.pos,b.bottom,'stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
+  parts.push(line(t.pos,axisY-style.tick,t.pos,axisY+style.tick,'stroke="#333"'));
  }
  for(const t of ticks.y){
-  if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'stroke="#d9dee4" stroke-width="0.8"'));
-  parts.push(line(axisX-3,t.pos,axisX+3,t.pos,'stroke="#333"'));
+  if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
+  parts.push(line(axisX-style.tick,t.pos,axisX+style.tick,t.pos,'stroke="#333"'));
  }
  // Draw arrowheads separately: the visible shaft ends at the head's base,
  // not at the tip (marker-end used to leave a line through the arrowhead).
- const xTip=b.right+16,xBase=xTip-11,yTip=b.top-16,yBase=yTip+11;
- parts.push(line(b.left,axisY,xBase,axisY,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="x"'),
-  '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-4.2)+' L'+xBase+' '+(axisY+4.2)+' Z" fill="#111"/>',
-  line(axisX,b.bottom,axisX,yBase,'stroke="#111" stroke-width="1.7" stroke-linecap="butt" data-qw-axis-shaft="y"'),
-  '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-4.2)+' '+yBase+' L'+(axisX+4.2)+' '+yBase+' Z" fill="#111"/>');
+ const xTip=b.right+16,xBase=xTip-style.head,yTip=b.top-16,yBase=yTip+style.head;
+ const shaft='stroke="#111" stroke-width="'+style.axis+'" stroke-linecap="butt" ';
+ parts.push(line(b.left,axisY,xBase,axisY,shaft+'data-qw-axis-shaft="x"'),
+  '<path data-qw-axis-head="x" d="M'+xTip+' '+axisY+' L'+xBase+' '+(axisY-style.headHalf)+' L'+xBase+' '+(axisY+style.headHalf)+' Z" fill="#111"/>',
+  line(axisX,b.bottom,axisX,yBase,shaft+'data-qw-axis-shaft="y"'),
+  '<path data-qw-axis-head="y" d="M'+axisX+' '+yTip+' L'+(axisX-style.headHalf)+' '+yBase+' L'+(axisX+style.headHalf)+' '+yBase+' Z" fill="#111"/>');
  const xBaseline=axisY>b.bottom-23?b.bottom+font+6:axisY+font+5;
  const yLabelX=axisX<b.left+30?b.left-12:axisX-10;
  const numberBoxes=[];
@@ -309,7 +312,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
   numberBoxes.push(box);occupied.push(box);
   parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#263746">'+t.label+'</text>');
  }
- const titleFont=typography.titleFont||16,gap=6;
+ const titleFont=typography.titleFont||style.title,gap=6;
  const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#111">'+qwEsc(text)+'</text>';
  // Final placement uses actual glyph bounds (including descenders and subscripts).
  parts.push(title('x',xTip+gap,axisY+titleFont*.35,'start',g.xlabel,xTip,axisY),
@@ -322,7 +325,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const p=qwPlotXY(g,{x,y});
    d+=(drawing?' L':' M')+p.x.toFixed(2)+','+p.y.toFixed(2);drawing=true;
   }
-  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+(g.curveStyle?.stroke||'#186ba3')+'" stroke-width="'+(g.curveStyle?.width||2.5)+'" stroke-linecap="round"/>');
+  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+(g.curveStyle?.stroke||'#186ba3')+'" stroke-width="'+(g.curveStyle?.width||style.line)+'" stroke-linecap="round"/>');
  }
  const ps=g.points.map(p=>qwPlotXY(g,p));
  if(g.curveFamily==='points'&&g.connected&&ps.length>1){
@@ -331,10 +334,10 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const a=ps[i-1],p=ps[i];
    d+=g.smooth?' C'+((a.x+p.x)/2)+','+a.y+' '+((a.x+p.x)/2)+','+p.y+' '+p.x+','+p.y:' L'+p.x+','+p.y;
   }
-  parts.push('<path d="'+d+'" fill="none" stroke="'+(g.lineStyle?.stroke||'#142b42')+'" stroke-width="'+(g.lineStyle?.width||2.4)+'"/>');
+  parts.push('<path d="'+d+'" fill="none" stroke="'+(g.lineStyle?.stroke||'#142b42')+'" stroke-width="'+(g.lineStyle?.width||style.line)+'"/>');
  }
  ps.forEach((p,i)=>{
-  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:3.5)+'" fill="'+(g.points[i].style?.stroke||'#142b42')+'"/></g>');
+  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:style.point)+'" fill="'+(g.points[i].style?.stroke||'#142b42')+'"/></g>');
  });
  const contour=g.connected&&g.curveFamily==='points'&&!g.smooth?qwClosedContour(ps):null;
  ps.forEach((p,i)=>{
