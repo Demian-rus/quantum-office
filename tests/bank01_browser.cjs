@@ -235,6 +235,7 @@ async function main() {
     assert.ok(before.top > 0);
     const edit = page.locator('[data-bank-edit="' + id + '"]');
     await edit.click();
+    await page.locator('[data-bank-source]').click();
     const prompt = page.locator('[data-bank-task-field="prompt"]');
     const original = await prompt.inputValue();
     await prompt.fill(original + ' Уточнение.');
@@ -247,6 +248,7 @@ async function main() {
     const after = await listState();
     assert.equal(after.top, before.top, JSON.stringify({ before, after }));
     await edit.click();
+    await page.locator('[data-bank-source]').click();
     await prompt.fill('Несохранённое условие');
     acceptDiscard = false;
     await page.locator('[data-qw-action="bank-edit-back"]').click();

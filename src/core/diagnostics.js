@@ -623,6 +623,15 @@ function qdVariantsBuild(d,opts=qdVariantOptions){
   return {ok:true,variants,ignored,sectionCount:groups.length,seed:rawSeed};
 }
 
+function qdStudyField(value){
+  return typeof qwPrintFieldHTML==='function'?qwPrintFieldHTML(value):qdEsc(value).replace(/\n/g,'<br>');
+}
+function qdStudyScreenField(value){
+  return typeof qwHasRichSyntax==='function'&&qwHasRichSyntax(value)?qdStudyField(value):'<p>'+qdStudyField(value)+'</p>';
+}
+function qdStudyContent(value,rich){
+  return '<div class="qw-study-text qw-rich">'+(rich?'<div class="qd-rich-content">'+qdRichSafe(rich)+'</div>':qdStudyScreenField(value))+'</div>';
+}
 /* TASK111 — printable student sheets and separate teacher answer keys. */
 function qdVariantPaperHTML(variant,kind='student'){
   if(!variant?.document?.sections||!['student','key'].includes(kind))return '';
@@ -636,7 +645,7 @@ function qdVariantPaperHTML(variant,kind='student'){
       const options=['single','multiple'].includes(q.type)?qdChoices(q.choices):[];
       const opts=options.length?
         '<ol class="answers" type="A">'+options.map(c=>
-          '<li><span class="choice-box">'+(q.type==='multiple'?'□':'○')+'</span> '+qdEsc(c.text||'Не заполнено')+'</li>'
+          '<li><span class="choice-box">'+(q.type==='multiple'?'□':'○')+'</span> '+qdStudyField(c.text||'Не заполнено')+'</li>'
         ).join('')+'</ol>':'';
       const numeric=q.type==='numeric'&&!teacher?
         '<div class="write-line">Ответ: ______________________________</div>':'';
@@ -644,10 +653,12 @@ function qdVariantPaperHTML(variant,kind='student'){
         '<div class="write-lines"><span></span><span></span>'+
           (q.type==='practice'?'<span></span><span></span>':'')+'</div>':'';
       const solution=teacher?
-        '<div class="solution"><strong>Ответ и критерии</strong><div>'+qdEsc(answer).replace(/\n/g,'<br>')+'</div>'+
+        '<div class="solution"><strong>Ответ и критерии</strong><div>'+qdStudyField(answer)+'</div>'+
+          (q.answerRich?qdRichSafe(q.answerRich):'')+
+          (q.criteria?'<div>'+qdStudyField(q.criteria)+'</div>':'')+
           '<small>Полный ответ: '+qdPoints(q.points)+' балл(ов) · частичный: '+qdPartialCredit(q.partialCredit)+'%</small></div>':'';
       return '<article class="question"><div class="question-head"><span class="question-number">'+(qi+1)+'.</span>'+
-        '<div class="question-text">'+qdEsc(q.prompt||'Вопрос не заполнен').replace(/\n/g,'<br>')+'</div>'+
+        '<div class="question-text">'+(q.promptRich?qdRichSafe(q.promptRich):qdStudyField(q.prompt||'Вопрос не заполнен'))+'</div>'+
         '<span class="points">'+qdPoints(q.points)+' б.</span></div>'+
         opts+numeric+writing+solution+'</article>';
     }).join('')+'</section>').join('');
@@ -655,7 +666,7 @@ function qdVariantPaperHTML(variant,kind='student'){
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8">'+
     '<meta name="viewport" content="width=device-width,initial-scale=1">'+
     '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
-    '<style>'+
+    '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+
     '@page{size:A4;margin:17mm 16mm}'+
     '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#202833;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
     '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
@@ -667,6 +678,9 @@ function qdVariantPaperHTML(variant,kind='student'){
     '.question{margin:0 0 19px;break-inside:avoid-page;page-break-inside:avoid}'+
     '.question-head{display:flex;gap:9px;align-items:baseline;line-height:1.55}'+
     '.question-number{font-weight:700;flex:none}.question-text{flex:1;overflow-wrap:anywhere}'+
+    '.question-text,.answers,.solution{font-family:"QO Print Serif",Georgia,serif;line-height:1.26}'+
+    '.question-text p,.solution p{margin:0 0 .6em}.question-text :is(h3,h4,h5,h6){font-size:1em;margin:.65em 0 .25em}'+
+    '.question-text table,.solution table{border-collapse:collapse}.question-text :is(td,th),.solution :is(td,th){border:1px solid #888;padding:.15em .45em}'+
     '.points{flex:none;font-size:11px;color:#526278;white-space:nowrap}'+
     '.answers{margin:8px 0 0 25px;padding-left:15px;display:grid;gap:6px}'+
     '.choice-box{display:inline-block;width:16px;color:#2d3e55}'+
@@ -1036,6 +1050,7 @@ function qdAdvance(d){
   if(index>=0&&index<all.length-1)qdSelectQuestion(d,index+1);
 }
 function qdRunQuestion(q,number,d){
+  if(typeof qwStudyFonts==='function')qwStudyFonts();
   const mark=d.session.marks[q.id],visible=qdRevealed.has(q.id),points=qdPoints(q.points);
   const hasPrompt=!!qdText(q.prompt,1600).trim();
   const markButton=(state,title)=>'<button type="button" data-qd-action="mark" data-qid="'+qdEsc(q.id)+
@@ -1044,7 +1059,7 @@ function qdRunQuestion(q,number,d){
   return '<article class="qd-card qd-run-card qd-chat-card '+(mark?'qd-mark-'+mark:'')+'" data-qid="'+qdEsc(q.id)+'">'+
     '<div class="qd-chat-head"><div class="qd-question"><span class="qd-counter">'+(number+1)+'.</span><div>'+
       '<span class="qd-type">'+qdEsc(qdTypeTitle(q.type))+' · '+points+' '+(points===1?'балл':points<5?'балла':'баллов')+'</span>'+
-      '<p '+(q.promptRich?'hidden':'')+'>'+qdEsc(q.prompt||'Вопрос пока не заполнен').replace(/\n/g,'<br>')+'</p>'+(q.promptRich?'<div class="qd-rich-content">'+qdRichSafe(q.promptRich)+'</div>':'')+'</div></div>'+
+      qdStudyContent(q.prompt||'Вопрос пока не заполнен',q.promptRich)+'</div></div>'+
       '<div class="qd-rating qd-chat-rating" role="group" aria-label="Оценка ответа">'+
         markButton('yes','✓ Знает')+markButton('no','× Не знает')+
         markButton('partial','◐ Частично')+'</div></div>'+
@@ -1058,7 +1073,7 @@ function qdRunQuestion(q,number,d){
       (qdAuto(q.type)?'<button type="button" class="qd-primary" data-qd-action="auto-check" data-qid="'+qdEsc(q.id)+
         '">Проверить автоматически</button>':'')+
     '</div>'+
-    (visible?'<div class="qd-answer qd-chat-answer"><p>'+qdEsc(qdReference(q)).replace(/\n/g,'<br>')+'</p>'+(q.answerRich?'<div class="qd-rich-content">'+qdRichSafe(q.answerRich)+'</div>':'')+(q.criteria?'<p><b>Критерии:</b> '+qdEsc(q.criteria)+'</p>':'')+'</div>':'')+
+    (visible?'<div class="qd-answer qd-chat-answer qw-study-text qw-rich">'+qdStudyScreenField(qdReference(q))+(q.answerRich?'<div class="qd-rich-content">'+qdRichSafe(q.answerRich)+'</div>':'')+(q.criteria?'<div><b>Критерии оценивания</b>'+qdStudyScreenField(q.criteria)+'</div>':'')+'</div>':'')+
     (!hasPrompt?'<p class="qd-card-unfilled">Сначала заполните вопрос в конструкторе — пустую карточку нельзя оценить.</p>':'')+
     (mark?'<p class="qd-card-assessed" role="status">'+(mark==='yes'?'Знает':mark==='partial'?'Частично':'Не знает')+'</p>':'')+
   '</article>';
@@ -3207,16 +3222,17 @@ function qdProfessionalAction(action,button,d){
   return false;
 }
 function qdPreview(){
+  if(typeof qwStudyFonts==='function')qwStudyFonts();
   const d=qdWorkingDoc(),dialog=document.createElement('dialog');dialog.className='qd-professional-dialog';
   dialog.innerHTML='<header><strong>Предпросмотр диагностики</strong><button type="button" data-close>Закрыть</button></header>'+
     '<article><h1>'+qdEsc(d.title)+'</h1><p>'+qdEsc(d.description)+'</p>'+
     d.sections.map(s=>'<section><h2>'+qdEsc(s.title)+'</h2>'+s.questions.map((q,i)=>
       '<div class="qd-preview-question"><strong>'+(i+1)+'. '+qdEsc(qdTypeTitle(q.type))+' · '+qdPoints(q.points)+' б.</strong>'+
-      (q.promptRich?'<div class="qd-rich-content">'+qdRichSafe(q.promptRich)+'</div>':'<p>'+qdEsc(q.prompt).replace(/\n/g,'<br>')+'</p>')+
+      qdStudyContent(q.prompt,q.promptRich)+
       (typeof qdMediaRunHTML==='function'?qdMediaRunHTML(q.promptMedia,'prompt'):'')+
       (['single','multiple'].includes(q.type)?'<ul>'+qdChoices(q.choices).map(x=>'<li>'+qdEsc(x.text)+'</li>').join('')+'</ul>':'<div class="qd-preview-answer">Место для ответа ученика</div>')+
-      '<details><summary>Ответ и критерии преподавателя</summary><p>'+qdEsc(qdReference(q))+'</p>'+
-      (q.answerRich?qdRichSafe(q.answerRich):'')+'<p>'+qdEsc(q.criteria||'Критерии не указаны')+'</p></details></div>').join('')+'</section>').join('')+
+      '<details><summary>Ответ и критерии преподавателя</summary>'+qdStudyContent(qdReference(q),q.answerRich)+
+      qdStudyContent(q.criteria||'Критерии не указаны')+'</details></div>').join('')+'</section>').join('')+
     (!d.sections.length?'<p>Пустой шаблон. Добавьте разделы и вопросы.</p>':'')+'</article>';
   dialog.querySelector('[data-close]').onclick=()=>dialog.close();
   dialog.addEventListener('close',()=>dialog.remove());

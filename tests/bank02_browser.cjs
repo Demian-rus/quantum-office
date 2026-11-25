@@ -61,6 +61,7 @@ async function startBank(context, errors) {
 
 async function authorGraphTask(page) {
   await action(page, 'bank-new').click();
+  await page.locator('[data-bank-source]').click();
   const prompt = field(page, 'prompt');
   await prompt.fill('Движение тележки\nНайдите путь за 6 с по графику скорости.');
   await selectText(prompt, 'Движение тележки');
@@ -154,6 +155,7 @@ async function authorGraphTask(page) {
 
 async function authorSystemTask(page) {
   await action(page, 'bank-new').click();
+  await page.locator('[data-bank-source]').click();
   const prompt = field(page, 'prompt');
   await prompt.fill('## Линейная система\nРешите систему сложением уравнений.');
   await selectText(prompt, '');
@@ -213,6 +215,7 @@ async function main() {
     await page.locator('.qw-bank-video-canvas svg[viewBox]').first().waitFor();
     const edit = page.locator('[data-bank-edit]');
     await edit.click();
+    await page.locator('[data-bank-source]').click();
     await section(page, 'comment');
     const solution = field(page, 'comment');
     assert.match(await solution.inputValue(), /Площадь треугольника/);
@@ -236,7 +239,7 @@ async function main() {
     await page.locator('[data-bank-enlarge]').click();
     const zoom = page.locator('[data-bank-zoom]');
     await zoom.fill('130');
-    assert.equal(await canvas.evaluate(el => getComputedStyle(el).zoom), '1.3');
+    assert.equal(await page.locator('.qw-bank-study-page').evaluate(el => getComputedStyle(el).zoom), '1.3');
     await screenshot(page, 'bank-enlarged-paper');
     await zoom.press('Escape');
     assert.equal(await zoom.isVisible(), false);

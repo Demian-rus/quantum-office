@@ -5,7 +5,7 @@ async function checkBankLifecycle(p,id,dialogDecision){
  const prompt=p.locator('[data-bank-task-field="prompt"]');
  const original=await p.evaluate(async id=>JSON.parse(JSON.stringify(await qwBankRepository.getTask(id))),id);
  const unchanged=async()=>assert.deepEqual(await p.evaluate(async id=>JSON.parse(JSON.stringify(await qwBankRepository.getTask(id))),id),original);
- const edit=async()=>{await p.locator('[data-bank-view="'+id+'"]').click();await p.locator('.qw-bank-preview-actions [data-bank-edit="'+id+'"]').click();await prompt.waitFor();};
+ const edit=async()=>{await p.locator('[data-bank-view="'+id+'"]').click();await p.locator('.qw-bank-preview-actions [data-bank-edit="'+id+'"]').click();await p.locator('[data-bank-source]').click();await prompt.waitFor();};
  const graph=async()=>{await p.locator('[data-bank-visual="graph"]').click();await p.locator('#qw-visual-stage').waitFor();};
  await route('bank');await edit();
  // A genuinely unchanged transaction must leave without asking.

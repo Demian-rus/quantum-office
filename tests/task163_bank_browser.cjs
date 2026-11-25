@@ -56,11 +56,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await dialog.locator('[data-bank-enlarge]').click();
   assert.equal(await dialog.evaluate(el=>el.classList.contains('qw-bank-expanded')),false);
   await dialog.locator('.qw-bank-preview-actions [data-bank-edit]').click();
+  await p.locator('[data-bank-source]').click();
   const editor=p.locator('#qw-dialog');
   await editor.locator('[data-bank-task-field="prompt"]').fill('Изменённая задача о движении.');
   await editor.locator('[data-qw-action="bank-edit-save"]').click();
   await p.waitForFunction(()=>qwBankRead().find(x=>x.id==='bank-kinematics')?.task.prompt==='Изменённая задача о движении.');
   await p.locator('#qw-dialog [data-qw-action="bank-new"]').click();
+  await p.locator('[data-bank-source]').click();
   await p.locator('#qw-dialog [data-bank-task-field="prompt"]').fill('Авторский аналог о тепловом равновесии.');
   await editor.locator('[data-bank-tab="answer"]').click();
   await p.locator('#qw-dialog [data-bank-task-field="answer"]').fill('24 °C');
@@ -75,6 +77,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task163-ban
   await p.locator('#qw-dialog [data-qw-action="bank-edit-back"]').click();
   assert.equal(await p.evaluate(()=>qwBankRead().length),3,'cancel does not create empty entry');
   await p.locator('#qw-dialog [data-qw-action="bank-new"]').click();
+  await p.locator('[data-bank-source]').click();
   await p.locator('#qw-dialog [data-bank-task-field="type"]').selectOption('choice');
   await p.locator('#qw-dialog [data-bank-task-field="prompt"]').fill('Какой величиной измеряется напряжение?');
   await p.locator('#qw-dialog [data-bank-choices]').fill('Вольт\nАмпер\nОм');

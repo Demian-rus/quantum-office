@@ -339,7 +339,7 @@ let connection,dialogs;
  await page.screenshot({path:path.join(out,'native-close-declined-diagram.png')});
  decision.accept=true;await page.locator('[data-qw-action="visual-cancel"]').click();await page.locator('#qw-dialog').waitFor({state:'detached'});
  // Native close with an unchanged child and dirty parent must also ask.
- await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-native-lifecycle"]').click();await page.locator('.qw-bank-preview-actions [data-bank-edit="task1673-native-lifecycle"]').click();await page.locator('[data-bank-task-field="prompt"]').fill('Native unsaved parent');await page.locator('[data-bank-visual="graph"]').click();await page.locator('#qw-visual-stage').waitFor();
+ await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-native-lifecycle"]').click();await page.locator('.qw-bank-preview-actions [data-bank-edit="task1673-native-lifecycle"]').click();await page.locator('[data-bank-source]').click();await page.locator('[data-bank-task-field="prompt"]').fill('Native unsaved parent');await page.locator('[data-bank-visual="graph"]').click();await page.locator('#qw-visual-stage').waitFor();
  const bankDecline=await declineClose('dirty bank parent',bankPrompt);await page.screenshot({path:path.join(out,'native-close-declined-bank.png')});
  assert.equal(await page.evaluate(async()=>(await qwBankRepository.getTask('task1673-native-lifecycle')).task.prompt),'TASK167.3 explicitly saved bank condition');
  await page.locator('[data-qw-action="visual-cancel"]').click();assert.equal(await page.locator('[data-bank-task-field="prompt"]').inputValue(),'Native unsaved parent');

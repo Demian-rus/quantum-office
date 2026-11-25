@@ -73,7 +73,6 @@ body{font:var(--qw-print-size,10.8pt)/1.35 var(--qw-print-family)}
 .qw-print-topic{font-size:11pt;line-height:1.3;margin:0 0 1.5mm;font-weight:400}
 .qw-print-meta{font-size:9pt;line-height:1.3;margin:0 0 3mm;color:#444}
 .qw-print-intro{font-size:10pt;line-height:1.35;margin:0;white-space:pre-wrap}
-.qw-running-header{font-size:8.5pt;line-height:1.3;color:#555;margin:0 0 3mm;border-bottom:.2mm solid #ccc;padding-bottom:1.5mm}
 .qw-print-section{display:flow-root;margin:0 0 2.2mm;break-inside:avoid}
 .qw-paper-task{border:0;margin:0;padding:0;background:white;color:#111;overflow-wrap:anywhere}
 .qw-paper-task>header{display:block;margin:0 0 1.2mm;font-size:10.5pt;line-height:1.2;break-after:avoid}
@@ -157,7 +156,6 @@ body[data-qw-format="booklet"] .qw-print-title{font:700 14pt/1.2 "QO Print Sans"
 body[data-qw-format="booklet"] .qw-print-topic{font-size:11pt;line-height:1.25;margin:1mm 0 0;color:#111}
 body[data-qw-format="booklet"] .qw-print-meta{font:9pt/1.3 "QO Print Sans",Arial,sans-serif;color:#444;margin:0 0 2.5mm}
 .qw-booklet-variant{font:700 13pt/1.25 "QO Print Serif",Georgia,serif;margin:1mm 0 0;color:#111}
-body[data-qw-format="booklet"] .qw-running-header{font:8pt/1.3 "QO Print Sans",Arial,sans-serif;color:#333;margin-bottom:5mm;border:none;text-align:center}
 body[data-qw-format="booklet"] .qw-print-section{margin:0 0 5mm;break-inside:avoid}
 body[data-qw-format="booklet"] .qw-print-section:before{content:none}
 body[data-qw-format="booklet"] .qw-compact-entry{grid-template-columns:8mm minmax(0,1fr);column-gap:3mm;row-gap:0}
@@ -206,8 +204,8 @@ body[data-qw-format="booklet"] .qw-booklet-bank-id{font:600 8.5pt/1.2 var(--qw-p
 .qw-task-text.qw-print-rich {min-width:0;line-height:1.36}
 .qw-print-rich p{margin:0 0 1.25mm;orphans:2;widows:2}
 .qw-print-rich p:last-child{margin-bottom:0}
-.qw-print-rich :is(h3,h4,h5){font:700 1em/1.25 var(--qw-print-family);margin:2mm 0 .8mm;break-after:avoid}
-.qw-print-rich :is(h3,h4,h5):first-child{margin-top:0}
+.qw-print-rich :is(h3,h4,h5,h6){font:700 1em/1.25 var(--qw-print-family);margin:2mm 0 .8mm;break-after:avoid}
+.qw-print-rich :is(h3,h4,h5,h6):first-child{margin-top:0}
 .qw-print-rich :is(ul,ol){padding-left:5mm;margin:1mm 0 1.7mm;line-height:1.3}
 .qw-print-rich li{padding-left:.2mm;margin:.4mm 0}
 .qw-print-rich blockquote{border-left:.55mm solid #8d969d;padding:.7mm 2mm;margin:1.3mm 0 1.7mm;break-inside:avoid}
@@ -224,8 +222,11 @@ body[data-qw-format="answers"] .qw-print-rich .qw-rich-table-scroll{display:flex
 .qw-print-rich th,.qw-task-tables th{font-weight:700;background:#f1f1f1}
 .qw-answer-long .qw-print-answer-heading{font:700 1em/1.25 var(--qw-print-family);margin:2.3mm 0 1mm;break-after:avoid}
 .qw-answer-long .qw-print-answer-heading:first-child{margin-top:0}
-body[data-qw-format="compact"] .qw-print-rich p,body[data-qw-format="booklet"] .qw-print-rich p{margin-bottom:.75mm}
-body:is([data-qw-format="compact"],[data-qw-format="booklet"]) .qw-print-rich :is(ul,ol){margin:.5mm 0 .9mm}
+body:is([data-qw-format="compact"],[data-qw-format="booklet"],[data-qw-format="answers"]) .qw-print-rich p{margin-bottom:.75mm}
+body:is([data-qw-format="compact"],[data-qw-format="booklet"],[data-qw-format="answers"]) .qw-print-rich :is(ul,ol){margin:.5mm 0 .9mm}
+body[data-qw-format="answers"] .qw-answer-long{font:var(--qw-print-size,10pt)/1.25 var(--qw-print-family)}
+body[data-qw-format="answers"] .qw-booklet-bank-id{font-size:.85em;color:#333;white-space:nowrap}
+.qw-print-key-id+.qw-print-answer-heading{margin-top:.6mm}
 /* TASK154 — one typographic system for all exported document formats. */
 body{--qw-print-family:"QO Print Serif",Georgia,serif;--qw-title-family:"QO Print Sans",Arial,sans-serif;color:var(--qw-body-color,#111)}
 body[data-qw-font="sans"]{--qw-print-family:"QO Print Sans",Arial,sans-serif}
@@ -470,7 +471,7 @@ async function qwPreparePrintDocument(){
   if([...text.querySelectorAll('math')].some(m=>mathInkWidth(m)>contentWidth-(modern?7*MM:0)))throw Error('Формула шире страницы: разделите выражение.');
  }
  const brand=header.querySelector('.qw-print-brand');brand?.remove();
- const title=header.querySelector('h1')?.textContent||(modern?'':document.title),meta=header.querySelector('.qw-print-meta')?.textContent||'';
+ const meta=header.querySelector('.qw-print-meta')?.textContent||'';
  const footerLabel=format==='booklet'?'':[document.body.dataset.qwTheme?'Квант Икс | QX':'',meta].filter(Boolean).join(' · ');
  function newPage(){
   if(pages.length>=80)throw Error('Работа превышает 80 страниц');
@@ -501,10 +502,6 @@ async function qwPreparePrintDocument(){
    }
   }else{
    if(!pages.length)content.append(header);
-   else if(format==='answers'&&title){
-    const running=document.createElement('div');running.className='qw-running-header';
-    running.textContent=title+(meta?' · '+meta:'');content.append(running);
-   }
    if(brand)page.append(brand.cloneNode(true));
    host.append(page);
   }

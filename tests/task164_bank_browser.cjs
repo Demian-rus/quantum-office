@@ -21,6 +21,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task164-ban
   await editor.locator('.qw-bank-rich-editor').first().waitFor({state:'visible'});
   assert.equal(await editor.locator('.qw-bank-rich-editor').count(),4);
   assert.equal(await editor.locator('.qw-bank-rich-tools').count(),1,'one formatting toolbar for all fields');
+  await editor.locator('[data-bank-source]').click();
   const prompt=editor.locator('[data-bank-task-field="prompt"]');
   await prompt.fill('Дано: тело **массой 2 кг** имеет ускорение \\(a=3\\). Найдите силу.');
   await editor.locator('[data-bank-preview-toggle="prompt"]').click();

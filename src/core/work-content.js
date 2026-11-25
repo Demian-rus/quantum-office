@@ -131,10 +131,10 @@ function qwRichInline(source){
  // Literal NUL would be replaced by the HTML parser anyway.
  const atoms=[];
  const text=String(source||'').replace(/\0/g,'�').replace(
-  /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$/g,
-  (match,code,formula,blank,alternate)=>{
+  /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$|\\([\\*_~^+\x60$|#>[\].!:()-])/g,
+  (match,code,formula,blank,alternate,escaped)=>{
    if(code)return match;
-   const html=blank!==undefined?
+   const html=escaped!==undefined?qwEsc(escaped):blank!==undefined?
     '<span class="qw-inline-blank" style="width:'+Math.max(1,Math.min(30,Number(blank)))+'ch" aria-label="Место для ответа"></span>':
     qwRichMath(formula??alternate);
    return '\0'+(atoms.push(html)-1)+'\0';
@@ -145,15 +145,15 @@ function qwRichInline(source){
    text path. Only explicit Markdown syntax opts an individual field in. */
 function qwHasRichSyntax(value){
  const text=String(value??'');
- return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
+ return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|(?:-{3,}|\*{3,}|_{3,})[ \t]*$|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
   /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])(?:\*[^*\n]+\*|_[^_\n]+_)|`[^`\n]+`|\$[^$\n]{1,600}\$/.test(text)||
-  (/\+\+|[\^~]\{/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
+  /\\\\/.test(text)||(/[\\+^~]/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\\[\\*_~^+\x60$|#>[\].!:-]|\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
   /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
 }
 function qwPrintFieldHTML(value){
  return qwHasRichSyntax(value)?qwRichMarkdownHTML(value):qwContentHTML(value);
 }
-function qwRichMarkdownHTML(value){
+function qwRichMarkdownHTML(value,onBlock){
  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');
  const result=[];
  const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
@@ -163,61 +163,63 @@ function qwRichMarkdownHTML(value){
  const quote=line=>/^\s{0,3}>\s?/.test(line);
  const fence=line=>/^\s{0,3}```/.test(line);
  const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
- const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
+ const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(x=>x.trim());
  const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
  const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
- let i=0;
+ let i=0,blockStart=0;
+ const emit=html=>{result.push(html);if(onBlock)onBlock(lines.slice(blockStart,i).join('\n'));};
  while(i<lines.length){
   const line=lines[i];
   if(!line.trim()){i++;continue;}
+  blockStart=i;
   if(fence(line)){
    const lang=line.trim().slice(3).trim().slice(0,30);
    i++;const code=[];
    while(i<lines.length&&!fence(lines[i]))code.push(lines[i++]);
    if(i<lines.length)i++;
-   result.push('<pre><code'+(lang?' data-language="'+qwEsc(lang)+'"':'')+'>'+qwEsc(code.join('\n'))+'</code></pre>');
+   emit('<pre><code'+(lang?' data-language="'+qwEsc(lang)+'"':'')+'>'+qwEsc(code.join('\n'))+'</code></pre>');
    continue;
   }
   if(/^\s*(?:\$\$|\\\[)\s*$/.test(line)){
    const end=line.trim().charCodeAt(0)===36?String.fromCharCode(36,36):'\\]',body=[];
    i++;while(i<lines.length&&lines[i].trim()!==end)body.push(lines[i++]);
    if(i<lines.length)i++;
-   result.push('<div class="qw-rich-equation">'+qwRichMath(body.join(' ').trim(),true)+'</div>');
+   emit('<div class="qw-rich-equation">'+qwRichMath(body.join(' ').trim(),true)+'</div>');
    continue;
   }
   if(heading(line)){
-   const m=line.match(/^\s{0,3}(#{1,4})\s+(.*)$/),level=Math.min(5,m[1].length+2);
-   result.push('<h'+level+'>'+qwRichInline(m[2])+'</h'+level+'>');i++;continue;
+   const m=line.match(/^\s{0,3}(#{1,4})\s+(.*)$/),level=m[1].length+2;
+   i++;emit('<h'+level+'>'+qwRichInline(m[2])+'</h'+level+'>');continue;
   }
   const aligned=alignment(line);
   if(aligned){
-   result.push('<p style="text-align:'+aligned[1]+'">'+qwRichInline(aligned[2])+'</p>');i++;continue;
+   i++;emit('<p style="text-align:'+aligned[1]+'">'+qwRichInline(aligned[2])+'</p>');continue;
   }
-  if(ruler(line)){result.push('<hr>');i++;continue;}
+  if(ruler(line)){i++;emit('<hr>');continue;}
   if(quote(line)){
    const chunk=[];
    while(i<lines.length&&quote(lines[i]))chunk.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
-   result.push('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');continue;
+   emit('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');continue;
   }
   if(bullet(line)||numbered(line)){
    const ordered=numbered(line),items=[],regex=ordered?/^\s{0,3}\d{1,3}[.)]\s+/:/^\s{0,3}[-*+]\s+/;
    while(i<lines.length&&regex.test(lines[i]))items.push('<li>'+qwRichInline(lines[i++].replace(regex,''))+'</li>');
-   result.push((ordered?'<ol>':'<ul>')+items.join('')+(ordered?'</ol>':'</ul>'));continue;
+   emit((ordered?'<ol>':'<ul>')+items.join('')+(ordered?'</ol>':'</ul>'));continue;
   }
   if(i+1<lines.length&&line.includes('|')&&tableSep(lines[i+1])){
    const head=cells(line);i+=2;const rows=[];
    while(i<lines.length&&lines[i].trim()&&lines[i].includes('|')&&!startBlock(lines[i])){
     const row=cells(lines[i++]);rows.push('<tr>'+head.map((_,j)=>'<td>'+qwRichInline(row[j]||'')+'</td>').join('')+'</tr>');
    }
-   if(head.length<=12)result.push('<div class="qw-rich-table-scroll"><table><thead><tr>'+head.map(c=>'<th>'+qwRichInline(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>');
-   else result.push('<p>'+qwRichInline(line)+'</p>');
+   if(head.length<=12)emit('<div class="qw-rich-table-scroll"><table><thead><tr>'+head.map(c=>'<th>'+qwRichInline(c)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>');
+   else emit('<p>'+qwRichInline(lines.slice(blockStart,i).join(' '))+'</p>');
    continue;
   }
   const paragraph=[line];i++;
   while(i<lines.length&&lines[i].trim()&&!startBlock(lines[i])&&!(lines[i].includes('|')&&tableSep(lines[i+1]||''))){
    paragraph.push(lines[i++]);
   }
-  result.push('<p>'+paragraph.map(qwRichInline).join('<br>')+'</p>');
+  emit('<p>'+paragraph.map(qwRichInline).join('<br>')+'</p>');
  }
  return result.join('');
 }
