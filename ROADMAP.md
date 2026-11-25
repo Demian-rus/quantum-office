@@ -1,5 +1,8 @@
 # Quantum Office — roadmap and acceptance gates
 
+## Приоритет владельца и передача — 25.11.2026
+TASK167.3 PR #161 — завершение текущей приёмки, Draft; не начинать новую разработку до архитектурного merge и проверки main. Далее локальный Codex: сначала отдельное задание на улучшение банка (UX, категоризация/фильтры, редактирование, оформление, иллюстрации, авторский контент). Ранее предложенная последовательность TASK168+ — ориентир, не обязательный порядок и не начатые работы. PR #158 лекций изолирован. См. [handoff](docs/LOCAL_CODEX_HANDOFF.md) и [образовательный план](docs/EDUCATION_ROADMAP.md).
+
 ## TASK167.1 — candidate PR #159
 Routing and launcher separation, fixed notifications; not accepted until full CI and review. Future «Учебные материалы» remains separate, PR #158 not integrated.
 

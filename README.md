@@ -1,5 +1,8 @@
 # Quantum Office
 
+## Актуальная разработка — 25.11.2026
+Quantum Office уже содержит Sheets, Writer, Slides, Studio и образовательные рабочие области. Windows Tauri/SQLite реализован в main через PR #157; TASK167.3 в Draft PR #161 до финальной приёмки. Ниже сохранены исторические milestones, включая устаревшие ограничения. Начинать с [документа передачи локальному Codex](docs/LOCAL_CODEX_HANDOFF.md), [контекста](docs/PROJECT_CONTEXT.md) и [правил обновления](docs/UPDATES.md). Для Windows: Node.js 22, `npm ci`, `npm test`, `npm run build`, `npm run dev`; для native build — MSVC/Rust stable и Tauri CLI 2.11.4, см. handoff. Не запускать тестовую нативную сборку в пользовательском профиле с рабочими базами.
+
 **Project decisions and handoff:** [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md). Read this before editing the shell or Sheets.
 
 **One application, several editors. First: Quantum Sheets.**

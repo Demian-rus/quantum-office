@@ -1,5 +1,7 @@
 **REQUIRED FIRST READ: `docs/PROJECT_CONTEXT.md` — product decisions, owner UX feedback, current limitations, future plan and handoff.**
 
+**For local Codex, also read `docs/LOCAL_CODEX_HANDOFF.md` before edits. Use disposable browser profiles and an isolated Windows account/VM for native tests. Do not touch the owner's live databases, integrate lecture PR #158, or start TASK168 without a separate task.**
+
 # Quantum Office engineering rules
 
 1. One app, common shell, separate *editor workspaces*; first priority Quantum Sheets. Preserve the launcher and top-level switching.

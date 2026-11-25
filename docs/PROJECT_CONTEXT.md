@@ -1,5 +1,9 @@
 # Quantum Office — PRODUCT CONTEXT (source of truth)
 
+## Передача разработки локальному Codex — 25.11.2026
+TASK167.1/#159 и TASK167.2/#160 объединены. TASK167.3/#161 остаётся Draft до шести PASS на одном HEAD и решения архитектора; принятые компоненты не переделывать. После merge и проверки main дальнейшая разработка локальным Codex. Текущий main при подготовке передачи: `7be748bbd93661cf9df7149ae9ad81652944a0dc`. Источник актуального состояния: [LOCAL_CODEX_HANDOFF.md](LOCAL_CODEX_HANDOFF.md).
+Следующий приоритет владельца: банк заданий — интерфейс, навигация, категории/фильтры, редактирование условия и решения, научные изображения, авторское наполнение. Номер новой задачи определяет владелец; TASK168 не начат. Лекции PR #158 отдельно. Путь Z:\Progr\Programming\quantum-office. Исторические candidate-статусы ниже не отменяют этот раздел.
+
 ## TASK167.1 — candidate (not merged)
 Independent diagnostics/work/bank routes, office and education launcher groups, fixed native draft notices, and legacy diagnostic preservation are under review in PR #159. Do not treat the candidate as accepted until full browser/native CI. PR #158 remains separate. Future «Учебные материалы»: one editable theory/scenario document, catalogue and scientific objects; not implemented here.
 
