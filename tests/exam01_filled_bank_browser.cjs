@@ -72,7 +72,7 @@ const {pathToFileURL}=require('node:url'),{chromium}=require('playwright');
  await page.locator('[data-qw-action=quick-add][data-type=short]').click();
  await page.locator('[data-bank-live=prompt]').fill('Проверка профиля.');
  await page.locator('[data-action=work-preview]').click();
- const ready=()=>page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return f?.dataset.ready===f?.contentDocument?.documentElement.dataset.qwRender&&!!f?.dataset.ready&&!f.contentWindow.__qwPrintError;});
+ const ready=()=>page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return !!f?.dataset.ready&&f.dataset.ready===f.contentDocument?.documentElement?.dataset.qwRender&&!f.contentWindow.__qwPrintError;});
  const isExam=()=>page.frameLocator('#qw-print-preview-frame').locator('body').getAttribute('data-qw-exam-standard');
  await ready();assert.equal(await isExam(),'true');
  await page.locator('select[name=qw-pdf-layout]').selectOption('compact');await ready();assert.equal(await isExam(),'false');
