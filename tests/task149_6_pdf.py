@@ -2,6 +2,7 @@
 import json, os, re
 from pathlib import Path
 import pymupdf
+from pdf_signature_bounds import verify_signature
 
 out=Path(os.environ.get('QW_TASK1496_EVIDENCE',Path(__file__).resolve().parents[1]/'evidence/task149.6'))
 browser=json.loads((out/'browser-result.json').read_text(encoding='utf-8'))
@@ -17,10 +18,10 @@ for name in names:
         text=page.get_text(); numbers=[int(x) for x in re.findall(r'(?m)^(\d+)\.',text)];counts.append(len(numbers));all_numbers+=numbers
         assert not re.search(r'Рисунок\s*/\s*схема|\d+ б\.|PRIVATE_|INTERNAL_',text)
         spans=[s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
-        for s in spans:
+        for s in verify_signature(page, spans):
             x0,y0,x1,y1=s['bbox'];assert x0>=26 and y0>=22 and x1<=page.rect.width-26 and y1<=page.rect.height-10,(name,i,s)
             assert s['text']!='�',(name,s)
-            if name=='Physics-Graph-Comparison' and re.fullmatch(r'[-−]?\d+',s['text']):numeric_fonts.append(s['size']);assert 8<=s['size']<=9
+            if name=='Physics-Graph-Comparison' and re.fullmatch(r'[-−]?\d+',s['text']):numeric_fonts.append(s['size']);assert abs(s['size']-21*48*72/25.4/369)<.15
         for p in page.get_drawings():
             if p.get('fill') and max(abs(a-b) for a,b in zip(p['fill'],[224/255,228/255,232/255]))<.01:
                 assert .24<=p['rect'].height<=.4,('actual divider thickness',p['rect'].height)
@@ -41,7 +42,7 @@ for name in names:
         # Independently read vector grid segments in PDF points, then convert to mm.
         horizontal=[];vertical=[]
         for p in doc[0].get_drawings():
-            if not p.get('color') or max(abs(a-b) for a,b in zip(p['color'],[217/255,222/255,228/255]))>.01:continue
+            if not p.get('color') or max(abs(a-b) for a,b in zip(p['color'],[221/255,221/255,221/255]))>.01:continue
             for item in p['items']:
                 if item[0]!='l':continue
                 a,b=item[1:3]

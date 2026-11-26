@@ -12,7 +12,7 @@ const directory = path.resolve(process.argv[2] || path.join(root, 'evidence/cont
 const app = pathToFileURL(path.join(root, 'Quantum-Office.html')).href;
 
 async function newSession(browser) {
- const context = await browser.newContext({offline:true,viewport:{width:1920,height:1080}});
+ const context = await browser.newContext({offline:true,viewport:{width:1920,height:1080},colorScheme:'light'});
  const page = await context.newPage();
  await page.goto(app);
  return {context,page};
@@ -49,9 +49,9 @@ async function main() {
    });
    const draft = {...qwProject(),id:'qo-physics-ege2019-v1',title:'Физика — авторский вариант № 1 по модели ЕГЭ-2019',
     subject:'physics',grade:'11',variant:'1',topic:'',layout:'booklet',exam:'ege',
-    printSettings:{fontPt:10.5,orientation:'portrait',theme:'academic',showTitle:true,showVariant:false,showMeta:false,showPageNumbers:true,partHeadings:true},
+    printSettings:{profile:'exam',fontPt:10.5,orientation:'portrait',theme:'academic',showPageNumbers:true,examPartHeadings:false,examTopicHeadings:false},
     tasks:items.map((item,i)=>({...item.task,pageBreak:i===24}))};
-   const work = qwValidate(draft);
+   let work = qwValidate(draft);
    for (const task of work.tasks) {
     if (!task.prompt || !task.answer || !task.comment || !task.criteria) throw new Error(task.id+' missing a section');
     for (const field of ['prompt','answer','comment','criteria']) for (const match of task[field].matchAll(/\\\((.+?)\\\)/g)) qwMath(match[1]);
@@ -67,6 +67,16 @@ async function main() {
    const numbers=assigned.items.map(item=>item.bankNumber);
    if (new Set(numbers).size!==32||numbers.some(number=>number<1)||assigned.items.some(item=>item.year))
     throw new Error('Invalid imported metadata');
+   // QWORK references the actual assigned bank records, never position-derived IDs.
+   const assignedById=new Map(await Promise.all(assigned.items.map(async item=>[item.id,await repository.getTask(item.id)])));
+   work=qwValidate({...work,tasks:work.tasks.map(task=>{
+    const record=assignedById.get(task.source.id);
+    if(!record||!record.bankNumber)throw Error('Missing assigned bank number '+task.source.id);
+    for(const key of ['prompt','answer','comment','criteria','part','points','figure','graph','diagram','image'])
+     if(JSON.stringify(record.task[key])!==JSON.stringify(task[key]))throw Error('Bank task content mismatch '+task.source.id+' '+key);
+    return {...task,source:qwBankSource(record)};
+   })});
+   if(JSON.stringify(qwValidate(JSON.parse(JSON.stringify(work))))!==JSON.stringify(work))throw Error('Linked QWORK round trip');
    const portableItems=assigned.items.map(item=>({...item,bankNumber:0}));
    const bank={...pack,checksum:bankHash(JSON.stringify(portableItems)),items:portableItems};
    const backup=await repository.createVerifiedBackup();
@@ -104,9 +114,10 @@ async function main() {
   assert.equal(await page.locator('.qw-nav-task').count(),32);
   const shots=path.join(directory,'screenshots');
   await fs.mkdir(shots,{recursive:true});
+  assert.equal(await page.locator('html').getAttribute('data-qo-theme'),'light');
   await page.screenshot({path:path.join(shots,'variant-editor.png')});
   await page.locator('[data-action=work-preview]').click();
-  await page.frameLocator('#qw-print-preview-frame').locator('.qw-print-page .qw-topic-title').first().waitFor();
+  await page.frameLocator('#qw-print-preview-frame').locator('.qw-print-page .qw-exam-number-line').first().waitFor();
   await page.locator('#qw-dialog [data-publish-fit=page]').click();
   await page.screenshot({path:path.join(shots,'variant-a4.png')});
   const variants = [
@@ -132,15 +143,28 @@ async function main() {
      sections:[...new Set(all('[data-task]').map(node=>Number(node.dataset.task)))],
      answers:[...new Set(all('[data-answer-number]').map(node=>Number(node.dataset.answerNumber)))],
      partHeadings:all('.qw-topic-title').map(node=>node.textContent),graphs:all('svg[viewBox]').length,
-     criteria:all('.qw-print-answer-heading').filter(node=>node.textContent==='Критерии оценивания').length};
+     criteria:all('.qw-print-answer-heading').filter(node=>node.textContent==='Критерии оценивания').length,
+     title:document.querySelector('.qw-print-title')?.textContent,
+     headings:[...document.querySelectorAll('.qw-print-section:not([data-continuation=true]) .qw-exam-number-line')].map(node=>({text:node.textContent,number:Number(node.dataset.qwBankNumber)})),
+     squareCount:all('.qw-task-marker').length,
+     geometry:[...document.querySelectorAll('.qw-exam-publication')].filter(node=>node.querySelector('.qw-task-text')).map(node=>{
+      const header=node.querySelector('.qw-task-heading'),number=header.querySelector('b'),condition=node.querySelector('.qw-task-text');
+      const h=header.getBoundingClientRect(),n=number.getBoundingClientRect(),c=condition.getBoundingClientRect();
+      return {indent:Math.abs(n.left-c.left),next:c.top>=h.bottom-.5,weight:getComputedStyle(number).fontWeight,border:parseFloat(getComputedStyle(number).borderLeftWidth)};
+     })};
    });
    assert.equal(info.error,undefined,name);
+   const expectedTitle='Вариант 1'+({ 'brief-key':' — ответы','solutions-and-rubrics':' — решения и критерии','tasks-and-solutions':' — условия и решения'}[name]||'');
+   assert.equal(info.title,expectedTitle,name);
+   assert.equal(info.squareCount,0,name);
+   assert.deepEqual(info.headings,work.tasks.map((task,i)=>({text:'№ '+(i+1)+' ('+String(task.source.number).padStart(5,'0')+').',number:task.source.number})),name);
+   assert.ok(info.geometry.every(g=>g.indent<1&&g.next&&g.weight==='700'&&g.border===0),JSON.stringify(info.geometry));
    assert.ok(info.layout.sheets>=1,name);
    const ratio = orientation==='landscape'?297/210:210/297;
    assert.ok(Math.abs(info.width/info.height-ratio)<.001,name);
    if(parts){
     assert.deepEqual(info.sections,entries.map(entry=>entry.slot),name);
-    assert.deepEqual(info.partHeadings,['Часть 1','Часть 2'],name);
+    assert.deepEqual(info.partHeadings,[],name);
     assert.deepEqual(info.answers,[],name);
    }else{
     assert.equal(info.answers.length,32,name);
@@ -149,6 +173,7 @@ async function main() {
    if(parts||options.includePrompt)assert.ok(info.graphs>=4,name);
    const file=path.join(directory,name+'.pdf');
    await print.pdf({path:file,preferCSSPageSize:true,printBackground:true});
+   await print.locator('.qw-print-sheet, .qw-print-page').first().screenshot({path:path.join(shots,name+'.png')});
    const pdf=await fs.readFile(file);
    assert.equal(pdf.subarray(0,5).toString(),'%PDF-');
    artifacts.push({name,orientation,sheets:info.layout.sheets,graphs:info.graphs,criteria:info.criteria});

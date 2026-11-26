@@ -474,7 +474,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const p=qwPlotXY(g,{x,y});
    d+=(drawing?' L':' M')+p.x.toFixed(2)+','+p.y.toFixed(2);drawing=true;
   }
-  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+(g.curveStyle?.stroke||(typography.publishing?'#222222':'#186ba3'))+'" stroke-width="'+(g.curveStyle?.width||style.line)+'" stroke-linecap="round"/>');
+  if(d)parts.push('<path d="'+d.trim()+'" fill="none" stroke="'+qwGraphTemplateStroke(g,'curveStyle',typography.publishing)+'" stroke-width="'+(g.curveStyle?.width||style.line)+'" stroke-linecap="round"/>');
  }
  const ps=g.points.map(p=>qwPlotXY(g,p));
  if(g.curveFamily==='points'&&g.connected&&ps.length>1){
@@ -483,10 +483,10 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const a=ps[i-1],p=ps[i];
    d+=g.smooth?' C'+((a.x+p.x)/2)+','+a.y+' '+((a.x+p.x)/2)+','+p.y+' '+p.x+','+p.y:' L'+p.x+','+p.y;
   }
-  parts.push('<path d="'+d+'" fill="none" stroke="'+(g.lineStyle?.stroke||'#222222')+'" stroke-width="'+(g.lineStyle?.width||style.line)+'"/>');
+  parts.push('<path d="'+d+'" fill="none" stroke="'+qwGraphTemplateStroke(g,'lineStyle')+'" stroke-width="'+(g.lineStyle?.width||style.line)+'"/>');
  }
  ps.forEach((p,i)=>{
-  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:style.point)+'" fill="'+(g.points[i].style?.stroke||'#222222')+'"/></g>');
+  parts.push('<g '+(interactive?'data-qw-point="'+i+'"':'')+'><circle cx="'+p.x+'" cy="'+p.y+'" r="'+(interactive?5:style.point)+'" fill="'+qwEffectiveObjectPaint(g.points[i],'graph-point').stroke+'"/></g>');
  });
  const contour=g.connected&&g.curveFamily==='points'&&!g.smooth?qwClosedContour(ps):null;
  ps.forEach((p,i)=>{
@@ -519,10 +519,20 @@ function qwGraphSVG(g,interactive=false,typography={}){
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
 }
 function qwSVGKey(value){let hash=2166136261;for(const c of JSON.stringify(value)){hash^=c.charCodeAt(0);hash=Math.imul(hash,16777619);}return (hash>>>0).toString(36);}
+// Effective visual defaults are shared with the object inspector, not stored in QWORK.
+function qwEffectiveObjectPaint(object,kind){
+ const paint=object?.style?qwValidateStyle(object.style):{};
+ const stroke=paint.stroke||'#222222';
+ return {...paint,stroke,width:paint.width||(kind==='graph-element'?2.5:2),
+  text:paint.text||(kind==='graph-element'?stroke:'#000000')};
+}
+function qwGraphTemplateStroke(graph,key,publishing=false){
+ return graph[key]?.stroke||(key==='curveStyle'&&!publishing?'#186ba3':'#222222');
+}
 function qwGraphElementsSVG(g,interactive=false){
  const key=qwSVGKey(g),b=QW_PLOT,clip='<defs><clipPath id="qw-plot-clip"><rect x="'+b.left+'" y="'+b.top+'" width="'+(b.right-b.left)+'" height="'+(b.bottom-b.top)+'"/></clipPath></defs>';
  return clip+(g.elements||[]).map((o,i)=>{
-  const style=o.style?qwValidateStyle(o.style):{},color=style.stroke||'#222222',width=style.width||2.5,text=style.text||color;
+  const {stroke:color,width,text}=qwEffectiveObjectPaint(o,'graph-element');
   let shape='',label='',ps=[];
   if(o.kind==='function'){
    for(let n=0;n<=400;n++){const x=g.xmin+(g.xmax-g.xmin)*n/400,y=qwEvaluateCurve({curveFamily:o.family,curve:o.curve},x);ps.push(qwPlotXY(g,{x,y}));}
@@ -606,7 +616,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  const numeric=v=>Number(v.toFixed(3));
  const label=(value,x,y,size=18,anchor='middle',vector=false)=>qwScienceLabel(value,numeric(x),numeric(y),size,anchor,vector);
  return qwPlaceSVGLabels(qwSVG(guides+objects.map((o,i)=>{
-  const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#222222',width=paint.width||2,fill=paint.fill||'none';
+  const paint=o.style?qwValidateStyle(o.style):{}, {stroke,width}=qwEffectiveObjectPaint(o,'diagram'),fill=paint.fill||'none';
   const a=' stroke="'+stroke+'" stroke-width="'+width+'" fill="none"',
    vertices=['triangle','rightTriangle','quadrilateral','regularPolygon'].includes(o.kind)?qwGeometryVertices(o):null;
   const all=vertices||[{x:o.x,y:o.y},{x:o.x2,y:o.y2}];
@@ -755,4 +765,4 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';
  }).join('')));
 }
-export {qwMath,qwMathML,qwMathBox,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
+export {qwEffectiveObjectPaint,qwGraphTemplateStroke,qwMath,qwMathML,qwMathBox,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};

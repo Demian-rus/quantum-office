@@ -17,10 +17,24 @@ for entry in report['reports']:
         nums=task_numbers(p);numbers.extend(nums)
         drawings=p.get_drawings();vectors+=len(drawings)
         spans=[s for b in p.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
+        marks=[s for s in spans if s['text'].strip()=='QX / Квант Икс']
         for s in spans:
             x0,y0,x1,y1=s['bbox']
             if s['text'].strip()=='QX / Квант Икс':
-                assert p.rect.width-115<=x0<x1<=p.rect.width-24 and 0<=y0<y1<28,(name,i,'top-right handwritten signature bounds',s)
+                assert len(marks)==1 and 'Caveat' in s['font'] and abs(s['size']-15)<.05 and s['color']==0,(name,i,s)
+                assert any('Caveat' in font[3] and font[1]!='n/a' for font in p.get_fonts()),(name,i,'embedded Caveat')
+                # Same visible-ink measurement as UX-02; font bounding boxes include ascenders.
+                clip=fitz.Rect(p.rect.width-130,0,p.rect.width,27)
+                pix=p.get_pixmap(matrix=fitz.Matrix(8,8),clip=clip,colorspace=fitz.csGRAY)
+                dark=[j for j,v in enumerate(pix.samples) if v<105]
+                assert dark,(name,i,'signature ink missing')
+                top=min(j//pix.width for j in dark)*25.4/576
+                right=(pix.width-1-max(j%pix.width for j in dark))*25.4/576
+                assert abs(top-4)<.22 and abs(right-4)<.22,(name,i,'signature ink margins',top,right)
+                for other in spans:
+                    if other is not s:
+                        overlap=fitz.Rect(s['bbox']) & fitz.Rect(other['bbox'])
+                        assert overlap.is_empty,(name,i,'signature overlaps text',other['text'])
             else:
                 assert 25<=x0<x1<=p.rect.width-25 and 20<=y0<y1<=p.rect.height-10,(name,i,s)
         if '-BW' in name:

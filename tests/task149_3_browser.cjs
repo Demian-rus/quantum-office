@@ -29,7 +29,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1493_EVIDENCE||pa
   for(const {name,project} of task149CompactSamples()){
    await page.evaluate(d=>qwChange(()=>{qwDoc=qwValidate(d);qwSelected=qwDoc.tasks[0].id;}),project);
    const before=await page.evaluate(()=>JSON.stringify(qwDoc));
-   const dl=page.waitForEvent('download');await page.locator('[data-qw-action="save"]').click();const qwork=path.join(out,name+'.qwork');await(await dl).saveAs(qwork);
+   const dl=page.waitForEvent('download');await page.locator('[data-action="work-save"]').click();const qwork=path.join(out,name+'.qwork');await(await dl).saveAs(qwork);
    assert.deepEqual(JSON.parse(fs.readFileSync(qwork,'utf8')),project);
    await page.locator('[data-action="work-new"]').click();await page.locator('#qw-file').setInputFiles(qwork);await page.waitForFunction(count=>qwDoc.tasks.length===count,project.tasks.length);
    assert.equal(await page.evaluate(()=>JSON.stringify(qwDoc)),before,'QWORK roundtrip');
@@ -37,7 +37,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1493_EVIDENCE||pa
     // The old boolean export call now requests a separate key, never answers under conditions.
     let frame;
     if(teacher){frame=await browser.newPage();await frame.setContent(await page.evaluate(()=>qwPrintDocumentHTML(qwDoc,true,{answers:true,criteria:false,comments:false})));}
-    else{await page.locator('[data-qw-action="preview"]').click();await page.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();frame=await(await page.locator('#qw-print-preview-frame').elementHandle()).contentFrame();}
+    else{await page.locator('[data-action="work-preview"]').click();await page.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();frame=await(await page.locator('#qw-print-preview-frame').elementHandle()).contentFrame();}
     await ready(frame);
     const report=await measure(frame),suffix=teacher?'-Answers':'',file=name+suffix;
     const html=await frame.content();fs.writeFileSync(path.join(out,file+'.html'),html);

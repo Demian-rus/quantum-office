@@ -358,6 +358,16 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{width:136.5mm;height:190mm}
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{left:9mm;right:9mm}
 .qw-print-sheet>.qw-page-footer,body[data-qw-format="booklet"] .qw-page-footer{bottom:3mm;left:0;right:0;font:7.5pt/1.2 var(--qw-print-family)}
+/* EXAM-01: the number and condition share the left edge; no marker column. */
+.qw-paper-task.qw-standard-task.qw-exam-publication{grid-template-columns:minmax(0,1fr);column-gap:0}
+.qw-paper-task.qw-standard-task.qw-exam-publication>.qw-task-heading{display:block;grid-column:1;grid-row:1;margin:0 0 .8mm;text-align:left}
+.qw-paper-task.qw-standard-task.qw-exam-publication>:not(.qw-task-heading){grid-column:1;grid-row:auto}
+.qw-exam-number-line{display:inline-block;font:700 calc(1em + 1pt)/1.2 var(--qw-print-family);text-align:left;border:0;padding:0;width:auto;height:auto;white-space:nowrap}
+body[data-qw-exam-standard=true] .qw-print-header,body[data-qw-exam-standard=true] .qw-print-title,body[data-qw-exam-standard=true] .qw-topic-title{text-align:center!important}
+body[data-qw-exam-standard=true] .qw-print-title{color:#000}
+body[data-qw-exam-standard=true] .qw-print-section{margin-bottom:3mm}
+body[data-qw-exam-standard=true] .qw-answer-columns .qw-exam-brief-item{grid-template-columns:26mm minmax(0,1fr);column-gap:1.5mm}
+body[data-qw-exam-standard=true] .qw-exam-brief-item>.qw-print-number{text-align:left}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}
@@ -566,7 +576,7 @@ async function qwPreparePrintDocument(){
   copy.querySelectorAll('.qw-teacher-notes').forEach(e=>e.remove());return copy;
  }
  function bodyOf(section){return section.querySelector('.qw-exam-body')||section.querySelector('.qw-paper-task');}
- function tokens(element){
+ function tokens(element,splitKey=false){
   const items=[];
   function append(node,path){
    if(node.nodeType===3){
@@ -574,10 +584,15 @@ async function qwPreparePrintDocument(){
     return;
    }
    const callout=node.nodeType===1&&node.matches('.qw-callout');
-   const container=node.nodeType===1&&(node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub'));
+   // Detailed key captions and rich paragraphs are not atomic illustrations.
+   // Preserve the legacy tokenizer for all other print formats. MathML, tables,
+   // equations and inline blanks remain indivisible even inside styled text.
+   const container=node.nodeType===1&&(splitKey?
+    node.matches('.qw-answer-caption,.qw-format-block,p,ul,ol,li,blockquote,strong,b,em,i,s,del,u,span:not(.qw-inline-blank):not(.qw-formula-error)'):
+    (node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub')));
    if(callout||container){
     const body=callout?node.querySelector(':scope>.qw-callout-body'):node;
-    const first=items.length,trail=[...path,{source:node,body,first,callout}];
+    const first=items.length,trail=[...path,{source:node,body,first,callout,splitKey}];
     for(const child of body.childNodes)append(child,trail);
     if(items.length>first)return;
    }
@@ -602,6 +617,8 @@ async function qwPreparePrintDocument(){
      const offset=[...part.source.children].indexOf(firstItem);
      if(offset>0)block.start=part.source.start+offset;
     }
+    // A continued list item keeps its ordinal but must not print its marker twice.
+    if(part.splitKey&&part.source.tagName==='LI'&&i>part.first)block.style.listStyleType='none';
     group.append(block);let container=block;
     if(part.callout){
      const title=part.source.querySelector(':scope>.qw-callout-title').cloneNode(true);
@@ -641,10 +658,11 @@ async function qwPreparePrintDocument(){
   if(fits(current)){fragments.push(next);return next;}
   // Long teacher paragraphs are split as text atoms, never through a formula.
   const paragraphs=block.classList.contains('qw-teacher-notes')?[...block.children]:[];
-  next.remove();if(!paragraphs.length)throw Error('Поле решения превышает страницу.');
+  const splitKey=original.classList.contains('qw-answer-long')&&block.classList.contains('qw-key-solutions');
+  next.remove();if(!splitKey&&!paragraphs.length)throw Error('Поле решения превышает страницу.');
   let result=last;
-  if(block.querySelector('.qw-callout,.qw-format-block')){
-   const items=tokens(block);let start=0;
+  if(splitKey||block.querySelector('.qw-callout,.qw-format-block')){
+   const items=tokens(block,splitKey);let start=0;
    while(start<items.length){
     const fragment=continuation(original),notes=block.cloneNode(false);
     bodyOf(fragment).append(notes);start=fitTextChunk(fragment,notes,items,start);
@@ -661,7 +679,7 @@ async function qwPreparePrintDocument(){
  function splitLong(original){
   const text=original.querySelector('.qw-task-text'),article=bodyOf(original),flow=original.querySelector('.qw-task-flow');
   const answer=original.querySelector('.qw-answer-preview,.qw-booklet-answer'),teacher=original.querySelector('.qw-teacher-notes');
-  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');const items=tokens(text);
+  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');const items=tokens(text,original.classList.contains('qw-answer-long')&&!original.hasAttribute('data-qw-key-condition'));
   const tails=[...article.children].filter(e=>e!==flow&&e.tagName!=='HEADER'&&e!==answer&&!e.classList.contains('qw-exam-grid'));
   if(teacher)tails.push(teacher);
   let start=0,first=true,last;

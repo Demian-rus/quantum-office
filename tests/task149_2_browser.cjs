@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  const p=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true}),errors=[],matrix=[];
  p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
  const stage=p.locator('#qw-visual-stage svg');
- const action=key=>p.locator('[data-qw-action="'+key+'"]');
+ const action=key=>p.locator(['diagram','graph'].includes(key)?'[data-bank-visual="'+key+'"]':['save','preview'].includes(key)?'[data-action="work-'+key+'"]':'[data-qw-action="'+key+'"]');
  const tool=key=>p.locator('[data-tool="'+key+'"]').click();
  const at=async(x,y)=>{const b=await stage.boundingBox();return {x:b.x+b.width*x/520,y:b.y+b.height*y/320};};
  const click=async(x,y)=>{const a=await at(x,y);await p.mouse.click(a.x,a.y);};
@@ -16,7 +16,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
-  await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();await p.locator('#qw-prompt').fill('Постройте и отредактируйте геометрическую схему.');await action('diagram').click();
+  await p.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();await p.locator('[data-bank-live=prompt]').fill('Постройте и отредактируйте геометрическую схему.');await action('diagram').click();
   assert.deepEqual(await p.locator('.qw-tool-group').first().locator('[data-tool]').evaluateAll(es=>es.map(e=>e.dataset.tool)),['select','point','line','dashed','arrow','text']);
   assert.equal(await p.locator('[data-tool="dashed"]').count(),1);assert.equal(await p.locator('#qw-object-label').count(),0,'no empty selected-object form');
   await p.locator('#qw-snap-geometry').uncheck();
@@ -62,7 +62,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await p.reload();assert.deepEqual(await p.evaluate(()=>JSON.parse(JSON.stringify(qwDoc))),expected,'reload preserves new figures');
   for(const [width,height,dpr] of [[1366,768,1],[1440,900,1],[1920,1080,1],[2560,1440,1],[1093,614,1.25],[1280,720,1.5]])for(const theme of ['light','dark']){
    const context=await browser.newContext({viewport:{width,height},deviceScaleFactor:dpr});const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('.global-bar [data-target="work"]').click();await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===1);await page.locator('[data-qw-action="diagram"]').click();
+   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('.global-bar [data-target="work"]').click();await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===1);await page.locator('[data-bank-visual="diagram"]').click();
    for(const selected of [false,true]){
     if(selected)await page.locator('[data-object-select="0"]').click();
     const geometry=await page.locator('#qw-visual-properties').evaluate(e=>{

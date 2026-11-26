@@ -31,7 +31,8 @@ with sync_playwright() as p:
  offsets=[]
  for label,expected in [('По левому краю','flex-start'),('По центру','center'),('По правому краю','flex-end')]:
   page.get_by_role('button',name=label).click()
-  assert justify('B2')==expected,(label,justify('B2'))
+  aliases={'flex-start': {'flex-start','start','flow-start'}, 'center': {'center'}, 'flex-end': {'flex-end','end','flow-end'}}
+  assert justify('B2') in aliases[expected],(label,justify('B2'))
   measured=page.locator('.grid-cell[data-ref=B2]').evaluate("""el=>{
    const range=document.createRange();range.selectNodeContents(el);
    const a=range.getBoundingClientRect(), b=el.getBoundingClientRect();

@@ -6,7 +6,7 @@ def verify_ab(page, region, graph, measured_points):
     drawings = [p for p in page.get_drawings() if region.contains(p['rect'])]
     # Derive the plot transform independently from its actual grid strokes.
     grid = [p for p in drawings if p['color'] is not None and
-            max(abs(a-b) for a, b in zip(p['color'], (217/255, 222/255, 228/255))) < .001]
+            max(abs(a-b) for a, b in zip(p['color'], (221/255, 221/255, 221/255))) < .001]
     assert grid, 'actual PDF grid is missing'
     plot = pymupdf.Rect(min(p['rect'].x0 for p in grid), min(p['rect'].y0 for p in grid),
                        max(p['rect'].x1 for p in grid), max(p['rect'].y1 for p in grid))

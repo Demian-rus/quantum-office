@@ -20,6 +20,31 @@ jobs:
       - run: npm ci
       - run: python -m pip install playwright==1.56.0 openpyxl pymupdf==1.26.6
       - run: python -m playwright install --with-deps chromium
+      - run: npx playwright install chromium
+        id: browser_setup
+      - run: node tests/exam01_browser.cjs
+      - run: node scripts/content01-export.cjs evidence/exam-01/content
+      - run: node tests/exam01_filled_bank_browser.cjs
+      - run: node scripts/editor01-export.cjs
+      - uses: actions/checkout@v4
+        with:
+          ref: f2d1432c3134b605a549c91acd4950ef959a7f36
+          path: exam01-baseline
+      - run: npm ci
+        working-directory: exam01-baseline
+      - run: npm run build
+        working-directory: exam01-baseline
+      - run: node scripts/editor01-export.cjs ../evidence/exam-01/baseline-practice
+        working-directory: exam01-baseline
+      - run: python tests/exam01_practice_regression.py evidence/exam-01/baseline-practice evidence/editor-01/materials
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exam-01-publication-evidence
+          path: |
+            evidence/exam-01/
+            evidence/editor-01/
+          if-no-files-found: warn
       # Rebuild the exact TASK147 baseline for reproducible before screenshots.
       - uses: actions/checkout@v4
         with:
@@ -31,84 +56,163 @@ jobs:
         env:
           QW_BEFORE_HTML: ${{ github.workspace }}/task147-baseline/Quantum-Office.html
       - run: node tests/task147_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task148_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task148_graph_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task148_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_1_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_2_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_2_sample.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_2_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task150_1_pdf_regression.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_3_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_3_layout_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_3_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_4_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_4_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_5_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_5_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_7_pdf_regression.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_6_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_6_pdf.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_7_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task149_7_offline.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task144_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task145_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task146_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task146_compact_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task143_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task142_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task141_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task100_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task101_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task102_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task103_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task104_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task105_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task106_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task107_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task108_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task109_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task110_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task111_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task112_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task113_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task114_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task115_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task116_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task117_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task118_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task119_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task120_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task121_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task122_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task123_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task126_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task127_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task128_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task129_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task130_writer_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task131_writer_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task132_writer_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task133_writer_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task134_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task135_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task136_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task137_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task138_writer_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task139_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task140_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/ui_smoke.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/xlsx_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/filter_freeze_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/xlsx_filter_freeze_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/clipboard_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/structure_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/launcher_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task162_launcher_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task163_bank_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task164_bank_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task165_rich_print_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -120,72 +224,137 @@ jobs:
             evidence/task165-rich-print/*.png
           if-no-files-found: warn
       - run: python tests/templates_headers_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/color_border_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/color_border_xlsx_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/formatting21_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/merge_xlsx_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/merged_clipboard_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/merged_structure_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/bulk_structure_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/formula_conditional_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/formula_sheets_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
 
       - run: python tests/temporal_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/dependency_cache_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/recalculation_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/formatting030_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task031_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task032_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task033_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task034_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task035_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task036_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task037_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task038_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task039_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task040_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task041_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task042_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task043_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task044_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task045_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task046_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task047_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task048_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task049_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task050_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task051_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task052_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task053_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task054_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task055_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task056_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task057_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task058_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task059_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task060_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task061_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task062_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task063_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task064_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task065_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task067_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task068_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task069_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task070_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task071_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task072_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task073_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task074_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task075_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task076_browser.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
 
       - run: node tests/task095_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task096_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task097_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task098_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: node tests/task099_browser.cjs
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - run: python tests/task149_7_artifacts.py
+        if: ${{ !cancelled() && steps.browser_setup.outcome == 'success' }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

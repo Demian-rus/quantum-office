@@ -5,6 +5,7 @@ import unicodedata
 import os
 from pathlib import Path
 import pymupdf
+from pdf_signature_bounds import verify_signature
 
 out = Path(os.environ.get('QW_TASK1493_EVIDENCE', Path(__file__).resolve().parents[1] / 'evidence/task149.3'))
 measurements = {x['file']: x for x in json.loads((out / 'measurements.json').read_text(encoding='utf-8'))}
@@ -34,7 +35,7 @@ for name, count in [('Compact-Physics-Math', 4), ('Five-Illustrated-Tasks', 5), 
             for answer in ['30 Н.', '16 м.', '24 см2.']:
                 assert (answer in text) == teacher, (key, answer)
         spans = [s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
-        for s in spans:
+        for s in verify_signature(page, spans):
             x0, y0, x1, y1 = s['bbox']
             assert x0 >= (30 if teacher else 38) and y0 >= (25 if teacher else 30) and x1 <= page.rect.width - (30 if teacher else 38) and y1 <= page.rect.height - 12, (key, s)
         paths = page.get_drawings()
@@ -53,8 +54,9 @@ assert stress_text.count('Измерения повторяют через ра�
 assert stress_text.count('приведена формула и объяснён смысл каждой величины.') == 0
 for i, page in enumerate(stress):
     assert ('Контрольная работа' in page.get_text()) == (i == 0), ('title must appear only on first physical page', i + 1)
-    for block in page.get_text('blocks'):
-        assert block[1] >= 30 and block[3] <= page.rect.height - 12, ('stress bounds', i + 1, block)
+    spans = [s for b in page.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] if s['text'].strip()]
+    for span in verify_signature(page, spans):
+        assert span['bbox'][1] >= 30 and span['bbox'][3] <= page.rect.height - 12, ('stress bounds', i + 1, span)
     page.get_pixmap(matrix=pymupdf.Matrix(1.5, 1.5), alpha=False).save(out / 'stress' / ('long-layout-' + str(i + 1) + '.png'))
 report['stress'] = {'status': 'PASS', 'pages': len(stress), 'conditionSentences': 60, 'criteriaSentences': 0, 'bounds': 'PASS'}
 (out / 'pdf-result.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')

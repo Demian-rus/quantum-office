@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 import pymupdf
+from pdf_signature_bounds import verify_signature
 from pdf_task_numbers import task_numbers
 from pdf_graph_geometry import verify_ab
 
@@ -13,6 +14,7 @@ measured = {r['file']: r for r in browser['reports']}
 names = ['Compact-Geometry-Polished', 'Compact-Geometry-Answers-Polished', 'Practice-One-Task-Polished', 'Practice-Multiple-Tasks-Polished', 'Label-Collision-Cases']
 result = {'status': 'PASS', 'documents': []}
 all_prefixes = []
+expected_headings = {'Углы', 'Длины и площади', 'Координаты и окружности'}
 for name in names:
     doc = pymupdf.open(out / (name + '.pdf'))
     assert len(doc) == len(measured[name]['layout']['pages'])
@@ -29,20 +31,20 @@ for name in names:
         if 'Practice-' in name:
             assert 'Ответ:' not in text
         spans = [s for block in page.get_text('dict')['blocks'] if 'lines' in block for line in block['lines'] for s in line['spans'] if s['text'].strip()]
-        for s in spans:
+        for s in verify_signature(page, spans):
             b = pymupdf.Rect(s['bbox'])
             assert b.x0 >= 25 and b.y0 >= 22 and b.x1 <= page.rect.width - 25 and b.y1 <= page.rect.height - 10, (name, i, s)
-            if s['color'] == 0xB42318:
-                assert abs(s['size'] - 10.5) < .05
+            if name == 'Compact-Geometry-Polished' and s['text'].strip() in expected_headings:
+                assert s['color'] == 0 and s['flags'] & 16 and abs(s['size'] - 10.5) < .05
                 assert any(n['bbox'][1] >= b.y1 and re.fullmatch(r'\d+\.', n['text'].strip()) for n in spans), 'heading must share the page with its task'
-                headings.append({'text': s['text'], 'font': s['font'], 'size': round(s['size'], 2), 'color': '#b42318', 'page': i + 1})
+                headings.append({'text': s['text'], 'font': s['font'], 'size': round(s['size'], 2), 'color': '#000000', 'page': i + 1})
             if name.endswith('Answers-Polished') and re.fullmatch(r'\d+\.', s['text'].strip()):
                 all_prefixes.append({'number': int(s['text'].strip()[:-1]), 'font': s['font'], 'size': round(s['size'], 2), 'flags': s['flags']})
         page.get_pixmap(matrix=pymupdf.Matrix(1.6, 1.6), alpha=False).save(out / (name + '-' + str(i + 1) + '.png'))
     if name in ['Compact-Geometry-Polished', 'Compact-Geometry-Answers-Polished']:
         assert numbers == list(range(1, 25)), (name, numbers)
     if name == 'Compact-Geometry-Polished':
-        assert 2 <= len(doc) <= 3 and len(headings) == 3  # TASK149.6 retains all tasks with larger figures
+        assert 2 <= len(doc) <= 3 and len(headings) == 3 and {h['text'].strip() for h in headings} == expected_headings  # TASK149.6 retains all tasks with larger figures
     if name.endswith('Answers-Polished'):
         assert len(doc) == 1 and 'Найдите третий угол' not in doc[0].get_text()
     if 'Practice-' in name:
@@ -85,4 +87,4 @@ assert labels['A'][2] < a.x and labels['A'][1] < a.y
 assert labels['B'][0] > b.x and labels['B'][1] > b.y
 result['task18'] = {'status':'PASS','page':control['page'],'points':[list(a),list(b)],'letterBounds':labels,'actualABPath':True,'A':'left and above, clear of line','B':'right and below',**transform}
 (out / 'pdf-result.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
-print('PASS TASK149.5 PDF: A avoids actual AB vector/B right-below; all 24 prefixes share one bold font/size; red 10.5pt themes, vector A4 pages and bounds')
+print('PASS TASK149.5 PDF: A avoids actual AB vector/B right-below; all 24 prefixes share one bold font/size; black 10.5pt themes, vector A4 pages and bounds')

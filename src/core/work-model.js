@@ -13,6 +13,21 @@ function qwLabelPosition(raw){
  const dx=raw.dx??0,dy=raw.dy??0;if(!Number.isFinite(dx)||!Number.isFinite(dy)||Math.abs(dx)>1040||Math.abs(dy)>1040)throw Error('Некорректное смещение подписи');
  return {mode:raw.mode,dx,dy};
 }
+// EXAM-01: legacy booklet documents opt in automatically, but explicit practice
+// and notes profiles retain their original rendering. The obsolete compact exam
+// layout remains readable independently of the current booklet profile.
+function qwExamPublication(project,format=project.layout){
+ const profile=project.printSettings?.profile;
+ return (!profile||profile==='exam')&&(format==='booklet'||(format==='answers'&&(project.layout==='booklet'||project.layout==='exam'&&profile==='exam'))||format==='exam'&&profile==='exam');
+}
+function qwExamVariant(value){
+ const number=String(value??'').trim();
+ return /^\d{1,9}$/.test(number)&&Number(number)>0?String(Number(number)):'1';
+}
+function qwExamNumberText(index,number){
+ const valid=Number.isInteger(number)&&number>0&&number<=99999;
+ return '№ '+(index+1)+(valid?' ('+String(number).padStart(5,'0')+')':'')+'.';
+}
 function qwPrintSettings(raw={}){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректные параметры печати');
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
@@ -27,7 +42,7 @@ function qwPrintSettings(raw={}){
   options.numbering=raw.numbering;
  }
  if(raw.text!==undefined)options.text=qwTextStyle(raw.text);
- const flags=['showTitle','showMeta','showVariant','showPageNumbers','partHeadings','monochrome'];
+ const flags=['showTitle','showMeta','showVariant','showPageNumbers','partHeadings','monochrome','examPartHeadings','examTopicHeadings'];
  for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
  const textKeys={titleText:160};
  for(const [key,max] of Object.entries(textKeys))if(raw[key]!==undefined){
@@ -135,6 +150,11 @@ function qwValidate(raw){
   if(raw.source&&typeof raw.source==='object'){
    q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
    const number=raw.source.number,slot=raw.source.slot;
+   if(raw.source.createdAt!==undefined){
+    const stamp=raw.source.createdAt;
+    if(typeof stamp!=='string'||stamp.length>40||!/^\d{4}-\d\d-\d\dT/.test(stamp)||!Number.isFinite(Date.parse(stamp)))throw Error('Некорректная дата создания записи банка');
+    q.source.createdAt=stamp;
+   }
    if(number!==undefined){
     if(!Number.isInteger(number)||number<1||number>99999)throw Error('Некорректный постоянный номер задания банка');
     q.source.number=number;
@@ -444,4 +464,4 @@ function qwReorder(d,id,gap,part){const i=d.tasks.findIndex(q=>q.id===id);if(i<0
 function qwMove(d,id,delta){const i=d.tasks.findIndex(q=>q.id===id),j=i+delta;if(i<0||j<0||j>=d.tasks.length)return false;return qwReorder(d,id,delta>0?j+1:j,d.tasks[j].part);}
 function qwDuplicate(d,id){if(d.tasks.length>=QW_LIMITS.tasks)return null;const i=d.tasks.findIndex(q=>q.id===id);if(i<0)return null;const q=structuredClone(d.tasks[i]);q.id=qwId();d.tasks.splice(i+1,0,q);return q;}
 function qwFromDiagnostic(q){const t=qwTask(q.type==='practice'?'extended':q.type==='numeric'?'short':'short');t.prompt=qwText(q.prompt);t.answer=qwText(q.answer);t.criteria=qwText(q.criteria);t.points=qwNum(q.points,0,100,2);t.source={kind:'diagnostic',id:qwText(q.id,80)};return t;}
-export {qwSetFigureWidth,qwPublishSettings,qwPublishStyle,qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};
+export {qwExamPublication,qwExamVariant,qwExamNumberText,qwSetFigureWidth,qwPublishSettings,qwPublishStyle,qwLabelPosition,qwPrintSettings,QW_TYPES,QW_SUBJECTS,QW_LIMITS,qwProject,qwTask,qwQuickTask,qwValidate,qwValidateGraph,qwValidateDiagram,qwMove,qwReorder,qwResolveDiagram,qwDuplicate,qwFromDiagnostic,qwGraphGridStep,qwSnapGraphPoint,qwEvaluateCurve,qwGeometryVertices,qwRegularPolygonVertices,qwTriangleConstruction,qwSnapDiagramPoint,qwValidateStyle,qwValidateGraphElements,qwCoordinatePreset,QW_PLOT,qwPlotXY,QW_MECHANICS,QW_ELECTRICS,qwDiagramPorts,qwNearestDiagramPort};

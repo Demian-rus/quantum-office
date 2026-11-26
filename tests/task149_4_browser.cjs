@@ -13,7 +13,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
   const overlap=(a,b)=>Math.max(0,Math.min(a.right,b.right)-Math.max(a.left,b.left))*Math.max(0,Math.min(a.bottom,b.bottom)-Math.max(a.top,b.top));
   const sections=[...document.querySelectorAll('.qw-print-section')].map(section=>{
    const figure=section.querySelector('figure'),box=figure?.getBoundingClientRect(),svg=figure?.querySelector('svg'),vb=svg?.viewBox.baseVal,ink=svg?.getBBox();
-   const text=section.querySelector('.qw-task-text'),walker=document.createTreeWalker(text,NodeFilter.SHOW_TEXT),space=section.querySelector('.qw-practice-space');let node,intersections=0;
+   const text=section.querySelector('.qw-task-text')||section.querySelector('.qw-key-solutions'),walker=document.createTreeWalker(text,NodeFilter.SHOW_TEXT),space=section.querySelector('.qw-practice-space');let node,intersections=0;
    const sb=space?.getBoundingClientRect(),pb=section.closest('.qw-print-page').getBoundingClientRect();
    while(node=walker.nextNode()){if(!node.textContent.trim())continue;const range=document.createRange();range.selectNodeContents(node);if(box)for(const r of range.getClientRects())if(overlap(r,box)>1)intersections++;}
    return {task:+section.dataset.task,heightMm:section.getBoundingClientRect().height*25.4/96,figure:box?{widthMm:box.width*25.4/96,heightMm:box.height*25.4/96,position:figure.dataset.printPosition}:null,intersections,
@@ -21,7 +21,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
     labelPt:svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim()).map(e=>parseFloat(getComputedStyle(e).fontSize)*box.width/vb.width*.75):[],
     solutionMm:sb?.height*25.4/96||0,solutionBoxMm:sb?{x:(sb.left-pb.left)*25.4/96,y:(sb.top-pb.top)*25.4/96,width:sb.width*25.4/96,height:sb.height*25.4/96}:null};
   });
-  const bounds=[...document.querySelectorAll('.qw-page-content')].flatMap(p=>{const b=p.getBoundingClientRect();return [...p.querySelectorAll('.qw-paper-task,figure,math,.qw-practice-space,.qw-answer-item')].filter(e=>{const r=e.getBoundingClientRect();return r.left<b.left-.8||r.right>b.right+.8||r.top<b.top-.8||r.bottom>b.bottom+.8;}).map(e=>e.className?.baseVal||e.className||e.tagName);});
+  const bounds=[...document.querySelectorAll('.qw-page-content')].flatMap(p=>{const b=p.getBoundingClientRect();return [...p.querySelectorAll('.qw-paper-task,figure,math,.qw-practice-space,.qw-answer-item,.qw-key-solutions')].filter(e=>{const r=e.getBoundingClientRect();return r.left<b.left-.8||r.right>b.right+.8||r.top<b.top-.8||r.bottom>b.bottom+.8;}).map(e=>e.className?.baseVal||e.className||e.tagName);});
   return {layout:window.__qwPrintLayout,sections,bounds,bodyPt:parseFloat(getComputedStyle(document.body).fontSize)*.75,mathPt:[...document.querySelectorAll('.qw-task-text>math')].map(e=>parseFloat(getComputedStyle(e).fontSize)*.75),answerLines:document.querySelectorAll('.qw-answer-preview,.qw-solution-preview').length,text:document.body.innerText};
  });}
  async function exportPreview(name){
@@ -38,9 +38,9 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
   const untouched=await app.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   for(const {name,project} of samples){
    await app.evaluate(d=>qwChange(()=>{qwDoc=qwValidate(d);qwSelected=qwDoc.tasks[0].id;}),project);
-   const before=await app.evaluate(()=>JSON.stringify(qwDoc)),event=app.waitForEvent('download');await app.locator('[data-qw-action="save"]').click();const file=path.join(out,name+'.qwork');await(await event).saveAs(file);assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),project);
+   const before=await app.evaluate(()=>JSON.stringify(qwDoc)),event=app.waitForEvent('download');await app.locator('[data-action="work-save"]').click();const file=path.join(out,name+'.qwork');await(await event).saveAs(file);assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),project);
    await app.locator('[data-action="work-new"]').click();await app.locator('#qw-file').setInputFiles(file);await app.waitForFunction(n=>qwDoc.tasks.length===n,project.tasks.length);assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before);
-   await app.locator('[data-qw-action="preview"]').click();assert.equal(await app.locator('#qw-teacher').count(),0);assert.equal(await app.locator('.qw-exam-unavailable').count(),0,'removed roadmap hints must never reappear');
+   await app.locator('[data-action="work-preview"]').click();assert.equal(await app.locator('#qw-teacher').count(),0);assert.equal(await app.locator('.qw-exam-unavailable').count(),0,'removed roadmap hints must never reappear');
    const report=await exportPreview(name);assert.equal(report.answerLines,0);assert.doesNotMatch(report.text,/PRIVATE_|INTERNAL_|Задание \d+|Ответ:|Рисунок\s*\/\s*схема|\d+ б\./);for(const hidden of [project.instructions,project.tasks[0].criteria,project.tasks[0].comment])assert.ok(!report.text.includes(hidden));
    if(name==='Compact-Geometry'){
     assert.equal(report.sections.length,24);assert.ok(report.layout.pages.length<=3);assert.equal(await(await frame()).locator('.qw-topic-title').count(),3);
@@ -51,8 +51,10 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
    }else{assert.equal(report.layout.pages.length,1);assert.ok(report.sections.every(s=>s.solutionMm>=30));}
    await app.locator('[data-qw-close]').click();assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before,'export does not mutate data');
   }
+  // Persist the independently generated PDF measurements even if a later stress scenario fails.
+  fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify({status:'MATERIALS_GENERATED',reports,errors},null,2));
   // Real format/preset controls persist, undo and QWORK corruption is atomic.
-  await app.locator('[data-qw-action="preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
+  await app.locator('[data-action="work-preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
   await app.locator('[data-practice="perPage"]').selectOption('2');await app.locator('[data-practice="grid"]').selectOption('none');await frame();assert.equal(await app.evaluate(()=>qwDoc.practice.perPage),2);
   assert.equal(await(await frame()).locator('.qw-practice-space svg').count(),0);
   await app.setViewportSize({width:800,height:900});await app.screenshot({path:path.join(out,'preview-narrow.png')});assert.ok(await app.locator('[data-qw-action="preview-pdf"]').isVisible());await app.locator('[data-qw-close]').click();await app.setViewportSize({width:1440,height:1080});
@@ -66,7 +68,41 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
   const alias=await browser.newPage();await alias.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,true),missing));await ready(alias);assert.equal(await alias.locator('body').getAttribute('data-qw-format'),'answers');assert.equal(await alias.locator('figure').count(),0);assert.doesNotMatch(await alias.locator('body').innerText(),/Два угла треугольника/);await alias.close();
   const criteria=await browser.newPage();await criteria.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),missing));await ready(criteria);assert.ok((await criteria.locator('body').innerText()).includes(missing.tasks[0].criteria));await criteria.close();
   const long=structuredClone(missing);long.tasks=long.tasks.slice(0,1);long.tasks[0].answer=('Обоснование: используем сумму углов треугольника. ').repeat(240);long.tasks[0].criteria=('Критерий: вычисления объяснены. ').repeat(180);
-  const lp=await browser.newPage();await lp.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),long));await ready(lp);const longText=(await lp.locator('.qw-task-text').allTextContents()).join('');assert.equal(longText.split('Обоснование:').length-1,240);assert.equal(longText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(lp)).bounds,[]);await lp.close();
+  const lp=await browser.newPage();await lp.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),long));await ready(lp);const longText=(await lp.locator('.qw-task-text').allTextContents()).join('');assert.equal(longText.split('Обоснование:').length-1,240);assert.equal(longText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(lp)).bounds,[]);await lp.emulateMedia({media:'print'});await lp.pdf({path:path.join(out,'Long-Key-Portrait.pdf'),preferCSSPageSize:true,printBackground:true});await lp.close();
+  // Re-run the exact historical input in landscape; do not reduce its length.
+  const landscape=structuredClone(long);landscape.printSettings={...landscape.printSettings,orientation:'landscape'};
+  const ll=await browser.newPage();await ll.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),landscape));await ready(ll);
+  const landscapeText=(await ll.locator('.qw-task-text').allTextContents()).join('');assert.equal(landscapeText.split('Обоснование:').length-1,240);assert.equal(landscapeText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(ll)).bounds,[]);
+  await ll.emulateMedia({media:'print'});await ll.pdf({path:path.join(out,'Long-Key-Landscape.pdf'),preferCSSPageSize:true,printBackground:true});await ll.close();
+  // Rich text and formulas are compared to the unpaginated production HTML.
+  // Exercise both key-only and condition + key paths, with no synthetic renderer.
+  const rich=structuredClone(long);
+  rich.tasks[0].answer=('**Точный ответ**: $x=2$. ').repeat(160).trim();
+  rich.tasks[0].comment=('**Переход решения**: *подстановка* $a=3$. ').repeat(200).trim();
+  rich.tasks[0].criteria=('++Критерий проверки++: $b=4$. ').repeat(180).trim()+'\n\n1. Первый пункт.\n2. Второй пункт.';
+  for(const orientation of ['portrait','landscape'])for(const includePrompt of [false,true]){
+   rich.printSettings={...rich.printSettings,orientation};
+   const options={format:'answers',keyMode:'detailed',includeCriteria:true,includePrompt};
+   const html=await app.evaluate(({d,options})=>qwPrintDocumentHTML(d,false,options),{d:rich,options});
+   const p=await browser.newPage();await p.setContent(html);await ready(p);
+   const comparison=await p.evaluate(({html,includePrompt})=>{
+    const selector=includePrompt?'.qw-key-solutions':'.qw-answer-long .qw-task-text';
+    const collect=doc=>{
+     const roots=[...doc.querySelectorAll(selector)];
+     return {text:roots.map(e=>e.textContent).join(''),math:roots.flatMap(e=>[...e.querySelectorAll('math')].map(m=>m.outerHTML)),
+      styles:['strong','em','u'].map(tag=>roots.flatMap(e=>[...e.querySelectorAll(tag)].map(n=>n.textContent)).join(''))};
+    };
+    return {expected:collect(new DOMParser().parseFromString(html,'text/html')),actual:collect(document),
+     layout:window.__qwPrintLayout,footers:[...document.querySelectorAll('.qw-page-footer')].map(e=>e.textContent)};
+   },{html,includePrompt});
+   assert.deepEqual(comparison.actual,comparison.expected,'rich text, MathML and inline styles survive pagination');
+   assert.equal(comparison.actual.math.length,540);assert.ok(comparison.actual.styles.every(s=>s.length>0));
+   assert.ok(comparison.layout.pages.length>1);assert.ok(comparison.layout.pages.every(p=>p.freeMm>=-.1));
+   assert.deepEqual(comparison.footers,Array.from({length:comparison.layout.sheets},(_,i)=>(i+1)+' / '+comparison.layout.sheets));
+   assert.deepEqual((await inspect(p)).bounds,[]);
+   const name='Long-Rich-'+orientation+(includePrompt?'-Condition':'');
+   await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});await p.close();
+  }
   const cp=structuredClone(samples[0].project);cp.tasks=cp.tasks.slice(0,1);cp.tasks[0].prompt=('Докажите утверждение. Объясните каждый переход. ').repeat(250);const cl=await render(cp,'compact');assert.equal((await cl.locator('.qw-task-text').allTextContents()).join('').split('Докажите').length-1,250);assert.equal(await cl.locator('figure').count(),1);assert.deepEqual((await inspect(cl)).bounds,[]);await cl.close();
   assert.deepEqual(await app.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())})),untouched);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify({status:'PASS',reports,errors},null,2));console.log('PASS TASK149.4: actual formats/keys, 24 original tasks, vector print pipeline, adaptive figures, practice presets, QWORK roundtrip/corruption, narrow preview');

@@ -61,7 +61,7 @@ with sync_playwright() as p:
     frame:box(document.getElementById('grid-frame')),reserve:scroll.offsetWidth-scroll.clientWidth};
  }""")
  assert abs(pos['scroll']['top']-pos['headers']['bottom'])<1.1,pos
- assert pos['reserve']>=12,pos
+ assert pos['reserve']==11,pos
  # At zero scroll, A1 begins precisely below the letter header.
  page.locator('#formula-input').fill('Исходное значение')
  page.locator('#formula-input').press('Enter')

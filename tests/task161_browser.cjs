@@ -22,8 +22,9 @@ const obj=(kind,x,y,x2,y2,label='',extra={})=>({kind,x,y,x2,y2,label,...extra});
   await page.evaluate(()=>route('writer'));
   await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="diagram"]').click();
+  await page.locator('[data-bank-source]').click();
   await page.locator('#qw-prompt').fill('Исследуйте электрическую цепь.');
-  await page.locator('[data-qw-action="diagram"]').click();
+  await page.locator('[data-bank-visual="diagram"]').click();
   await page.locator('#qw-snap-geometry').uncheck();
   for(const kind of ['resistor','rheostat','cell','battery','lamp','switchOpen','switchClosed','ammeter','voltmeter','wireOrth','junction',
     'forceVector','velocityVector','accelerationVector','torque','dynamometer','weightSet']){

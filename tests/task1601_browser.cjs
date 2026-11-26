@@ -119,10 +119,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
     if(new Set(n).size!==3||n.some(x=>!Number.isInteger(x)||x<1))throw Error('duplicate or missing bank numbers');
     if(qwBankRead().map(x=>x.bankNumber).join()!==n.join())throw Error('unstable bank number');
     const doc=qwProject();doc.layout='booklet';doc.tasks=[qwTask('short')];
-    doc.tasks[0].prompt='Укажите скорость';
-    doc.tasks[0].source={kind:'bank',id:'legacy2',number:1807,slot:'7'};
+    const linked=entries.find(x=>x.id==='legacy2');
+    doc.tasks[0]={...linked.task,source:{kind:'bank',id:linked.id,number:linked.bankNumber,slot:linked.slot}};
+    if(linked.bankNumber!==1807)throw Error('existing permanent number changed');
     const page=qwPrintDocumentHTML(qwValidate(doc),false,{format:'booklet'});
-    if(!page.includes('№ 01807.'))throw Error('missing printed bank identity');
+    const exact='№ 1 ('+String(linked.bankNumber).padStart(5,'0')+').';
+    if(!page.includes(exact)||!page.includes('data-qw-bank-number="'+linked.bankNumber+'"'))throw Error('missing printed bank identity');
     return {numbers:n,printedIdentity:true,legacyPreserved:true};
    }finally{
     if(original===null)localStorage.removeItem(QW_BANK_KEY);else localStorage.setItem(QW_BANK_KEY,original);

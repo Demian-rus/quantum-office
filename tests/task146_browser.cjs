@@ -10,9 +10,9 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   const errors=[];page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));await page.locator('.global-bar [data-target="work"]').click();
-  const action=k=>page.locator('[data-qw-action="'+k+'"]');
+  const action=k=>page.locator(['diagram','graph'].includes(k)?'[data-bank-visual="'+k+'"]':['save','preview'].includes(k)?'[data-action="work-'+k+'"]':'[data-qw-action="'+k+'"]');
   await page.locator('[data-qw-action="quick-add"][data-type="'+'diagram'+'"]').click();
-  await page.locator('#qw-prompt').fill('В треугольнике ABC определите неизвестную сторону и проведите высоту.');
+  await page.locator('[data-bank-source]').click();await page.locator('#qw-prompt').fill('В треугольнике ABC определите неизвестную сторону и проведите высоту.');
   await action('diagram').click();
   const modal=page.locator('#qw-dialog'),stage=page.locator('#qw-visual-stage svg');
   assert.equal(await modal.evaluate(x=>x.classList.contains('qw-visual-dialog')),true);
@@ -59,7 +59,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
   await page.screenshot({path:path.join(out,'fixed_dialog_many_objects.png')});
   await action('visual-apply').click();
   await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
-  await page.locator('#qw-prompt').fill('Определите значение скорости по графику.');
+  await page.locator('[data-bank-source]').click();await page.locator('#qw-prompt').fill('Определите значение скорости по графику.');
   await action('graph').click();
   const svg=await stage.evaluate(x=>x.outerHTML);
   const yLabels=[...svg.matchAll(/<text class="qw-axis-number" data-axis="y" data-value="([^"]+)"/g)].map(m=>m[1]);

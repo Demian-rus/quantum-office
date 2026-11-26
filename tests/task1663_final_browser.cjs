@@ -44,7 +44,10 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1663');
   await release();assert.equal(await count(),1);assert.equal(await p.evaluate(()=>qwDoc.tasks[0].prompt),'Bank plain');
   await bank();await select('picture');await button('picture').click();await p.waitForFunction(()=>qwDoc.tasks.length===2&&!document.querySelector('#qw-dialog[open]'));
   assert.equal(await p.evaluate(()=>qwDoc.tasks.at(-1).image),fixtures.image);
-  assert.ok(await p.locator('#qw-task-preview img').evaluate(img=>img.complete&&img.naturalWidth===32));
+  const liveImage=p.locator('#qw-task-editor [data-bank-live-figure] img');
+   await liveImage.waitFor({state:'visible'});
+   await liveImage.evaluate(img=>img.decode());
+   assert.ok(await liveImage.evaluate(img=>img.complete&&img.naturalWidth===32));
   // Actual QWORK download and reopen, with the active picture included.
   const event=p.waitForEvent('download');await p.evaluate(()=>qwSaveFile());const download=await event;
   const file=path.join(out,'final-image-roundtrip.qwork');await download.saveAs(file);

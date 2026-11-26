@@ -3,7 +3,13 @@ import re
 
 
 def task_numbers(page):
-    return [int(s['text'].strip()[:-1])
-            for block in page.get_text('dict')['blocks']
-            for line in block.get('lines', []) for s in line['spans']
-            if s['flags'] & 16 and re.fullmatch(r'\d+\.', s['text'].strip())]
+    result=[]
+    for block in page.get_text('dict')['blocks']:
+        for line in block.get('lines', []):
+            for s in line['spans']:
+                if not s['flags'] & 16:
+                    continue
+                match=re.fullmatch(r'(?:№\s+)?(\d+)(?:\s*\(\d{5}\))?\.',s['text'].strip())
+                if match:
+                    result.append(int(match.group(1)))
+    return result

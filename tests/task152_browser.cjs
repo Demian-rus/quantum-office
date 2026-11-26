@@ -19,8 +19,9 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task152');
   await page.evaluate(()=>route('writer'));
   await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="diagram"]').click();
+  await page.locator('[data-bank-source]').click();
   await page.locator('#qw-prompt').fill('Постройте схему: эллипс, правильный многоугольник и зависимые геометрические построения.');
-  await action('diagram').click();await page.locator('#qw-snap-geometry').uncheck();
+  await page.locator('[data-bank-visual="diagram"]').click();await page.locator('#qw-snap-geometry').uncheck();
   for(const k of ['ellipse','regularPolygon','midpoint','angleBisector','perpendicularBisector'])
    assert.equal(await page.locator('[data-tool="'+k+'"]').count(),1,'tool '+k);
   await tool('ellipse');await drag(65,40,185,100);
@@ -63,13 +64,13 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task152');
   // Project-wide undo/redo also covers the complete visual editor transaction.
   await action('undo').click();assert.equal(await page.evaluate(()=>qwCurrent().diagram.length),0);
   await action('redo').click();assert.deepEqual(await page.evaluate(()=>structuredClone(qwCurrent().diagram)),before);
-  const download=page.waitForEvent('download');await action('save').click();
+  const download=page.waitForEvent('download');await page.locator('[data-action="work-save"]').click();
   const file=path.join(out,'task152.qwork');await(await download).saveAs(file);
   assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')).tasks[0].diagram,before);
   await page.locator('[data-action="work-new"]').click();await page.locator('#qw-file').setInputFiles(file);
   await page.waitForFunction(()=>qwDoc.tasks.length===1&&qwDoc.tasks[0].diagram.length===7);
   assert.deepEqual(await page.evaluate(()=>structuredClone(qwCurrent().diagram)),before);
-  await page.locator('.qw-center-head [data-qw-action="preview"]').click();
+  await page.locator('[data-action="work-preview"]').click();
   await page.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();
   const frame=await(await page.locator('#qw-print-preview-frame').elementHandle()).contentFrame();
   await frame.evaluate(()=>window.qwPrintReady);

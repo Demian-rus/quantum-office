@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149.7')
  fs.mkdirSync(out,{recursive:true});
  const browser=await chromium.launch({headless:true}),p=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true}),errors=[],checks=[];
  p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept());
- const action=k=>p.locator('[data-qw-action="'+k+'"]'),stage=p.locator('#qw-visual-stage svg');
+ const action=k=>p.locator(['diagram','graph'].includes(k)?'[data-bank-visual="'+k+'"]':['save','preview'].includes(k)?'[data-action="work-'+k+'"]':'[data-qw-action="'+k+'"]'),stage=p.locator('#qw-visual-stage svg');
  const tool=k=>p.locator('[data-tool="'+k+'"]').click();
  async function drag(x,y,x2,y2){const b=await stage.boundingBox(),at=(x,y)=>({x:b.x+x*b.width/520,y:b.y+y*b.height/320}),a=at(x,y),z=at(x2,y2);await p.mouse.move(a.x,a.y);await p.mouse.down();await p.mouse.move(z.x,z.y,{steps:8});await p.mouse.up();}
  const selected=()=>stage.locator('.qw-visual-selected[data-qw-object]').evaluateAll(es=>es.map(e=>+e.dataset.qwObject));

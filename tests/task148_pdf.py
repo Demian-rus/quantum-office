@@ -24,7 +24,7 @@ for name in ('vector', 'raster'):
     report[name] = {'pages': len(doc), 'coloredPixels': counts}
     if name == 'vector':
         text = ''.join(page.get_text() for page in doc)
-        assert all(label in text for label in ('F₁', 'F₂', 'F₃', '-10', 'Подвижный блок'))
+        assert all(label in text for label in ('F₁', 'F₂', 'F₃', '−10', 'Подвижный блок'))
         colored = {key: [] for key in targets}
         slopes = []
         for page in doc:

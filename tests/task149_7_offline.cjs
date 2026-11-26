@@ -6,7 +6,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149.7')
  const browser=await chromium.launch({headless:true}),context=await browser.newContext({offline:true,acceptDownloads:true}),p=await context.newPage(),errors=[],requests=[],roundtrips=[];
  p.on('pageerror',e=>errors.push(e.message));p.on('request',r=>{if(/^https?:/.test(r.url()))requests.push(r.url());});p.on('dialog',d=>d.accept());
  await p.addInitScript(()=>{window.print=function(){window.top.__printedHTML=document.documentElement.outerHTML;window.dispatchEvent(new Event('afterprint'));};});
- const action=k=>p.locator('[data-qw-action="'+k+'"]');
+ const action=k=>p.locator(['diagram','graph'].includes(k)?'[data-bank-visual="'+k+'"]':['save','preview'].includes(k)?'[data-action="work-'+k+'"]':'[data-qw-action="'+k+'"]');
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const files=['User-Workflow','Reorder-Workflow','Construction-Tools','Compact-Geometry-Improved','Practice-One-Per-Page-Three-Tasks','Practice-Multiple-Tasks-Improved','Physics-Graph-Comparison'];
@@ -17,7 +17,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task149.7')
    await p.locator('[data-action="work-new"]').click();await p.locator('#qw-file').setInputFiles(saved);await p.waitForFunction(id=>qwDoc.id===id,source.id);assert.deepEqual(await p.evaluate(()=>structuredClone(qwDoc)),source);roundtrips.push({file:name+'.qwork',exactDocument:true});
   }
   const before=await p.evaluate(()=>structuredClone(qwDoc));await p.locator('#qw-file').setInputFiles({name:'corrupt.qwork',mimeType:'application/json',buffer:Buffer.from('{"format":"quantum-work","version":1,"tasks":[')});await p.waitForFunction(()=>document.getElementById('toast').textContent.includes('Не удалось открыть QWORK'));assert.deepEqual(await p.evaluate(()=>qwDoc),before);
-  await p.locator('.qw-center-head [data-qw-action="preview"]').click();await p.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();const f=await(await p.locator('#qw-print-preview-frame').elementHandle()).contentFrame();await f.evaluate(()=>window.qwPrintReady);assert.equal(await f.evaluate(()=>window.__qwPrintError),undefined);
+  await p.locator('[data-action="work-preview"]').click();await p.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();const f=await(await p.locator('#qw-print-preview-frame').elementHandle()).contentFrame();await f.evaluate(()=>window.qwPrintReady);assert.equal(await f.evaluate(()=>window.__qwPrintError),undefined);
   await action('preview-pdf').click();await p.waitForFunction(()=>!!window.__printedHTML);const html=await p.evaluate(()=>window.__printedHTML);const print=await context.newPage();await print.setContent(html);await print.evaluate(()=>window.qwPrintReady);await print.emulateMedia({media:'print'});await print.pdf({path:path.join(out,'offline-student.pdf'),preferCSSPageSize:true,printBackground:true});
   await p.screenshot({path:path.join(out,'offline-preview.png')});assert.deepEqual(errors,[]);assert.deepEqual(requests,[]);fs.writeFileSync(path.join(out,'offline-result.json'),JSON.stringify({status:'PASS',roundtrips,corruptImportAtomic:true,printReady:true,networkRequests:requests,errors},null,2));console.log('PASS TASK149.7 offline: seven exact QWORK save/import/reopen cycles, corrupt import preserved document, native PDF, zero network requests');
  }finally{await browser.close();}

@@ -28,7 +28,7 @@ test('TASK153: booklet uses the vector-print path, never the canvas/JPEG PDF pat
  assert.match(builder,/if\(teacher\|\|\['compact','practice','booklet','worksheet','exam'\]\.includes\(qwDoc\.layout\)\)\{qwPrintTextPDF/);
  assert.match(builder,/\['worksheet','exam','compact','practice','answers','booklet'\]/);
  assert.match(builder,/format==='booklet'&&showVariant&&d\.variant/);
- assert.match(builder,/qw-booklet-entry qw-standard-task">'\+heading\+flow/);
+ assert.match(builder,/qw-booklet-entry qw-standard-task'\+\(exam\?' qw-exam-publication':''\)\+'">'\+heading\+flow/);
  assert.match(layout,/\.qw-standard-task>\.qw-task-heading\{display:grid;grid-column:1\/-1;grid-row:1/);
  assert.match(layout,/modern=\['compact','practice','answers','booklet'\]\.includes\(format\)/);
 });

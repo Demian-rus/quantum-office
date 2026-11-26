@@ -10,12 +10,12 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1492_EVIDENCE||pa
  try{
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   await p.evaluate(project=>qwChange(()=>{qwDoc=qwValidate(project);qwSelected=qwDoc.tasks[0].id;}),sample);
-  const event=p.waitForEvent('download');await p.locator('[data-qw-action="save"]').click();const file=path.join(out,'Quantum-Office-Sample.qwork');await(await event).saveAs(file);
+  const event=p.waitForEvent('download');await p.locator('[data-action="work-save"]').click();const file=path.join(out,'Quantum-Office-Sample.qwork');await(await event).saveAs(file);
   assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),sample);
   for(const teacher of [false,true]){
    let html;
    if(teacher)html=await p.evaluate(()=>qwPrintDocumentHTML(qwDoc,true,{answers:true,criteria:false,comments:false}));
-   else{await p.locator('[data-qw-action="preview"]').click();await p.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();const preview=await(await p.locator('#qw-print-preview-frame').elementHandle()).contentFrame();await preview.evaluate(()=>window.qwPrintReady);html=await preview.content();}
+   else{await p.locator('[data-action="work-preview"]').click();await p.locator('[data-qw-action="preview-pdf"]:enabled').waitFor();const preview=await(await p.locator('#qw-print-preview-frame').elementHandle()).contentFrame();await preview.evaluate(()=>window.qwPrintReady);html=await preview.content();}
    assert.doesNotMatch(html,/data-qw-(?:vertex|object|editor)/);
    await p.evaluate(()=>window.__qwPrintCalled=false);if(teacher)await p.evaluate(()=>qwPrintTextPDF(true,{answers:true,criteria:false,comments:false}));else await p.locator('[data-qw-action="preview-pdf"]').click();await p.waitForFunction(()=>window.__qwPrintCalled===true);
    const print=await browser.newPage();await print.setContent(html,{waitUntil:'load'});await print.evaluate(()=>window.qwPrintReady);await print.emulateMedia({media:'print'});await print.evaluate(()=>document.fonts.ready);

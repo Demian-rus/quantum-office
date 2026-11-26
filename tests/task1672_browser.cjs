@@ -38,7 +38,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1672');
   const original=JSON.parse(await snapshot()),raster=original.tasks[2].id;
   assert.equal(await p.locator('[data-qw-action="up"] svg').count(),1);
   assert.equal(await p.locator('[data-qw-action="down"] svg').count(),1);
-  await p.locator('[data-qw-action="preview"]').click();await ready();
+  await p.locator('[data-action="work-preview"]').click();await ready();
   assert.deepEqual(await format.locator('option').evaluateAll(es=>es.map(e=>e.value)),['booklet','compact','practice','worksheet']);
   for(const value of ['compact','practice','worksheet','booklet']){await changed(()=>format.selectOption(value));assert.equal(await p.evaluate(()=>qwDoc.layout),value);}
   await tasks.selectOption(raster);assert.equal(await mode.inputValue(),'auto');assert.equal(await widthControl.isDisabled(),true);
@@ -76,7 +76,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1672');
   const legacyOptions=await p.locator('[data-meta="layout"] option').evaluateAll(es=>es.map(e=>[e.value,e.textContent]));
   assert.equal(legacyOptions.find(x=>x[0]==='exam')[1],'Прежний компактный макет (без проверки ФИПИ)');
   await p.locator('[data-qw-close]').click();
-  await p.locator('[data-qw-action="preview"]').click();await ready();
+  await p.locator('[data-action="work-preview"]').click();await ready();
   assert.deepEqual(await format.locator('option').evaluateAll(es=>es.map(e=>[e.value,e.textContent])),legacyOptions);
   assert.equal(await format.inputValue(),'exam');
   const measure=()=>p.evaluate(()=>{
@@ -143,7 +143,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1672');
   await changed(()=>p.locator('#qw-layout-figure-reset').click());assert.equal(await mode.inputValue(),'auto');assert.ok(await widthControl.isDisabled());
   assert.equal(await p.evaluate(()=>qwDoc.tasks[2].figureWidthMode),undefined);
   await p.locator('[data-qw-close]').click();
-  const saved=await snapshot(),download=p.waitForEvent('download');await p.locator('[data-qw-action="save"]').click();
+  const saved=await snapshot(),download=p.waitForEvent('download');await p.locator('[data-action="work-save"]').click();
   const file=path.join(out,'roundtrip.qwork');await (await download).saveAs(file);
   await p.locator('#qw-file').setInputFiles(file);await p.waitForFunction(()=>document.querySelector('#toast')?.textContent.includes('Работа открыта'));assert.deepStrictEqual(JSON.parse(await snapshot()),JSON.parse(saved));
   await p.reload();await route('work');assert.deepStrictEqual(JSON.parse(await snapshot()),JSON.parse(saved));
