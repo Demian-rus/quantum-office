@@ -113,7 +113,7 @@ async function authorGraphTask(page) {
   await screenshot(page, 'editor-dark');
   const preview = page.locator('[data-bank-preview-toggle="prompt"]');
   await preview.click();
-  const rendered = page.locator('#qw-bank-edit-preview');
+  const rendered = page.frameLocator('[data-bank-publish-frame]').locator('.qw-print-document');
   await rendered.locator('svg[viewBox]').first().waitFor();
   assert.equal(await rendered.locator('strong').innerText(), 'путь');
   assert.equal(await rendered.locator('u').innerText(), '6 с');

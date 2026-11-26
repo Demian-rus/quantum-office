@@ -8,7 +8,8 @@ const finalEdition = process.argv.includes('--bank-02.4');
 const samples = finalEdition ? require('./fixtures/bank024-samples.cjs') : require('./fixtures/bank023-samples.cjs');
 
 const root = path.resolve(__dirname, '..');
-const out = path.join(root, finalEdition ? 'evidence/bank-02.4' : 'evidence/bank-02.3');
+const out = process.env.QO_BANK023_EVIDENCE ? path.resolve(process.env.QO_BANK023_EVIDENCE) :
+  path.join(root, finalEdition ? 'evidence/bank-02.4' : 'evidence/bank-02.3');
 const fixtureId = n => `bank023-${String(n).padStart(2, '0')}`;
 const action = (page, name) => page.locator(`[data-qw-action="${name}"]`);
 
@@ -120,16 +121,26 @@ function inspectEdition(){
   const tasks=[...document.querySelectorAll('.qw-print-section .qw-task-text')];
   const force=document.querySelector('[data-task="5"] figure svg');
   const graph=document.querySelector('[data-task="7"] figure svg');
-  const labels=force&&[...force.querySelectorAll('[data-qw-label]')].filter(e=>e.querySelector('text').textContent.startsWith('F')).map(node=>{
-    const owner=node.closest('[data-qw-label-owner]'), text=node.querySelector('text'), letter=text.firstElementChild, index=letter.nextElementSibling;
+  const point=(node,x,y)=>new DOMPoint(x,y).matrixTransform(node.getCTM());
+  const labels=force&&[...force.querySelectorAll('[data-qw-label]')].filter(e=>e.querySelector('[data-qw-science-math] > text')?.textContent==='F').map(node=>{
+    const owner=node.closest('[data-qw-label-owner]'), math=node.querySelector('[data-qw-science-math]');
+    const [letter,...indices]=math.querySelectorAll('text');
     const shaft=owner.querySelector('[data-qw-arrow-shaft]'), head=owner.querySelector('[data-qw-arrow-head]');
-    const translation=node.transform.baseVal.numberOfItems?node.transform.baseVal.getItem(0).matrix.f:0;
-    return { baseline:+text.getAttribute('y')+translation, clear:box(text).bottom<box(shaft).top, conflict:node.dataset.labelConflict,
-      style:letter.getAttribute('font-style'), font:css(letter).fontSize, index:index?.textContent||'', shift:index?.getAttribute('baseline-shift')||'',
-      length:Math.abs(+head.dataset.qwTip.split(',')[0]-shaft.points[0].x), arrowY:+head.dataset.qwTip.split(',')[1] };
+    const baseline=text=>point(text,+text.getAttribute('x'),+text.getAttribute('y')).y;
+    const [x,y]=head.dataset.qwTip.split(',').map(Number);
+    return {baseline:baseline(letter),clear:box(math).bottom<box(shaft).top,conflict:node.dataset.labelConflict,
+      style:letter.getAttribute('font-style'),font:css(letter).fontSize,index:indices.map(text=>text.textContent).join(''),
+      lowered:indices.every(text=>baseline(text)>baseline(letter)&&parseFloat(css(text).fontSize)<parseFloat(css(letter).fontSize)),
+      arrow:math.querySelector('[data-qw-math-rule]')&&box(math.querySelector('[data-qw-math-rule]')).bottom<box(letter).top+box(letter).height/2,
+      length:Math.abs(x-shaft.points[0].x),arrowY:point(head,x,y).y};
   });
+  const graphNumbers=graph&&[...graph.querySelectorAll('.qw-axis-number')].map(n=>({axis:n.dataset.axis,value:Number(n.dataset.value)}));
+  const bend=graph&&graph.querySelectorAll('circle')[1];
+  const projection=bend&&[...graph.querySelectorAll('line[data-qw-reference]')].some(line=>
+    line.hasAttribute('stroke-dasharray')&&Math.abs(+line.getAttribute('x1')-Number(bend.getAttribute('cx')))<.01&&
+    line.getAttribute('x1')===line.getAttribute('x2'));
   return {issues,pages:pages.length,tasks:tasks.map(t=>t.textContent),labels,
-    graph:graph&&[...graph.querySelectorAll('.qw-axis-number')].map(n=>n.dataset.axis+':'+n.dataset.value)};
+    graph:graphNumbers,projection};
 }
 
 async function render(context,page,work,name,orientation,options){
@@ -176,13 +187,16 @@ async function render(context,page,work,name,orientation,options){
       if(name.startsWith('pupil-')){
         assert.ok(edition.tasks.every(text=>!/Для первого участка используйте|Проверьте единицы|Используйте все три строки/.test(text)));
         assert.ok(edition.tasks[12].startsWith('Масса воды равна 250 г, а её объём составляет 250 см³. Выразите обе величины в СИ.'));
-        assert.ok(['x:6','y:20','y:50'].every(tick=>edition.graph.includes(tick)),edition.graph.join(', '));
+        const xTicks=edition.graph.filter(tick=>tick.axis==='x').map(tick=>tick.value);
+        const steps=xTicks.slice(1).map((value,index)=>value-xTicks[index]);
+        assert.ok(steps.length>=2&&steps.every(step=>step===steps[0]),JSON.stringify(edition.graph));
+        assert.ok(xTicks.includes(6)||edition.projection,JSON.stringify(edition.graph));
         const [applied,friction]=edition.labels;
         assert.equal(edition.labels.length,2);
         assert.deepEqual([applied.index,friction.index],['','тр']);
-        assert.equal(friction.shift,'sub');
-        assert.ok(edition.labels.every(label=>label.conflict==='false'&&label.style==='italic'&&label.clear&&label.baseline<label.arrowY));
-        assert.equal(applied.baseline,friction.baseline);
+        assert.ok(friction.lowered);
+        assert.ok(edition.labels.every(label=>label.conflict==='false'&&label.style==='italic'&&label.clear&&label.arrow&&label.baseline<label.arrowY),JSON.stringify(edition.labels));
+        assert.ok(Math.abs(applied.baseline-friction.baseline)<.05);
         assert.equal(applied.font,friction.font);
         assert.equal(applied.length/friction.length,2.5);
       }

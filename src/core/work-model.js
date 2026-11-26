@@ -17,7 +17,7 @@ function qwPrintSettings(raw={}){
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
  if(!Number.isFinite(fontPt)||fontPt<9||fontPt>12||!['auto','right','below'].includes(figurePosition)||typeof topicHeadings!=='boolean')throw Error('Проверьте параметры печати');
  const options={fontPt,figurePosition,topicHeadings};
- const flags=['showTitle','showMeta','showVariant','showPageNumbers','monochrome'];
+ const flags=['showTitle','showMeta','showVariant','showPageNumbers','partHeadings','monochrome'];
  for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
  const textKeys={titleText:160};
  for(const [key,max] of Object.entries(textKeys))if(raw[key]!==undefined){

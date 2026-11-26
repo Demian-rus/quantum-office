@@ -4,6 +4,7 @@ Run after tests/bank023_browser.cjs. Requires PyMuPDF and Pillow.
 """
 import json
 import math
+import os
 import sys
 from collections import deque
 from pathlib import Path
@@ -13,7 +14,9 @@ from PIL import Image, ImageDraw
 
 
 FINAL_EDITION = '--bank-02.4' in sys.argv
-OUT = Path(__file__).resolve().parent.parent / 'evidence' / ('bank-02.4' if FINAL_EDITION else 'bank-02.3')
+EVIDENCE = Path(__file__).resolve().parent.parent / 'evidence'
+OUTPUT_OVERRIDE = os.environ.get('QO_BANK023_EVIDENCE')
+OUT = Path(OUTPUT_OVERRIDE).resolve() if OUTPUT_OVERRIDE else EVIDENCE / ('bank-02.4' if FINAL_EDITION else 'bank-02.3')
 PNG = OUT / 'pdf-pages'
 FRAGMENTS = OUT / 'fragments'
 PNG.mkdir(exist_ok=True)
@@ -182,7 +185,7 @@ def verify():
             print(f'{name}: {len(document)} pages, max DOM center error {report["maxCenterDeltaPt"]:.3f} pt, max ink center error {max(deltas,default=0):.3f} pt, {len(report["roots"])} radicals')
 
     portrait=next(r for r in geometry['docs'] if r['name']=='pupil-portrait')
-    baseline_dir=OUT.parent/'bank-02.3' if FINAL_EDITION else OUT/'before'
+    baseline_dir=EVIDENCE/'bank-02.3' if FINAL_EDITION else OUT/'before'
     if FINAL_EDITION:
         for kind in ('student','key'):
             with fitz.open(OUT/f'diagnostic-{kind}.pdf') as document:
@@ -199,7 +202,7 @@ def verify():
             page=after[row['page']-1]
             _,old_image=render(legacy,baseline)
             _,new_image=render(page,padded(fitz.Rect(row['rect']),4))
-            labels=['BANK-02.3 · 300%','BANK-02.4 · 300%'] if FINAL_EDITION else ['BANK-02.2 · 300%','BANK-02.3 · 300%']
+            labels=['BANK-02.3 · 300%',('Текущая сборка' if OUTPUT_OVERRIDE else 'BANK-02.4')+' · 300%'] if FINAL_EDITION else ['BANK-02.2 · 300%','BANK-02.3 · 300%']
             montage([old_image,new_image],FRAGMENTS/f'008{number:02}-compare-300.png',labels)
     with fitz.open(baseline_dir/'key-brief.pdf') as before, fitz.open(OUT/'key-brief.pdf') as after:
         _,original=render(before[0],fitz.Rect(29,37,before[0].rect.width-20,240))

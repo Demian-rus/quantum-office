@@ -24,7 +24,7 @@ async function checkBankLifecycle(p,id,dialogDecision){
  if(await p.locator('#qw-graph-preset').isVisible()===false)await p.locator('[data-visual-panel="tools"]').click();
  await p.locator('#qw-graph-preset').selectOption('v');await action('visual-apply').click();await prompt.waitFor();
  const previewToggle=p.locator('[data-bank-preview-toggle="prompt"]');await previewToggle.click();
- const rendered=p.locator('#qw-bank-edit-preview');await rendered.locator('svg[viewBox]').first().waitFor();
+ const rendered=p.frameLocator('[data-bank-publish-frame]').locator('.qw-print-document');await rendered.locator('svg[viewBox]').first().waitFor();
  const preview=await rendered.innerHTML();await sameEditor();assert.equal(await rendered.innerHTML(),preview,'applied graph remains in working copy');
  await previewToggle.click();
  dialogDecision.accept=false;count=dialogDecision.count;await route('diagnostics');assert.equal(dialogDecision.count,count+1);assert.ok(await prompt.isVisible());await unchanged();

@@ -245,7 +245,7 @@ async function main() {
     await recovery.context.close();
 
     await page.evaluate(d => { route('work'); qwDoc=d; qwSelected=d.tasks[0].id; qwRender(); }, structuredClone(work));
-    await action(page, 'preview').click();
+    await page.locator('[data-action=work-preview]').click();
     const workFrame = '#qw-print-preview-frame';
     const docPreview = await ready(page, workFrame, { layout: 'portrait', width: '34' });
     await page.locator('.qw-pdf-design [data-style-field=width]').fill('39');

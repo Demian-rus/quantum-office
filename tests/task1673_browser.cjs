@@ -5,7 +5,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1673');
 (async()=>{
  fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const errors=[],reports=[];let page,context,acceptDialog=true;const bankDecision={accept:true,count:0};let bankTesting=false;
- const action=a=>page.locator('[data-qw-action="'+a+'"]');
+ const modern={preview:'[data-action=work-preview]',graph:'[data-bank-visual=graph]',diagram:'[data-bank-visual=diagram]',save:'[data-action=work-save]'};let candidate=false;
+ const action=a=>candidate&&modern[a]?page.locator(modern[a]):page.locator('[data-qw-action="'+a+'"]');
  const close=async()=>{await page.locator('[data-qw-close]').click();await page.locator('#qw-dialog').waitFor({state:'detached'});};
  const ready=()=>page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return !!f?.dataset.ready&&f.dataset.ready===f.contentDocument?.documentElement?.dataset.qwRender&&!f.contentWindow?.__qwPrintError;});
  const setup=async(file)=>{context=await browser.newContext({offline:true,acceptDownloads:true,viewport:{width:1920,height:1080}});page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>{if(bankTesting){bankDecision.count++;return bankDecision.accept?d.accept():d.dismiss();}return acceptDialog?d.accept():d.dismiss();});await page.goto(pathToFileURL(file).href);await page.evaluate(()=>{route('work');const d=qwProject(),g=qwTask('graph'),s=qwTask('diagram');g.prompt='Скорость по графику';g.graph.points=[{x:1,y:1,label:'A'},{x:8,y:5,label:'B'}];s.prompt='Геометрия';s.diagram=[{kind:'line',x:40,y:80,x2:300,y2:80,label:'AB'}];d.tasks=[g,s];d.layout='booklet';qwDoc=qwValidate(d);qwSelected=g.id;qwPersist();qwRender();});await page.evaluate(async()=>{await qwBankOpen();const task=structuredClone(qwDoc.tasks[0]);await qwBankRepository.createTask({id:'task1673-baseline-view',subject:'physics',task});});};
@@ -15,7 +16,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1673');
  async function capture(label){await screenshot(label+'-work');await action('preview').click();await ready();await screenshot(label+'-pdf');await close();await action('graph').click();await screenshot(label+'-graph');await close();await page.locator('.qw-nav-task').nth(1).click();await action('diagram').click();await screenshot(label+'-diagram');await close();await page.locator('.qw-nav-task').first().click();await page.evaluate(()=>{route('diagnostics');qdMode='builder';qdRefresh();});await screenshot(label+'-diagnostics');await page.evaluate(()=>route('bank'));await page.locator('[data-bank-view="task1673-baseline-view"]').click();await page.locator('[data-bank-add="task1673-baseline-view"]').waitFor();await screenshot(label+'-bank');}
  try{
   const baseline=process.env.QO_TASK1673_BASELINE||path.join(root,'task1673-baseline','Quantum-Office.html');
-  await setup(baseline);await capture('before');await context.close();
+  await setup(baseline);await capture('before');await context.close();candidate=true;candidate=true;
   await setup(path.join(root,'Quantum-Office.html'));await capture('after');await page.evaluate(()=>route('work'));
   const before=await snap(),center=await page.locator('.qw-center').boundingBox();
   const left=page.locator('#qo-work-root [data-qw-dock-toggle="left"]'),divider=page.locator('#qo-work-root [data-qw-dock-resize="left"]');
@@ -25,7 +26,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1673');
   const pref=await page.evaluate(()=>qwPanelPreference('work'));assert.ok(pref.left>270);assert.equal(await snap(),before,'dock preferences must not alter QWORK');
   await page.reload();await page.evaluate(()=>route('work'));assert.deepEqual(await page.evaluate(()=>qwPanelPreference('work')),pref);
   await page.locator('[data-qw-dock-reset="work"]').click();assert.equal(await page.evaluate(()=>qwPanelPreference('work').left),228);
-  const selected=await page.evaluate(()=>qwSelected);await page.locator('#qw-prompt').fill('Новая формулировка графика');await page.locator('#qw-prompt').press('Tab');
+  const selected=await page.evaluate(()=>qwSelected);await page.locator('[data-bank-live=prompt]').fill('Новая формулировка графика');await page.locator('[data-bank-live=prompt]').press('Tab');
   await action('preview').click();await ready();assert.equal(await page.locator('#qw-dialog').evaluate(d=>d.matches(':modal')),false);
   assert.ok(await page.locator('.qw-mode-host[data-qw-mode="pdf"]').isVisible());
   await page.locator('select[name="qw-pdf-layout"]').selectOption('compact');await page.locator('[data-print-setting="orientation"]').selectOption('landscape');await page.locator('#qw-layout-figure-mode').selectOption('manual');await page.locator('#qw-layout-figure-width').fill('80');await page.locator('#qw-layout-figure-width').press('Tab');await ready();await close();

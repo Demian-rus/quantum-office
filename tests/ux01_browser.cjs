@@ -24,6 +24,8 @@ async function main(){
   await page.locator('[data-action=work-new]').click();
   await command('add').click();
   assert.equal(await live('prompt').evaluate(node=>document.activeElement===node),true);
+  assert.equal(await page.locator('#qw-task-editor [data-bank-rich]:visible').count(),1);
+  assert.equal(await page.locator('#qw-task-editor .qw-bank-equation-box:visible').count(),0);
   await shot('empty-work-task');
   await live('prompt').fill('Проводник движется вдоль оси X. Найдите скорость.');
   await page.locator('[data-bank-format-select="formula"]').selectOption('fraction');
@@ -70,12 +72,16 @@ async function main(){
   await page.setViewportSize({width:1920,height:1080});
   await shot('work-toolbar',page.locator('[data-education-ribbon=work]'));
   assert.equal(await page.locator('[data-education-ribbon=work] .qo-work-group-caption').count(),0);
+  assert.equal((await page.locator('.qo-education-workspace .qo-office-toolbar').boundingBox()).height,48);
   const ribbon=await page.locator('[data-education-ribbon=work] button').evaluateAll(elements=>elements.map(button=>{
    const r=button.getBoundingClientRect(),i=button.querySelector('svg').getBoundingClientRect();
    return {height:r.height,icon:i.width,tooltip:button.title,vertical:Math.abs((r.top+r.bottom-i.top-i.bottom)/2)};
   }));
   assert.ok(ribbon.every(item=>item.height===34&&item.icon===16&&item.vertical<.2&&item.tooltip),JSON.stringify(ribbon));
   await page.locator('#qw-task-editor [data-bank-preview-toggle]').click();
+  await page.frameLocator('#qw-task-editor [data-bank-publish-frame]').locator('.qw-print-page').first().waitFor();
+  await page.locator('#qw-task-editor [data-bank-preview-toggle]').click();
+  await page.locator('[data-action=work-preview]').click();
   const frame=page.locator('#qw-print-preview-frame');
   await page.waitForFunction(()=>document.querySelector('#qw-print-preview-frame')?.dataset.ready);
   await page.locator('#qw-dialog [data-publish-fit=page]').click();
@@ -151,8 +157,35 @@ async function main(){
   });
   assert.deepEqual([labels.labels,labels.scalars],[13,0]);assert.ok(labels.rules>=10);
   fs.writeFileSync(path.join(out,'scientific-labels.svg'),labels.markup);
+  const scaling=[];
+  for(const scale of [1.25,1.5,2]){
+   const sample=await browser.newContext({viewport:{width:Math.round(1920/Math.min(scale,1.5)),height:Math.round(1080/Math.min(scale,1.5))},
+    deviceScaleFactor:scale,offline:true});
+   try{
+    const scaled=await sample.newPage();
+    await scaled.goto(app);
+    await scaled.evaluate(()=>route('work'));
+    const buttons=scaled.locator('[data-education-ribbon=work] button');
+    const dimensions=await buttons.evaluateAll(nodes=>nodes.map(button=>{
+     const icon=button.querySelector('svg').getBoundingClientRect(),box=button.getBoundingClientRect();
+     return {icon:icon.width,button:box.height,alignment:Math.abs((icon.top+icon.bottom-box.top-box.bottom)/2)};
+    }));
+    assert.ok(dimensions.every(item=>item.icon===16&&item.button===34&&item.alignment<.2));
+    if(scale===2)await scaled.locator('[data-education-ribbon=work]').screenshot({path:path.join(out,'screenshots/work-toolbar-2x.png')});
+    await scaled.evaluate(()=>route('bank'));
+    const add=scaled.locator('[data-qw-action=bank-new]');
+    await add.waitFor();
+    const bankCenter=await add.evaluate(button=>{
+     const i=button.querySelector('svg').getBoundingClientRect(),l=button.querySelector('span').getBoundingClientRect();
+     return Math.abs((i.top+i.bottom-l.top-l.bottom)/2);
+    });
+    assert.ok(bankCenter<.2);
+    if(scale===2)await add.locator('..').screenshot({path:path.join(out,'screenshots/bank-toolbar-2x.png')});
+    scaling.push({scale,dimensions,bankCenter});
+   }finally{await sample.close();}
+  }
   assert.deepEqual(errors,[]);
-  fs.writeFileSync(path.join(out,'geometry.json'),JSON.stringify({layouts,ribbon,icon,portrait,labels:{labels:labels.labels,rules:labels.rules}},null,2));
+  fs.writeFileSync(path.join(out,'geometry.json'),JSON.stringify({layouts,ribbon,icon,portrait,scaling,labels:{labels:labels.labels,rules:labels.rules}},null,2));
   console.log('PASS both editor contexts, QWORK round trip and corruption, SVG math captions, responsive layouts, A4 preview/PDF and bank controls');
  }finally{await browser.close();}
 }

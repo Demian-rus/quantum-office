@@ -221,11 +221,12 @@ async function author(page) {
   assert.match(storedPrompt, /\\\*\\\*буквально/);
   await page.locator('[data-bank-source]').click();
   await page.locator('[data-bank-preview-toggle]').click();
-  const preview = page.locator('#qw-bank-edit-preview');
-  await preview.locator('.qw-study-tables table').waitFor();
+  const preview = page.frameLocator('[data-bank-publish-frame]').locator('.qw-print-document');
+  await preview.locator('.qw-print-page table').waitFor();
   assert.match(await preview.innerText(), /\*\*буквально\*\*/);
   assert.match(await preview.innerText(), /\\\(x\\\)/);
   assert.equal(await preview.locator('img').count(), 0);
+  await page.locator('[data-bank-preview-toggle]').click();
   await action(page, 'bank-edit-save').click();
   await page.locator('.qw-bank-edit-dialog').waitFor({ state: 'detached' });
   const saved = await page.evaluate(async () => {
@@ -353,7 +354,7 @@ async function main() {
     fs.writeFileSync(path.join(output, 'study.qwork'), JSON.stringify(project, null, 2));
     const surfaces = await page.evaluate(d => {
       route('work'); qwDoc = d; qwSelected = d.tasks[0].id; qwRender();
-      const work = document.querySelector('#qw-task-preview .qw-study-task');
+      const work = document.querySelector('#qw-task-editor [data-bank-live=prompt]');
       const question = { id: 'bank021-diag', type: 'numeric', points: 2, prompt: d.tasks[0].prompt,
         answer: '18 м', criteria: 'Критерий диагноста' };
       const diag = qdNormalize({ sections: [{ title: 'Раздел', questions: [question] }] });
@@ -362,11 +363,14 @@ async function main() {
       template.innerHTML = qdRunQuestion(q, 0, diag);
       const teacherInitiallyHidden = !template.content.textContent.includes('Критерий диагноста');
       qdRevealed.add(q.id); template.innerHTML = qdRunQuestion(q, 0, diag); qdRevealed.delete(q.id);
-      return { constructorMath: !!work.querySelector('math'), permanent: work.querySelector('.qw-study-id').textContent,
+      return { constructorMath: !!work.querySelector('math'),
         diagnosticsMath: !!template.content.querySelector('.qw-study-text math'), teacherInitiallyHidden,
         teacherRevealed: template.content.textContent.includes('Критерий диагноста') };
     }, project);
-    assert.deepEqual(surfaces, { constructorMath: true, permanent: '№ 00801.', diagnosticsMath: true,
+    await page.locator('#qw-task-editor [data-bank-publish-toggle]').click();
+    const permanent = page.frameLocator('#qw-task-editor [data-bank-publish-frame]').locator('.qw-print-page .qw-study-id');
+    assert.equal(await permanent.textContent(), '№ 00801.');
+    assert.deepEqual(surfaces, { constructorMath: true, diagnosticsMath: true,
       teacherInitiallyHidden: true, teacherRevealed: true });
     const print = [];
     for (const orientation of ['portrait', 'landscape']) print.push(await renderPdf(context, page, project, orientation, 'booklet', errors));
