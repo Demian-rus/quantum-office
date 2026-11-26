@@ -1,5 +1,6 @@
 /* Quantum Office design system. Build resolves local imports into the offline HTML. */
 @import "./styles/foundation.css";
+@import "./styles/scrollbars.css";
 @import "./styles/components.css";
 @import "./styles/shell.css";
 @import "./styles/sheets.css";

@@ -72,7 +72,8 @@ async function capture(page, label) {
   }
   await shot(page, label + '-card');
   await page.locator('[data-bank-enlarge]').click();
-  await page.locator('[data-bank-zoom]').fill('125');
+  if (label === 'before') await page.locator('[data-bank-zoom]').fill('125');
+  else await page.locator('.qw-bank-zoom [data-publish-zoom]').selectOption('125');
   await page.locator('.qw-bank-solution summary').click();
   await shot(page, label + '-enlarged');
   await page.locator('[data-bank-enlarge]').click();

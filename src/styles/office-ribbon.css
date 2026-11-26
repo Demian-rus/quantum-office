@@ -19,7 +19,7 @@
 :is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-ribbon{
  box-sizing:border-box;height:var(--qo-office-ribbon-height);
  min-height:var(--qo-office-ribbon-height);max-height:var(--qo-office-ribbon-height);
- overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;min-width:0;
+ overflow-x:auto;overflow-y:hidden;min-width:0;
 }
 :is(.qo-document-workspace,.qo-slides-workspace,.qs-studio) .qo-work-panel.active{
  box-sizing:border-box;min-height:var(--qo-office-ribbon-height);

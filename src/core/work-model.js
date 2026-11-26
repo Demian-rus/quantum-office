@@ -142,7 +142,7 @@ function qwValidateGraph(raw){
  for(const k of ['xmin','xmax','ymin','ymax','step']){const n=Number(raw[k]);if(!Number.isFinite(n)||Math.abs(n)>1000000)throw Error('Некорректный диапазон графика');g[k]=n;}
  if(g.xmax<=g.xmin||g.ymax<=g.ymin||g.step<=0)throw Error('Проверьте диапазоны и шаг сетки');
  g.coordinateMode=['first','positiveX','math','custom'].includes(raw.coordinateMode)?raw.coordinateMode:(g.xmin===0&&g.ymin===0?'first':'custom');
- g.xlabel=qwText(raw.xlabel,30);g.ylabel=qwText(raw.ylabel,30);g.grid=raw.grid!==false;g.connected=raw.connected!==false;g.smooth=raw.smooth===true;g.snapToGrid=raw.snapToGrid!==false;g.curveFamily=['points','quadratic','trigonometric'].includes(raw.curveFamily)?raw.curveFamily:'points';
+ g.xlabel=qwText(raw.xlabel,120);g.ylabel=qwText(raw.ylabel,120);g.grid=raw.grid!==false;g.connected=raw.connected!==false;g.smooth=raw.smooth===true;g.snapToGrid=raw.snapToGrid!==false;g.curveFamily=['points','quadratic','trigonometric'].includes(raw.curveFamily)?raw.curveFamily:'points';
  const c=raw.curve&&typeof raw.curve==='object'?raw.curve:{};
  for(const k of ['a','b','c','amplitude','frequency','phase','offset']){
   const value=c[k]===undefined?g.curve[k]:Number(c[k]);

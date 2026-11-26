@@ -1,0 +1,14 @@
+/* Keep the native scroll hit targets, including the Sheets viewport. */
+@media (forced-colors:none) {
+  ::-webkit-scrollbar {width:11px;height:11px}
+  ::-webkit-scrollbar-track,::-webkit-scrollbar-corner {background:transparent}
+  ::-webkit-scrollbar-thumb {
+    min-width:28px;min-height:28px;border:2px solid transparent;border-radius:999px;
+    background:var(--qo-scrollbar,#9ca9bb);background-clip:padding-box
+  }
+  ::-webkit-scrollbar-thumb:hover {background-color:var(--qo-muted,#52637a)}
+  ::-webkit-scrollbar-thumb:active {background-color:var(--qo-text,#18202c)}
+  @supports not selector(::-webkit-scrollbar) {
+    * {scrollbar-color:var(--qo-scrollbar,#9ca9bb) transparent;scrollbar-width:thin}
+  }
+}

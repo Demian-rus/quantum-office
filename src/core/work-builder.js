@@ -1,7 +1,7 @@
 /* TASK144: standalone mathematics/physics workbench, reusing Office shell/symbols. */
 const QW_KEY='quantum-office.work-builder.v1',QW_BANK_KEY='quantum-office.work-bank.v1',
  QW_BANK_NUMBER_KEY='quantum-office.work-bank.number-sequence.v1';
-let qwDoc=qwProject(),qwSelected='',qwLeft=false,qwRight=false,qwStorageError='',qwCorrupt='',qwUndo=[],qwRedo=[],qwExported='',qwBusy=false,qwRecentWork=null,qwWorkZoom=100;
+let qwDoc=qwProject(),qwSelected='',qwLeft=false,qwRight=false,qwStorageError='',qwCorrupt='',qwUndo=[],qwRedo=[],qwExported='',qwBusy=false,qwRecentWork=null,qwWorkZoom={percent:100,fit:''};
 qwDoc.layout='compact';
 try{const raw=localStorage.getItem(QW_KEY);if(raw)try{qwDoc=qwValidate(JSON.parse(raw));}catch(e){qwCorrupt=raw;qwStorageError='Не удалось открыть черновик. Скачайте исходные данные.';}}catch(e){qwStorageError='Хранилище недоступно. Сохраняйте QWORK.';}
 
@@ -190,33 +190,54 @@ function qwBindPublishInspector(host,getTasks,onApply,selectedTask=()=>null){
 function qwUsePublishing(task,publishing){
  if(Object.keys(publishing).length)task.publishing=publishing;else delete task.publishing;
 }
-function qwPublishZoomControls(value){
- return '<label class="qw-publish-zoom">Масштаб <input data-publish-zoom type="range" min="50" max="200" step="1" value="'+value+'"><output>'+value+'%</output></label>'+
-  '<div class="qw-fit-controls" role="group" aria-label="Размер листа на экране"><button type="button" data-publish-fit="width" aria-pressed="false">По ширине</button>'+
+const QW_ZOOM_STEPS=[50,75,100,125,150,175,200];
+function qwPublishZoomControls(){
+ return '<div class="qw-zoom" role="group" aria-label="Масштаб просмотра">'+
+  '<button type="button" data-zoom-step="-1" title="Уменьшить масштаб" aria-label="Уменьшить масштаб">−</button>'+
+  '<select data-publish-zoom aria-label="Масштаб">'+qwOptions(QW_ZOOM_STEPS.map(n=>[n,n+'%']),100)+'</select>'+
+  '<button type="button" data-zoom-step="1" title="Увеличить масштаб" aria-label="Увеличить масштаб">+</button>'+
+  '<button type="button" data-publish-fit="width" aria-pressed="false">По ширине</button>'+
   '<button type="button" data-publish-fit="page" aria-pressed="false">Целая страница</button></div>';
 }
-function qwBindPublishZoom(host,frame){
- const zoom=host.querySelector('[data-publish-zoom]'),buttons=[...host.querySelectorAll('[data-publish-fit]')],viewport=frame.parentElement;
- let fit='';
+function qwBindZoom(control,state,viewports,measure,paint){
+ const select=control.querySelector('select'),steps=[...control.querySelectorAll('[data-zoom-step]')],
+  modes=[...control.querySelectorAll('[data-publish-fit]')];
  const apply=()=>{
-  const doc=frame.contentDocument,sheet=doc?.querySelector('.qw-print-document>:is(.qw-print-sheet,.qw-print-page)');
-  if(sheet){
-   const width=sheet.offsetWidth,height=sheet.offsetHeight,body=doc.body;
-   frame.style.width=(width+24)+'px';
-   const last=sheet.parentElement.lastElementChild,tail=last.getBoundingClientRect().bottom-body.getBoundingClientRect().top;
-   frame.style.height=(Math.ceil(tail)+12)+'px';
-   if(fit&&viewport.clientWidth&&viewport.clientHeight){
-    const across=(viewport.clientWidth-4)/(width+24),down=(viewport.clientHeight-20)/height;
-    zoom.value=Math.round(Math.max(.5,Math.min(2,across,fit==='page'?down:2))*100);
-   }
+  const geometry=measure();
+  if(state.fit&&geometry?.width&&geometry.view.clientWidth){
+   const across=(geometry.view.clientWidth-8)/geometry.width;
+   const down=(geometry.view.clientHeight-16)/geometry.height;
+   state.percent=Math.max(50,Math.min(200,Math.floor(100*Math.min(across,state.fit==='page'?down:2))));
   }
-  frame.style.zoom=Number(zoom.value)/100;zoom.nextElementSibling.textContent=zoom.value+'%';
-  for(const button of buttons)button.setAttribute('aria-pressed',String(button.dataset.publishFit===fit));
+  select.querySelector('[data-zoom-computed]')?.remove();
+  if(!QW_ZOOM_STEPS.includes(state.percent)){
+   const option=new Option(state.percent+'%',state.percent);option.dataset.zoomComputed='';select.add(option);
+  }
+  select.value=state.percent;
+  steps[0].disabled=state.percent<=50;steps[1].disabled=state.percent>=200;
+  for(const button of modes)button.setAttribute('aria-pressed',String(button.dataset.publishFit===state.fit));
+  paint(state.percent/100);
  };
- zoom.addEventListener('input',()=>{fit='';apply();});
- for(const button of buttons)button.onclick=()=>{fit=button.dataset.publishFit;apply();};
- const observer=new ResizeObserver(()=>{if(!frame.isConnected){observer.disconnect();return;}if(fit)apply();});
- observer.observe(viewport);apply();return apply;
+ const set=percent=>{state.percent=percent;state.fit='';apply();};
+ select.onchange=()=>set(Number(select.value));
+ steps[0].onclick=()=>set(QW_ZOOM_STEPS.findLast(n=>n<state.percent)??50);
+ steps[1].onclick=()=>set(QW_ZOOM_STEPS.find(n=>n>state.percent)??200);
+ for(const button of modes)button.onclick=()=>{state.fit=button.dataset.publishFit;apply();};
+ const resize=new ResizeObserver(()=>{if(control.isConnected)apply();else resize.disconnect();});
+ viewports.forEach(view=>resize.observe(view));
+ apply();return apply;
+}
+function qwFrameZoomGeometry(frame){
+ const doc=frame.contentDocument,sheet=doc?.querySelector('.qw-print-document>:is(.qw-print-sheet,.qw-print-page)');
+ if(!sheet)return null;
+ const width=sheet.offsetWidth+24, height=sheet.offsetHeight;
+ const tail=sheet.parentElement.lastElementChild.getBoundingClientRect().bottom-doc.body.getBoundingClientRect().top;
+ frame.style.width=width+'px';frame.style.height=(Math.ceil(tail)+12)+'px';
+ return {view:frame.parentElement,width,height};
+}
+function qwBindPublishZoom(host,frame){
+ return qwBindZoom(host.querySelector('.qw-zoom'),{percent:100,fit:''},[frame.parentElement],
+  ()=>qwFrameZoomGeometry(frame),scale=>{frame.style.zoom=scale;});
 }
 function qwStudyFigureHTML(q,printing=false){
  const visual=q.figure==='graph'?qwGraphSVG(q.graph,false,{publishing:true,...(printing?{axisFont:21,titleFont:22}:{})}):q.figure==='diagram'?qwDiagramSVG(q.diagram):q.figure==='image'&&q.image?'<img alt="Иллюстрация задания" src="'+q.image+'">':'';
@@ -494,7 +515,7 @@ async function qwPreview(output='tasks'){
  const answers='<div class="qw-row qw-preview-options">'+
   ['includeComments','includePrompt','includeCriteria','includeNumbers'].map((k,i)=>'<label class="qw-check"><input type="checkbox" data-key-option="'+k+'" '+(i===3?'checked':'')+'>'+['Подробный ключ','Условия','Критерии оценивания','Постоянные номера'][i]+'</label>').join('')+'</div>';
  const d=qwDialog(key?'Отдельные ответы PDF':'Макет и экспорт PDF',
-  '<div class="qw-pdf-controls">'+(key?answers:qwLayoutSelect(qwDoc.layout))+qwPublishZoomControls(100)+'</div>'+
+  '<div class="qw-pdf-controls">'+(key?answers:qwLayoutSelect(qwDoc.layout))+qwPublishZoomControls()+'</div>'+
   '<div class="qw-pdf-workspace">'+design+
   '<div id="qw-pages"><iframe id="qw-print-preview-frame" title="Макет PDF" loading="eager"></iframe></div></div>'+
   '<p id="qw-label-warnings" class="qw-error" hidden></p>',
@@ -823,15 +844,13 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const inspector=qwPublishInspector();
  const publishing='<section class="qw-bank-publishing" data-bank-publishing hidden>'+(work?'':inspector)+
   '<div class="qw-bank-publish-main"><div class="qw-bank-publish-toolbar">'+
-  '<label>Ориентация A4 <select data-bank-publish-orientation><option value="portrait">Книжная</option><option value="landscape">Альбомная · две колонки</option></select></label>'+
-  qwPublishZoomControls(100)+'</div>'+
+  '<label>Ориентация A4 <select data-bank-publish-orientation><option value="portrait">Книжная</option><option value="landscape">Альбомная · две колонки</option></select></label></div>'+
   '<p class="qw-error" data-bank-publish-error role="status" hidden></p>'+
   '<div class="qw-bank-publish-paper"><iframe data-bank-publish-frame title="Макет задания A4"></iframe></div></div></section>';
  const markup='<div class="qw-bank-edit-top">'+tabs+
    '<button type="button" data-bank-preview-toggle="prompt" data-bank-publish-toggle aria-pressed="false">'+qoWorkIcon('eye')+'<span>'+(work?'Лист задания':'Предпросмотр')+'</span></button>'+
    '<button type="button" data-bank-source aria-pressed="false">Исходный текст</button>'+
-   '<label class="qw-edit-zoom" title="Масштаб рабочей поверхности">Масштаб <select data-edit-zoom aria-label="Масштаб рабочей поверхности">'+
-   qwOptions([75,90,100,110,125,150,200].map(scale=>[scale,scale+'%']),work?qwWorkZoom:(transaction?.view.zoom||100))+'</select></label></div>'+
+   qwPublishZoomControls()+'</div>'+
    '<div class="qw-bank-edit-layout">'+
    '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+'</div>'+equationBox+
    '<div class="qw-edit-scroll">'+fields+'</div>'+publishing+'</section>'+
@@ -865,8 +884,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const catalogName=d.querySelector('[data-bank-task-field="title"]'),tags=d.querySelector('[data-bank-tags]');
  const bookmarks=new WeakMap();
  let formula=null,composing=false;
- let publishRevision=0,publishTimer=0;
- const rezoom=qwBindPublishZoom(publishingPane,publishFrame);
+ let publishRevision=0,publishTimer=0,rezoom=()=>{};
  function refreshPublishing(){
   if(!d.isConnected||transaction.view.mode!=='publish')return;
   const revision=++publishRevision,notice=publishingPane.querySelector('[data-bank-publish-error]');
@@ -930,7 +948,9 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    history.before=null;showError('Превышена допустимая длина поля');return;
   }
   input.value=next;surface.qwRenderedSource=next;
+  surface.toggleAttribute('data-empty',!next.trim());
   if(surface.dataset.bankLive==='prompt')updateFigurePlacement(surface);
+  if(transaction.view.zoom?.fit==='page'||work&&qwWorkZoom.fit==='page')rezoom();
   rememberLive(surface);recordText(input,before);
  }
  function renderEquation(){
@@ -1039,7 +1059,12 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  function updateFigurePlacement(surface){
   const picture=task.publishing?.figure,position=picture?.position||task.position;
   const wide=position==='below'||position==='auto'&&(picture?picture.width>46:task.figureWidth>300);
-  d.querySelector('[data-bank-live-figure]').toggleAttribute('data-wide',wide||!!surface.querySelector('table'));
+  const figure=d.querySelector('[data-bank-live-figure]');
+  figure.toggleAttribute('data-wide',wide||!!surface.querySelector('table'));
+  figure.dataset.align=picture?.align||'center';
+  figure.dataset.position=position;
+  figure.style.setProperty('--qw-editor-figure-gap',(picture?.gapMm??2)+'mm');
+  figure.parentElement.style.setProperty('--qw-editor-figure-width',picture?'min('+picture.width+'%,'+picture.maxMm+'mm)':Math.min(task.figureWidth,470)+'px');
  }
  function renderEditor(){
   const {tab,mode}=transaction.view,show=mode==='preview',publish=mode==='publish';
@@ -1061,6 +1086,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    const input=fieldInput(key),surface=live(key);
    input.hidden=mode!=='source';surface.hidden=mode!=='visual';
    if(mode==='visual'&&key===tab&&surface.qwRenderedSource!==input.value)mountLive(surface,input);
+   surface.toggleAttribute('data-empty',!input.value.trim());
    pane.querySelector('[data-bank-render]').hidden=!show;
   }
   d.querySelector('[data-bank-choices-wrap]').hidden=show||task.type!=='choice';
@@ -1072,6 +1098,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   }
   updateHistoryButtons();preview();
   if(work||publish)syncPublishing();
+  rezoom();
   if(publish){if(transaction.view.orientation)orientation.value=transaction.view.orientation;refreshPublishing();}
  }
  function historyStep(input,redo,surface=null){
@@ -1287,10 +1314,14 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  if(work)transaction.workSource=JSON.stringify(task);
  d.qwDirty=()=>{collect();return transaction.workInvalid||(formula&&equationSource.value!==formula.initial)||!work&&JSON.stringify(draft)!==transaction.initialDraft;};
  d.qwCanLeave=()=>!saving&&!imagePending&&(!d.qwDirty()||confirm('Отменить несохранённые изменения задания?'));
- const editZoom=d.querySelector('[data-edit-zoom]'),scroll=d.querySelector('.qw-edit-scroll');
- const rescale=()=>{const value=Number(editZoom.value);scroll.style.setProperty('--qw-edit-scale',value/100);
-  if(work)qwWorkZoom=value;else transaction.view.zoom=value;};
- editZoom.addEventListener('change',rescale);rescale();
+ const scroll=d.querySelector('.qw-edit-scroll'),sheetView=publishFrame.parentElement;
+ const zoom=work?qwWorkZoom:(transaction.view.zoom??={percent:100,fit:''});
+ rezoom=qwBindZoom(top.querySelector('.qw-zoom'),zoom,[scroll,sheetView],()=>{
+  if(transaction.view.mode==='publish')return qwFrameZoomGeometry(publishFrame);
+  const width=Math.max(160,Math.min(820,scroll.clientWidth-32));
+  scroll.style.setProperty('--qw-editor-width',width+'px');
+  return {view:scroll,width:width+32,height:Math.max(360,editors.find(surface=>!surface.hidden)?.offsetHeight||0)+32};
+ },scale=>{scroll.style.setProperty('--qw-edit-scale',scale);publishFrame.style.zoom=scale;});
  scroll.addEventListener('click',event=>{
   if(!event.target.matches('[data-bank-rich]')||transaction.view.mode!=='visual')return;
   const input=live(transaction.view.tab);
@@ -1435,7 +1466,8 @@ async function qwBank(previousFilters={}){
  const results=list.parentElement;
  const previousPage=d.querySelector('[data-bank-page="prev"]');
  const nextPage=d.querySelector('[data-bank-page="next"]');
- let previewSequence=0,previewId='',catalogueScroll=0,searchTimer,queryError='',paperView=false,zoom=100;
+ let previewSequence=0,previewId='',catalogueScroll=0,searchTimer,queryError='',paperView=false,rezoomPreview=()=>{};
+ const previewZoom={percent:100,fit:''};
  function setQueryPending(on){
   results.setAttribute('aria-busy',String(on));
   workspace.classList.toggle('qw-bank-query-pending',on);
@@ -1481,6 +1513,7 @@ async function qwBank(previousFilters={}){
    button.focus({preventScroll:true});
   }
   if(!on)list.scrollTop=catalogueScroll;
+  rezoomPreview();
   qwRefreshLiveGraphText(preview);
  }
  function setPaperView(on){
@@ -1489,18 +1522,6 @@ async function qwBank(previousFilters={}){
   const button=preview.querySelector('[data-bank-paper]');
   if(button)button.setAttribute('aria-pressed',String(on));
  }
- function setPreviewZoom(value){
-  zoom=value;
-  preview.style.setProperty('--qw-bank-preview-zoom',String(value/100));
-  const output=preview.querySelector('[data-bank-zoom-value]');
-  if(output)output.textContent=value+'%';
- }
- preview.addEventListener('input',event=>{
-  if(event.target.matches('[data-bank-zoom]'))setPreviewZoom(Number(event.target.value));
- });
- preview.addEventListener('change',event=>{
-  if(event.target.matches('[data-bank-zoom]'))qwRefreshLiveGraphText(preview);
- });
  async function showPreview(){
   const token=++previewSequence,id=activeId;
   for(const row of list.querySelectorAll('[data-bank-entry]')){
@@ -1534,10 +1555,16 @@ async function qwBank(previousFilters={}){
    '<button type="button" data-bank-edit="'+qwEsc(entry.id)+'">Редактировать</button>'+
    '<button type="button" data-bank-paper aria-pressed="false">Белый лист</button>'+
    '<button type="button" data-bank-enlarge aria-pressed="false">Увеличить</button>'+
-   '<label class="qw-bank-zoom">Масштаб<input type="range" data-bank-zoom min="75" max="160" step="5" value="'+zoom+'"><output data-bank-zoom-value>'+zoom+'%</output></label>'+
+   '<div class="qw-bank-zoom">'+qwPublishZoomControls()+'</div>'+
    '<button type="button" data-bank-delete="'+qwEsc(entry.id)+'" aria-label="Удалить из банка" title="Удалить из банка">'+qoWorkIcon('trash-2')+'</button></div></div>'+
    '<div class="qw-bank-study-page"><div class="qw-bank-video-canvas" aria-label="Просмотр условия задачи">'+paper+'</div>'+qwStudySolution(task)+'</div>';
-  setPaperView(paperView);setPreviewZoom(zoom);
+  setPaperView(paperView);
+  const sheet=preview.querySelector('.qw-bank-study-page');
+  rezoomPreview=qwBindZoom(preview.querySelector('.qw-zoom'),previewZoom,[previewPane],()=>{
+   const width=Math.min(760,previewPane.clientWidth-28);
+   sheet.style.setProperty('--qw-bank-preview-width',width+'px');
+   return {view:previewPane,width,height:sheet.offsetHeight+44};
+  },scale=>{sheet.style.setProperty('--qw-bank-preview-zoom',scale);qwRefreshLiveGraphText(sheet);});
   qwRefreshLiveGraphText(preview);
   const illustration=preview.querySelector('img[alt="Иллюстрация задания"]');
   if(illustration){const failed=()=>{if(token===previewSequence&&d.isConnected)reportStatus('Изображение повреждено. Исходные данные сохранены; можно заменить рисунок через редактирование.',true);};illustration.addEventListener('error',failed,{once:true});if(illustration.complete&&!illustration.naturalWidth)failed();}
@@ -2214,7 +2241,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null,parentDir
    props.innerHTML=labelProperties()+extra.selectedPanel+stylePanel()+
     '<section class="qw-inspector-section"><h2>Оси и масштаб</h2><div class="qw-graph-range">'+range+'</div><div class="qw-grid-quick"><label>Шаг делений<input data-graph-field="step" type="number" min="0.001" step="any" value="'+qwEsc(value.step)+'"></label></div></section>'+
     '<section class="qw-inspector-section"><h2>Сетка и линии</h2><div class="qw-graph-flags">'+toggles+'</div></section>'+
-    '<details class="qw-inspector-section" open><summary>Подписи осей</summary><div class="qw-axis-titles">'+['xlabel','ylabel'].map((k,i)=>'<label>'+['Подпись X','Подпись Y'][i]+'<input data-graph-field="'+k+'" type="text" maxlength="30" value="'+qwEsc(value[k])+'"></label>').join('')+'</div></details>'+
+    '<details class="qw-inspector-section" open><summary>Подписи осей</summary><div class="qw-axis-titles">'+['xlabel','ylabel'].map((k,i)=>'<label>'+['Подпись X','Подпись Y'][i]+'<input data-graph-field="' + k + '" type="text" maxlength="120" value="'+qwEsc(value[k])+'"></label>').join('')+'</div></details>'+
     (curve?'<details class="qw-inspector-section" open><summary>Параметры функции</summary><div class="qw-function-settings">'+curve+'</div></details>':'')+
     (value.points.length?'<details class="qw-inspector-section" open><summary>Точки шаблона ('+value.points.length+')</summary><div class="qw-point-list">'+points+'</div></details>':'')+extra.templateColor+extra.independent;
   }

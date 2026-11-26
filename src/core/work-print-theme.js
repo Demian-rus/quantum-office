@@ -103,6 +103,9 @@ function qwPrintTheme(options={}){
  return {id,monochrome:options.monochrome===true,name:QW_PRINT_THEMES[id]||''};
 }
 const QW_PRINT_BRAND='QX / Квант Икс';
+// Caveat 15 pt: the ink begins 0.18 mm below the line box and overhangs
+// the right edge by 0.27 mm. These offsets are measured on the embedded font.
+const QW_BRAND_TOP='3.82mm',QW_BRAND_RIGHT='4.27mm';
 function qwPrintBrand(){
  return '<div class="qw-print-brand qw-booklet-brand" aria-label="'+QW_PRINT_BRAND+'"><span class="qw-qx-lettering">'+QW_PRINT_BRAND+'</span></div>';
 }
@@ -114,8 +117,10 @@ function qwPrintBrandFonts(){return `
 @font-face{font-family:"QX Handwritten";src:url(data:font/woff2;base64,${QW_QX_CYRILLIC}) format("woff2");font-style:normal;font-weight:700;font-display:block;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
  `;}
 function qwDiagnosticPageStyles(margin){
+ const right=margin.trim().split(/\s+/).at(-1);
  return qwPrintBrandFonts()+`@page{size:A4;margin:${margin};
- @top-right{content:"${QW_PRINT_BRAND}";font:700 15pt/1 "QX Handwritten",cursive;color:#000;vertical-align:middle}
+ @top-right{content:"${QW_PRINT_BRAND}";font:700 15pt/1 "QX Handwritten",cursive;color:#000;vertical-align:top;
+  padding-top:${QW_BRAND_TOP};margin-right:calc(${QW_BRAND_RIGHT} - ${right})}
  @bottom-center{content:counter(page);font:8pt/1.2 "QO Print Sans",Arial,sans-serif;color:#000;vertical-align:middle}
  }`;
 }
@@ -135,7 +140,7 @@ body[data-qw-monochrome="true"] :is(.qw-print-topic,.qw-topic-title){color:#000}
 body[data-qw-monochrome="true"] .qw-print-page .qw-print-section:before{background:#e2e2e2!important}
 /* Brand is inserted once per physical A4 sheet by the pagination engine. */
 .qw-print-brand{
- position:absolute;top:3mm;right:9mm;z-index:2;
+ position:absolute;top:${QW_BRAND_TOP};right:${QW_BRAND_RIGHT};z-index:2;
  color:#000;font:700 15pt/1 "QX Handwritten",cursive;
  white-space:nowrap;pointer-events:none;
 }

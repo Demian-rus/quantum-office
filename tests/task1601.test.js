@@ -39,7 +39,7 @@ test('TASK160.1 QX is embedded handwritten black type without plaque',()=>{
  assert.match(css,/font:700 15pt\/1 "QX Handwritten"/);
  const brand=css.match(/\.qw-print-brand\{([^}]+)\}/)[1];
  assert.match(brand,/color:#000/);
- assert.match(brand,/top:3mm;right:9mm/);
+ assert.match(brand,/top:3\.82mm;right:4\.27mm/);
  assert.doesNotMatch(brand,/background|border|filter|transform/);
 });
 

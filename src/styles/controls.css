@@ -25,7 +25,6 @@
 input:is([type=range],[type=checkbox],[type=radio]),progress { accent-color:var(--qo-accent-fill); }
 input[type=range] { cursor:pointer; padding:0; min-height:20px; }
 input[type=checkbox] { width:15px; height:15px; flex:none; }
-:where(.ribbon,.qo-office-toolbar,.qs-studio,.qo-slide-properties,.qo-appearance-menu) { scrollbar-color:var(--qo-scrollbar) var(--qo-surface-alt); scrollbar-width:thin; }
 .qo-control { min-height:var(--qo-control); padding:6px 12px; border:1px solid var(--qo-border-strong); border-radius:var(--qo-radius); font:600 12px "Segoe UI",sans-serif; }
 
 /* Commands with an icon use a flex row instead of an inline text baseline. */

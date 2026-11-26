@@ -22,7 +22,7 @@ function qwMath(source){
   if(key==='sqrt')return {t:'sqrt',a:atom(depth)};
   if(key==='vec')return {t:'vec',a:atom(depth)};
   if(key==='mathrm'||key==='text')return {t:'upright',a:atom(depth)};
-  return {t:'text',v:key==='circ'?'°':QW_GREEK[key]||key};
+  return {t:'text',v:key==='circ'?'°':key==='varepsilon'?'ε':QW_GREEK[key]||key};
  }
  function group(depth=0,end=''){
   if(depth>12)throw Error('Слишком глубокая формула');const list=[];
@@ -142,13 +142,27 @@ function qwMathSVG(node,x,y,size,align='middle'){
 }
 function qwScienceExpression(value,vector=false){
  const text=String(value??'').trim();
- const delimited=text.match(/^\\\(([\s\S]+)\\\)$/);
- let source=delimited?.[1];
- if(!source&&(/\\[a-z]+/i.test(text)||/^[a-zα-ω][_^][^ ]+$/i.test(text)))source=text;
- if(!source&&vector&&/^[A-Za-zα-ωΑ-Ω]$/.test(text))source='\\vec{'+text+'}';
- if(!source&&vector&&text==='Fтр')source='\\vec{F}_{\\mathrm{тр}}';
- if(!source)return null;
- try{return {ast:qwMath(source),source};}catch{return null;}
+ const explicit=[...text.matchAll(/\\\((.+?)\\\)/g)];
+ try{
+  if(explicit.length){
+   if(explicit.length===1&&explicit[0][0]===text)return {ast:qwMath(explicit[0][1]),source:explicit[0][1]};
+   const list=[];let offset=0;
+   for(const match of explicit){
+    if(match.index>offset)list.push({t:'upright',a:{t:'text',v:text.slice(offset,match.index)}});
+    list.push(qwMath(match[1]));offset=match.index+match[0].length;
+   }
+   if(offset<text.length)list.push({t:'upright',a:{t:'text',v:text.slice(offset)}});
+   return {ast:{t:'row',list},source:text};
+  }
+  const match=text.match(/^(.+?)(,\s+[^,]+)?$/),formula=match?.[1],units=match?.[2];
+  const notation=/^(?:[A-Za-zα-ωΑ-Ω]|\\[A-Za-z]+)(?:[_^](?:\{[^{}]+\}|[A-Za-zα-ωΑ-Ω0-9]))+$/u;
+  let source=notation.test(formula)||/^(?:\|?\s*\\(?:vec|frac|sqrt|mathrm|varepsilon|[a-z]{2,7}(?=$))\b)/i.test(formula)?formula:'';
+  if(!source&&vector&&/^[A-Za-zα-ωΑ-Ω]$/.test(formula))source='\\vec{'+formula+'}';
+  if(!source&&vector&&formula==='Fтр')source='\\vec{F}_{\\mathrm{тр}}';
+  if(!source)return null;
+  const ast=qwMath(source);
+  return units?{ast:{t:'row',list:[ast,{t:'upright',a:{t:'text',v:units}}]},source:source+units}:{ast,source};
+ }catch{return null;}
 }
 function qwScienceLabel(value,x,y,size=18,anchor='middle',vector=false,ink='#000'){
  const math=qwScienceExpression(value,vector);
@@ -416,7 +430,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
  const titleFont=typography.titleFont||style.title,gap=6;
  const title=(axis,x,y,anchor,value,tipX,tipY)=>{
   const attrs=' class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'"';
-  if(qwScienceExpression(value))return '<g'+attrs+'>'+qwScienceLabel(value,x,y,titleFont,anchor)+'</g>';
+  if(qwScienceExpression(value))return '<g'+attrs+' font-size="'+titleFont+'" transform="translate('+x+' '+y+')"><g data-qw-axis-art>'+qwScienceLabel(value,0,0,titleFont,anchor)+'</g></g>';
   return '<text'+attrs+' x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#000">'+qwEsc(value)+'</text>';
  };
  // Final placement uses actual glyph bounds (including descenders and subscripts).

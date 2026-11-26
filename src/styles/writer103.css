@@ -26,7 +26,6 @@
   overflow-x:auto;
   overflow-y:hidden;
   padding:0;
-  scrollbar-width:thin;
   background:var(--qo-surface-alt);
 }
 .qo-document-workspace .qo-work-panel{

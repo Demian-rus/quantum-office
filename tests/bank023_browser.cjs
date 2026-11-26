@@ -108,7 +108,7 @@ function inspectEdition(){
     const brand=page.querySelector(':scope>.qw-print-brand'), footer=page.querySelector(':scope>.qw-page-footer');
     const surface=box(page), top=box(brand), foot=box(footer);
     if(page.querySelectorAll('.qw-print-brand').length!==1||brand.textContent!=='QX / Квант Икс')issues.push('signature count or text');
-    if(Math.abs(top.top-surface.top-3*96/25.4)>.1||Math.abs(surface.right-top.right-9*96/25.4)>.1)issues.push('signature position');
+    if(Math.abs(top.top-surface.top-3.82*96/25.4)>.1||Math.abs(surface.right-top.right-4.27*96/25.4)>.1)issues.push('signature position');
     if(css(brand).fontSize!=='20px'||!css(brand).fontFamily.includes('QX Handwritten')||
        css(brand).color!=='rgb(0, 0, 0)'||css(brand).backgroundColor!=='rgba(0, 0, 0, 0)'||css(brand).transform!=='none')issues.push('signature style');
     if(Math.abs(foot.x+foot.width/2-surface.x-surface.width/2)>.1||top.bottom>=foot.top)issues.push('centered footer');

@@ -427,7 +427,7 @@ async function qwPreparePrintDocument(){
     Math.min(requested, (below?95:60)*MM):
     modern?(below?70:format==='practice'?35:34)*MM:
     below?(requested>=470?160*MM:requested*320/520):38*MM;
-   const fontSizes=(modern||manual)&&svg?[...svg.querySelectorAll('text')].filter(e=>e.textContent.trim())
+   const fontSizes=(modern||manual)&&svg?[...svg.querySelectorAll('text:not([data-qw-axis-art] text),[data-qw-axis-art]')].filter(e=>e.textContent.trim())
     .map(e=>parseFloat(getComputedStyle(e).fontSize)).filter(n=>n>0):[];
    const minLabelScale=fontSizes.length?(graph?8.8:7.4)/Math.min(...fontSizes):0;
    const calculate=below=>Math.min(widthLimit(below)/w,heightLimit(below)/h);
@@ -470,7 +470,9 @@ async function qwPreparePrintDocument(){
     const artworkSize=Number(label.getAttribute('font-size'));
     const min=label.classList.contains('qw-axis-title')?9:8,max=label.classList.contains('qw-axis-title')?13:11;
     const target=Math.max(min,Math.min(max,artworkSize*scale));
-    label.setAttribute('font-size',target/scale);
+    const art=label.querySelector('[data-qw-axis-art]');
+    if(art)art.setAttribute('transform','scale('+target/(scale*artworkSize)+')');
+    else label.setAttribute('font-size',target/scale);
     if(custom||artworkSize*scale>max)label.dataset.qwDisplayFont=target.toFixed(1);
    }
   }

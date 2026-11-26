@@ -189,14 +189,14 @@ async function main() {
     await screenshot(page, 'figure-moved-below');
     await page.locator('[data-bank-publish-orientation]').selectOption('landscape');
     const landscape = await ready(page, bankFrame, { layout: 'spread', position: 'below' });
-    await page.locator('[data-bank-publishing] [data-publish-zoom]').fill('65');
+    await page.locator('.qw-bank-edit-top [data-publish-zoom]').selectOption('75');
     assert.ok(Math.abs((await ready(page, bankFrame, { layout: 'spread' })).size-landscape.size)<.03);
     await screenshot(page, 'layout-landscape');
     await width.fill('34');
     await maximum.fill('56');
     await page.locator('[data-bank-publishing] [data-style-field=position]').selectOption('right');
     await page.locator('[data-bank-publish-orientation]').selectOption('portrait');
-    await page.locator('[data-bank-publishing] [data-publish-zoom]').fill('85');
+    await page.locator('.qw-bank-edit-top [data-publish-zoom]').selectOption('125');
     await ready(page, bankFrame, { width: '34', position: 'right', layout: 'portrait' });
     await screenshot(page, 'layout-portrait');
     await action(page, 'bank-edit-back').click();

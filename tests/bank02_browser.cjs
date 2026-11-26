@@ -237,9 +237,9 @@ async function main() {
     await page.locator('[data-bank-paper]').click();
     assert.equal(await background(), 'rgb(255, 255, 255)');
     await page.locator('[data-bank-enlarge]').click();
-    const zoom = page.locator('[data-bank-zoom]');
-    await zoom.fill('130');
-    assert.equal(await page.locator('.qw-bank-study-page').evaluate(el => getComputedStyle(el).zoom), '1.3');
+    const zoom = page.locator('.qw-bank-zoom [data-publish-zoom]');
+    await zoom.selectOption('125');
+    assert.equal(await page.locator('.qw-bank-study-page').evaluate(el => getComputedStyle(el).zoom), '1.25');
     await screenshot(page, 'bank-enlarged-paper');
     await zoom.press('Escape');
     assert.equal(await zoom.isVisible(), false);

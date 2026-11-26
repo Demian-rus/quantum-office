@@ -92,7 +92,7 @@ async function main(){
   const portrait=await measure();
   assert.ok(Math.abs(portrait.width/portrait.height-210/297)<.001&&portrait.brand);
   await shot('a4-portrait');
-  await page.locator('#qw-dialog [data-publish-zoom]').fill('200');
+  await page.locator('#qw-dialog [data-publish-zoom]').selectOption('200');
   const large=await measure();
   assert.ok(Math.abs(large.width-portrait.width)<.05&&Math.abs(large.height-portrait.height)<.05&&large.pages===portrait.pages);
   await page.locator('[data-print-setting=orientation]').selectOption('landscape');
