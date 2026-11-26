@@ -40,12 +40,21 @@ function inspectPrint() {
     for(const entry of surface.querySelectorAll('.qw-print-section')){
       const number=+entry.dataset.task;
       const area=entry.closest('.qw-page-content');
-      const heading=entry.querySelector('.qw-task-heading'), marker=heading?.querySelector('.qw-task-marker');
+      const heading=entry.querySelector('.qw-task-heading'), examNumber=heading?.querySelector('.qw-exam-number-line'), marker=heading?.querySelector('.qw-task-marker');
       const permanent=heading?.querySelector('.qw-booklet-bank-id'), content=entry.querySelector('.qw-task-text');
       const answer=entry.querySelector('.qw-booklet-answer,.qw-answer-preview');
       const figure=entry.querySelector('figure');
       const issue=name=>proof.errors.push({task:number,page:page+1,error:name});
-      if(heading){
+      if(examNumber){
+        const b=bounds(examNumber),h=bounds(heading),c=bounds(content),bank=examNumber.dataset.qwBankNumber;
+        const expected='№ '+number+(bank?' ('+String(bank).padStart(5,'0')+')':'')+'.';
+        if(examNumber.textContent!==expected||heading.children.length!==1||marker)issue('incorrect exam number');
+        if(getComputedStyle(examNumber).fontWeight!=='700'||parseFloat(getComputedStyle(examNumber).borderLeftWidth)!==0)issue('incorrect number weight or border');
+        if(c.top<h.bottom+.4||Math.abs(b.left-c.left)>.6)issue('exam condition row or indent');
+        if([...content.querySelectorAll(':scope>p')].some(p=>Math.abs(bounds(p).left-b.left)>.6))issue('paragraph indent');
+        if(answer&&Math.abs(bounds(answer).left-b.left)>.6)issue('answer line indent');
+        proof.tasks.push({number,page:page+1,rect:relative(bounds(entry)),mark:relative(b),permanent:bank?'№ '+String(bank).padStart(5,'0')+'.':''});
+      }else if(heading){
         const b=bounds(marker),h=bounds(heading),c=bounds(content);
         if(Math.abs(b.width-b.height)>.08)issue('ordinal is not square');
         if(heading.querySelector('math')||heading.children.length!==(permanent?2:1))issue('heading contains other material');
@@ -157,14 +166,14 @@ async function render(context,page,work,name,orientation,options){
     const proof=await surface.evaluate(inspectPrint);
     assert.deepEqual(proof.errors,[],`${name} geometry`);
     const features=await surface.evaluate(()=>({
-      text:document.body.innerText, ordinal:document.querySelectorAll('.qw-task-marker').length,
+      text:document.body.innerText, ordinal:document.querySelectorAll('.qw-exam-number-line').length,squares:document.querySelectorAll('.qw-task-marker').length,
       displayedRoot:document.querySelector('math')?document.fonts.check('10pt "QO Math"'):true,
       keyCaptions:[...document.querySelectorAll('.qw-answer-caption')].map(node=>({text:node.textContent,breaks:node.querySelectorAll('br').length})),
       rectangles:[...document.querySelectorAll('[data-task="14"] figure rect')].map(node=>[+node.getAttribute('width'),+node.getAttribute('height'),node.getAttribute('fill')]),
     }));
     assert.equal(features.displayedRoot,true);
     if(name.startsWith('pupil-')){
-      assert.equal(features.ordinal,14);
+      assert.equal(features.ordinal,14);assert.equal(features.squares,0);
       assert.equal(proof.tasks.find(item=>item.number===9).permanent,'№ 00809.');
       assert.deepEqual(features.rectangles,[[240,240,'#ffffff'],[100,100,'#e9e9e9']]);
       assert.doesNotMatch(features.text,/a₁ = 4|За первые 4 с путь/);
@@ -279,8 +288,8 @@ async function main(){
       }))];return qwValidate(work);
     },{work,shapes});
     const proof=await render(context,page,stress,'math-raster-proof','portrait',{format:'booklet'});
-    const squareSizes=proof.tasks.map(task=>[task.mark[2]-task.mark[0],task.mark[3]-task.mark[1]]);
-    assert.ok(squareSizes.every(pair=>pair.every((size,i)=>Math.abs(size-squareSizes[0][i])<.05)));
+    const numberHeights=proof.tasks.map(task=>task.mark[3]-task.mark[1]);
+    assert.ok(numberHeights.every(height=>Math.abs(height-numberHeights[0])<.05));
     assert.ok(proof.roots.length>=7);
     docs.push(proof);
     if(finalEdition){

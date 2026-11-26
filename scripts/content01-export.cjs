@@ -12,7 +12,7 @@ const directory = path.resolve(process.argv[2] || path.join(root, 'evidence/cont
 const app = pathToFileURL(path.join(root, 'Quantum-Office.html')).href;
 
 async function newSession(browser) {
- const context = await browser.newContext({offline:true,viewport:{width:1920,height:1080}});
+ const context = await browser.newContext({offline:true,viewport:{width:1920,height:1080},colorScheme:'light'});
  const page = await context.newPage();
  await page.goto(app);
  return {context,page};
@@ -72,6 +72,8 @@ async function main() {
    work=qwValidate({...work,tasks:work.tasks.map(task=>{
     const record=assignedById.get(task.source.id);
     if(!record||!record.bankNumber)throw Error('Missing assigned bank number '+task.source.id);
+    for(const key of ['prompt','answer','comment','criteria','part','points','figure','graph','diagram','image'])
+     if(JSON.stringify(record.task[key])!==JSON.stringify(task[key]))throw Error('Bank task content mismatch '+task.source.id+' '+key);
     return {...task,source:{kind:'bank',id:record.id,number:record.bankNumber,slot:task.source.slot}};
    })});
    if(JSON.stringify(qwValidate(JSON.parse(JSON.stringify(work))))!==JSON.stringify(work))throw Error('Linked QWORK round trip');
@@ -112,6 +114,7 @@ async function main() {
   assert.equal(await page.locator('.qw-nav-task').count(),32);
   const shots=path.join(directory,'screenshots');
   await fs.mkdir(shots,{recursive:true});
+  assert.equal(await page.locator('html').getAttribute('data-qo-theme'),'light');
   await page.screenshot({path:path.join(shots,'variant-editor.png')});
   await page.locator('[data-action=work-preview]').click();
   await page.frameLocator('#qw-print-preview-frame').locator('.qw-print-page .qw-exam-number-line').first().waitFor();

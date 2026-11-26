@@ -24,6 +24,17 @@ jobs:
       - run: node tests/exam01_browser.cjs
       - run: node scripts/content01-export.cjs evidence/exam-01/content
       - run: node scripts/editor01-export.cjs
+      - uses: actions/checkout@v4
+        with:
+          ref: f2d1432c3134b605a549c91acd4950ef959a7f36
+          path: exam01-baseline
+      - run: npm ci
+        working-directory: exam01-baseline
+      - run: npm run build
+        working-directory: exam01-baseline
+      - run: node scripts/editor01-export.cjs ../evidence/exam-01/baseline-practice
+        working-directory: exam01-baseline
+      - run: python tests/exam01_practice_regression.py evidence/exam-01/baseline-practice evidence/editor-01/materials
       - uses: actions/upload-artifact@v4
         if: always()
         with:

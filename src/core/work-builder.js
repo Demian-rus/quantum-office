@@ -500,8 +500,8 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
   (format==='booklet'&&showVariant&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
   (meta?'<div class="qw-print-meta">'+meta+'</div>':'')+
   (format==='worksheet'&&d.instructions?'<p class="qw-print-intro">'+qwContentHTML(d.instructions)+'</p>':''));
- const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(p.titleColor??'#000000')+
-  ';--qw-body-color:'+(p.bodyColor??'#000000')+';--qw-title-align:'+(p.titleAlign??'center')+';';
+ const css=(d.printSettings?'--qw-print-size:'+p.fontPt+'pt;':'')+'--qw-title-size:'+(p.titlePt??14)+'pt;--qw-title-color:'+(examStandard?'#000000':p.titleColor??'#000000')+
+  ';--qw-body-color:'+(examStandard?'#000000':p.bodyColor??'#000000')+';--qw-title-align:'+(p.titleAlign??'center')+';';
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(['booklet','answers'].includes(format)?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
@@ -584,7 +584,7 @@ async function qwPreview(output='tasks'){
 
   const title=d.querySelector('#qw-title-controls'),standard=qwExamPublication(qwDoc,key?'answers':qwDoc.layout);
   if(title)title.hidden=!standard&&!d.querySelector('[data-print-setting="showTitle"]').checked;
-  for(const name of ['showTitle','titleText','titleAlign','showMeta','showVariant','topicHeadings','partHeadings','numbering']){
+  for(const name of ['showTitle','titleText','titleAlign','titleColor','bodyColor','showMeta','showVariant','topicHeadings','partHeadings','numbering']){
    const control=d.querySelector('[data-print-setting="'+name+'"]');if(control)control.closest('label').hidden=standard;
   }
   for(const name of ['examPartHeadings','examTopicHeadings']){

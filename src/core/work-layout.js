@@ -366,7 +366,7 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-sha
 body[data-qw-exam-standard=true] .qw-print-header,body[data-qw-exam-standard=true] .qw-print-title,body[data-qw-exam-standard=true] .qw-topic-title{text-align:center!important}
 body[data-qw-exam-standard=true] .qw-print-title{color:#000}
 body[data-qw-exam-standard=true] .qw-print-section{margin-bottom:3mm}
-body[data-qw-exam-standard=true] .qw-answer-columns .qw-exam-brief-item{grid-template-columns:max-content minmax(0,1fr);column-gap:1.5mm}
+body[data-qw-exam-standard=true] .qw-answer-columns .qw-exam-brief-item{grid-template-columns:26mm minmax(0,1fr);column-gap:1.5mm}
 body[data-qw-exam-standard=true] .qw-exam-brief-item>.qw-print-number{text-align:left}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}

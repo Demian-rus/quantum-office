@@ -37,6 +37,12 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
   await page.locator('[data-qw-action="bank-assemble"]').click();
   await page.locator('.qw-print-design-dialog').waitFor();
   assert.ok(await page.locator('#qw-title-controls').count());
+  const examNumber=page.locator('[data-exam-variant]');
+  await examNumber.fill('15');await examNumber.press('Tab');
+  await page.frameLocator('#qw-print-preview-frame').locator('.qw-print-title').filter({hasText:'Вариант 15'}).waitFor();
+  assert.equal(await page.locator('[data-print-setting="titleText"]').isVisible(),false);
+  // Custom titles remain editable outside the exam publication format.
+  await page.locator('select[name="qw-pdf-layout"]').selectOption('compact');
   const title=page.locator('[data-print-setting="titleText"]');
   assert.equal(await title.inputValue(),'Аналоги ЕГЭ 2018');
   await title.fill('Аналоги ЕГЭ 2018 — тренировочный вариант');
@@ -49,6 +55,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
   await page.locator('[data-print-setting="showMeta"]').uncheck();
   await page.locator('[data-print-setting="showVariant"]').uncheck();
   await page.locator('[data-print-setting="theme"]').selectOption('academic');
+  await page.locator('select[name="qw-pdf-layout"]').selectOption('booklet');
   const ready=async()=>{await page.waitForFunction(()=>{
    const f=document.querySelector('#qw-print-preview-frame');
    return f?.contentWindow?.__qwPrintLayout&& !f.contentWindow.__qwPrintError && f.dataset.ready;
@@ -74,7 +81,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
     meta:doc.querySelector('.qw-print-meta')?.textContent||'',
     warnings:[...doc.querySelectorAll('.qw-print-section')].some(x=>x.getBoundingClientRect().width<1)};
   });
-  assert.equal(documentData.title,'Аналоги ЕГЭ 2018 — тренировочный вариант');
+  assert.equal(documentData.title,'Вариант 15');assert.equal(documentData.colors,'rgb(0, 0, 0)');
   assert.equal(documentData.meta,'');assert.equal(documentData.brand,1);
   assert.deepEqual(documentData.tasks,['1','2']);
   assert.equal(documentData.warnings,false);
@@ -91,7 +98,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task154');
     mathFont:getComputedStyle(document.querySelector('math')).fontFamily,
     size:getComputedStyle(document.body).fontSize,
     remote:[...document.images].some(img=>img.src.startsWith('http'))}));
-   assert.equal(details.tasks,2);assert.equal(details.title,state.settings.titleText);
+   assert.equal(details.tasks,2);assert.equal(details.title,format==='booklet'?'Вариант 15':state.settings.titleText);
    assert.ok(details.pages>=1&&details.pages<=3,format);
    assert.equal(details.remote,false);
    await p.emulateMedia({media:'print'});
