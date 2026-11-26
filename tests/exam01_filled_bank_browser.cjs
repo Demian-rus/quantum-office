@@ -56,8 +56,36 @@ const {pathToFileURL}=require('node:url'),{chromium}=require('playwright');
  const foreign=structuredClone(demo);foreign.id='foreign-unrelated';foreign.tasks=foreign.tasks.slice(0,1);foreign.tasks[0].source={kind:'bank',id:'not-in-local-bank',number:seed[0].bankNumber};
  await page.locator('#qw-file').setInputFiles({name:'foreign.qwork',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(foreign))});await page.waitForFunction(()=>qwDoc.id==='foreign-unrelated');
  const unresolved=await page.evaluate(()=>qwDoc);assert.equal(unresolved.tasks[0].source.kind,'external-bank');assert.equal(unresolved.tasks[0].source.number,seed[0].bankNumber);await exportProof(unresolved,'external');
+ // Same record ID and number, but a different task and no matching creation stamp.
+ const collision=structuredClone(foreign);collision.id='foreign-id-collision';collision.tasks[0].source={kind:'bank',id:seed[0].id,number:seed[0].bankNumber};
+ await page.locator('#qw-file').setInputFiles({name:'collision.qwork',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(collision))});await page.waitForFunction(()=>qwDoc.id==='foreign-id-collision');
+ assert.equal(await page.evaluate(()=>qwDoc.tasks[0].source.kind),'external-bank');
+ // A failed read must not block opening the independent QWORK.
+ await page.evaluate(()=>{window.__examOriginalGet=qwBankRepository.getTask;qwBankRepository.getTask=async()=>{throw Error('isolated test bank read failure');};});
+ const unavailable=structuredClone(foreign);unavailable.id='bank-unavailable';
+ await page.locator('#qw-file').setInputFiles({name:'unavailable.qwork',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(unavailable))});await page.waitForFunction(()=>qwDoc.id==='bank-unavailable');
+ assert.equal(await page.evaluate(()=>qwDoc.tasks[0].source.kind),'external-bank');
+ await page.evaluate(()=>{qwBankRepository.getTask=window.__examOriginalGet;});
+ // The new-work route, A4 selector and separate key all follow the active format.
+ await page.locator('[data-action=work-new]').click();
+ assert.equal(await page.evaluate(()=>qwDoc.printSettings.profile),'exam');
+ await page.locator('[data-qw-action=quick-add][data-type=short]').click();
+ await page.locator('[data-bank-live=prompt]').fill('Проверка профиля.');
+ await page.locator('[data-action=work-preview]').click();
+ const ready=()=>page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return f?.dataset.ready===f?.contentDocument?.documentElement.dataset.qwRender&&!!f?.dataset.ready&&!f.contentWindow.__qwPrintError;});
+ const isExam=()=>page.frameLocator('#qw-print-preview-frame').locator('body').getAttribute('data-qw-exam-standard');
+ await ready();assert.equal(await isExam(),'true');
+ await page.locator('select[name=qw-pdf-layout]').selectOption('compact');await ready();assert.equal(await isExam(),'false');
+ await page.locator('[data-qw-close]').click();await page.locator('[data-action=work-answers]').click();await ready();assert.equal(await isExam(),'false');await page.locator('[data-qw-close]').click();
+ await page.locator('[data-action=work-preview]').click();await ready();await page.locator('select[name=qw-pdf-layout]').selectOption('booklet');await ready();assert.equal(await isExam(),'true');await page.locator('[data-qw-close]').click();
+ await page.locator('[data-action=work-answers]').click();await ready();assert.equal(await isExam(),'true');await page.locator('[data-qw-close]').click();
+ const legacy=await page.evaluate(()=>({...qwProject(),id:'legacy-exam',layout:'exam',tasks:[{...qwTask(),prompt:'Старый макет.'}]}));
+ await page.locator('#qw-file').setInputFiles({name:'legacy.qwork',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(legacy))});await page.waitForFunction(()=>qwDoc.id==='legacy-exam');
+ await page.locator('[data-action=work-preview]').click();await ready();assert.equal(await isExam(),'false');
+ assert.equal(await page.locator('select[name=qw-pdf-layout]').inputValue(),'exam');await page.locator('select[name=qw-pdf-layout]').selectOption('booklet');await ready();assert.equal(await isExam(),'true');assert.equal(await page.locator('select[name=qw-pdf-layout] option[value=exam]').count(),0);
+ await page.locator('[data-qw-close]').click();
  assert.equal(await page.evaluate(async()=> (await qwBankRepository.getStatistics()).count),37);assert.deepEqual(errors,[]);
- await fs.writeFile(path.join(out,'filled-bank-report.json'),JSON.stringify({seed:seed.map(e=>[e.id,e.bankNumber]),records:real.map(e=>[e.id,e.bankNumber]),assembled:assembled.tasks.map(t=>t.source),rebound:rebound.tasks.map(t=>t.source),unresolved:unresolved.tasks[0].source,duplicates:0},null,2));
+ await fs.writeFile(path.join(out,'filled-bank-report.json'),JSON.stringify({seed:seed.map(e=>[e.id,e.bankNumber]),records:real.map(e=>[e.id,e.bankNumber]),assembled:assembled.tasks.map(t=>t.source),rebound:rebound.tasks.map(t=>t.source),unresolved:unresolved.tasks[0].source,duplicates:0,profileUI:true,sameIdCollisionRejected:true,unavailableBankOpened:true},null,2));
  await context.close();console.log('PASS EXAM-01 filled bank: actual UI import/assemble/save/reopen, 4 PDFs, repeat import, foreign IDs');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

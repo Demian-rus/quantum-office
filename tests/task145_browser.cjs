@@ -12,10 +12,10 @@ const {pathToFileURL}=require('node:url');
   await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);
   await page.evaluate(()=>route('writer'));
   await page.locator('.global-bar [data-target="work"]').click();
-  const action=k=>page.locator('[data-qw-action="'+k+'"]');
+  const action=k=>page.locator(['diagram','graph'].includes(k)?'[data-bank-visual="'+k+'"]':['save','preview'].includes(k)?'[data-action="work-'+k+'"]':'[data-qw-action="'+k+'"]');
   const add=async(type,prompt)=>{
    await page.locator('[data-qw-action="quick-add"][data-type="'+type+'"]').click();
-   await page.locator('#qw-prompt').fill(prompt);
+   await page.locator('[data-bank-source]').click();await page.locator('#qw-prompt').fill(prompt);
   };
   await add('diagram','В треугольнике ABC найдите длину стороны AB и обозначьте высоту.');
   await action('diagram').click();

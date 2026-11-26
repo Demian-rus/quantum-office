@@ -697,11 +697,16 @@ function qwSameBankContent(a,b){
 async function qwCheckWorkBankLinks(project){
  const candidates=project.tasks.filter(q=>['bank','external-bank'].includes(q.source?.kind));
  if(!candidates.length)return {rebound:0,external:0};
- const repository=await qwBankOpen(),records=new Map();
+ // A damaged/unavailable bank must not prevent access to independent QWORK content.
+ let repository;try{repository=await qwBankOpen();}catch(error){console.warn('Не удалось проверить ссылки QWORK:',error);}
+ const records=new Map();
  let rebound=0,external=0;
  for(const task of candidates){
   const source=task.source;
-  if(!records.has(source.id))records.set(source.id,await repository.getTask(source.id));
+  if(!records.has(source.id)){
+   let record;try{record=await repository?.getTask(source.id);}catch(error){console.warn('Не удалось проверить запись QWORK:',source.id,error);}
+   records.set(source.id,record);
+  }
   const entry=records.get(source.id);
   if(entry&&entry.id===source.id&&qwBankNumber(entry.bankNumber)&&
    ((source.createdAt&&source.createdAt===entry.createdAt)||qwSameBankContent(task,entry.task))){
