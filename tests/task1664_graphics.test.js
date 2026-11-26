@@ -45,3 +45,23 @@ test('TASK166.4 closed polygon captions prefer exterior, open graphs unchanged',
   }
  }
 });
+
+import {qwEffectiveObjectPaint,qwGraphTemplateStroke,qwGraphSVG,qwDiagramSVG} from '../src/core/work-content.js';
+import {qwTask} from '../src/core/work-model.js';
+test('FINAL FIX 2: effective paint matches SVG, without adding defaults to saved model',()=>{
+ const g=qwTask('graph').graph;
+ g.elements=[{kind:'line',x:0,y:0,x2:1,y2:1,label:''},{kind:'line',x:1,y:0,x2:2,y2:1,label:'',style:{stroke:'#16a34a',width:4}}];
+ const d=[{kind:'line',x:10,y:20,x2:100,y2:40,label:''},{kind:'block',x:100,y:100,x2:150,y2:150,label:'',style:{stroke:'#dc2626',width:3}}];
+ const before=JSON.stringify({g,d});
+ const graph=qwGraphSVG(g,true),diagram=qwDiagramSVG(d,true);
+ for(const [i,o] of g.elements.entries()){
+  const paint=qwEffectiveObjectPaint(o,'graph-element');const group=graph.split('data-qw-element="'+i+'"')[1].split('</g>')[0];
+  assert.ok(group.includes('stroke="'+paint.stroke+'"'));assert.ok(group.includes('stroke-width="'+paint.width+'"'));
+ }
+ for(const [i,o] of d.entries()){
+  const paint=qwEffectiveObjectPaint(o,'diagram');const group=diagram.split('data-qw-object="'+i+'"')[1].split('</g>')[0];
+  assert.ok(group.includes('stroke="'+paint.stroke+'"'));assert.ok(group.includes('stroke-width="'+paint.width+'"'));
+ }
+ assert.equal(qwGraphTemplateStroke(g,'lineStyle'),'#222222');assert.equal(qwGraphTemplateStroke(g,'curveStyle'),'#186ba3');assert.equal(qwGraphTemplateStroke(g,'curveStyle',true),'#222222');
+ assert.equal(JSON.stringify({g,d}),before);
+});

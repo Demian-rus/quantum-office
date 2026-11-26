@@ -55,3 +55,9 @@ TASK148 PDF: фактический векторный PDF артефакта 15
 ### Дополнительная историческая регрессия TASK149.1
 
 В run 45822914092 (job 139919672674) первый непройденный шаг общего Browser — TASK149.1: прежний селектор `line[stroke="#d9dee4"]` возвращал 0 вместо 22. На исходном HEAD 0.4.3 `src/core/work-content.js:359,409,413` уже задаёт цвет `#dddddd` и семантический атрибут `data-qw-grid-line="true"`. Проверка переведена на этот атрибут с исключением вспомогательных линий reference; точное требование 22 линий сохранено. Классификация: историческое устаревшее ожидание, подтверждённое исходником базы, а не регрессия EXAM-01. Полный прогон после изменения должен подтвердить результат.
+
+## FINAL FIX 2 — historical paint defaults and diagnostic execution
+
+TASK149.1 job 139921944788 (run 45823569183): actual inspector #186ba3, selected SVG #222222. The same fallback expressions exist in the baseline f2d1432. This is a genuine historical editor mismatch, not EXAM-01 and not an incorrect selector. Shared effective paint functions preserve the renderer's existing default/explicit stroke and width; the inspector reads those values instead of obsolete defaults. Template stroke and point defaults are aligned; publishing curve behavior stays unchanged. No model defaults are materialized or stored. The historical test compares actual SVG to inspector, including palette and undo; block undo compares the captured original SVG rather than a retired hard-coded color.
+
+The general Browser job now executes 144 historical steps after earlier failures if Chromium setup succeeded and the run was not cancelled. No step uses continue-on-error, so every failure still fails the job. Dependent tests may fail because prerequisite evidence is absent; these must be classified separately, not called independent functional failures. EXAM-01 and pixel checks remain unchanged. No protected document or bank migration is intended.
