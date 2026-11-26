@@ -18,7 +18,7 @@ function qwLabelPosition(raw){
 // layout remains readable independently of the current booklet profile.
 function qwExamPublication(project,format=project.layout){
  const profile=project.printSettings?.profile;
- return (!profile||profile==='exam')&&(format==='booklet'||(format==='answers'&&(project.layout==='booklet'||profile==='exam'))||format==='exam'&&profile==='exam');
+ return (!profile||profile==='exam')&&(format==='booklet'||(format==='answers'&&(project.layout==='booklet'||project.layout==='exam'&&profile==='exam'))||format==='exam'&&profile==='exam');
 }
 function qwExamVariant(value){
  const number=String(value??'').trim();
@@ -150,6 +150,11 @@ function qwValidate(raw){
   if(raw.source&&typeof raw.source==='object'){
    q.source={kind:qwText(raw.source.kind,30),id:qwText(raw.source.id,80)};
    const number=raw.source.number,slot=raw.source.slot;
+   if(raw.source.createdAt!==undefined){
+    const stamp=raw.source.createdAt;
+    if(typeof stamp!=='string'||stamp.length>40||!/^\d{4}-\d\d-\d\dT/.test(stamp)||!Number.isFinite(Date.parse(stamp)))throw Error('Некорректная дата создания записи банка');
+    q.source.createdAt=stamp;
+   }
    if(number!==undefined){
     if(!Number.isInteger(number)||number<1||number>99999)throw Error('Некорректный постоянный номер задания банка');
     q.source.number=number;

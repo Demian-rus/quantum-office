@@ -325,7 +325,7 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace,exam=false)
  const settings=q.publishing?.figure;
  const position=settings?.position||(preferences?.figurePosition&&preferences.figurePosition!=='auto'?preferences.figurePosition:q.position);
  const placement=!figure?'none':position==='below'||position==='left'||tables.length||position==='auto'&&(settings?settings.width>46:q.figureWidth>300)?'below':'right';
- const permanent=bankNumber||(exam&&q.source?.kind!=='bank'?0:q.source?.number);
+ const permanent=bankNumber||(q.source?.kind==='external-bank'||exam&&q.source?.kind!=='bank'?0:q.source?.number);
  const answer=q.answerVisible?'<div class="qw-study-answer">Ответ: '+(q.answerStyle==='boxes'?
   '<span class="qw-study-boxes">'+Array.from({length:q.boxes},()=>'<i></i>').join('')+'</span>':
   '<span class="'+(q.answerStyle==='box'?'qw-study-box':'qw-study-line')+'"></span>')+'</div>':'';
@@ -687,6 +687,33 @@ function qwBankNormalize(x){
 const qwBankRepository=createOfficeBankRepository({normalize:qwBankNormalize});
 const qwBankStorageName=qoNativeDesktop?'SQLite':'IndexedDB';
 async function qwBankOpen(){await qwBankRepository.open({onProgress:count=>status('Перенос изображений банка: '+count+' заданий…')});return qwBankRepository;}
+// EXAM-01: verify portable bank references by record identity, not display number.
+function qwBankSource(entry){
+ return {kind:'bank',id:entry.id,number:entry.bankNumber,...(entry.slot?{slot:entry.slot}:{}),...(entry.createdAt?{createdAt:entry.createdAt}:{})};
+}
+function qwSameBankContent(a,b){
+ return ['type','prompt','answer','comment','criteria','choices','points','figure','graph','diagram','image'].every(key=>JSON.stringify(a[key])===JSON.stringify(b[key]));
+}
+async function qwCheckWorkBankLinks(project){
+ const candidates=project.tasks.filter(q=>['bank','external-bank'].includes(q.source?.kind));
+ if(!candidates.length)return {rebound:0,external:0};
+ const repository=await qwBankOpen(),records=new Map();
+ let rebound=0,external=0;
+ for(const task of candidates){
+  const source=task.source;
+  if(!records.has(source.id))records.set(source.id,await repository.getTask(source.id));
+  const entry=records.get(source.id);
+  if(entry&&entry.id===source.id&&qwBankNumber(entry.bankNumber)&&
+   ((source.createdAt&&source.createdAt===entry.createdAt)||qwSameBankContent(task,entry.task))){
+   if(source.kind!=='bank'||source.number!==entry.bankNumber)rebound++;
+   task.source={...source,kind:'bank',number:entry.bankNumber};
+   if(source.createdAt&&entry.createdAt)task.source.createdAt=entry.createdAt;
+  }else{
+   task.source={...source,kind:'external-bank'};external++;
+  }
+ }
+ return {rebound,external};
+}
 async function qwBankSnapshotSmall(){
  const stats=await qwBankRepository.getStatistics();
  qwBankSnapshot=stats.count<=500?await qwBankRepository.snapshotMetadata():[];
@@ -2050,7 +2077,7 @@ async function qwBank(previousFilters={}){
   const copies=choices.map(entry=>{
    const t=structuredClone(entry.task);t.id=qwId();
    if(single)return t; // Preserve the historical single-copy QWORK semantics.
-   t.source={kind:'bank',id:entry.id,number:entry.bankNumber,...(entry.slot?{slot:entry.slot}:{})};
+   t.source=qwBankSource(entry);
    t.grade=entry.grade;t.exam=entry.exam;t.topic=entry.topic;t.subtopic=entry.subtopic;
    t.part=entry.part?'Часть '+entry.part:'';
    return t;
@@ -2814,7 +2841,7 @@ function qwVisualEditor(kind,bankTask=null,onCommit=null,onCancel=null,parentDir
    }if(t instanceof HTMLInputElement)t.defaultValue=t.value;}catch(error){draw();hint.textContent=error.message;hint.className='qw-error';}});
  d.querySelector('[data-qw-action="visual-apply"]').onclick=()=>{try{if(polyline.length){hint.textContent='Завершите ломаную или отмените её клавишей Escape';return;}const validated=kind==='graph'?qwValidateGraph(value):qwValidateDiagram(value);if(onCommit){visualCommitted=true;d.close();onCommit(kind,validated);}else{visualCommitted=true;qwChange(()=>{q[kind]=validated;q.figure=kind;});d.close();}}catch(e){hint.textContent=e.message;}};draw();
 }
-function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();if(qwDoc.tasks.length)qwRecentWork=structuredClone(qwDoc);qwCorrupt='';qwDoc=qwProject();qwDoc.layout='booklet';qwSelected='';qwPersist();qwRender();}
+function qwNew(){if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Создать новую работу? Для резервной копии сохраните QWORK.'))return;qwRemember();if(qwDoc.tasks.length)qwRecentWork=structuredClone(qwDoc);qwCorrupt='';qwDoc=qwProject();qwDoc.layout='booklet';qwDoc.printSettings=qwPrintSettings({profile:'exam'});qwSelected='';qwPersist();qwRender();}
 function qwAction(action,button){
  const q=qwCurrent();
  if(!qwCanNavigate())return;
@@ -2845,7 +2872,7 @@ if(typeof document!=='undefined'){
  document.addEventListener('focusin',e=>{if(qwActive()&&e.target.matches('#qo-work-root textarea,#qo-work-root input[data-qw-field]'))qwRemember();});
  document.addEventListener('input',e=>{if(!qwActive())return;const t=e.target,k=t.dataset.qwField,q=qwCurrent();if(!q||!['prompt','answer','criteria','comment','part','title'].includes(k))return;q[k]=qwText(t.value,k==='part'||k==='title'?120:16000);qwPersist();qwPreviewSelected();});
  document.addEventListener('change',async e=>{if(!qwActive())return;const t=e.target;
-  if(t.id==='qw-file'){const file=t.files?.[0];t.value='';if(!file)return;try{if(file.size>QW_LIMITS.bytes)throw Error('Файл больше 18 МБ');const next=qwValidate(JSON.parse(await file.text()));for(const image of new Set(next.tasks.map(q=>q.image).filter(Boolean)))await qwImage(image);if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Открыть работу вместо текущей? Сохраните текущую в QWORK.'))return;qwRemember();qwDoc=next;qwRecentWork=structuredClone(next);qwCorrupt='';qwSelected='';qwPersist();qwRender();status('Работа открыта');}catch(e){status('Не удалось открыть QWORK: '+e.message,true);}return;}
+  if(t.id==='qw-file'){const file=t.files?.[0];t.value='';if(!file)return;try{if(file.size>QW_LIMITS.bytes)throw Error('Файл больше 18 МБ');const next=qwValidate(JSON.parse(await file.text()));for(const image of new Set(next.tasks.map(q=>q.image).filter(Boolean)))await qwImage(image);if((qwDoc.tasks.length||qwCorrupt)&&!confirm('Открыть работу вместо текущей? Сохраните текущую в QWORK.'))return;const links=await qwCheckWorkBankLinks(next);qwRemember();qwDoc=next;qwRecentWork=structuredClone(next);qwCorrupt='';qwSelected='';qwPersist();qwRender();status('Работа открыта'+(links.rebound?' · Уточнены номера банка: '+links.rebound:'')+(links.external?' · Внешние ссылки без локального подтверждения: '+links.external:''));}catch(e){status('Не удалось открыть QWORK: '+e.message,true);}return;}
 
   const k=t.dataset.qwField,q=qwCurrent();if(!q||!k||['prompt','answer','criteria','comment','part','title'].includes(k))return;if(k==='choices'){try{const choices=t.value.split(/\n/).map(s=>s.trim()).filter(Boolean);qwValidate({...qwDoc,tasks:qwDoc.tasks.map(a=>a===q?{...q,choices}:a)});qwRemember();q.choices=choices;t.defaultValue=t.value;qwPersist();qwPreviewSelected();}catch(error){status(error.message,true);}return;}qwRemember();if(t.type==='checkbox')q[k]=t.checked;else if(t.type==='number'){const ranges={points:[0,100],boxes:[1,30],solutionHeight:[24,500],figureWidth:[120,470]};const [min,max]=ranges[k]||[0,100];q[k]=qwNum(t.value,min,max,min);t.value=q[k];}else q[k]=t.value;
   if(k==='type'){if(q.type==='choice')q.choices??=qwTask('choice').choices;if(['extended','combined'].includes(q.type))q.solutionVisible=true;if(q.type==='graph')q.figure='graph';if(q.type==='diagram')q.figure='diagram';}

@@ -17,3 +17,10 @@ test('EXAM-01 legacy QWORK and explicit section settings round trip without chan
  assert.throws(()=>qwPrintSettings({examPartHeadings:'yes'}));
  for(const profile of ['notes','practice'])assert.equal(qwExamPublication({...old,printSettings:{profile}}),false);
 });
+
+test('EXAM-01 key follows active format, not stale exam profile',()=>{
+ for(const layout of ['compact','practice','worksheet'])assert.equal(qwExamPublication({layout,printSettings:{profile:'exam'}},'answers'),false);
+ assert.equal(qwExamPublication({layout:'exam'},'answers'),false);
+ assert.equal(qwExamPublication({layout:'exam',printSettings:{profile:'exam'}},'answers'),true);
+ assert.equal(qwExamPublication({layout:'booklet',printSettings:{profile:'exam'}},'answers'),true);
+});

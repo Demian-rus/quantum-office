@@ -68,13 +68,13 @@ async function main() {
    if (new Set(numbers).size!==32||numbers.some(number=>number<1)||assigned.items.some(item=>item.year))
     throw new Error('Invalid imported metadata');
    // QWORK references the actual assigned bank records, never position-derived IDs.
-   const assignedById=new Map(assigned.items.map(item=>[item.id,item]));
+   const assignedById=new Map(await Promise.all(assigned.items.map(async item=>[item.id,await repository.getTask(item.id)])));
    work=qwValidate({...work,tasks:work.tasks.map(task=>{
     const record=assignedById.get(task.source.id);
     if(!record||!record.bankNumber)throw Error('Missing assigned bank number '+task.source.id);
     for(const key of ['prompt','answer','comment','criteria','part','points','figure','graph','diagram','image'])
      if(JSON.stringify(record.task[key])!==JSON.stringify(task[key]))throw Error('Bank task content mismatch '+task.source.id+' '+key);
-    return {...task,source:{kind:'bank',id:record.id,number:record.bankNumber,slot:task.source.slot}};
+    return {...task,source:qwBankSource(record)};
    })});
    if(JSON.stringify(qwValidate(JSON.parse(JSON.stringify(work))))!==JSON.stringify(work))throw Error('Linked QWORK round trip');
    const portableItems=assigned.items.map(item=>({...item,bankNumber:0}));
