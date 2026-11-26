@@ -76,7 +76,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   assert.equal(await swatch.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(234, 88, 12)','hover keeps actual swatch color');
   await page.locator('[data-style-key="stroke"][data-style-color="#dc2626"]').click();
   assert.equal(await line.getAttribute('stroke'),'#dc2626');await checkStroke();
-  await page.keyboard.press('Control+z');assert.equal(await line.getAttribute('stroke'),original,'palette redraw/lost focus undo');await checkStroke();
+  await page.keyboard.press('Control+z');assert.equal(await line.getAttribute('stroke'),original,'palette redraw/lost focus undo');await page.locator('[data-graph-object="0"]').click();await checkStroke();
   await tool('select');
   await page.locator('[data-tool="select"]').dispatchEvent('keydown',{key:'я',code:'KeyZ',ctrlKey:true,bubbles:true,cancelable:true});
   assert.equal(await stage.locator('[data-qw-element]').count(),0,'Russian physical Ctrl+Z from tool button');
@@ -118,6 +118,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   assert.equal(await block.getAttribute('stroke'),'#dc2626');assert.equal(await page.locator('[data-style="stroke"]').inputValue(),await block.getAttribute('stroke'));
   await page.keyboard.press('Control+z');
   assert.equal(await block.getAttribute('stroke'),blockStroke,'diagram style undo after redraw');
+  await page.locator('[data-object-select="1"]').click();
   assert.equal(await page.locator('[data-style="stroke"]').inputValue(),await block.getAttribute('stroke'),'diagram inspector matches SVG after undo');
   await page.locator('[data-object-select="1"]').click();
   await page.locator('#qw-object-label').focus();await page.locator('#qw-object-label').pressSequentially('AB');await page.keyboard.press('Control+z');

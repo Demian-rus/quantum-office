@@ -19,6 +19,8 @@ for audience in ('Student', 'Answers'):
         for fault in ('missing-label', 'wrong-label', 'missing-number', 'wrong-number',
                       'misplaced-number', 'clipped-number', 'duplicate-number',
                       'body-in-footer', 'body-outside-left'):
+            if fault in ('missing-label', 'wrong-label') and index != 0:
+                continue  # Metadata intentionally appears only on the first page.
             mutated = pymupdf.open(stream=source, filetype='pdf')
             page = mutated[index]
             if fault in ('missing-label', 'wrong-label'):
@@ -28,7 +30,7 @@ for audience in ('Student', 'Answers'):
                 page.add_redact_annot(pymupdf.Rect(footers[number]))
                 page.apply_redactions(images=0, graphics=0)
             if fault == 'wrong-label':
-                page.insert_text((42.5, 819.75), 'Wrong metadata', fontsize=8)
+                page.insert_text((42.5, 90), 'Wrong metadata', fontsize=9)
             if fault == 'wrong-number':
                 page.insert_text((537, 819.75), '9 / 9', fontsize=8)
             if fault == 'misplaced-number':

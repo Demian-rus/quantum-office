@@ -1566,7 +1566,10 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   qwVisualEditor(kind,task,(updatedKind,validated)=>{
    if(!active())return;
    task[updatedKind]=validated;task.figure=updatedKind;
-   if(work){fieldInput('figure').value=updatedKind;saveWorking();renderEditor();}
+   if(work){
+     // Each accepted modal edit is a separate project undo transaction.
+     transaction.recorded=false;fieldInput('figure').value=updatedKind;saveWorking();transaction.recorded=false;renderEditor();
+    }
    else qwBankEdit(id,draft,returnFilters,transaction);
   },()=>{if(!work&&active())qwBankEdit(id,draft,returnFilters,transaction);},()=>!work&&JSON.stringify(draft)!==transaction.initialDraft);
  });

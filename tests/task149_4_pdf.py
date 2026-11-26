@@ -5,6 +5,7 @@ import re
 import unicodedata
 from pathlib import Path
 import pymupdf
+from pdf_signature_bounds import verify_signature
 from pdf_task_numbers import task_numbers
 
 out = Path(os.environ.get('QW_TASK1494_EVIDENCE', Path(__file__).resolve().parents[1] / 'evidence/task149.4'))
@@ -31,7 +32,7 @@ for name, counts in expected.items():
         assert not re.search(r'PRIVATE_|INTERNAL_|Задание \d+|Ответ:|Рисунок\s*/\s*схема|\d+ б\.', text)
         assert not page.get_images(), (name, 'raster image found')
         spans = [s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
-        for span in spans:
+        for span in verify_signature(page, spans):
             x0, y0, x1, y1 = span['bbox']
             assert x0 >= 30 and y0 >= 25 and x1 <= page.rect.width - 30 and y1 <= page.rect.height - 12, (name, span)
         assert any(abs(s['size'] - 10) < .05 for s in spans), 'readable ordinary body font'

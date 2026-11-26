@@ -72,7 +72,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1496_EVIDENCE||pa
   for(const {name,project}of task149ImprovedSamples()){
    const file=path.join(out,name+'.qwork');fs.writeFileSync(file,JSON.stringify(project,null,2));await open(file);await p.locator('[data-action="work-preview"]').click();const f=await frame();
    if(name.startsWith('Practice-One')){await p.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await p.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await p.locator('[data-practice="perPage"]').selectOption('1');await frame();assert.equal(await(await frame()).locator('.qw-print-page').count(),3);}
-   const r=await exportPDF(name);if(name==='Physics-Graph-Comparison'){const grids=r.sections.map(s=>s.figure.gridMm);assert.ok(grids.every(g=>Math.abs(g.w-48)<.1&&Math.abs(g.h-48*216/369)<.1));assert.ok(r.sections.every(s=>s.figure.axisPt.every(pt=>pt>=8&&pt<=9)));}
+   const r=await exportPDF(name);if(name==='Physics-Graph-Comparison'){const grids=r.sections.map(s=>s.figure.gridMm);assert.ok(grids.every(g=>Math.abs(g.w-48)<.1&&Math.abs(g.h-48*216/369)<.1));assert.ok(r.sections.every(s=>s.figure.axisPt.every(pt=>Math.abs(pt-21*48*72/25.4/369)<.15)));}
    if(name==='Practice-Multiple-Tasks-Improved')assert.equal(r.layout.pages.length,1);await p.locator('[data-qw-close]').click();await save(name);
   }
   // Bounds include focus-ring allowance, scroll viewport and drawer controls in both themes.

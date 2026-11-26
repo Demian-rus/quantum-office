@@ -51,6 +51,8 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
    }else{assert.equal(report.layout.pages.length,1);assert.ok(report.sections.every(s=>s.solutionMm>=30));}
    await app.locator('[data-qw-close]').click();assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before,'export does not mutate data');
   }
+  // Persist the independently generated PDF measurements even if a later stress scenario fails.
+  fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify({status:'MATERIALS_GENERATED',reports,errors},null,2));
   // Real format/preset controls persist, undo and QWORK corruption is atomic.
   await app.locator('[data-action="work-preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
   await app.locator('[data-practice="perPage"]').selectOption('2');await app.locator('[data-practice="grid"]').selectOption('none');await frame();assert.equal(await app.evaluate(()=>qwDoc.practice.perPage),2);

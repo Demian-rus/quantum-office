@@ -9,7 +9,7 @@ module.exports=function inspectSVG(svg){
  for(const e of svg.querySelectorAll('line,path,polyline,polygon,rect,circle,ellipse')){
   if(e.closest('defs,[data-qw-label],[data-qw-editor-only]')||e.hasAttribute('data-qw-vertex'))continue;
   const style=getComputedStyle(e),r=Number(e.getAttribute('r'))||0;
-  if(['rgb(217, 222, 228)','rgb(220, 230, 236)'].includes(style.stroke))continue;
+  if(e.matches('line[data-qw-grid-line="true"]:not([data-qw-reference])'))continue;
   if(e.tagName==='circle'&&r<=7&&style.fill!=='none'){const m=matrix(e);points.push({...at(m,{x:Number(e.getAttribute('cx')),y:Number(e.getAttribute('cy'))}),r});continue;}
   if(style.stroke==='none')continue;
   const length=e.getTotalLength(),m=matrix(e),sample=[];if(!length)continue;

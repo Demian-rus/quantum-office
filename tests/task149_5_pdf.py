@@ -4,6 +4,7 @@ import os
 import re
 from pathlib import Path
 import pymupdf
+from pdf_signature_bounds import verify_signature
 from pdf_task_numbers import task_numbers
 from pdf_graph_geometry import verify_ab
 
@@ -29,7 +30,7 @@ for name in names:
         if 'Practice-' in name:
             assert 'Ответ:' not in text
         spans = [s for block in page.get_text('dict')['blocks'] if 'lines' in block for line in block['lines'] for s in line['spans'] if s['text'].strip()]
-        for s in spans:
+        for s in verify_signature(page, spans):
             b = pymupdf.Rect(s['bbox'])
             assert b.x0 >= 25 and b.y0 >= 22 and b.x1 <= page.rect.width - 25 and b.y1 <= page.rect.height - 10, (name, i, s)
             if s['color'] == 0xB42318:
