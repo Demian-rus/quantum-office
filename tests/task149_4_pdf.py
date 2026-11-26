@@ -43,7 +43,7 @@ for name, counts in expected.items():
         pages.append({'page': i + 1, 'tasks': current, 'usedMm': round(measured['usedMm'], 2), 'freeMm': round(measured['freeMm'], 2), 'vectorPaths': len(page.get_drawings()), 'rasterImages': 0})
     assert numbers == list(range(1, sum(counts) + 1)), (name, numbers)
     if name == 'Compact-Geometry-Answers':
-        full_text = ' '.join(p.get_text() for p in doc)
+        full_text = re.sub(r'\s+', ' ', ' '.join(p.get_text() for p in doc))
         assert 'Ответы' in full_text and 'По обратной теореме Пифагора' in full_text
         assert all(q['prompt'][:24] not in full_text for q in source['tasks']), 'conditions leaked into key'
         for answer in ['65°', '68°', '62°', '57°', 'AB и BC', '80°']:
