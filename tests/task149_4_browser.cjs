@@ -38,9 +38,9 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
   const untouched=await app.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   for(const {name,project} of samples){
    await app.evaluate(d=>qwChange(()=>{qwDoc=qwValidate(d);qwSelected=qwDoc.tasks[0].id;}),project);
-   const before=await app.evaluate(()=>JSON.stringify(qwDoc)),event=app.waitForEvent('download');await app.locator('[data-qw-action="save"]').click();const file=path.join(out,name+'.qwork');await(await event).saveAs(file);assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),project);
+   const before=await app.evaluate(()=>JSON.stringify(qwDoc)),event=app.waitForEvent('download');await app.locator('[data-action="work-save"]').click();const file=path.join(out,name+'.qwork');await(await event).saveAs(file);assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),project);
    await app.locator('[data-action="work-new"]').click();await app.locator('#qw-file').setInputFiles(file);await app.waitForFunction(n=>qwDoc.tasks.length===n,project.tasks.length);assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before);
-   await app.locator('[data-qw-action="preview"]').click();assert.equal(await app.locator('#qw-teacher').count(),0);assert.equal(await app.locator('.qw-exam-unavailable').count(),0,'removed roadmap hints must never reappear');
+   await app.locator('[data-action="work-preview"]').click();assert.equal(await app.locator('#qw-teacher').count(),0);assert.equal(await app.locator('.qw-exam-unavailable').count(),0,'removed roadmap hints must never reappear');
    const report=await exportPreview(name);assert.equal(report.answerLines,0);assert.doesNotMatch(report.text,/PRIVATE_|INTERNAL_|Задание \d+|Ответ:|Рисунок\s*\/\s*схема|\d+ б\./);for(const hidden of [project.instructions,project.tasks[0].criteria,project.tasks[0].comment])assert.ok(!report.text.includes(hidden));
    if(name==='Compact-Geometry'){
     assert.equal(report.sections.length,24);assert.ok(report.layout.pages.length<=3);assert.equal(await(await frame()).locator('.qw-topic-title').count(),3);
@@ -52,7 +52,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
    await app.locator('[data-qw-close]').click();assert.equal(await app.evaluate(()=>JSON.stringify(qwDoc)),before,'export does not mutate data');
   }
   // Real format/preset controls persist, undo and QWORK corruption is atomic.
-  await app.locator('[data-qw-action="preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
+  await app.locator('[data-action="work-preview"]').click();await app.locator('select[name="qw-pdf-layout"]').selectOption('practice');assert.equal(await app.locator('select[name="qw-pdf-layout"]').inputValue(),'practice');await frame();
   await app.locator('[data-practice="perPage"]').selectOption('2');await app.locator('[data-practice="grid"]').selectOption('none');await frame();assert.equal(await app.evaluate(()=>qwDoc.practice.perPage),2);
   assert.equal(await(await frame()).locator('.qw-practice-space svg').count(),0);
   await app.setViewportSize({width:800,height:900});await app.screenshot({path:path.join(out,'preview-narrow.png')});assert.ok(await app.locator('[data-qw-action="preview-pdf"]').isVisible());await app.locator('[data-qw-close]').click();await app.setViewportSize({width:1440,height:1080});
