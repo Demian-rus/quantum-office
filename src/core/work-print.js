@@ -1,37 +1,7 @@
 /* Portable PDF: paginated A4 canvases rendered at 180 dpi, embedded by pdf-lib.
    Student output never traverses answer/criteria/comment strings. */
 import {QW_SUBJECTS} from './work-model.js';
-function qwMathBox(ctx,n,size=12,upright=false,unary=false){
- const text=source=>{const v=source==='-'?'−':source,font=(!upright&&/^[A-Za-zα-ωΑ-Ω]$/.test(v)?'italic ':'')+size+'px "Times New Roman",serif',pad=!upright&&!unary&&/^[=+−×÷·±<>≤≥≠]$/.test(v)?size*.28:0;ctx.font=font;const m=ctx.measureText(v);return {w:m.width+pad*2,a:Math.max(size*.7,m.actualBoundingBoxAscent||0),d:Math.max(size*.2,m.actualBoundingBoxDescent||0),draw:(x,y)=>{ctx.font=font;ctx.fillText(v,x+pad,y);}};};
- if(n.t==='text')return text(n.v);
- if(n.t==='upright')return qwMathBox(ctx,n.a,size,true);
- if(n.t==='row'){const bs=n.list.map((v,i)=>qwMathBox(ctx,v,size,upright,qwMathIsUnary(n.list,i)));return {w:bs.reduce((s,b)=>s+b.w,0),a:Math.max(size*.8,...bs.map(b=>b.a)),d:Math.max(size*.24,...bs.map(b=>b.d)),draw:(x,y)=>{for(const b of bs){b.draw(x,y);x+=b.w;}}};}
- if(n.t==='frac'){const a=qwMathBox(ctx,n.a,size*.78,upright),b=qwMathBox(ctx,n.b,size*.78,upright),w=Math.max(a.w,b.w)+8;return {w,a:a.a+a.d+size*.35,d:b.a+b.d+size*.25,draw:(x,y)=>{a.draw(x+(w-a.w)/2,y-size*.35-a.d);ctx.beginPath();ctx.lineWidth=.7;ctx.moveTo(x,y-size*.18);ctx.lineTo(x+w,y-size*.18);ctx.stroke();b.draw(x+(w-b.w)/2,y+b.a+2);}};}
- if(n.t==='sqrt'){
-  const radicand=qwMathBox(ctx,n.a,size,upright),rule=Math.max(.55,size*.055),lead=size*.79;
-  const bar=radicand.a+size*.12+rule/2,depth=Math.max(size*.14,radicand.d),width=lead+radicand.w+size*.09;
-  return {w:width,a:bar+rule,d:depth+rule,draw:(x,y)=>{
-   radicand.draw(x+lead,y);
-   ctx.save();ctx.beginPath();ctx.lineWidth=rule;ctx.lineJoin='round';ctx.lineCap='butt';
-   ctx.moveTo(x+rule/2,y-size*.08);ctx.lineTo(x+size*.16,y-size*.16);
-   ctx.lineTo(x+size*.35,y+depth);ctx.lineTo(x+size*.67,y-bar);ctx.lineTo(x+width,y-bar);
-   ctx.stroke();ctx.restore();
-  }};
- }
- if(n.t==='cases'){
-  const rows=n.rows.map(row=>qwMathBox(ctx,row,size,upright));
-  const gap=size*.15,height=rows.reduce((sum,row)=>sum+row.a+row.d+gap,-gap);
-  const a=height/2+size*.25,d=height-a,brace=size*.8;
-  return {w:brace+Math.max(...rows.map(row=>row.w)),a,d,draw:(x,y)=>{
-   ctx.font=height+'px "Times New Roman",serif';
-   ctx.save();ctx.translate(x,y+(d-a)/2);ctx.scale(brace/Math.max(1,ctx.measureText('{').width),1);
-   ctx.textBaseline='middle';ctx.fillText('{',0,0);ctx.restore();
-   let top=y-a;
-   for(const row of rows){row.draw(x+brace,top+row.a);top+=row.a+row.d+gap;}
-  }};
- }
- const a=qwMathBox(ctx,n.a,size,upright),b=qwMathBox(ctx,n.b,size*.66,upright),dy=n.t==='sup'?-size*.58:size*.34;return {w:a.w+b.w,a:Math.max(a.a,b.a-dy),d:Math.max(a.d,b.d+dy),draw:(x,y)=>{a.draw(x,y);b.draw(x+a.w,y+dy);}};
-}
+import {qwMathBox} from './work-content.js';
 async function qwImage(source){const img=new Image();img.src=source;await img.decode();return img;}
 async function qwFigureImage(q){
  if(q.figure==='image'&&q.image)return qwImage(q.image);

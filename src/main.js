@@ -1420,7 +1420,7 @@ function qoEducationPage(kind){
    diagTile('writer-diag-templates-import','Загрузить QTPL','folder')+
    diagTile('writer-diag-templates-export','Скачать QTPL','copy'),'qo-diag-tile-group');
 
- const toolbar=kind==='diagnostics'?diagnosticFiles+diagnosticTemplates:kind==='work'?qwToolbar()+qoWorkGroup('Банк заданий',qoWorkButton('route-bank','Открыть банк','folder')):'';
+ const toolbar=kind==='diagnostics'?diagnosticFiles+diagnosticTemplates:kind==='work'?qwToolbar():'';
  const content=kind==='diagnostics'?'<section id="qo-diag-workspace" class="qo-editor-scroll qo-diag-scroll"><div id="qo-diag-root"></div></section>':kind==='work'?'<section id="qo-work-workspace" class="qo-editor-scroll"><div id="qo-work-root"></div></section>':'<section id="qo-bank-root" class="qo-editor-scroll" aria-label="Каталог задач"></section>';
  const label={diagnostics:'Диагностики',work:'Конструктор заданий',bank:'Банк заданий'}[kind];
  return '<main class="qo-document-workspace qo-education-workspace" data-workspace="'+kind+'" aria-label="'+label+'">'+

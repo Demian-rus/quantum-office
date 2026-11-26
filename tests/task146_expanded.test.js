@@ -58,8 +58,8 @@ test('TASK146 automatically places a labeled point away from adjacent segments',
 });
 test('TASK146 has only one PDF button and icon-first physics drawing palette',()=>{
  const source=readFileSync(new URL('../src/core/work-builder.js',import.meta.url),'utf8');
- assert.match(source,/qoWorkButton\('work-pdf','Скачать PDF'/);
- assert.doesNotMatch(source,/qoWorkButton\('work-pdf-student'/);
+ assert.equal((source.match(/tool\('work-pdf','Скачать PDF'/g)||[]).length,1);
+ assert.doesNotMatch(source,/(?:qoWorkButton|tool)\('work-pdf-student'/);
  assert.doesNotMatch(source,/qwButton\('preview-pdf','PDF \(растровый\)'/);
  assert.match(source,/function qwPrintDocumentHTML/);
  assert.match(source,/const QW_VISUAL_TOOLS=\[/);

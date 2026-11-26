@@ -20,6 +20,7 @@ function qwMath(source){
   i+=match[0].length;const key=match[0];
   if(key==='frac')return {t:'frac',a:atom(depth),b:atom(depth)};
   if(key==='sqrt')return {t:'sqrt',a:atom(depth)};
+  if(key==='vec')return {t:'vec',a:atom(depth)};
   if(key==='mathrm'||key==='text')return {t:'upright',a:atom(depth)};
   return {t:'text',v:key==='circ'?'°':QW_GREEK[key]||key};
  }
@@ -62,6 +63,7 @@ function qwMathML(n,upright=false,unary=false){
  if(n.t==='frac')return tag('mfrac',qwMathML(n.a,upright)+qwMathML(n.b,upright));
  // Keep MathML semantics and use the measured radicand for the outline.
  if(n.t==='sqrt')return '<msqrt class="qw-radical"><mrow class="qw-radicand"><mrow>'+qwMathML(n.a,upright)+'</mrow><mspace class="qw-radical-ink" aria-hidden="true"></mspace></mrow></msqrt>';
+ if(n.t==='vec')return '<mover accent="true">'+qwMathML(n.a,upright)+'<mo stretchy="true">→</mo></mover>';
  if(n.t==='cases')return tag('mrow','<mo fence="true" stretchy="true">{</mo><mtable columnalign="left">'+
   n.rows.map(row=>tag('mtr',tag('mtd',qwMathML(row,upright)))).join('')+'</mtable>');
  if(n.t==='sup'||n.t==='sub')return tag(n.t==='sup'?'msup':'msub',qwMathML(n.a,upright)+qwMathML(n.b,upright));
@@ -71,6 +73,89 @@ function qwMathML(n,upright=false,unary=false){
  if(/[=+−\-×÷·±<>≤≥≠→←↔]/.test(value))return '<mo lspace="0.28em" rspace="0.28em">'+qwEsc(value)+'</mo>';
  if(/^\s+$/.test(value))return '<mspace width="0.18em"/>';
  return tag(/[0-9]/.test(value)?'mn':/[A-Za-zα-ωΑ-Ω]/.test(value)?'mi':'mo',qwEsc(value));
+}
+function qwMathBox(ctx,n,size=12,upright=false,unary=false){
+ const text=source=>{const v=source==='-'?'−':source,font=(!upright&&/^[A-Za-zα-ωΑ-Ω]$/.test(v)?'italic ':'')+size+'px "Times New Roman",serif',pad=!upright&&!unary&&/^[=+−×÷·±<>≤≥≠]$/.test(v)?size*.28:0;ctx.font=font;const m=ctx.measureText(v);return {w:m.width+pad*2,a:Math.max(size*.7,m.actualBoundingBoxAscent||0),d:Math.max(size*.2,m.actualBoundingBoxDescent||0),draw:(x,y)=>{ctx.font=font;ctx.fillText(v,x+pad,y);}};};
+ if(n.t==='text')return text(n.v);
+ if(n.t==='upright')return qwMathBox(ctx,n.a,size,true);
+ if(n.t==='row'){const bs=n.list.map((v,i)=>qwMathBox(ctx,v,size,upright,qwMathIsUnary(n.list,i)));return {w:bs.reduce((s,b)=>s+b.w,0),a:Math.max(size*.8,...bs.map(b=>b.a)),d:Math.max(size*.24,...bs.map(b=>b.d)),draw:(x,y)=>{for(const b of bs){b.draw(x,y);x+=b.w;}}};}
+ if(n.t==='vec'){
+  const base=qwMathBox(ctx,n.a,size,upright),width=Math.max(base.w+.08*size,.55*size),arrowY=base.a+.09*size;
+  return {w:width,a:arrowY+.16*size,d:base.d,draw:(x,y)=>{
+   base.draw(x+(width-base.w)/2,y);
+   const start=x+.07*size,end=x+width-.04*size,top=y-arrowY,head=Math.min(.16*size,(end-start)/3);
+   ctx.save();ctx.beginPath();ctx.lineWidth=Math.max(.7,size*.055);
+   ctx.moveTo(start,top);ctx.lineTo(end,top);ctx.moveTo(end-head,top-head*.65);ctx.lineTo(end,top);ctx.lineTo(end-head,top+head*.65);
+   ctx.stroke();ctx.restore();
+  }};
+ }
+ if(n.t==='frac'){const a=qwMathBox(ctx,n.a,size*.78,upright),b=qwMathBox(ctx,n.b,size*.78,upright),w=Math.max(a.w,b.w)+8;return {w,a:a.a+a.d+size*.35,d:b.a+b.d+size*.25,draw:(x,y)=>{a.draw(x+(w-a.w)/2,y-size*.35-a.d);ctx.beginPath();ctx.lineWidth=.7;ctx.moveTo(x,y-size*.18);ctx.lineTo(x+w,y-size*.18);ctx.stroke();b.draw(x+(w-b.w)/2,y+b.a+2);}};}
+ if(n.t==='sqrt'){
+  const radicand=qwMathBox(ctx,n.a,size,upright),rule=Math.max(.55,size*.055),lead=size*.79;
+  const bar=radicand.a+size*.12+rule/2,depth=Math.max(size*.14,radicand.d),width=lead+radicand.w+size*.09;
+  return {w:width,a:bar+rule,d:depth+rule,draw:(x,y)=>{
+   radicand.draw(x+lead,y);
+   ctx.save();ctx.beginPath();ctx.lineWidth=rule;ctx.lineJoin='round';ctx.lineCap='butt';
+   ctx.moveTo(x+rule/2,y-size*.08);ctx.lineTo(x+size*.16,y-size*.16);
+   ctx.lineTo(x+size*.35,y+depth);ctx.lineTo(x+size*.67,y-bar);ctx.lineTo(x+width,y-bar);
+   ctx.stroke();ctx.restore();
+  }};
+ }
+ if(n.t==='cases'){
+  const rows=n.rows.map(row=>qwMathBox(ctx,row,size,upright));
+  const gap=size*.15,height=rows.reduce((sum,row)=>sum+row.a+row.d+gap,-gap);
+  const a=height/2+size*.25,d=height-a,brace=size*.8;
+  return {w:brace+Math.max(...rows.map(row=>row.w)),a,d,draw:(x,y)=>{
+   ctx.font=height+'px "Times New Roman",serif';
+   ctx.save();ctx.translate(x,y+(d-a)/2);ctx.scale(brace/Math.max(1,ctx.measureText('{').width),1);
+   ctx.textBaseline='middle';ctx.fillText('{',0,0);ctx.restore();
+   let top=y-a;
+   for(const row of rows){row.draw(x+brace,top+row.a);top+=row.a+row.d+gap;}
+  }};
+ }
+ const a=qwMathBox(ctx,n.a,size,upright),b=qwMathBox(ctx,n.b,size*.66,upright),dy=n.t==='sup'?-size*.58:size*.34;return {w:a.w+b.w,a:Math.max(a.a,b.a-dy),d:Math.max(a.d,b.d+dy),draw:(x,y)=>{a.draw(x,y);b.draw(x+a.w,y+dy);}};
+}
+function qwMathSVG(node,x,y,size,align='middle'){
+ const canvas=typeof document!=='undefined'?document.createElement('canvas').getContext('2d'):null;
+ const parts=[],stack=[];
+ let path='',tx=0,ty=0,sx=1,sy=1;
+ const round=n=>Number(n.toFixed(3));
+ const point=(px,py)=>round(tx+px*sx)+' '+round(ty+py*sy);
+ const ink={
+  font:'16px serif',lineWidth:1,lineJoin:'miter',lineCap:'butt',textBaseline:'alphabetic',
+  measureText(value){if(canvas){canvas.font=this.font;return canvas.measureText(value);}
+   return {width:Array.from(value).length*(parseFloat(this.font.match(/[\d.]+px/)?.[0])||size)*.55};},
+  fillText(value,px,py){
+   const [,n]=this.font.match(/([\d.]+)px/)||[];
+   const middle=this.textBaseline==='middle'?' dominant-baseline="central"':'';
+   parts.push('<text x="'+round(px)+'" y="'+round(py)+'" transform="translate('+round(tx)+' '+round(ty)+') scale('+round(sx)+' '+round(sy)+')" fill="#000" font-family="Times New Roman,serif" font-size="'+n+'"'+(this.font.startsWith('italic ')?' font-style="italic"':'')+middle+'>'+qwEsc(value)+'</text>');
+  },
+  beginPath(){path='';},moveTo(px,py){path+='M'+point(px,py);},lineTo(px,py){path+='L'+point(px,py);},
+  stroke(){parts.push('<path data-qw-math-rule d="'+path+'" fill="none" stroke="#000" stroke-width="'+round(this.lineWidth)+'" stroke-linejoin="'+this.lineJoin+'" stroke-linecap="'+this.lineCap+'"/>');},
+  save(){stack.push([tx,ty,sx,sy,this.font,this.lineWidth,this.lineJoin,this.lineCap,this.textBaseline]);},
+  restore(){[tx,ty,sx,sy,this.font,this.lineWidth,this.lineJoin,this.lineCap,this.textBaseline]=stack.pop();},
+  translate(px,py){tx+=px*sx;ty+=py*sy;},scale(px,py){sx*=px;sy*=py;}
+ };
+ const box=qwMathBox(ink,node,size);
+ box.draw(x-(align==='middle'?box.w/2:align==='end'?box.w:0),y);
+ return parts.join('');
+}
+function qwScienceExpression(value,vector=false){
+ const text=String(value??'').trim();
+ const delimited=text.match(/^\\\(([\s\S]+)\\\)$/);
+ let source=delimited?.[1];
+ if(!source&&(/\\[a-z]+/i.test(text)||/^[a-zα-ω][_^][^ ]+$/i.test(text)))source=text;
+ if(!source&&vector&&/^[A-Za-zα-ωΑ-Ω]$/.test(text))source='\\vec{'+text+'}';
+ if(!source&&vector&&text==='Fтр')source='\\vec{F}_{\\mathrm{тр}}';
+ if(!source)return null;
+ try{return {ast:qwMath(source),source};}catch{return null;}
+}
+function qwScienceLabel(value,x,y,size=18,anchor='middle',vector=false,ink='#000'){
+ const math=qwScienceExpression(value,vector);
+ if(math)return '<g data-qw-science-math="'+qwEsc(math.source)+'" aria-label="'+qwEsc(math.source)+'">'+
+  qwMathSVG(math.ast,x,y,size,anchor).replace(/(fill|stroke)="#000"/g,'$1="'+ink+'"')+'</g>';
+ return '<text x="'+x+'" y="'+y+'" text-anchor="'+anchor+'" font-size="'+size+
+  '" fill="'+ink+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(value)+'</text>';
 }
 function qwTokens(text){const tokens=[];let start=0;const re=/\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]/g;let m;while((m=re.exec(text))){if(m.index>start)tokens.push({t:'text',v:text.slice(start,m.index)});if(m[1]!==undefined){try{tokens.push({t:'math',v:m[1],ast:qwMath(m[1])});}catch(e){tokens.push({t:'error',v:m[1],error:e.message});}}else tokens.push({t:'blank',size:Math.max(1,Math.min(30,Number(m[2])))});start=re.lastIndex;}if(start<text.length)tokens.push({t:'text',v:text.slice(start)});return tokens;}
 // Only standalone, unambiguous numeric and single-symbol mathematical
@@ -243,7 +328,10 @@ function qwAxisLayout(g,axisFont,russian=false){
   const longest=Math.max(format(Number(min.toPrecision(6))).length,format(Number(max.toPrecision(6))).length);
   const gap=pixels*step/span;
   const desired=axis==='x'?Math.max(17,longest*font*.59+5):font+6;
-  const stride=Math.max(1,Math.ceil(desired/Math.max(1,gap)));
+  const minimum=Math.max(1,Math.ceil(desired/Math.max(1,gap)));
+  const decade=10**Math.floor(Math.log10(minimum*step));
+  const nice=[1,2,2.5,5,10].map(n=>n*decade/step).find(n=>n>=minimum-1e-8&&Math.abs(n-Math.round(n))<1e-8);
+  const stride=russian&&axisFont&&nice?Math.round(nice):minimum;
   let count=0;
   for(let n=Math.ceil((min-1e-8)/step);n*step<=max+step*.00001&&count++<30;n++){
    const v=Number((n*step).toPrecision(9));
@@ -255,23 +343,13 @@ function qwAxisLayout(g,axisFont,russian=false){
    if(axis==='x'&&isZero&&zeroY)numbered=true;
    const label=format(v);
    const w=Math.max(8,label.length*font*.63);
-   if(axisFont&&!isZero){
+   if(axisFont&&!russian&&!isZero){
     const first=Math.ceil((min-1e-8)/step),last=Math.floor((max+step*.00001)/step),edge=n===first||n===last;
     const nearEdge=!edge&&Math.min(n-first,last-n)*gap<desired;
     const nearZero=(axis==='x'?zeroX:zeroY)&&Math.abs(v)/span*pixels<(w+font*.63)/2+5;
     numbered=!nearZero&&!nearEdge&&(edge||numbered);
    }
    ticks[axis].push({value:v,pos:axis==='x'?p.x:p.y,label,numbered,w});
-  }
-  if(russian&&axisFont&&g.points.length){
-   const list=ticks[axis],selected=[];
-   const reserve=tick=>{
-    if(selected.every(other=>Math.abs(other.pos-tick.pos)>=desired))selected.push(tick);
-   };
-   for(const tick of list)if(tick.numbered&&(tick===list[0]||tick===list.at(-1)||tick.value===0))reserve(tick);
-   for(const tick of list)if((axis!=='y'||!zeroX||tick.value!==0)&&g.points.some(p=>Math.abs(p[axis]-tick.value)<step*1e-7))reserve(tick);
-   for(const tick of list)if(tick.numbered&&!selected.includes(tick))reserve(tick);
-   for(const tick of list)tick.numbered=selected.includes(tick);
   }
  }
  return {axisX,axisY,font,ticks,math};
@@ -290,6 +368,18 @@ function qwGraphSVG(g,interactive=false,typography={}){
  for(const t of ticks.y){
   if(g.grid)parts.push(line(b.left,t.pos,b.right,t.pos,'data-qw-grid-line="true" stroke="'+style.grid+'" stroke-width="'+style.gridWeight+'"'));
   parts.push(line(axisX-style.tick,t.pos,axisX+style.tick,t.pos,'stroke="#000"'));
+ }
+ if(typography.publishing&&g.grid&&g.connected&&g.points.length>2){
+  const guide='data-qw-grid-line="true" data-qw-reference="true" stroke="#888" stroke-width="1" stroke-dasharray="4 3"';
+  const marked=(axis,value)=>ticks[axis].some(t=>t.numbered&&Math.abs(t.value-value)<1e-8);
+  g.points.slice(1,-1).forEach((point,i)=>{
+   const before=g.points[i],after=g.points[i+2];
+   if(Math.abs((point.x-before.x)*(after.y-point.y)-(point.y-before.y)*(after.x-point.x))<1e-8)return;
+   const p=qwPlotXY(g,point);
+   if(p.x<b.left||p.x>b.right||p.y<b.top||p.y>b.bottom)return;
+   if(!marked('x',point.x))parts.push(line(p.x,p.y,p.x,axisY,guide));
+   if(!marked('y',point.y))parts.push(line(p.x,p.y,axisX,p.y,guide));
+  });
  }
  // Draw arrowheads separately: the visible shaft ends at the head's base,
  // not at the tip (marker-end used to leave a line through the arrowhead).
@@ -324,7 +414,11 @@ function qwGraphSVG(g,interactive=false,typography={}){
   parts.push('<text class="qw-axis-number" data-axis="y" data-value="'+t.value+'" x="'+yLabelX+'" y="'+y+'" font-size="'+font+'" text-anchor="end" fill="#000">'+t.label+'</text>');
  }
  const titleFont=typography.titleFont||style.title,gap=6;
- const title=(axis,x,y,anchor,text,tipX,tipY)=>'<text class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'" x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#000">'+qwEsc(text)+'</text>';
+ const title=(axis,x,y,anchor,value,tipX,tipY)=>{
+  const attrs=' class="qw-axis-title" data-axis="'+axis+'" data-axis-tip-x="'+tipX+'" data-axis-tip-y="'+tipY+'"';
+  if(qwScienceExpression(value))return '<g'+attrs+'>'+qwScienceLabel(value,x,y,titleFont,anchor)+'</g>';
+  return '<text'+attrs+' x="'+x+'" y="'+y+'" font-size="'+titleFont+'" text-anchor="'+anchor+'" fill="#000">'+qwEsc(value)+'</text>';
+ };
  // Final placement uses actual glyph bounds (including descenders and subscripts).
  parts.push(title('x',xTip+gap,axisY+titleFont*.35,'start',g.xlabel,xTip,axisY),
   title('y',axisX,yTip-gap,'middle',g.ylabel,axisX,yTip));
@@ -375,7 +469,7 @@ function qwGraphSVG(g,interactive=false,typography={}){
    const gap=10;best={x:p.x+(outward.x<-.1?-w-gap:outward.x>.1?gap:-w/2),y:p.y+(outward.y<-.1?-h-gap/2:outward.y>.1?gap:-h/2),w,h};
   }
   occupied.push(best);
-  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,'<text x="'+best.x+'" y="'+(best.y+17)+'" font-size="19" fill="'+(g.points[i].style?.text||'#000')+'" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+qwEsc(label)+'</text>',{plot:true,contour,outward}));
+  parts.push(qwLabelSVG('g:p:'+i,p,g.points[i].labelPosition,qwScienceLabel(label,best.x,best.y+17,19,'start',false,g.points[i].style?.text||'#000'),{plot:true,contour,outward}));
  });
  parts.push(qwGraphElementsSVG(g,interactive));
  return qwPlaceSVGLabels(qwSVG(parts.join(''),'Координатный график'));
@@ -393,7 +487,7 @@ function qwGraphElementsSVG(g,interactive=false){
   else if(['line','polyline','function'].includes(o.kind)){
    shape='<path d="'+ps.map((p,n)=>(n?'L':'M')+p.x.toFixed(3)+' '+p.y.toFixed(3)).join(' ')+'" fill="none" stroke="'+color+'" stroke-width="'+width+'" stroke-linecap="round" stroke-linejoin="round"/>';
   }else if(o.kind==='point')shape='<circle cx="'+ps[0].x+'" cy="'+ps[0].y+'" r="4" fill="'+color+'"/>';
-  if(o.label&&ps.length){const p=ps[Math.floor((ps.length-1)/2)];label=qwLabelSVG('g:e:'+i,p,o.labelPosition,'<text x="'+(p.x+(o.kind==='text'?0:8))+'" y="'+(p.y+(o.kind==='text'?0:-10))+'" font-size="18" fill="'+text+'" stroke="white" stroke-width="3" paint-order="stroke">'+qwEsc(o.label)+'</text>',{plot:true,free:o.kind==='text'});}
+  if(o.label&&ps.length){const p=ps[Math.floor((ps.length-1)/2)];label=qwLabelSVG('g:e:'+i,p,o.labelPosition,qwScienceLabel(o.label,p.x+(o.kind==='text'?0:8),p.y+(o.kind==='text'?0:-10),18,'start',false,text),{plot:true,free:o.kind==='text'});}
   return '<g '+(interactive?'data-qw-element="'+i+'"':'')+' clip-path="url(#qw-plot-clip)">'+shape+label+'</g>';
  }).join('');
 }
@@ -441,13 +535,6 @@ function qwGeometryCaptionLocation(value,base,away,segments,points,placed,size=2
  if(best.box)placed.push(best.box);
  return {x:best.x,y:best.y};
 }
-function qwVectorLabel(value){
- const symbol=value.match(/^([A-Za-zα-ωΑ-Ω])(?:_\{([^{}]+)\}|_([A-Za-zА-Яа-яЁё0-9]+)|(тр))?$/);
- if(!symbol)return qwEsc(value);
- const index=symbol[2]||symbol[3]||symbol[4];
- return '<tspan font-family="QO Print Serif,Times New Roman,serif" font-style="italic">'+qwEsc(symbol[1])+'</tspan>'+
-  (index?'<tspan font-family="QO Print Serif,Times New Roman,serif" font-size="67%" baseline-shift="sub">'+qwEsc(index)+'</tspan>':'');
-}
 function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
  objects=qwResolveDiagram(objects);
  const key=qwSVGKey(objects);
@@ -473,9 +560,7 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   }else if(item.kind==='point')allPoints.push({x:item.x,y:item.y});
  }
  const numeric=v=>Number(v.toFixed(3));
- const label=(value,x,y,size=18,anchor='middle',vector=false)=>
-  '<text x="'+numeric(x)+'" y="'+numeric(y)+'" text-anchor="'+anchor+'" font-size="'+size+
-  '" fill="#000" stroke="white" stroke-width="4" paint-order="stroke" stroke-linejoin="round">'+(vector?qwVectorLabel(value):qwEsc(value))+'</text>';
+ const label=(value,x,y,size=18,anchor='middle',vector=false)=>qwScienceLabel(value,numeric(x),numeric(y),size,anchor,vector);
  return qwPlaceSVGLabels(qwSVG(guides+objects.map((o,i)=>{
   const paint=o.style?qwValidateStyle(o.style):{},stroke=paint.stroke||'#222222',width=paint.width||2,fill=paint.fill||'none';
   const a=' stroke="'+stroke+'" stroke-width="'+width+'" fill="none"',
@@ -620,10 +705,10 @@ function qwDiagramSVG(objects,interactive=false,showGuides=interactive){
   if(o.ticks){const dx=o.x2-o.x,dy=o.y2-o.y,len=Math.hypot(dx,dy)||1;for(let n=0;n<o.ticks;n++){const shift=(n-(o.ticks-1)/2)*6,cx=(o.x+o.x2)/2+dx/len*shift,cy=(o.y+o.y2)/2+dy/len*shift;shape+='<line data-qw-equal-mark="'+(n+1)+'" x1="'+(cx-dy/len*6)+'" y1="'+(cy+dx/len*6)+'" x2="'+(cx+dy/len*6)+'" y2="'+(cy-dx/len*6)+'"'+a+'/>';}}
   if(paint.stroke||paint.width)shape=shape.replace(/stroke="#222222"/g,'stroke="'+stroke+'"').replace(/stroke-width="2"/g,'stroke-width="'+width+'"').replace(/fill="#222222"/g,'fill="'+stroke+'"');
   if(paint.fill)shape=shape.replace(/fill="(?:none|#f2f2f2|#eeeeee|white)"/g,'fill="'+fill+'"');
-  if(paint.text)captions=captions.replace(/fill="#000"/g,'fill="'+paint.text+'"');
+  if(paint.text)captions=captions.replace(/(fill|stroke)="#000"/g,'$1="'+paint.text+'"');
 
   const center=o.kind==='regularPolygon'?{x:(o.x+o.x2)/2,y:(o.y+o.y2)/2}:{x:minX+w/2,y:minY+h/2},transform=o.rotation?' transform="rotate('+o.rotation+' '+numeric(center.x)+' '+numeric(center.y)+')"':'';
   return '<g data-qw-label-owner="d:'+i+'" '+(interactive?'data-qw-object="'+i+'"':'')+transform+'>'+shape+captions+'</g>';
  }).join('')));
 }
-export {qwMath,qwMathML,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};
+export {qwMath,qwMathML,qwMathBox,qwTokens,qwContentHTML,qwHasRichSyntax,qwPrintFieldHTML,qwRichMarkdownHTML,qwAxisLayout,qwGraphSVG,qwDiagramSVG,qwPlotXY,qwEsc};

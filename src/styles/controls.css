@@ -27,6 +27,14 @@ input[type=range] { cursor:pointer; padding:0; min-height:20px; }
 input[type=checkbox] { width:15px; height:15px; flex:none; }
 :where(.ribbon,.qo-office-toolbar,.qs-studio,.qo-slide-properties,.qo-appearance-menu) { scrollbar-color:var(--qo-scrollbar) var(--qo-surface-alt); scrollbar-width:thin; }
 .qo-control { min-height:var(--qo-control); padding:6px 12px; border:1px solid var(--qo-border-strong); border-radius:var(--qo-radius); font:600 12px "Segoe UI",sans-serif; }
+
+/* Commands with an icon use a flex row instead of an inline text baseline. */
+:is(.qo-education-workspace,.qw-dialog) :is(button,summary):has(>svg.qo-work-icon) {
+ display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1.2;
+}
+:is(.qo-education-workspace,.qw-dialog) :is(button,summary)>svg.qo-work-icon {
+ display:block;inline-size:16px;block-size:16px;flex:0 0 16px;
+}
 .qo-control[aria-busy=true] { cursor:progress; }
 .qo-control[aria-busy=true]::before { content:""; display:inline-block; width:10px; height:10px; margin-right:7px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:qo-spin 800ms linear infinite; }
 @keyframes qo-spin { to { transform:rotate(360deg); } }
