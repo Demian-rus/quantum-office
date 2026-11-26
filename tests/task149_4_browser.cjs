@@ -68,7 +68,41 @@ const root=path.resolve(__dirname,'..'),out=process.env.QW_TASK1494_EVIDENCE||pa
   const alias=await browser.newPage();await alias.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,true),missing));await ready(alias);assert.equal(await alias.locator('body').getAttribute('data-qw-format'),'answers');assert.equal(await alias.locator('figure').count(),0);assert.doesNotMatch(await alias.locator('body').innerText(),/Два угла треугольника/);await alias.close();
   const criteria=await browser.newPage();await criteria.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),missing));await ready(criteria);assert.ok((await criteria.locator('body').innerText()).includes(missing.tasks[0].criteria));await criteria.close();
   const long=structuredClone(missing);long.tasks=long.tasks.slice(0,1);long.tasks[0].answer=('Обоснование: используем сумму углов треугольника. ').repeat(240);long.tasks[0].criteria=('Критерий: вычисления объяснены. ').repeat(180);
-  const lp=await browser.newPage();await lp.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),long));await ready(lp);const longText=(await lp.locator('.qw-task-text').allTextContents()).join('');assert.equal(longText.split('Обоснование:').length-1,240);assert.equal(longText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(lp)).bounds,[]);await lp.close();
+  const lp=await browser.newPage();await lp.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),long));await ready(lp);const longText=(await lp.locator('.qw-task-text').allTextContents()).join('');assert.equal(longText.split('Обоснование:').length-1,240);assert.equal(longText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(lp)).bounds,[]);await lp.emulateMedia({media:'print'});await lp.pdf({path:path.join(out,'Long-Key-Portrait.pdf'),preferCSSPageSize:true,printBackground:true});await lp.close();
+  // Re-run the exact historical input in landscape; do not reduce its length.
+  const landscape=structuredClone(long);landscape.printSettings={...landscape.printSettings,orientation:'landscape'};
+  const ll=await browser.newPage();await ll.setContent(await app.evaluate(d=>qwPrintDocumentHTML(d,false,{format:'answers',includeCriteria:true}),landscape));await ready(ll);
+  const landscapeText=(await ll.locator('.qw-task-text').allTextContents()).join('');assert.equal(landscapeText.split('Обоснование:').length-1,240);assert.equal(landscapeText.split('Критерий:').length-1,180);assert.deepEqual((await inspect(ll)).bounds,[]);
+  await ll.emulateMedia({media:'print'});await ll.pdf({path:path.join(out,'Long-Key-Landscape.pdf'),preferCSSPageSize:true,printBackground:true});await ll.close();
+  // Rich text and formulas are compared to the unpaginated production HTML.
+  // Exercise both key-only and condition + key paths, with no synthetic renderer.
+  const rich=structuredClone(long);
+  rich.tasks[0].answer=('**Точный ответ**: $x=2$. ').repeat(160).trim();
+  rich.tasks[0].comment=('**Переход решения**: *подстановка* $a=3$. ').repeat(200).trim();
+  rich.tasks[0].criteria=('++Критерий проверки++: $b=4$. ').repeat(180).trim()+'\n\n1. Первый пункт.\n2. Второй пункт.';
+  for(const orientation of ['portrait','landscape'])for(const includePrompt of [false,true]){
+   rich.printSettings={...rich.printSettings,orientation};
+   const options={format:'answers',keyMode:'detailed',includeCriteria:true,includePrompt};
+   const html=await app.evaluate(({d,options})=>qwPrintDocumentHTML(d,false,options),{d:rich,options});
+   const p=await browser.newPage();await p.setContent(html);await ready(p);
+   const comparison=await p.evaluate(({html,includePrompt})=>{
+    const selector=includePrompt?'.qw-key-solutions':'.qw-answer-long .qw-task-text';
+    const collect=doc=>{
+     const roots=[...doc.querySelectorAll(selector)];
+     return {text:roots.map(e=>e.textContent).join(''),math:roots.flatMap(e=>[...e.querySelectorAll('math')].map(m=>m.outerHTML)),
+      styles:['strong','em','u'].map(tag=>roots.flatMap(e=>[...e.querySelectorAll(tag)].map(n=>n.textContent)).join(''))};
+    };
+    return {expected:collect(new DOMParser().parseFromString(html,'text/html')),actual:collect(document),
+     layout:window.__qwPrintLayout,footers:[...document.querySelectorAll('.qw-page-footer')].map(e=>e.textContent)};
+   },{html,includePrompt});
+   assert.deepEqual(comparison.actual,comparison.expected,'rich text, MathML and inline styles survive pagination');
+   assert.equal(comparison.actual.math.length,540);assert.ok(comparison.actual.styles.every(s=>s.length>0));
+   assert.ok(comparison.layout.pages.length>1);assert.ok(comparison.layout.pages.every(p=>p.freeMm>=-.1));
+   assert.deepEqual(comparison.footers,Array.from({length:comparison.layout.sheets},(_,i)=>(i+1)+' / '+comparison.layout.sheets));
+   assert.deepEqual((await inspect(p)).bounds,[]);
+   const name='Long-Rich-'+orientation+(includePrompt?'-Condition':'');
+   await p.emulateMedia({media:'print'});await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});await p.close();
+  }
   const cp=structuredClone(samples[0].project);cp.tasks=cp.tasks.slice(0,1);cp.tasks[0].prompt=('Докажите утверждение. Объясните каждый переход. ').repeat(250);const cl=await render(cp,'compact');assert.equal((await cl.locator('.qw-task-text').allTextContents()).join('').split('Докажите').length-1,250);assert.equal(await cl.locator('figure').count(),1);assert.deepEqual((await inspect(cl)).bounds,[]);await cl.close();
   assert.deepEqual(await app.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())})),untouched);assert.deepEqual(errors,[]);
   fs.writeFileSync(path.join(out,'browser-result.json'),JSON.stringify({status:'PASS',reports,errors},null,2));console.log('PASS TASK149.4: actual formats/keys, 24 original tasks, vector print pipeline, adaptive figures, practice presets, QWORK roundtrip/corruption, narrow preview');

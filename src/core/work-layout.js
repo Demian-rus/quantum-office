@@ -576,7 +576,7 @@ async function qwPreparePrintDocument(){
   copy.querySelectorAll('.qw-teacher-notes').forEach(e=>e.remove());return copy;
  }
  function bodyOf(section){return section.querySelector('.qw-exam-body')||section.querySelector('.qw-paper-task');}
- function tokens(element){
+ function tokens(element,splitKey=false){
   const items=[];
   function append(node,path){
    if(node.nodeType===3){
@@ -584,10 +584,15 @@ async function qwPreparePrintDocument(){
     return;
    }
    const callout=node.nodeType===1&&node.matches('.qw-callout');
-   const container=node.nodeType===1&&(node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub'));
+   // Detailed key captions and rich paragraphs are not atomic illustrations.
+   // Preserve the legacy tokenizer for all other print formats. MathML, tables,
+   // equations and inline blanks remain indivisible even inside styled text.
+   const container=node.nodeType===1&&(splitKey?
+    node.matches('.qw-answer-caption,.qw-format-block,p,ul,ol,li,blockquote,strong,b,em,i,s,del,u,span:not(.qw-inline-blank):not(.qw-formula-error)'):
+    (node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub')));
    if(callout||container){
     const body=callout?node.querySelector(':scope>.qw-callout-body'):node;
-    const first=items.length,trail=[...path,{source:node,body,first,callout}];
+    const first=items.length,trail=[...path,{source:node,body,first,callout,splitKey}];
     for(const child of body.childNodes)append(child,trail);
     if(items.length>first)return;
    }
@@ -612,6 +617,8 @@ async function qwPreparePrintDocument(){
      const offset=[...part.source.children].indexOf(firstItem);
      if(offset>0)block.start=part.source.start+offset;
     }
+    // A continued list item keeps its ordinal but must not print its marker twice.
+    if(part.splitKey&&part.source.tagName==='LI'&&i>part.first)block.style.listStyleType='none';
     group.append(block);let container=block;
     if(part.callout){
      const title=part.source.querySelector(':scope>.qw-callout-title').cloneNode(true);
@@ -651,10 +658,11 @@ async function qwPreparePrintDocument(){
   if(fits(current)){fragments.push(next);return next;}
   // Long teacher paragraphs are split as text atoms, never through a formula.
   const paragraphs=block.classList.contains('qw-teacher-notes')?[...block.children]:[];
-  next.remove();if(!paragraphs.length)throw Error('Поле решения превышает страницу.');
+  const splitKey=original.classList.contains('qw-answer-long')&&block.classList.contains('qw-key-solutions');
+  next.remove();if(!splitKey&&!paragraphs.length)throw Error('Поле решения превышает страницу.');
   let result=last;
-  if(block.querySelector('.qw-callout,.qw-format-block')){
-   const items=tokens(block);let start=0;
+  if(splitKey||block.querySelector('.qw-callout,.qw-format-block')){
+   const items=tokens(block,splitKey);let start=0;
    while(start<items.length){
     const fragment=continuation(original),notes=block.cloneNode(false);
     bodyOf(fragment).append(notes);start=fitTextChunk(fragment,notes,items,start);
@@ -671,7 +679,7 @@ async function qwPreparePrintDocument(){
  function splitLong(original){
   const text=original.querySelector('.qw-task-text'),article=bodyOf(original),flow=original.querySelector('.qw-task-flow');
   const answer=original.querySelector('.qw-answer-preview,.qw-booklet-answer'),teacher=original.querySelector('.qw-teacher-notes');
-  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');const items=tokens(text);
+  answer?.remove();teacher?.remove();flow.classList.remove('qw-booklet-answer-by-figure','qw-booklet-answer-near');const items=tokens(text,original.classList.contains('qw-answer-long')&&!original.hasAttribute('data-qw-key-condition'));
   const tails=[...article.children].filter(e=>e!==flow&&e.tagName!=='HEADER'&&e!==answer&&!e.classList.contains('qw-exam-grid'));
   if(teacher)tails.push(teacher);
   let start=0,first=true,last;

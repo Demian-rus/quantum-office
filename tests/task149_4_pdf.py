@@ -66,5 +66,48 @@ for name, counts in expected.items():
         pages[0]['lightGrid'] = grids
     report['documents'].append({'file': name + '.pdf', 'pages': pages, 'bodyPt': 10, 'bounds': 'PASS'})
 
+# Independently audit the actual stress PDFs, not only the prepared DOM.
+for orientation in ('Portrait', 'Landscape'):
+    name = 'Long-Key-' + orientation
+    doc = pymupdf.open(out / (name + '.pdf'))
+    assert len(doc) > 1, (name, 'expected multiple physical sheets')
+    contents = []
+    for i, page in enumerate(doc):
+        width, height = (595.28, 841.89) if orientation == 'Portrait' else (841.89, 595.28)
+        assert abs(page.rect.width-width)<1 and abs(page.rect.height-height)<1, (name, page.rect)
+        spans = [s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
+        body = verify_signature(page, spans)
+        assert any(s['text'].strip()==f'{i+1} / {len(doc)}' for s in body), (name, 'footer', i+1)
+        for span in body:
+            x0,y0,x1,y1=span['bbox']
+            assert x0>=20 and y0>=20 and x1<=page.rect.width-20 and y1<=page.rect.height-10, (name, span)
+        contents.append(page.get_text())
+    text = re.sub(r'\s+', ' ', ' '.join(contents))
+    assert text.count('Обоснование:') == 240 and text.count('Критерий:') == 180, name
+    assert text.count('используем сумму углов треугольника.') == 240, name
+    assert text.count('вычисления объяснены.') == 180, name
+    report['documents'].append({'file': name+'.pdf', 'pages': len(doc), 'answerSentences':240, 'criteriaSentences':180, 'bounds':'PASS'})
+
+for orientation in ('portrait', 'landscape'):
+    for suffix in ('', '-Condition'):
+        name = 'Long-Rich-'+orientation+suffix
+        doc = pymupdf.open(out / (name+'.pdf'))
+        assert len(doc)>1, name
+        contents=[]
+        for i,page in enumerate(doc):
+            w,h=(595.28,841.89) if orientation=='portrait' else (841.89,595.28)
+            assert abs(page.rect.width-w)<1 and abs(page.rect.height-h)<1, (name,page.rect)
+            spans=[s for b in page.get_text('dict')['blocks'] if 'lines' in b for line in b['lines'] for s in line['spans'] if s['text'].strip()]
+            body=verify_signature(page,spans)
+            assert any(s['text'].strip()==f'{i+1} / {len(doc)}' for s in body), (name,'footer',i+1)
+            for s in body:
+                x0,y0,x1,y1=s['bbox']
+                assert x0>=20 and y0>=20 and x1<=page.rect.width-20 and y1<=page.rect.height-10, (name,s)
+            contents.append(page.get_text())
+        text=re.sub(r'\s+',' ',' '.join(contents))
+        assert text.count('Точный ответ')==160 and text.count('Переход решения')==200 and text.count('Критерий проверки')==180, name
+        assert text.count('Первый пункт.')==1 and text.count('Второй пункт.')==1, name
+        report['documents'].append({'file':name+'.pdf','pages':len(doc),'bounds':'PASS','richTextCounts':'PASS'})
+
 (out / 'pdf-result.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
 print('PASS TASK149.4 PDF: 24 exercises at measured capacity, separate 24-answer key, one/three practice tasks, A4 bounds, vector content and actual light grid pixels')
