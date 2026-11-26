@@ -869,3 +869,9 @@
 }
 @media(max-width:1000px){.qw-workspace-mode.qw-visual-dialog>header>.qw-dock-controls,.qw-workspace-mode .qw-visual-body>.qw-dock-divider{display:none}}
 .qw-bank-inline.qw-bank-assemble-dialog>.qw-dialog-body{padding:0}
+
+/* EXAM-01: constructor preview only; bank cards retain their existing geometry. */
+.qw-paper-task.qw-standard-task.qw-exam-publication{grid-template-columns:minmax(0,1fr);column-gap:0}
+.qw-paper-task.qw-standard-task.qw-exam-publication>.qw-task-heading{display:block;grid-column:1;grid-row:1;margin:0 0 .8mm;text-align:left}
+.qw-paper-task.qw-standard-task.qw-exam-publication>:not(.qw-task-heading){grid-column:1;grid-row:auto}
+.qw-exam-publication .qw-exam-number-line{display:inline-block;font-family:inherit;font-size:calc(1em + 1pt);font-weight:700;line-height:1.2;text-align:left;border:0;padding:0;width:auto;height:auto;white-space:nowrap}

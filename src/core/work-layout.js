@@ -358,6 +358,16 @@ body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"][data-qw-format="booklet"] .qw-page-content{width:136.5mm;height:190mm}
 body[data-qw-orientation="landscape"][data-qw-landscape-layout="spread"] .qw-shared-sheet-header{left:9mm;right:9mm}
 .qw-print-sheet>.qw-page-footer,body[data-qw-format="booklet"] .qw-page-footer{bottom:3mm;left:0;right:0;font:7.5pt/1.2 var(--qw-print-family)}
+/* EXAM-01: the number and condition share the left edge; no marker column. */
+.qw-paper-task.qw-standard-task.qw-exam-publication{grid-template-columns:minmax(0,1fr);column-gap:0}
+.qw-paper-task.qw-standard-task.qw-exam-publication>.qw-task-heading{display:block;grid-column:1;grid-row:1;margin:0 0 .8mm;text-align:left}
+.qw-paper-task.qw-standard-task.qw-exam-publication>:not(.qw-task-heading){grid-column:1;grid-row:auto}
+.qw-exam-number-line{display:inline-block;font:700 calc(1em + 1pt)/1.2 var(--qw-print-family);text-align:left;border:0;padding:0;width:auto;height:auto;white-space:nowrap}
+body[data-qw-exam-standard=true] .qw-print-header,body[data-qw-exam-standard=true] .qw-print-title,body[data-qw-exam-standard=true] .qw-topic-title{text-align:center!important}
+body[data-qw-exam-standard=true] .qw-print-title{color:#000}
+body[data-qw-exam-standard=true] .qw-print-section{margin-bottom:3mm}
+body[data-qw-exam-standard=true] .qw-answer-columns .qw-exam-brief-item{grid-template-columns:max-content minmax(0,1fr);column-gap:1.5mm}
+body[data-qw-exam-standard=true] .qw-exam-brief-item>.qw-print-number{text-align:left}
 .qw-print-error{margin:12mm;color:#981b1b;font-size:11pt}
 @media screen{html{background:#e8edf2}body{padding:12px}.qw-print-page{margin:0 auto 12px;box-shadow:0 2px 8px #1f2b3740}}
 @media print{.qw-print-page{margin:0;box-shadow:none}}

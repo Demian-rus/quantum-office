@@ -20,6 +20,18 @@ jobs:
       - run: npm ci
       - run: python -m pip install playwright==1.56.0 openpyxl pymupdf==1.26.6
       - run: python -m playwright install --with-deps chromium
+      - run: npx playwright install chromium
+      - run: node tests/exam01_browser.cjs
+      - run: node scripts/content01-export.cjs evidence/exam-01/content
+      - run: node scripts/editor01-export.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exam-01-publication-evidence
+          path: |
+            evidence/exam-01/
+            evidence/editor-01/
+          if-no-files-found: warn
       # Rebuild the exact TASK147 baseline for reproducible before screenshots.
       - uses: actions/checkout@v4
         with:
