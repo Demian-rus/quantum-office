@@ -23,7 +23,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
       const m=tip.getAttribute('d')?.match(/M\s*(-?[\d.]+)\s*(-?[\d.]+)/);
       return m?{x:Number(m[1]),y:Number(m[2]),path:tip.getAttribute('d')}:null;
      }),
-     grid:svg.querySelectorAll('line[stroke="#d9dee4"]').length};
+     grid:svg.querySelectorAll('line[data-qw-grid-line="true"]:not([data-qw-reference])').length};
    });
    assert.ok(data.arrows.every(a=>a&&Number.isFinite(a.x)&&Number.isFinite(a.y)),name+' axis heads must exist');
    const labels=data.labels;
