@@ -21,8 +21,9 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
   if(width<1200)await action('left').click();
   if(await p.locator('[data-qw-action="quick-add"]').count()){await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();}else{await p.locator('#qw-add-type').selectOption(kind);await p.locator('.qw-left [data-qw-action="add"]').click();}
+  if(!before)await p.locator('[data-bank-source]').click();
   await p.locator('#qw-prompt').fill('TASK147: '+kind+' — редактируемая иллюстрация');
-  await action(kind).click();
+  await (before?action(kind):p.locator('[data-bank-visual="'+kind+'"]')).click();
   const panel=async name=>{if(width<=1000&&await p.locator('#qw-dialog').getAttribute('data-panel')!==name)await p.locator('[data-visual-panel="'+name+'"]').click();};
   const closePanel=async()=>{if(width<=1000){const name=await p.locator('#qw-dialog').getAttribute('data-panel');if(name)await p.locator('[data-visual-panel="'+name+'"]').click();}};
   const change=async(sel,value)=>{await p.locator(sel).fill(value);await p.locator(sel).dispatchEvent('change');};
@@ -109,7 +110,7 @@ const sameBox=(a,b,message)=>{for(const k of ['x','y','width','height'])assert.o
    assert.equal(expected.tasks[0].figure,kind);
    if(kind==='diagram'){assert.equal(expected.tasks[0].diagram.length,2);assert.equal(expected.tasks[0].diagram[0].vertices[0].label,'D');}
    else{assert.equal(expected.tasks[0].graph.curve.trig,'cos');assert.equal(expected.tasks[0].graph.curve.amplitude,2);assert.equal(expected.tasks[0].graph.snapToGrid,false);}
-   const dl=p.waitForEvent('download');await action('save').click();const file=path.join(out,kind+'_'+width+'_'+theme+'.qwork');await(await dl).saveAs(file);
+   const dl=p.waitForEvent('download');await p.locator('[data-action="work-save"]').click();const file=path.join(out,kind+'_'+width+'_'+theme+'.qwork');await(await dl).saveAs(file);
    assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),expected);
    await p.locator('[data-action="work-new"]').click();assert.equal(await p.evaluate(()=>qwDoc.tasks.length),0);
    await p.locator('#qw-file').setInputFiles(file);await p.waitForFunction(()=>qwDoc.tasks.length===1);

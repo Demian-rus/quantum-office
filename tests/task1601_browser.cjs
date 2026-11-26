@@ -122,7 +122,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task1601');
     doc.tasks[0].prompt='Укажите скорость';
     doc.tasks[0].source={kind:'bank',id:'legacy2',number:1807,slot:'7'};
     const page=qwPrintDocumentHTML(qwValidate(doc),false,{format:'booklet'});
-    if(!page.includes('№ 01807.'))throw Error('missing printed bank identity');
+    if(!page.includes('№ 1 (01807).')||!page.includes('data-qw-bank-number="1807"'))throw Error('missing printed bank identity');
     return {numbers:n,printedIdentity:true,legacyPreserved:true};
    }finally{
     if(original===null)localStorage.removeItem(QW_BANK_KEY);else localStorage.setItem(QW_BANK_KEY,original);
