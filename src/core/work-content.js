@@ -3,6 +3,7 @@ import {qwGraphGridStep,qwEvaluateCurve,qwGeometryVertices,qwValidateStyle,qwRes
 import {qwArcPoints,qwLinearSegments,qwExtendedSegment} from './work-geometry.js';
 import {QW_MECHANICS,QW_ELECTRICS,qwPhysicsShape,qwArrowSVG} from './work-physics.js';
 import {qwLabelSVG,qwPlaceSVGLabels,qwClosedContour,qwContourOutward} from './work-labels.js';
+import {qwReadTextStyle,qwTextStyleAttrs,qwCalloutOptions,qwCalloutOptionSource,qwCalloutLook} from './work-text-style.js';
 const QW_GREEK={alpha:'α',beta:'β',gamma:'γ',delta:'δ',epsilon:'ε',zeta:'ζ',eta:'η',iota:'ι',kappa:'κ',nu:'ν',xi:'ξ',tau:'τ',upsilon:'υ',chi:'χ',psi:'ψ',Gamma:'Γ',Theta:'Θ',Lambda:'Λ',Pi:'Π',Sigma:'Σ',Phi:'Φ',Psi:'Ψ',Delta:'Δ',theta:'θ',lambda:'λ',mu:'μ',pi:'π',rho:'ρ',sigma:'σ',phi:'φ',omega:'ω',Omega:'Ω',cdot:'·',times:'×',pm:'±',le:'≤',ge:'≥',neq:'≠',infty:'∞'};
 function qwEsc(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function qwMath(source){
@@ -230,22 +231,36 @@ function qwRichInline(source){
  // Keep formulas and blanks atomic inside styles such as **F = \(ma\)**.
  // Literal NUL would be replaced by the HTML parser anyway.
  const atoms=[];
+ const marker=html=>'\0'+(atoms.push(html)-1)+'\0';
+ const render=text=>qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
  const text=String(source||'').replace(/\0/g,'�').replace(
   /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$|\\([\\*_~^+\x60$|#>[\].!:()-])/g,
   (match,code,formula,blank,alternate,escaped)=>{
-   if(code)return match;
+   if(code)return marker(qwRichInlineText(code));
    const html=escaped!==undefined?qwEsc(escaped):blank!==undefined?
     '<span class="qw-inline-blank" style="width:'+Math.max(1,Math.min(30,Number(blank)))+'ch" aria-label="Место для ответа"></span>':
     qwRichMath(formula??alternate);
-   return '\0'+(atoms.push(html)-1)+'\0';
+   return marker(html);
   });
- return qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
+ const stack=[{text:''}];let offset=0;
+ for(const tag of text.matchAll(/\[\[(?:style ([^\]\n]{1,180})|(\/style))\]\]/g)){
+  const top=stack.at(-1);top.text+=text.slice(offset,tag.index);offset=tag.index+tag[0].length;
+  const style=tag[1]&&qwReadTextStyle(tag[1]);
+  if(style&&stack.length<13)stack.push({text:'',style,original:tag[0]});
+  else if(tag[2]&&stack.length>1){
+   const frame=stack.pop();
+   stack.at(-1).text+=marker('<span'+qwTextStyleAttrs(frame.style)+'>'+render(frame.text)+'</span>');
+  }else top.text+=tag[0];
+ }
+ stack.at(-1).text+=text.slice(offset);
+ while(stack.length>1){const frame=stack.pop();stack.at(-1).text+=frame.original+frame.text;}
+ return render(stack[0].text);
 }
 /* TASK165: leave ordinary legacy exercises byte-for-byte on the original PDF
    text path. Only explicit Markdown syntax opts an individual field in. */
 function qwHasRichSyntax(value){
  const text=String(value??'');
- return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|(?:-{3,}|\*{3,}|_{3,})[ \t]*$|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
+ return /\[\[style |^::format /m.test(text)||/(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|(?:-{3,}|\*{3,}|_{3,})[ \t]*$|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
   /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])(?:\*[^*\n]+\*|_[^_\n]+_)|`[^`\n]+`|\$[^$\n]{1,600}\$/.test(text)||
   /\\\\/.test(text)||(/[\\+^~]/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\\[\\*_~^+\x60$|#>[\].!:-]|\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
   /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
@@ -253,7 +268,7 @@ function qwHasRichSyntax(value){
 function qwPrintFieldHTML(value){
  return qwHasRichSyntax(value)?qwRichMarkdownHTML(value):qwContentHTML(value);
 }
-function qwRichMarkdownHTML(value,onBlock){
+function qwRichMarkdownHTML(value,onBlock,depth=0){
  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');
  const result=[];
  const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
@@ -261,17 +276,23 @@ function qwRichMarkdownHTML(value,onBlock){
  const heading=line=>/^\s{0,3}#{1,4}\s+/.test(line);
  const alignment=line=>line.match(/^\s{0,3}::(left|center|right|justify)[ \t]+(.+)$/);
  const quote=line=>/^\s{0,3}>\s?/.test(line);
+ const formatted=line=>line.match(/^::format ([^\n]{1,180})$/);
  const fence=line=>/^\s{0,3}```/.test(line);
  const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
  const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(x=>x.trim());
  const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
- const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
- let i=0,blockStart=0;
- const emit=html=>{result.push(html);if(onBlock)onBlock(lines.slice(blockStart,i).join('\n'));};
+ const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||formatted(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
+ let i=0,blockStart=0,pending=null;
+ const emit=html=>{
+  result.push(pending?'<div class="qw-format-block qw-local-format"'+qwTextStyleAttrs(pending.style)+'>'+html+'</div>':html);
+  if(onBlock)onBlock(lines.slice(pending?.start??blockStart,i).join('\n'));pending=null;
+ };
  while(i<lines.length){
   const line=lines[i];
   if(!line.trim()){i++;continue;}
   blockStart=i;
+  const format=formatted(line),style=format&&qwReadTextStyle(format[1]);
+  if(style&&!pending&&lines[i+1]?.trim()){pending={start:i++,style};continue;}
   if(fence(line)){
    const lang=line.trim().slice(3).trim().slice(0,30);
    i++;const code=[];
@@ -299,7 +320,16 @@ function qwRichMarkdownHTML(value,onBlock){
   if(quote(line)){
    const chunk=[];
    while(i<lines.length&&quote(lines[i]))chunk.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
-   emit('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');continue;
+   const callout=depth<4&&chunk[0].match(/^\[!([a-z]+)(?: ([^\]]{1,180}))?\](?:[ \t]+(.*))?$/);
+   const options=callout&&qwCalloutOptions(callout[1],callout[2]);
+   if(options){
+    const type=callout[1],look=qwCalloutLook(type,options);
+    emit('<aside class="qw-callout" data-qw-callout="'+type+'" data-qw-callout-options="'+qwCalloutOptionSource(options)+'" style="'+look.css+'">'+
+     '<div class="qw-callout-title">'+(look.icon?'<span class="qw-callout-icon" aria-hidden="true" contenteditable="false">'+look.icon+'</span>':'')+
+     '<span data-qw-callout-title>'+qwRichInline(callout[3]||look.label)+'</span></div><div class="qw-callout-body">'+
+     (qwRichMarkdownHTML(chunk.slice(1).join('\n'),null,depth+1)||'<p><br></p>')+'</div></aside>');
+   }else emit('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');
+   continue;
   }
   if(bullet(line)||numbered(line)){
    const ordered=numbered(line),items=[],regex=ordered?/^\s{0,3}\d{1,3}[.)]\s+/:/^\s{0,3}[-*+]\s+/;

@@ -1,5 +1,6 @@
 /* TASK144: independent, portable work projects. No diagnostic/student mutations. */
 import {QW_MECHANICS,QW_ELECTRICS,QW_ELECTRIC_TERMINALS,qwDiagramPorts,qwNearestDiagramPort,qwPhysicsPortPoint} from './work-physics.js';
+import {QW_PUBLISH_PROFILES,qwTextStyle} from './work-text-style.js';
 const QW_TYPES={short:'Краткий ответ',extended:'Развёрнутый ответ',choice:'Тест',graph:'Задание с графиком',diagram:'Рисунок / схема',blanks:'Пустые вставки',combined:'Комбинированное'};
 const QW_SUBJECTS={math:'Математика',geometry:'Геометрия',algebra:'Алгебра',physics:'Физика',mixed:'Математика и физика',other:'Авторская подборка'};
 const QW_PLOT={left:82,right:451,top:46,bottom:262};
@@ -17,6 +18,15 @@ function qwPrintSettings(raw={}){
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
  if(!Number.isFinite(fontPt)||fontPt<9||fontPt>12||!['auto','right','below'].includes(figurePosition)||typeof topicHeadings!=='boolean')throw Error('Проверьте параметры печати');
  const options={fontPt,figurePosition,topicHeadings};
+ if(raw.profile!==undefined){
+  if(!Object.hasOwn(QW_PUBLISH_PROFILES,raw.profile))throw Error('Неизвестный профиль документа');
+  options.profile=raw.profile;
+ }
+ if(raw.numbering!==undefined){
+  if(!['auto','none','continuous'].includes(raw.numbering))throw Error('Неизвестный режим нумерации');
+  options.numbering=raw.numbering;
+ }
+ if(raw.text!==undefined)options.text=qwTextStyle(raw.text);
  const flags=['showTitle','showMeta','showVariant','showPageNumbers','partHeadings','monochrome'];
  for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
  const textKeys={titleText:160};
@@ -69,6 +79,7 @@ function qwPublishSettings(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректное издательское оформление');
  const result={};
  if(raw.figure!==undefined)result.figure=qwPublishStyle(raw.figure,'figure');
+ if(raw.text!==undefined)result.text=qwTextStyle(raw.text);
  if(raw.tables!==undefined){
   if(!raw.tables||typeof raw.tables!=='object'||Array.isArray(raw.tables))throw Error('Некорректное оформление таблиц');
   const styled={};

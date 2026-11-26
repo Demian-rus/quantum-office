@@ -82,7 +82,24 @@ function qwField(key,label,value,type='text',extra=''){return '<label>'+label+'<
 function qwSelect(key,label,values,value){return '<label>'+label+'<select data-qw-field="'+key+'">'+qwOptions(values,value)+'</select></label>';}
 function qwCheck(key,label,on){return '<label class="qw-check"><input type="checkbox" data-qw-field="'+key+'" '+(on?'checked':'')+'>'+label+'</label>';}
 function qwQuickButtons(){return '<div class="qw-quick-add" aria-label="Добавить задание">'+[['short','Краткий ответ','line'],['extended','Развёрнутый ответ','text'],['test','Тест','rect'],['diagram','Рисунок / схема','triangle'],['graph','График','quadratic'],['text','Текстовое задание','text']].map(([type,title,icon])=>qwButton('quick-add',qwVisualIcon(icon)+'<span>'+title+'</span>','data-type="'+type+'"')).join('')+'</div>';}
-function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3 data-task-part="'+qwEsc(t.part)+'" data-task-gap="'+i+'">'+qwEsc(t.part||'Без части')+'</h3>':'')+'<div class="qw-nav-row" data-task-row="'+i+'" data-task-id="'+qwEsc(t.id)+'"><button type="button" draggable="true" class="qw-task-drag" data-drag-id="'+qwEsc(t.id)+'" aria-label="Перетащить задание '+(i+1)+'" title="Перетащите для изменения порядка"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4h0m4 0h0M4 10h0m4 0h0M4 16h0m4 0h0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button><button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(t.prompt)+'"><b>'+(i+1)+'</b><span>'+qwEsc(t.title||t.prompt||(!t.answerVisible&&t.type==='short'?'Текстовое задание':QW_TYPES[t.type]))+'</span></button></div>').join('');}
+function qwTaskSummary(value){
+ return String(value||'').slice(0,1600)
+  .replace(/^\s{0,3}(?:>[ \t]?)+/gm,'')
+  .replace(/^[ \t]*::format [^\r\n]*(?:\r?\n|$)/gm,'')
+  .replace(/^[ \t]*\[\![a-z]+(?: [^\]\r\n]*)?\][ \t]*/gm,'')
+  .replace(/\[\[(?:style [^\]\r\n]{1,180}|\/style)\]\]/g,'')
+  .replace(/^[ \t]*(?:#{1,4}|::(?:left|center|right|justify))\s+/gm,'')
+  .replace(/\\\((.*?)\\\)|\$([^$\n]{1,600})\$/g,(_,explicit,dollar)=>{
+   const formula=explicit??dollar;return /[\\{}]/.test(formula)?'…':formula;
+  })
+  .replace(/(\*\*|__|~~|\+\+|\x60)([^\n]+?)\1/g,'$2')
+  .replace(/(^|[\s(])([*_])([^*_\n]+)\2/g,'$1$3')
+  .replace(/\s+/g,' ').trim().slice(0,185);
+}
+function qwTaskLabel(task){
+ return task.title||qwTaskSummary(task.prompt)||(!task.answerVisible&&task.type==='short'?'Текстовое задание':QW_TYPES[task.type]);
+}
+function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3 data-task-part="'+qwEsc(t.part)+'" data-task-gap="'+i+'">'+qwEsc(t.part||'Без части')+'</h3>':'')+'<div class="qw-nav-row" data-task-row="'+i+'" data-task-id="'+qwEsc(t.id)+'"><button type="button" draggable="true" class="qw-task-drag" data-drag-id="'+qwEsc(t.id)+'" aria-label="Перетащить задание '+(i+1)+'" title="Перетащите для изменения порядка"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4h0m4 0h0M4 10h0m4 0h0M4 16h0m4 0h0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button><button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(qwTaskLabel(t))+'"><b>'+(i+1)+'</b><span>'+qwEsc(qwTaskLabel(t))+'</span></button></div>').join('');}
 function qwToolbar(){
  const tool=(action,title,icon)=>qoWorkButton(action,title,icon,'','qw-ribbon-icon');
  const group=buttons=>'<div class="qw-ribbon-group">'+buttons.join('')+'</div>';
@@ -248,10 +265,12 @@ function qwStudyFigureHTML(q,printing=false){
 }
 function qwPublishedFieldHTML(q,field,renderer=qwPrintFieldHTML){
  const html=renderer(q[field]||''),settings=q.publishing?.tables?.[field];
- if(!settings?.length)return html;
+ const style=qwTextStyleAttrs(q.publishing?.text,true);
+ const decorate=markup=>style?'<div class="qw-format-block"'+style+'>'+markup+'</div>':markup;
+ if(!settings?.length)return decorate(html);
  const template=document.createElement('template');template.innerHTML=html;
  qwStylePublishedTables(template.content,settings);
- return template.innerHTML;
+ return decorate(template.innerHTML);
 }
 function qwStylePublishedTables(scope,settings){
  if(!settings?.length)return;
@@ -329,7 +348,7 @@ function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=
  const standardClass=standardized?' qw-standard-task':'';
  if(layout==='compact'||layout==='practice')return '<article class="qw-paper-task qw-compact-entry'+standardClass+'">'+(heading||'<header><b class="qw-task-number qw-print-number">'+(index+1)+'.</b></header>')+flow+'</article>';
  if(layout==='exam')return standardized?'<article class="qw-paper-task qw-exam-task qw-standard-task">'+heading+flow+'</article>':'<article class="qw-paper-task qw-exam-task"><div class="qw-exam-grid"><b class="qw-exam-number qw-print-number">'+(index+1)+'.</b><div class="qw-exam-body">'+flow+'</div></div></article>';
- return '<article class="qw-paper-task qw-worksheet-task'+standardClass+'">'+(heading||'<header><b class="qw-print-number">Задание '+(index+1)+'</b></header>')+flow+
+ return '<article class="qw-paper-task qw-worksheet-task'+standardClass+'">'+(heading||'<header><b class="qw-print-number">'+(preferences?.numbering==='continuous'?(index+1)+'.':'Задание '+(index+1))+'</b></header>')+flow+
   (q.answerVisible?'<div class="qw-answer-preview">Ответ: '+(q.answerStyle==='boxes'?Array.from({length:q.boxes},()=>'<i></i>').join(''):q.answerStyle==='box'?'<i class="qw-answer-box"></i>':'<span></span>')+'</div>':'')+
   (q.solutionVisible?'<div class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
@@ -372,7 +391,7 @@ function qwRefreshLiveGraphText(scope){
  if(!scope)return;
  for(const svg of scope.querySelectorAll('svg:has(.qw-axis-title[data-axis-tip-x])'))if(svg.getCTM())qwAlignSVGText(svg);
 }
-function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){const open=p.querySelector('.qw-bank-solution')?.open;p.innerHTML=qwConstructorStudyTask(q,qwDoc.tasks.indexOf(q));const solution=p.querySelector('.qw-bank-solution');if(solution)solution.open=!!open;qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.title||q.prompt||QW_TYPES[q.type];t.parentElement.title=q.title||q.prompt;}}
+function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){const open=p.querySelector('.qw-bank-solution')?.open;p.innerHTML=qwConstructorStudyTask(q,qwDoc.tasks.indexOf(q));const solution=p.querySelector('.qw-bank-solution');if(solution)solution.open=!!open;qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){const label=qwTaskLabel(q);t.textContent=label;t.parentElement.title=label;}}
 function qwDialog(title,body,footer='',inline=false){const old=document.getElementById('qw-dialog');qwReleaseMode(old);old?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">'+qoWorkIcon('x')+'</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(typeof inline==='string'){qwOpenMode(d,inline);}else if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route(qoBankReturnPage);}else{document.body.append(d);d.showModal();}return d;}
 function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],['worksheet','Обычная контрольная работа'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[])],current);}
 function qwPracticeControls(settings={},attribute='data-practice'){
@@ -381,8 +400,20 @@ function qwPracticeControls(settings={},attribute='data-practice'){
 function qwSettings(){
  const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions(Object.entries(QW_SUBJECTS),qwDoc.subject)+'</select></label><label>Формат PDF<select data-meta="layout">'+qwFormatOptions(qwDoc.layout)+'</select></label><div class="qw-settings-wide qw-row" data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div><label class="qw-settings-wide">Инструкция для обычной контрольной<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));
  const format=d.querySelector('[data-meta="layout"]'),toggle=()=>d.querySelector('[data-practice-controls]').hidden=format.value!=='practice';format.onchange=toggle;toggle();
+ const existing=qwDoc.printSettings||{};
+ const profileField=document.createElement('label');profileField.textContent='Профиль оформления';
+ const profile=document.createElement('select');profile.dataset.workProfile='';
+ profile.innerHTML=qwOptions([['','Текущие настройки'],...Object.entries(QW_PUBLISH_PROFILES).map(([key,[title]])=>[key,title])],existing.profile||'');
+ profileField.append(profile);format.closest('label').before(profileField);
+ profile.onchange=()=>{if(profile.value){format.value=QW_PUBLISH_PROFILES[profile.value][1];toggle();}};
  d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{
   for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=qwText(e.value,e.dataset.meta==='instructions'?4000:160);
+  if(profile.value!==(existing.profile||'')){
+   const settings={...existing};
+   if(profile.value){settings.profile=profile.value;settings.monochrome=profile.value==='exam';delete settings.numbering;}
+   else delete settings.profile;
+   qwDoc.printSettings=qwPrintSettings(settings);
+  }
   if(format.value==='practice')qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
   qwDoc.title=qwDoc.title.trim()||'Новая работа';
  });d.close();};
@@ -437,12 +468,14 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  if(!['worksheet','exam','compact','practice','answers','booklet'].includes(format))throw Error('Неизвестный формат PDF');
  if(!d.tasks.length)throw Error('Добавьте задания в работу');
  const p=qwPrintSettings(d.printSettings||{}),showTitle=p.showTitle??(d.title!=='Новая работа'),showMeta=p.showMeta??format!=='booklet',showVariant=p.showVariant!==false;
+ if(p.text)for(const task of d.tasks)task.publishing={...task.publishing,text:{...p.text,...task.publishing?.text}};
+ const numbering=p.numbering||(p.profile==='notes'?'none':'auto');
  const heading=p.titleText===undefined?d.title:p.titleText;
  const sectionTitle=q=>q.part&&!/^Часть \d+$/.test(q.part)?q.part:q.topic||q.part;
  let previousTopic='';const topics=new Set(d.tasks.map(sectionTitle).filter(Boolean));
  const tasks=format==='answers'?qwAnswerSections(d,options):d.tasks.map((q,i)=>{
   if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));
-  const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
+  const topic=sectionTitle(q),showTopic=(format==='compact'||p.profile==='practice')&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   const partHeading=format==='booklet'&&p.partHeadings&&q.part&&q.part!==d.tasks[i-1]?.part?q.part:'';
   const heading=partHeading||(showTopic?topic:'');
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(heading?'<h2 class="qw-topic-title">'+qwEsc(heading)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
@@ -460,8 +493,8 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(['booklet','answers'].includes(format)?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
-  '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
-  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
+  '" data-qw-profile="'+(p.profile||'')+'" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '"><main class="qw-print-document" data-qw-numbering="'+(format==='answers'?'auto':numbering)+'"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"></script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});</script>')+'</body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){
  let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
@@ -506,6 +539,7 @@ async function qwPreview(output='tasks'){
   selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
   selected('showVariant',prefs.showVariant!==false)+selected('showPageNumbers',prefs.showPageNumbers!==false)+
   selected('topicHeadings',prefs.topicHeadings)+
+  (!key?label('Нумерация заданий','<select data-print-setting="numbering">'+opt([['auto','По формату'],['none','Без номера'],['continuous','Порядковый номер']],prefs.numbering??(prefs.profile==='notes'?'none':'auto'))+'</select>'):'')+
   (!key&&qwDoc.layout==='booklet'&&new Set(qwDoc.tasks.map(q=>q.part).filter(Boolean)).size>1?selected('partHeadings',prefs.partHeadings===true):'')+
   '<div data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div>'+
   (key?'':qwFigureLayoutControls())+qwPublishInspector()+'<h3>Оформление QX</h3>'+
@@ -702,6 +736,7 @@ function qwBankMarkup(source,start,end,kind,argument=''){
  const selected=source.slice(start,end);
  const inline={
   bold:['**','**','текст'],italic:['*','*','текст'],underline:['++','++','текст'],
+  strike:['~~','~~','текст'],
   sup:['^{','}','2'],sub:['~{','}','0'],math:['\\(','\\)','F=ma'],
   fraction:['\\(\\frac{','}{b}\\)','a'],root:['\\(\\sqrt{','}\\)','x'],
   power:['\\(','^{2}\\)','x']
@@ -728,6 +763,7 @@ function qwBankMarkup(source,start,end,kind,argument=''){
  }
  if(kind==='symbol')return {start,end,text:argument};
  if(kind==='blank')return {start,end,text:'[[blank:4]]'};
+ if(kind==='clear')return {start,end,text:selected.replace(/\[\[(?:style [^\]\n]+|\/style)\]\]|^::format [^\n]+\n|(\*\*|__|~~|\+\+)([^\n]+?)\1/gm,(_,marker,text)=>text||'')};
  if(['heading','align','list','numbered','quote'].includes(kind)){
   const first=start?source.lastIndexOf('\n',start-1)+1:0;
   const last=source.indexOf('\n',Math.max(start,end-1));
@@ -741,6 +777,8 @@ function qwBankMarkup(source,start,end,kind,argument=''){
   return {start:first,end:stop,text,select:[0,text.length]};
  }
  const snippets={
+  rule:'---',
+  callout:Object.hasOwn(QW_CALLOUTS,argument)?'> [!'+argument+'] '+QW_CALLOUTS[argument][0]+'\n'+(selected?selected.split('\n').map(line=>'> '+line).join('\n'):'>'):'',
   table:'| Величина | Значение |\n| --- | --- |\n| '+(selected.trim()||'Название').replace(/[\n|]/g,' ')+' | Значение |',
   cases:'$$\n\\begin{cases}\nx+y=5 \\\\\nx-y=1\n\\end{cases}\n$$',
   ege:'### Физическая модель и обоснование\n[Объясните применимость физических законов.]\n\n### Решение\n1. [Запишите законы и формулы.]\n2. [Выполните преобразования.]\n3. [Подставьте значения с единицами.]',
@@ -753,6 +791,37 @@ function qwBankMarkup(source,start,end,kind,argument=''){
 }
 function qwBankTextState(input){
  return {value:input.value,start:input.selectionStart,end:input.selectionEnd};
+}
+function qwEditorTextTools(){
+ const fontChoices=Object.entries(QW_TEXT_FONTS).map(([id,[title]])=>[id,title]);
+ const sizes=[8,9,10,11,12,14,16,18,20,24,28,32,36,48];
+ const picker=(key,caption,options)=>'<label>'+caption+' <select data-editor-style="'+key+'"><option value="">—</option>'+qwOptions(options,'')+'</select></label>';
+ const color=(key,caption,style='editor-style',value='#16202a')=>'<label title="'+caption+'"><span>'+caption+'</span><input type="color" aria-label="'+caption+'" data-'+style+'="'+key+'" value="'+value+'"></label>';
+ return '<div class="qw-editor-text-tools" role="group" aria-label="Шрифт и абзац">'+
+  picker('font','Шрифт',fontChoices)+picker('size','Размер',sizes.map(n=>[n,n+' пт']))+
+  color('color','Текст')+color('highlight','Маркер','editor-style','#ffe396')+
+  '<label>Применить к <select data-editor-scope>'+qwOptions([['selection','Выделению'],['document','Всему документу']],'selection')+'</select></label>'+
+  '<details class="qw-editor-popover"><summary>Абзац</summary><div>'+
+  picker('line','Интервал строки',[1,1.15,1.3,1.5,1.75,2,2.5,3].map(n=>[n,n]))+
+  ['before','after'].map((key,i)=>'<label>'+['До абзаца','После абзаца'][i]+' <input data-editor-style="'+key+'" type="number" min="0" max="48" step=".5" aria-label="'+['До абзаца, пт','После абзаца, пт'][i]+'"></label>').join('')+
+  '</div></details>'+
+  qwBankFormatSelect('callout','Блок',Object.entries(QW_CALLOUTS).map(([key,[title]])=>[key,title]))+
+  '<details class="qw-editor-popover" data-editor-callout hidden><summary>Свойства блока</summary><div>'+
+  '<label>Тип <select data-callout-setting="type">'+qwOptions(Object.entries(QW_CALLOUTS).map(([key,[title]])=>[key,title]),'info')+'</select></label>'+
+  '<label>Схема <select data-callout-setting="tone">'+qwOptions([['','По типу'],['blue','Синяя'],['green','Зелёная'],['purple','Фиолетовая'],['amber','Янтарная'],['red','Красная'],['gray','Серая']],'')+'</select></label>'+
+  '<label><input type="checkbox" data-callout-setting="icon" checked> Иконка</label>'+
+  '<label><input type="checkbox" data-callout-setting="borderVisible" checked> Граница</label>'+
+  color('color','Акцент','callout-setting')+color('background','Фон','callout-setting','#edf5fc')+color('border','Цвет границы','callout-setting','#1d4f91')+
+  '<label>Внутренний отступ <input type="number" data-callout-setting="pad" min="2" max="24" value="9"></label>'+
+  '</div></details></div>';
+}
+function qwEditorContextTools(){
+ const tools=[['bold','<b>Ж</b>','Жирный'],['italic','<i>К</i>','Курсив'],
+  ['strike','<s>З</s>','Зачёркивание'],['underline','<u>Ч</u>','Подчёркивание'],
+  ['highlight','▨','Выделить маркером'],['sup','x²','Верхний индекс'],['sub','x₀','Нижний индекс'],
+  ['math','∑','Формула'],['quote','❝','Цитата']];
+ return '<div class="qw-editor-context" role="toolbar" aria-label="Форматирование выделения" hidden>'+
+  tools.map(([id,icon,title])=>'<button type="button" data-editor-context="'+id+'" title="'+title+'" aria-label="'+title+'">'+icon+'</button>').join('')+'</div>';
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
@@ -798,6 +867,9 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   qwBankFormatSelect('formula','Формула',[['math','Выражение'],['fraction','Дробь'],['power','Степень'],['root','Корень'],['cases','Система уравнений']])+
   qwBankFormatSelect('symbol','Символы',['α','β','γ','Δ','θ','λ','μ','π','ρ','σ','φ','ω','Ω','±','×','·','÷','≤','≥','≠','≈','∞','→','∠','°','√','∑','∫'].map(symbol=>[symbol,symbol]))+
   qwBankFormatButton(...formatButtons[7])+qwBankFormatButton('quote','❝','Цитата')+
+  qwBankFormatButton('strike','<s>З</s>','Зачёркивание')+
+  qwBankFormatButton('rule','—','Горизонтальный разделитель')+
+  qwBankFormatButton('clear',qoWorkIcon('eraser'),'Очистить форматирование')+
   qwBankFormatButton('blank','Поле','Вставить поле для записи')+
   '<span data-bank-template="comment" hidden>'+qwBankFormatButton('ege','Шаблон решения')+'</span>'+
   '<span data-bank-template="criteria" hidden>'+qwBankFormatButton('rubric','Шаблон критериев')+'</span>'+
@@ -852,8 +924,8 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    '<button type="button" data-bank-source aria-pressed="false">Исходный текст</button>'+
    qwPublishZoomControls()+'</div>'+
    '<div class="qw-bank-edit-layout">'+
-   '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+'</div>'+equationBox+
-   '<div class="qw-edit-scroll">'+fields+'</div>'+publishing+'</section>'+
+   '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+qwEditorTextTools()+'</div>'+equationBox+
+   '<div class="qw-edit-scroll">'+fields+'</div>'+publishing+qwEditorContextTools()+'</section>'+
    '<aside class="qw-bank-edit-side" aria-label="'+(work?'Свойства задания':'Метаданные задания')+'">'+(work?qwButton('close-panels','Закрыть','class="qw-drawer-close"'):'')+category+
    (work?'<details class="qw-work-publishing"><summary>Рисунки и таблицы</summary>'+inspector+'</details>':'')+'</aside>'+
    '</div><p id="qw-bank-edit-error" role="alert" class="qw-error" hidden></p>';
@@ -882,7 +954,8 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const publishToggle=top.querySelector('[data-bank-publish-toggle]'),orientation=publishingPane.querySelector('[data-bank-publish-orientation]');
  const moveTitle=d.querySelector('[data-bank-move-title]');
  const catalogName=d.querySelector('[data-bank-task-field="title"]'),tags=d.querySelector('[data-bank-tags]');
- const bookmarks=new WeakMap();
+ const bookmarks=new WeakMap(),contextBar=d.querySelector('.qw-editor-context'),calloutPanel=d.querySelector('[data-editor-callout]');
+ let currentCallout=null;
  let formula=null,composing=false;
  let publishRevision=0,publishTimer=0,rezoom=()=>{};
  function refreshPublishing(){
@@ -917,9 +990,119 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  });
  function mountLive(surface,input){
   qwLiveMount(surface,input.value);
+  styleSurface(surface);
   qwStylePublishedTables(surface,task.publishing?.tables?.[surface.dataset.bankLive]);
   for(const node of surface.children){const source=surface.qwSourceBlocks.get(node);if(source)source.html=node.outerHTML;}
   surface.qwRenderedSource=input.value;
+ }
+ function authorStyle(){return {...(work?qwDoc.printSettings?.text:null),...task.publishing?.text};}
+ function styleSurface(surface){
+  const style=authorStyle();
+  qwLiveApplyStyle(surface,style,true);
+ }
+ function syncTextControls(){
+  const defaults=authorStyle();
+  const scope=d.querySelector('[data-editor-scope]').value;
+  const surface=live(transaction.view.tab),range=qwLiveRange(surface);
+  const node=range?.startContainer.nodeType===1?range.startContainer:range?.startContainer.parentElement;
+  const styled=node?.closest('[data-qw-text-style]'),local=styled&&styled!==surface?qwReadTextStyle(styled.dataset.qwTextStyle):null;
+  const selected=scope==='document'?defaults:{...defaults,...local};
+  for(const control of d.querySelectorAll('[data-editor-style]')){
+   if(control===document.activeElement)continue;
+   const key=control.dataset.editorStyle,value=selected[key];
+   if(control.type==='color'){if(value)control.value=value;}else control.value=value??'';
+  }
+ }
+ function changeDocText(key,value){
+  const current=work?qwDoc.printSettings?.text:task.publishing?.text;
+  const requested=key?{...current,version:1}:{version:1};
+  if(key){if(value===undefined)delete requested[key];else requested[key]=value;}
+  const format=qwTextStyle(requested);
+  const next=qwStyleSource(format)?format:null;
+  if(work){
+   const settings={...qwDoc.printSettings};
+   if(next)settings.text=next;else delete settings.text;
+   qwRemember();qwDoc.printSettings=qwPrintSettings(settings);qwPersist();
+  }else{
+   const settings={...task.publishing};
+   if(next)settings.text=next;else delete settings.text;
+   qwUsePublishing(task,settings);
+  }
+  for(const [section] of QW_BANK_SECTIONS)styleSurface(live(section));
+  syncTextControls();refreshPublishing();
+ }
+ function changeTextStyle(key,argument,scope){
+  const value=QW_TEXT_RULES[key].min===undefined?argument:Number(argument);
+  try{qwTextStyle({version:1,[key]:value});}catch(error){showError(error.message);return;}
+  if(scope==='document'){changeDocText(key,value);return;}
+  const input=fieldInput(transaction.view.tab),surface=live(transaction.view.tab);
+  if(transaction.view.mode==='source'){
+   const before=qwBankTextState(input),{start,end}=before, spec=key+'='+value;
+   if(QW_PARAGRAPH_STYLES.has(key)){
+    const first=start?input.value.lastIndexOf('\n',start-1)+1:0;
+    const previous=first?input.value.lastIndexOf('\n',first-2)+1:0;
+    const prior=input.value.slice(previous,first).match(/^::format ([^\n]+)\n$/);
+    const existing=prior&&qwReadTextStyle(prior[1]);
+    const next=qwStyleSource({...existing,version:1,[key]:value});
+    input.setRangeText('::format '+next+'\n',existing?previous:first,first,'preserve');
+   }else if(start!==end)input.setRangeText('[[style '+spec+']]'+input.value.slice(start,end)+'[[/style]]',start,end,'select');
+   recordText(input,before);return;
+  }
+  qwLiveRestore(surface,qwLiveBookmark(surface)||bookmarks.get(surface));
+  const before=currentSnapshot(input,surface),range=qwLiveRange(surface);
+  const changed=QW_PARAGRAPH_STYLES.has(key)?qwLiveParagraphStyle(surface,range,key,value):
+   qwLiveTextSelection(surface,range,key,value);
+  if(changed){historyFor(input).before=before;commitLive(surface);showError('');}
+ }
+ function syncCallout(block){
+  if(block===currentCallout)return;
+  currentCallout=block;
+  calloutPanel.hidden=!block;
+  if(!block){calloutPanel.open=false;return;}
+  const type=block.dataset.qwCallout,options=qwCalloutOptions(type,block.dataset.qwCalloutOptions)||{};
+  const look=qwCalloutLook(type,options),[ink,paper]=QW_CALLOUT_TONES[look.tone];
+  const values={type,tone:options.tone||'',icon:options.icon!=='0',borderVisible:options.border!=='none',color:options.color||ink,
+   background:options.background||paper,border:options.border&&options.border!=='none'?options.border:ink,pad:options.pad||9};
+  for(const control of calloutPanel.querySelectorAll('[data-callout-setting]')){
+   const value=values[control.dataset.calloutSetting];
+   if(control.type==='checkbox')control.checked=value;else control.value=value;
+  }
+ }
+ function changeCallout(control){
+  if(!currentCallout?.isConnected)return;
+  const block=currentCallout,type=block.dataset.qwCallout,key=control.dataset.calloutSetting;
+  const input=fieldInput(transaction.view.tab),surface=live(transaction.view.tab);
+  const options=qwCalloutOptions(type,block.dataset.qwCalloutOptions)||{};
+  const nextType=key==='type'?control.value:type;
+  if(key==='icon')options.icon=control.checked?'1':'0';
+  else if(key==='borderVisible'){if(control.checked)delete options.border;else options.border='none';}
+  else if(key==='tone'&&!control.value)delete options.tone;
+  else if(key!=='type')options[key]=control.value;
+  const spec=qwCalloutOptionSource(options),valid=qwCalloutOptions(nextType,spec);
+  if(!valid){showError('Проверьте настройки блока');return;}
+  const before=currentSnapshot(input,surface),look=qwCalloutLook(nextType,valid);
+  block.dataset.qwCallout=nextType;block.dataset.qwCalloutOptions=spec;block.style.cssText=look.css;
+  const heading=block.querySelector('.qw-callout-title');
+  heading.querySelector('.qw-callout-icon')?.remove();
+  if(look.icon){const icon=document.createElement('span');icon.className='qw-callout-icon';icon.contentEditable='false';
+   icon.setAttribute('aria-hidden','true');icon.textContent=look.icon;heading.prepend(icon);}
+  historyFor(input).before=before;commitLive(surface);currentCallout=null;syncCallout(block);
+ }
+ function updateEducationSelection(){
+  if(transaction.view.mode!=='visual'||formula||d.closest('[inert]')){contextBar.hidden=true;syncCallout(null);return;}
+  const surface=live(transaction.view.tab),range=qwLiveRange(surface);
+  const anchor=range?.startContainer.nodeType===1?range.startContainer:range?.startContainer.parentElement;
+  if(!calloutPanel.open&&range&&surface.contains(document.activeElement))syncCallout(anchor?.closest('[data-qw-callout]')||null);
+  syncTextControls();
+  if(!range||range.collapsed||!range.toString().trim()){contextBar.hidden=true;return;}
+  const selected=range.getBoundingClientRect(),viewport=surface.closest('.qw-edit-scroll').getBoundingClientRect();
+  if(selected.top<viewport.top||selected.bottom>viewport.bottom){contextBar.hidden=true;return;}
+  contextBar.hidden=false;
+  const area=contextBar.getBoundingClientRect(),above=selected.top-8-area.height;
+  const top=above>=viewport.top?above:selected.bottom+8;
+  if(top+area.height>viewport.bottom){contextBar.hidden=true;return;}
+  contextBar.style.left=Math.max(viewport.left+6,Math.min(viewport.right-area.width-6,(selected.left+selected.right-area.width)/2))+'px';
+  contextBar.style.top=top+'px';
  }
  function currentSnapshot(input,surface){
   const state=qwBankTextState(input);
@@ -1096,7 +1279,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    updateFigurePlacement(live(tab));
    graphic.innerHTML=qwStudyFigureHTML(task);qwRefreshLiveGraphText(graphic);
   }
-  updateHistoryButtons();preview();
+  updateHistoryButtons();preview();updateEducationSelection();
   if(work||publish)syncPublishing();
   rezoom();
   if(publish){if(transaction.view.orientation)orientation.value=transaction.view.orientation;refreshPublishing();}
@@ -1118,7 +1301,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   const history=historyFor(input);
   qwLiveRestore(surface,qwLiveBookmark(surface)||bookmarks.get(surface));
   if(kind==='undo'||kind==='redo'){historyStep(input,kind==='redo',surface);return;}
-  const commands={bold:'bold',italic:'italic',underline:'underline',sup:'superscript',sub:'subscript',
+  const commands={bold:'bold',italic:'italic',underline:'underline',strike:'strikeThrough',clear:'removeFormat',sup:'superscript',sub:'subscript',
    list:'insertUnorderedList',numbered:'insertOrderedList'};
   const align={left:'justifyLeft',center:'justifyCenter',right:'justifyRight',justify:'justifyFull'};
   const templates={math:'F=ma',fraction:'\\frac{a}{b}',power:'x^{2}',root:'\\sqrt{x}',cases:'\\begin{cases}\nx+y=5 \\\\\nx-y=1\n\\end{cases}'};
@@ -1128,9 +1311,15 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   }
   const originalHTML=surface.innerHTML;
   history.before=currentSnapshot(input,surface);
+  if(kind==='clear'&&d.querySelector('[data-editor-scope]').value==='document'){changeDocText('');history.before=null;return;}
   if(commands[kind])document.execCommand(commands[kind],false,null);
   else if(kind==='align'&&align[argument])document.execCommand(align[argument],false,null);
   else if(kind==='heading'||kind==='quote')document.execCommand('formatBlock',false,kind==='quote'?'blockquote':'h'+(2+Number(argument)));
+  else if(kind==='callout'||kind==='rule'){
+   const range=qwLiveRange(surface),selected=range&&!range.collapsed?qwLiveSource(range.cloneContents()):'';
+   const snippet=qwBankMarkup(selected,0,selected.length,kind,argument);
+   if(snippet)qwLiveInsertBlock(surface,qwLiveHTML(snippet.text));
+  }
   else if(kind==='symbol'||kind==='blank'){
    const range=qwLiveRange(surface);
    if(range){
@@ -1151,6 +1340,19 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  function format(kind,argument){
   const input=fieldInput(transaction.view.tab);
   if(formula||transaction.view.mode==='preview'||saving)return;
+  if(d.querySelector('[data-editor-scope]').value==='document'){
+   if(kind==='clear'){changeDocText('');return;}
+   const defaults=work?qwDoc.printSettings?.text:task.publishing?.text;
+   if(kind==='align'){changeDocText('align',argument);return;}
+   if(kind==='bold'||kind==='italic'){
+    const key=kind==='bold'?'weight':'slant';changeDocText(key,defaults?.[key]?undefined:kind);return;
+   }
+   if(kind==='underline'||kind==='strike'){
+    const line=kind==='underline'?'underline':'line-through',existing=defaults?.decoration||'';
+    const active=['underline','line-through'].filter(decoration=>existing.includes(decoration)!==(decoration===line));
+    changeDocText('decoration',active.length?active.join('-'):undefined);return;
+   }
+  }
   if(transaction.view.mode==='visual'){visualFormat(kind,argument);return;}
   if(kind==='undo'||kind==='redo'){historyStep(input,kind==='redo');return;}
   const before=qwBankTextState(input);
@@ -1231,6 +1433,12 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   if(input.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices],[data-bank-tags]')){collect();preview();}
  });
  d.addEventListener('change',event=>{
+  if(event.target.matches('[data-editor-scope]')){syncTextControls();return;}
+  if(event.target.matches('[data-editor-style]')){
+   if(event.target.value!=='')changeTextStyle(event.target.dataset.editorStyle,event.target.value,d.querySelector('[data-editor-scope]').value);
+   return;
+  }
+  if(event.target.matches('[data-callout-setting]')){changeCallout(event.target);return;}
   const select=event.target.closest('[data-bank-format-select]');
   if(select&&select.value){
    format(select.dataset.bankFormatSelect==='formula'?select.value:select.dataset.bankFormatSelect,select.value);
@@ -1245,6 +1453,13 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('click',event=>{
+  const context=event.target.closest('[data-editor-context]');
+  if(context){
+   const key=context.dataset.editorContext;
+   if(key==='highlight')changeTextStyle(key,d.querySelector('[data-editor-style=highlight]').value,'selection');
+   else format(key);
+   return;
+  }
   const tab=event.target.closest('[data-bank-tab]');
   if(tab){if(formula)equationSource.focus();else{if(transaction.view.mode==='publish')transaction.view.mode=transaction.view.beforePublishing;selectSection(tab.dataset.bankTab);}return;}
   if(event.target.closest('[data-bank-publish-toggle]')){
@@ -1322,6 +1537,14 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   scroll.style.setProperty('--qw-editor-width',width+'px');
   return {view:scroll,width:width+32,height:Math.max(360,editors.find(surface=>!surface.hidden)?.offsetHeight||0)+32};
  },scale=>{scroll.style.setProperty('--qw-edit-scale',scale);publishFrame.style.zoom=scale;});
+ contextBar.addEventListener('pointerdown',event=>event.preventDefault());
+ const caretEvents=new AbortController();
+ document.addEventListener('selectionchange',updateEducationSelection,{signal:caretEvents.signal});
+ scroll.addEventListener('scroll',updateEducationSelection,{signal:caretEvents.signal});
+ const detach=new MutationObserver(()=>{
+  if(!d.isConnected){caretEvents.abort();detach.disconnect();}
+ });
+ detach.observe(document.getElementById('app'),{childList:true,subtree:true});
  scroll.addEventListener('click',event=>{
   if(!event.target.matches('[data-bank-rich]')||transaction.view.mode!=='visual')return;
   const input=live(transaction.view.tab);
@@ -1486,14 +1709,7 @@ async function qwBank(previousFilters={}){
    control.innerHTML=qwOptions([['all','Все'],...sorted.map(name=>[name,name])],value);
   }
  }
- const summary=value=>String(value||'').slice(0,700)
-  .replace(/^[ \t]*(?:#{1,4}|::(?:left|center|right|justify))\s+/gm,'')
-  .replace(/\\\((.*?)\\\)|\$([^$\n]{1,600})\$/g,(_,explicit,dollar)=>{
-   const formula=explicit??dollar;return /[\\{}]/.test(formula)?'…':formula;
-  })
-  .replace(/(\*\*|__|~~|\+\+|\x60)([^\n]+?)\1/g,'$2')
-  .replace(/(^|[\s(])([*_])([^*_\n]+)\2/g,'$1$3')
-  .replace(/\s+/g,' ').trim().slice(0,185);
+ const summary=qwTaskSummary;
  const readFilters=()=>Object.fromEntries(filterKeys.map(key=>[key,pick(key)]));
  const viewState=()=>({...readFilters(),search:pick('search'),__view:activeId,__offset:pageOffset,
   __scroll:list.scrollTop,__navScroll:get('filters').scrollTop,__selected:[...selected.keys()],

@@ -721,6 +721,29 @@
 .qw-zoom :is(button,select) {min-height:28px}
 .qw-zoom [data-zoom-step] {min-width:28px;padding-inline:0;font-size:15px}
 .qw-zoom button[aria-pressed=true] {background:var(--qo-accent-soft);color:var(--qo-accent);border-color:var(--qo-accent-border)}
+.qw-editor-text-tools {
+ display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;width:100%;padding-block-start:4px;border-block-start:1px solid var(--qo-border)
+}
+.qw-editor-text-tools label {display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.qw-editor-text-tools select {min-width:4em;max-width:180px;width:auto}
+.qw-editor-text-tools input[type=color] {width:26px;height:25px;padding:2px;cursor:pointer}
+.qw-editor-popover {position:relative;min-width:0;font-size:12px}
+.qw-editor-popover>summary {cursor:pointer;padding:4px 7px;border:1px solid var(--qo-border);border-radius:4px;background:var(--qo-surface)}
+.qw-editor-popover>div {position:absolute;left:0;top:calc(100% + 5px);z-index:4;display:grid;grid-template-columns:max-content max-content;gap:8px;
+ padding:10px;border:1px solid var(--qo-border-strong);border-radius:5px;background:var(--qo-surface);box-shadow:var(--qo-shadow)}
+.qw-editor-popover:not([open])>div {display:none}
+.qw-editor-popover input[type=number] {width:55px;min-width:0}
+@media(max-width:660px) {
+ .qw-editor-text-tools {position:relative}
+ .qw-editor-popover {position:static}
+ .qw-editor-popover>div {max-width:100%;grid-template-columns:minmax(0,1fr)}
+}
+.qw-editor-context {
+ position:fixed;z-index:1300;display:flex;align-items:center;gap:3px;padding:4px;
+ border:1px solid var(--qo-border-strong);border-radius:6px;background:var(--qo-surface);box-shadow:0 4px 14px #15203130
+}
+.qw-editor-context[hidden] {display:none!important}
+.qw-editor-context button {min-width:30px;min-height:30px;padding:2px}
 .qw-print-preview-dialog #qw-pages,.qw-bank-publish-paper {overflow:auto;overscroll-behavior:contain}
 #qw-print-preview-frame,.qw-bank-publish-paper iframe {margin-inline:auto}
 .qw-inline-task-editor {display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden}
@@ -819,6 +842,9 @@
 .qw-dock-divider:hover,.qw-dock-divider:focus-visible{background:var(--qo-accent);outline:0}
 .qw-dock-left{left:calc(var(--qw-dock-left-size) - 4px)}
 .qw-dock-right{right:calc(var(--qw-dock-right-size) - 4px)}
+/* Keep the resize hit target inside the inspector and clear of the editor scrollbar. */
+.qw-author-workspace>.qw-dock-right{right:calc(var(--qw-author-right) - 9px)}
+.qw-bank-edit-layout>.qw-dock-right{right:calc(var(--qw-dock-right-size) - 9px)}
 .qw-dock-hide-left{--qw-dock-left-size:0px}.qw-dock-hide-right{--qw-dock-right-size:0px}
 @media(min-width:1200px){
  .qw-frame.qw-dock-layout{grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr) var(--qw-dock-right-size)}

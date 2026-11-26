@@ -37,7 +37,7 @@ function qwLiveHTML(source) {
 
 function qwLiveEscape(text) {
  return text.replace(/\u00a0/g,' ').replace(/[\\*_~^+\x60$|#>[\]]/g,'\\$&')
-  .replace(/(^|\n)([ \t]*)(::(?:left|center|right|justify)[ \t]+|-{3,}(?=[ \t]*(?:\n|$))|- |\d{1,3}[.)] )/g,(_,line,space,marker)=>
+  .replace(/(^|\n)([ \t]*)(::(?:left|center|right|justify|format)[ \t]+|-{3,}(?=[ \t]*(?:\n|$))|- |\d{1,3}[.)] )/g,(_,line,space,marker)=>
    line+space+marker.replace(/[:.()-]/,'\\$&'));
 }
 
@@ -52,6 +52,7 @@ function qwLiveAtomSource(node) {
 }
 
 function qwLiveInline(node) {
+ if(!node)return '';
  if(node.nodeType===Node.TEXT_NODE)return qwLiveEscape(node.data);
  if(node.nodeType!==Node.ELEMENT_NODE)return '';
  if(node.hasAttribute('data-qw-live-atom'))return qwLiveAtomSource(node);
@@ -63,15 +64,29 @@ function qwLiveInline(node) {
  if(tag==='B'||tag==='STRONG'||/^(?:bold|[6-9]00)$/.test(style.fontWeight))value='__'+value+'__';
  if(tag==='I'||tag==='EM'||style.fontStyle==='italic')value='*'+value+'*';
  if(tag==='U'||style.textDecorationLine?.includes('underline'))value='++'+value+'++';
- if(tag==='DEL'||tag==='S')value='~~'+value+'~~';
+ if(tag==='DEL'||tag==='S'||tag==='STRIKE'||style.textDecorationLine?.includes('line-through'))value='~~'+value+'~~';
  if(tag==='SUP'||style.verticalAlign==='super')value='^{'+value+'}';
  if(tag==='SUB'||style.verticalAlign==='sub')value='~{'+value+'}';
+ const format=node.dataset.qwTextStyle;
+ if(format&&node.getAttribute('style'))value='[[style '+format+']]'+value+'[[/style]]';
  return value;
 }
 
-function qwLiveBlock(node) {
+function qwLiveBlock(node,withStyle=true) {
  if(node.nodeType!==Node.ELEMENT_NODE)return qwLiveInline(node);
  if(node.hasAttribute('data-qw-live-atom'))return qwLiveAtomSource(node);
+ const format=withStyle&&node.dataset.qwTextStyle;
+ if(format){
+  const body=node.classList.contains('qw-format-block')?[...node.children].map(child=>qwLiveBlock(child)).filter(Boolean):[qwLiveBlock(node,false)].filter(Boolean);
+  return body.map(block=>'::format '+format+'\n'+block).join('\n\n');
+ }
+ if(node.hasAttribute('data-qw-callout')){
+  const options=node.dataset.qwCalloutOptions,title=node.querySelector(':scope>.qw-callout-title [data-qw-callout-title]');
+  const content=node.querySelector(':scope>.qw-callout-body');
+  const body=content?qwLiveSource(content):'';
+  return '> [!'+node.dataset.qwCallout+(options?' '+options:'')+'] '+qwLiveInline(title).trim().replace(/\s*\n\s*/g,' ')+'\n'+
+   body.split('\n').map(line=>line?'> '+line:'>').join('\n');
+ }
  const tag=node.tagName;
  if(node.matches('.qw-rich-equation')&&node.firstElementChild?.hasAttribute('data-qw-live-atom'))
   return qwLiveAtomSource(node.firstElementChild);
@@ -91,9 +106,9 @@ function qwLiveBlock(node) {
   rows.splice(1,0,rows[0].map(()=> '---'));
   return rows.map(row=>'| '+row.join(' | ')+' |').join('\n');
  }
- if(tag==='DIV'&&[...node.children].some(child=>child.matches('p,div,ul,ol,h3,h4,h5,h6,blockquote,table')))
+ if(tag==='DIV'&&[...node.children].some(child=>child.matches('p,div,ul,ol,h3,h4,h5,h6,blockquote,aside,table')))
   return qwLiveSource(node);
- const text=qwLiveInline(node).replace(/\n$/,'');
+ const text=(node.dataset.qwTextStyle?[...node.childNodes].map(qwLiveInline).join(''):qwLiveInline(node)).replace(/\n$/,'');
  if(!text.trim())return '';
  if(/^H[1-6]$/.test(tag))return '#'.repeat(Math.max(1,Number(tag[1])-2))+' '+text;
  if(tag==='BLOCKQUOTE')return text.split('\n').map(line=>'> '+line).join('\n');
@@ -108,7 +123,7 @@ function qwLiveSource(surface) {
  let inline='';
  for(const node of surface.childNodes){
   const known=surface.qwSourceBlocks?.get(node);
-  if(node.nodeType===Node.ELEMENT_NODE&&node.matches('p,div,section,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table,pre,hr')){
+  if(node.nodeType===Node.ELEMENT_NODE&&node.matches('p,div,section,aside,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table,pre,hr')){
    if(inline.trim())parts.push(inline);inline='';
    const block=known?.html===node.outerHTML?known.source:qwLiveBlock(node);
    if(block?.trim())parts.push(block);
@@ -158,4 +173,74 @@ function qwLiveRestore(surface,bookmark) {
  }
  const selection=window.getSelection();
  selection.removeAllRanges();selection.addRange(range);
+}
+
+
+// Writer and the education editor share Range-based paragraph targeting.
+function qwLiveApplyStyle(node,format,defaults=false){
+ const value=qwStyleSource(format);
+ for(const rule of Object.values(QW_TEXT_RULES))node.style.removeProperty(rule.property);
+ if(defaults){
+  for(const key of ['before','after'])node.style.removeProperty('--qw-default-'+key);
+  const spacing=qwDefaultSpacing(format);
+  if(spacing)node.dataset.qwDefaultSpacing=spacing;else delete node.dataset.qwDefaultSpacing;
+ }
+ if(value){
+  node.dataset.qwTextStyle=value;
+  node.style.cssText+=qwTextStyleCSS(format,defaults);
+ }else delete node.dataset.qwTextStyle;
+}
+function qwLiveTextSelection(surface,range,key,value){
+ if(!range||range.collapsed)return false;
+ const walker=document.createTreeWalker(surface,NodeFilter.SHOW_TEXT);
+ const selected=[];
+ while(walker.nextNode()){
+  const node=walker.currentNode;
+  if(node.parentElement.closest('[contenteditable=false]')||!range.intersectsNode(node))continue;
+  const start=node===range.startContainer?range.startOffset:0;
+  const end=node===range.endContainer?range.endOffset:node.length;
+  if(end>start)selected.push({node,start,end});
+ }
+ let first,last;
+ for(const {node,start,end} of selected){
+  const parent=node.parentElement;
+  if(end<node.length)node.splitText(end);
+  const text=start?node.splitText(start):node;
+  const current=parent.dataset.qwTextStyle&&parent.childNodes.length===1?parent:null;
+  const format=qwTextStyle({...((current&&qwReadTextStyle(current.dataset.qwTextStyle))||{version:1}),[key]:value});
+  const span=current||document.createElement('span');
+  if(!current){text.replaceWith(span);span.append(text);}
+  qwLiveApplyStyle(span,format);first??=text;last=text;
+ }
+ if(!first)return false;
+ range.setStart(first,0);range.setEnd(last,last.length);
+ const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ return true;
+}
+function qwLiveParagraphStyle(surface,range,key,value){
+ const selector='.qw-format-block,p,h3,h4,h5,h6,ul,ol,blockquote,.qw-rich-equation';
+ const nodes=qoParagraphsInRange(surface,range,selector);
+ const blocks=new Set(nodes.map(node=>node.closest('.qw-format-block')||node));
+ for(const block of blocks){
+  const current=qwReadTextStyle(block.dataset.qwTextStyle||'');
+  qwLiveApplyStyle(block,qwTextStyle({...current,version:1,[key]:value}));
+ }
+ return blocks.size>0;
+}
+function qwLiveInsertBlock(surface,html){
+ const range=qwLiveRange(surface);
+ if(!range)return null;
+ const origin=range.startContainer.nodeType===Node.ELEMENT_NODE?range.startContainer:range.startContainer.parentElement;
+ const host=origin.closest('.qw-callout-body')||surface;
+ let anchor=origin;
+ while(anchor!==host&&anchor.parentElement!==host)anchor=anchor.parentElement;
+ const template=document.createElement('template');template.innerHTML=html;
+ const block=template.content.firstElementChild;
+ if(!block)return null;
+ range.deleteContents();
+ if(anchor===host||!anchor.isConnected)host.append(block);else anchor.after(block);
+ const editable=block.querySelector('.qw-callout-body p')||block;
+ range.selectNodeContents(editable);range.collapse(false);
+ const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ return block;
 }

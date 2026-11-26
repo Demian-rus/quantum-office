@@ -668,6 +668,7 @@ function qdVariantPaperHTML(variant,kind='student'){
     '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
     '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+(typeof QW_MATH_FONT_CSS==='string'?QW_MATH_FONT_CSS:'')+(typeof QW_RADICAL_CSS==='string'?QW_RADICAL_CSS:'')+
     (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('17mm 16mm'):'@page{size:A4;margin:17mm 16mm}')+
+    (typeof QW_EDUCATION_TEXT_CSS==='string'?QW_EDUCATION_TEXT_CSS:'')+
     '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#000;--qw-math-ink:#000;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
     '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
     '.eyebrow{color:#55667d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}'+
@@ -1483,6 +1484,7 @@ function qdReportHTML(entry){
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Отчёт · '+title+'</title>'+
    '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+
    (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('20mm'):'@page{size:A4;margin:20mm}')+
+   (typeof QW_EDUCATION_TEXT_CSS==='string'?QW_EDUCATION_TEXT_CSS:'')+
    'body{font:15px/1.5 Arial,sans-serif;color:#000;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
    '.muted{color:#60746a}.score{display:flex;align-items:baseline;gap:14px;padding:20px;background:#f0f7f3;border-radius:12px}.score strong{font-size:36px;color:#1c684a}'+
    'table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #cbd9d1}th{background:#eaf2ed}'+

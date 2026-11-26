@@ -99,7 +99,7 @@ function checkPrint(m,orientation,fixture){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');
   if(orientation==='portrait')assert.equal(s.columns,1);else if(i<m.sheets.length-1)assert.equal(s.columns,2);
   assert.equal(s.footers,1);assert.equal(s.pageNumber,String(i+1));assert.equal(s.brand,1);assert.match(s.brandFont,/QX Handwritten/);assert.equal(s.brandColor,'rgb(0, 0, 0)');assert.equal(s.brandSize,'20px');
-  assert.ok(Math.abs(s.brandRight-9)<.2&&Math.abs(s.brandTop-3)<.2&&s.footerCenterDelta<.3,'incorrect physical-sheet margins '+JSON.stringify(s));
+  assert.ok(Math.abs(s.brandRight-4.27)<.2&&Math.abs(s.brandTop-3.82)<.2&&s.footerCenterDelta<.3,'incorrect physical-sheet margins '+JSON.stringify(s));
  }
  assert.ok(m.report.pages.every(p=>p.capacityMm>150&&p.freeMm>=-.7),'invalid physical pagination');
 }

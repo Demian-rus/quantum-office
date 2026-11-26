@@ -1,6 +1,6 @@
 {
   "name": "quantum-office",
-  "version": "0.4.2",
+  "version": "0.4.3",
   "private": true,
   "type": "module",
   "description": "Local-first cross-platform office suite, beginning with Sheets",

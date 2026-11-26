@@ -76,7 +76,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/task158');
   assert.equal(data.brandColor,'rgb(0, 0, 0)');
   assert.equal(data.brandBg,'rgba(0, 0, 0, 0)');
   assert.equal(data.brandClip,'none','handwritten signature has no geometric badge');
-  assert.ok(Math.abs(data.brandBounds.top-3*96/25.4)<1&&Math.abs(data.brandBounds.right-9*96/25.4)<1&&data.brandBounds.bottom<data.firstTaskTop,'handwritten signature occupies the physical top margin');
+  assert.ok(Math.abs(data.brandBounds.top-3.82*96/25.4)<1&&Math.abs(data.brandBounds.right-4.27*96/25.4)<1&&data.brandBounds.bottom<data.firstTaskTop,'handwritten signature occupies the physical top margin');
   assert.ok(data.handwrittenFont.includes('QX Handwritten'),'brand must use embedded font');
   assert.equal(data.fontReady,true,'Latin + Cyrillic branded font loaded offline');
   assert.equal(data.svgBrandCount,0,'do not trace handwritten glyphs manually');

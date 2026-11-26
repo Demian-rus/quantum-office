@@ -12615,6 +12615,29 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-zoom :is(button,select) {min-height:28px}
 .qw-zoom [data-zoom-step] {min-width:28px;padding-inline:0;font-size:15px}
 .qw-zoom button[aria-pressed=true] {background:var(--qo-accent-soft);color:var(--qo-accent);border-color:var(--qo-accent-border)}
+.qw-editor-text-tools {
+ display:flex;align-items:center;flex-wrap:wrap;gap:5px 10px;width:100%;padding-block-start:4px;border-block-start:1px solid var(--qo-border)
+}
+.qw-editor-text-tools label {display:flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.qw-editor-text-tools select {min-width:4em;max-width:180px;width:auto}
+.qw-editor-text-tools input[type=color] {width:26px;height:25px;padding:2px;cursor:pointer}
+.qw-editor-popover {position:relative;min-width:0;font-size:12px}
+.qw-editor-popover>summary {cursor:pointer;padding:4px 7px;border:1px solid var(--qo-border);border-radius:4px;background:var(--qo-surface)}
+.qw-editor-popover>div {position:absolute;left:0;top:calc(100% + 5px);z-index:4;display:grid;grid-template-columns:max-content max-content;gap:8px;
+ padding:10px;border:1px solid var(--qo-border-strong);border-radius:5px;background:var(--qo-surface);box-shadow:var(--qo-shadow)}
+.qw-editor-popover:not([open])>div {display:none}
+.qw-editor-popover input[type=number] {width:55px;min-width:0}
+@media(max-width:660px) {
+ .qw-editor-text-tools {position:relative}
+ .qw-editor-popover {position:static}
+ .qw-editor-popover>div {max-width:100%;grid-template-columns:minmax(0,1fr)}
+}
+.qw-editor-context {
+ position:fixed;z-index:1300;display:flex;align-items:center;gap:3px;padding:4px;
+ border:1px solid var(--qo-border-strong);border-radius:6px;background:var(--qo-surface);box-shadow:0 4px 14px #15203130
+}
+.qw-editor-context[hidden] {display:none!important}
+.qw-editor-context button {min-width:30px;min-height:30px;padding:2px}
 .qw-print-preview-dialog #qw-pages,.qw-bank-publish-paper {overflow:auto;overscroll-behavior:contain}
 #qw-print-preview-frame,.qw-bank-publish-paper iframe {margin-inline:auto}
 .qw-inline-task-editor {display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;overflow:hidden}
@@ -12713,6 +12736,9 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 .qw-dock-divider:hover,.qw-dock-divider:focus-visible{background:var(--qo-accent);outline:0}
 .qw-dock-left{left:calc(var(--qw-dock-left-size) - 4px)}
 .qw-dock-right{right:calc(var(--qw-dock-right-size) - 4px)}
+/* Keep the resize hit target inside the inspector and clear of the editor scrollbar. */
+.qw-author-workspace>.qw-dock-right{right:calc(var(--qw-author-right) - 9px)}
+.qw-bank-edit-layout>.qw-dock-right{right:calc(var(--qw-dock-right-size) - 9px)}
 .qw-dock-hide-left{--qw-dock-left-size:0px}.qw-dock-hide-right{--qw-dock-right-size:0px}
 @media(min-width:1200px){
  .qw-frame.qw-dock-layout{grid-template-columns:var(--qw-dock-left-size) minmax(0,1fr) var(--qw-dock-right-size)}
@@ -12738,7 +12764,7 @@ body.qo-sheet-tab-reordering .sheet-tab{user-select:none;cursor:grabbing}
 @media(max-width:1000px){.qw-workspace-mode.qw-visual-dialog>header>.qw-dock-controls,.qw-workspace-mode .qw-visual-body>.qw-dock-divider{display:none}}
 .qw-bank-inline.qw-bank-assemble-dialog>.qw-dialog-body{padding:0}
 
-
+.qw-callout{margin:.65em 0;padding:var(--qw-callout-pad);background:var(--qw-callout-fill);color:#151d2a;border:1px solid var(--qw-callout-border);border-inline-start-width:3px;border-radius:4px;overflow-wrap:anywhere;print-color-adjust:exact}.qw-callout-title{display:flex;align-items:baseline;gap:.55em;font-weight:700;color:#172333;margin:0 0 .35em}.qw-callout-icon{color:var(--qw-callout-color);user-select:none;flex:none}.qw-callout-body>:first-child{margin-block-start:0!important}.qw-callout-body>:last-child{margin-block-end:0!important}.qw-format-block{display:flow-root}.qw-format-block>:first-child{margin-block-start:0}.qw-format-block>:last-child{margin-block-end:0}.qw-format-block :is(p,ul,ol,blockquote,h3,h4,h5,h6){line-height:inherit}[data-qw-default-spacing~=before] :is(p,ul,ol,blockquote,h3,h4,h5,h6,.qw-rich-equation):not([data-qw-text-style],.qw-local-format *){margin-block-start:var(--qw-default-before)}[data-qw-default-spacing~=after] :is(p,ul,ol,blockquote,h3,h4,h5,h6,.qw-rich-equation):not([data-qw-text-style],.qw-local-format *){margin-block-end:var(--qw-default-after)}body[data-qw-profile=practice] .qw-topic-title{margin:2mm 0 1mm;font-weight:700}body[data-qw-profile=notes] .qw-task-text{line-height:1.45}body[data-qw-profile=notes] .qw-task-text :is(h3,h4,h5,h6){font-size:revert;margin-block-start:.6em}body[data-qw-monochrome=true] :is(.qw-format-block,[data-qw-text-style]){color:#000!important;background-color:transparent!important}body[data-qw-monochrome=true] .qw-callout{background:#fff;color:#000;border-color:#777}body[data-qw-monochrome=true] .qw-callout :is(.qw-callout-title,.qw-callout-icon){color:#000}.qw-print-document[data-qw-numbering=none] .qw-paper-task > header:not(.qw-print-header){display:none}.qw-print-document[data-qw-numbering=none] .qw-paper-task.qw-standard-task{grid-template-columns:minmax(0,1fr)}.qw-print-document[data-qw-numbering=none] .qw-paper-task.qw-standard-task > *{grid-column:1}
 @media (forced-colors:none){
  @supports (clip-path:polygon(0 0,100% 0,100% 100%)){
   .qw-radical{color:transparent}
@@ -18682,6 +18708,7 @@ function qdVariantPaperHTML(variant,kind='student'){
     '<title>'+qdEsc(purpose)+' · '+title+'</title>'+
     '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+(typeof QW_MATH_FONT_CSS==='string'?QW_MATH_FONT_CSS:'')+(typeof QW_RADICAL_CSS==='string'?QW_RADICAL_CSS:'')+
     (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('17mm 16mm'):'@page{size:A4;margin:17mm 16mm}')+
+    (typeof QW_EDUCATION_TEXT_CSS==='string'?QW_EDUCATION_TEXT_CSS:'')+
     '*{box-sizing:border-box}body{font:13px/1.5 Arial,Helvetica,sans-serif;color:#000;--qw-math-ink:#000;background:#fff;margin:0 auto;max-width:900px;padding:22px}'+
     '.doc-head{border-bottom:2px solid #263a56;padding-bottom:13px;margin-bottom:22px}'+
     '.eyebrow{color:#55667d;font-size:10px;text-transform:uppercase;letter-spacing:.08em;font-weight:700}'+
@@ -19497,6 +19524,7 @@ function qdReportHTML(entry){
   return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>Отчёт · '+title+'</title>'+
    '<style>'+(typeof QW_PRINT_FONT_CSS==='string'?QW_PRINT_FONT_CSS:'')+
    (typeof qwDiagnosticPageStyles==='function'?qwDiagnosticPageStyles('20mm'):'@page{size:A4;margin:20mm}')+
+   (typeof QW_EDUCATION_TEXT_CSS==='string'?QW_EDUCATION_TEXT_CSS:'')+
    'body{font:15px/1.5 Arial,sans-serif;color:#000;margin:40px auto;max-width:820px;padding:0 24px}h1{font-size:27px}h2{font-size:18px;margin-top:30px}'+
    '.muted{color:#60746a}.score{display:flex;align-items:baseline;gap:14px;padding:20px;background:#f0f7f3;border-radius:12px}.score strong{font-size:36px;color:#1c684a}'+
    'table{border-collapse:collapse;width:100%}td,th{padding:10px;text-align:left;border-bottom:1px solid #cbd9d1}th{background:#eaf2ed}'+
@@ -22624,11 +22652,14 @@ function qoWriterParagraphTargets(){
  const selected=window.getSelection();
  let range=qoWriterSelectionRange;
  if(selected?.rangeCount&&editor.contains(selected.anchorNode))range=selected.getRangeAt(0);
+ return qoParagraphsInRange(editor,range,'p,h1,h2,h3,blockquote,li');
+}
+function qoParagraphsInRange(editor,range,selector){
  if(!range||!editor.contains(range.commonAncestorContainer))return [];
- const blocks=[...editor.querySelectorAll('p,h1,h2,h3,blockquote,li')];
+ const blocks=[...editor.querySelectorAll(selector)];
  if(range.collapsed){
   const node=range.startContainer,nodeElement=node.nodeType===1?node:node.parentElement;
-  const one=nodeElement?.closest?.('p,h1,h2,h3,blockquote,li');
+  const one=nodeElement?.closest?.(selector);
   return one&&editor.contains(one)?[one]:[];
  }
  return blocks.filter(block=>{
@@ -23444,6 +23475,139 @@ function qwPhysicsShape(o,interactive=false){
 }
 
 
+/* Portable, allowlisted author formatting. Values never contain raw CSS. */
+const QW_TEXT_FONTS={
+ serif:['Книжный', '"QO Print Serif",Georgia,serif'],
+ sans:['Без засечек', '"QO Print Sans",Arial,sans-serif'],
+ mono:['Моноширинный','Consolas,"Courier New",monospace']
+};
+const QW_TEXT_RULES={
+ font:{property:'font-family',choices:Object.keys(QW_TEXT_FONTS)},
+ size:{property:'font-size',min:6,max:48,unit:'pt'},
+ color:{property:'color',color:true},
+ highlight:{property:'background-color',color:true},
+ weight:{property:'font-weight',choices:['bold']},
+ slant:{property:'font-style',choices:['italic']},
+ decoration:{property:'text-decoration-line',choices:['underline','line-through','underline-line-through']},
+ line:{property:'line-height',min:1,max:3,unit:''},
+ before:{property:'margin-block-start',min:0,max:48,unit:'pt'},
+ after:{property:'margin-block-end',min:0,max:48,unit:'pt'},
+ align:{property:'text-align',choices:['left','center','right','justify']}
+};
+const QW_PARAGRAPH_STYLES=new Set(['line','before','after','align']);
+const QW_CALLOUTS={
+ info:['Информация','ℹ','blue'],theory:['Теория','§','blue'],
+ definition:['Определение','≡','green'],formula:['Формула','∑','blue'],
+ example:['Пример','◇','purple'],important:['Важно','!','amber'],
+ warning:['Предупреждение','△','red'],note:['Примечание','✎','gray'],
+ solution:['Решение','✓','green'],answer:['Ответ','→','green'],
+ conclusion:['Вывод','∴','purple'],quote:['Цитата','❝','gray']
+};
+const QW_CALLOUT_TONES={
+ blue:['#1d4f91','#edf5fc'],green:['#166047','#edf7f1'],purple:['#60338f','#f5effa'],
+ amber:['#7e4e11','#fff7e8'],red:['#9b3038','#fff0f0'],gray:['#4b5563','#f3f5f7']
+};
+const QW_PUBLISH_PROFILES={
+ exam:['Экзаменационный сборник','booklet'],practice:['Лист практики','worksheet'],notes:['Теория и конспект','worksheet']
+};
+const qwStyleColor=value=>typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value);
+function qwTextStyle(raw){
+ if(!raw||typeof raw!=='object'||Array.isArray(raw)||raw.version!==1)throw Error('Неизвестная версия оформления текста');
+ const result={version:1};
+ for(const [key,value] of Object.entries(raw)){
+  if(key==='version')continue;
+  if(!Object.hasOwn(QW_TEXT_RULES,key))throw Error('Неизвестный параметр оформления');
+  const {choices,color,min,max}=QW_TEXT_RULES[key];
+  if(color? !qwStyleColor(value):choices? !choices.includes(value): !Number.isFinite(value)||value<min||value>max)
+   throw Error('Недопустимое значение оформления текста');
+  result[key]=color?value.toLowerCase():value;
+ }
+ return result;
+}
+function qwReadTextStyle(source){
+ const values={version:1};
+ for(const declaration of source.trim().split(/\s+/)){
+  const match=declaration.match(/^([a-z]+)=([a-z0-9#.-]+)$/i);
+  if(!match||!Object.hasOwn(QW_TEXT_RULES,match[1])||Object.hasOwn(values,match[1]))return null;
+  const [,key,raw]=match;
+  values[key]=QW_TEXT_RULES[key].min===undefined?raw:Number(raw);
+ }
+ try{return qwTextStyle(values);}catch{return null;}
+}
+function qwStyleSource(style){
+ return Object.keys(QW_TEXT_RULES).filter(key=>style?.[key]!==undefined).map(key=>key+'='+style[key]).join(' ');
+}
+function qwTextStyleCSS(style,defaults=false){
+ return Object.entries(QW_TEXT_RULES).map(([key,rule])=>{
+  const value=style?.[key];
+  if(value===undefined)return '';
+  const spacing=defaults&&(key==='before'||key==='after'),property=spacing?'--qw-default-'+key:rule.property;
+  const css=key==='font'?QW_TEXT_FONTS[value][1]:key==='decoration'&&value==='underline-line-through'?'underline line-through':value+(rule.unit||'');
+  return property+':'+css+';';
+ }).join('');
+}
+function qwDefaultSpacing(style){
+ return ['before','after'].filter(key=>style?.[key]!==undefined).join(' ');
+}
+function qwTextStyleAttrs(style,defaults=false){
+ const spec=qwStyleSource(style);
+ const spacing=defaults?qwDefaultSpacing(style):'';
+ return spec?' data-qw-text-style="'+spec+'" style="'+qwTextStyleCSS(style,defaults).replace(/"/g,'&quot;')+'"'+
+  (spacing?' data-qw-default-spacing="'+spacing+'"':''):'';
+}
+function qwCalloutOptions(type,source=''){
+ if(!Object.hasOwn(QW_CALLOUTS,type))return null;
+ const result={};
+ if(!source.trim())return result;
+ for(const token of source.trim().split(/\s+/)){
+  const match=token.match(/^([a-z]+)=([a-z0-9#.]+)$/i);
+  if(!match||Object.hasOwn(result,match[1]))return null;
+  const [,key,value]=match;
+  if(key==='icon'&&/^[01]$/.test(value))result.icon=value;
+  else if(key==='tone'&&Object.hasOwn(QW_CALLOUT_TONES,value))result.tone=value;
+  else if((key==='color'||key==='background'||key==='border')&&qwStyleColor(value))result[key]=value.toLowerCase();
+  else if(key==='border'&&value==='none')result.border=value;
+  else if(key==='pad'&&/^\d{1,2}$/.test(value)&&+value>=2&&+value<=24)result.pad=+value;
+  else return null;
+ }
+ return result;
+}
+function qwCalloutOptionSource(options){
+ return ['icon','tone','color','background','border','pad']
+  .filter(key=>options[key]!==undefined).map(key=>key+'='+options[key]).join(' ');
+}
+function qwCalloutLook(type,options){
+ const [label,icon,defaultTone]=QW_CALLOUTS[type];
+ const tone=options.tone||defaultTone;
+ const [ink,paper]=QW_CALLOUT_TONES[tone];
+ const line=options.border==='none'?'transparent':options.border||options.color||ink;
+ const css='--qw-callout-color:'+(options.color||ink)+';--qw-callout-fill:'+(options.background||paper)+';--qw-callout-border:'+line+';--qw-callout-pad:'+(options.pad||9)+'pt';
+ return {label,icon:options.icon==='0'?'':icon,tone,css};
+}
+const QW_EDUCATION_TEXT_CSS=
+ '.qw-callout{margin:.65em 0;padding:var(--qw-callout-pad);background:var(--qw-callout-fill);color:#151d2a;border:1px solid var(--qw-callout-border);border-inline-start-width:3px;border-radius:4px;overflow-wrap:anywhere;print-color-adjust:exact}'+
+ '.qw-callout-title{display:flex;align-items:baseline;gap:.55em;font-weight:700;color:#172333;margin:0 0 .35em}'+
+ '.qw-callout-icon{color:var(--qw-callout-color);user-select:none;flex:none}'+
+ '.qw-callout-body>:first-child{margin-block-start:0!important}.qw-callout-body>:last-child{margin-block-end:0!important}'+
+ '.qw-format-block{display:flow-root}.qw-format-block>:first-child{margin-block-start:0}.qw-format-block>:last-child{margin-block-end:0}'+
+ '.qw-format-block :is(p,ul,ol,blockquote,h3,h4,h5,h6){line-height:inherit}'+
+ '[data-qw-default-spacing~=before] :is(p,ul,ol,blockquote,h3,h4,h5,h6,.qw-rich-equation):not([data-qw-text-style],.qw-local-format *){margin-block-start:var(--qw-default-before)}'+
+ '[data-qw-default-spacing~=after] :is(p,ul,ol,blockquote,h3,h4,h5,h6,.qw-rich-equation):not([data-qw-text-style],.qw-local-format *){margin-block-end:var(--qw-default-after)}'+
+ 'body[data-qw-profile=practice] .qw-topic-title{margin:2mm 0 1mm;font-weight:700}'+
+ 'body[data-qw-profile=notes] .qw-task-text{line-height:1.45}'+
+ 'body[data-qw-profile=notes] .qw-task-text :is(h3,h4,h5,h6){font-size:revert;margin-block-start:.6em}'+
+ 'body[data-qw-monochrome=true] :is(.qw-format-block,[data-qw-text-style]){color:#000!important;background-color:transparent!important}'+
+ 'body[data-qw-monochrome=true] .qw-callout{background:#fff;color:#000;border-color:#777}'+
+ 'body[data-qw-monochrome=true] .qw-callout :is(.qw-callout-title,.qw-callout-icon){color:#000}'+
+ '.qw-print-document[data-qw-numbering=none] .qw-paper-task > header:not(.qw-print-header){display:none}'+
+ '.qw-print-document[data-qw-numbering=none] .qw-paper-task.qw-standard-task{grid-template-columns:minmax(0,1fr)}'+
+ '.qw-print-document[data-qw-numbering=none] .qw-paper-task.qw-standard-task > *{grid-column:1}';
+
+{QW_TEXT_FONTS,QW_TEXT_RULES,QW_PARAGRAPH_STYLES,QW_CALLOUTS,QW_CALLOUT_TONES,QW_PUBLISH_PROFILES,
+ qwStyleColor,qwTextStyle,qwReadTextStyle,qwStyleSource,qwTextStyleCSS,qwTextStyleAttrs,qwDefaultSpacing,qwCalloutOptions,
+ qwCalloutOptionSource,qwCalloutLook,QW_EDUCATION_TEXT_CSS};
+
+
 /* TASK144: independent, portable work projects. No diagnostic/student mutations. */
 const QW_TYPES={short:'Краткий ответ',extended:'Развёрнутый ответ',choice:'Тест',graph:'Задание с графиком',diagram:'Рисунок / схема',blanks:'Пустые вставки',combined:'Комбинированное'};
 const QW_SUBJECTS={math:'Математика',geometry:'Геометрия',algebra:'Алгебра',physics:'Физика',mixed:'Математика и физика',other:'Авторская подборка'};
@@ -23462,6 +23626,15 @@ function qwPrintSettings(raw={}){
  const fontPt=raw.fontPt??10,figurePosition=raw.figurePosition??'auto',topicHeadings=raw.topicHeadings??true;
  if(!Number.isFinite(fontPt)||fontPt<9||fontPt>12||!['auto','right','below'].includes(figurePosition)||typeof topicHeadings!=='boolean')throw Error('Проверьте параметры печати');
  const options={fontPt,figurePosition,topicHeadings};
+ if(raw.profile!==undefined){
+  if(!Object.hasOwn(QW_PUBLISH_PROFILES,raw.profile))throw Error('Неизвестный профиль документа');
+  options.profile=raw.profile;
+ }
+ if(raw.numbering!==undefined){
+  if(!['auto','none','continuous'].includes(raw.numbering))throw Error('Неизвестный режим нумерации');
+  options.numbering=raw.numbering;
+ }
+ if(raw.text!==undefined)options.text=qwTextStyle(raw.text);
  const flags=['showTitle','showMeta','showVariant','showPageNumbers','partHeadings','monochrome'];
  for(const key of flags)if(raw[key]!==undefined){if(typeof raw[key]!=='boolean')throw Error('Некорректный переключатель оформления');options[key]=raw[key];}
  const textKeys={titleText:160};
@@ -23514,6 +23687,7 @@ function qwPublishSettings(raw){
  if(!raw||typeof raw!=='object'||Array.isArray(raw))throw Error('Некорректное издательское оформление');
  const result={};
  if(raw.figure!==undefined)result.figure=qwPublishStyle(raw.figure,'figure');
+ if(raw.text!==undefined)result.text=qwTextStyle(raw.text);
  if(raw.tables!==undefined){
   if(!raw.tables||typeof raw.tables!=='object'||Array.isArray(raw.tables))throw Error('Некорректное оформление таблиц');
   const styled={};
@@ -24378,22 +24552,36 @@ function qwRichInline(source){
  // Keep formulas and blanks atomic inside styles such as **F = \(ma\)**.
  // Literal NUL would be replaced by the HTML parser anyway.
  const atoms=[];
+ const marker=html=>'\0'+(atoms.push(html)-1)+'\0';
+ const render=text=>qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
  const text=String(source||'').replace(/\0/g,'�').replace(
   /(\x60[^\x60\n]+\x60)|\\\(([\s\S]*?)\\\)|\[\[blank:(\d{1,2})\]\]|\$([^$\n]{1,600})\$|\\([\\*_~^+\x60$|#>[\].!:()-])/g,
   (match,code,formula,blank,alternate,escaped)=>{
-   if(code)return match;
+   if(code)return marker(qwRichInlineText(code));
    const html=escaped!==undefined?qwEsc(escaped):blank!==undefined?
     '<span class="qw-inline-blank" style="width:'+Math.max(1,Math.min(30,Number(blank)))+'ch" aria-label="Место для ответа"></span>':
     qwRichMath(formula??alternate);
-   return '\0'+(atoms.push(html)-1)+'\0';
+   return marker(html);
   });
- return qwRichInlineText(text).replace(/\0(\d+)\0/g,(_,index)=>atoms[Number(index)]);
+ const stack=[{text:''}];let offset=0;
+ for(const tag of text.matchAll(/\[\[(?:style ([^\]\n]{1,180})|(\/style))\]\]/g)){
+  const top=stack.at(-1);top.text+=text.slice(offset,tag.index);offset=tag.index+tag[0].length;
+  const style=tag[1]&&qwReadTextStyle(tag[1]);
+  if(style&&stack.length<13)stack.push({text:'',style,original:tag[0]});
+  else if(tag[2]&&stack.length>1){
+   const frame=stack.pop();
+   stack.at(-1).text+=marker('<span'+qwTextStyleAttrs(frame.style)+'>'+render(frame.text)+'</span>');
+  }else top.text+=tag[0];
+ }
+ stack.at(-1).text+=text.slice(offset);
+ while(stack.length>1){const frame=stack.pop();stack.at(-1).text+=frame.original+frame.text;}
+ return render(stack[0].text);
 }
 /* TASK165: leave ordinary legacy exercises byte-for-byte on the original PDF
    text path. Only explicit Markdown syntax opts an individual field in. */
 function qwHasRichSyntax(value){
  const text=String(value??'');
- return /(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|(?:-{3,}|\*{3,}|_{3,})[ \t]*$|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
+ return /\[\[style |^::format /m.test(text)||/(^|\n)\s{0,3}(?:#{1,4}\s+|[-*+]\s+|\d{1,3}[.)]\s+|>\s?|`{3}|(?:-{3,}|\*{3,}|_{3,})[ \t]*$|\${2}\s*$|\\\[\s*$|::(?:left|center|right|justify)[ \t]+)/m.test(text)||
   /\*\*[^*\n]+\*\*|__[^_\n]+__|~~[^~\n]+~~|(^|[^\w])(?:\*[^*\n]+\*|_[^_\n]+_)|`[^`\n]+`|\$[^$\n]{1,600}\$/.test(text)||
   /\\\\/.test(text)||(/[\\+^~]/.test(text)&&qwTokens(text).some(token=>token.t==='text'&&/\\[\\*_~^+\x60$|#>[\].!:-]|\+\+[^+\n]+\+\+|[\^~]\{[^{}\n]+\}/.test(token.v)))||
   /(^|\n)\s*\|?[^\n]*\|[^\n]*\n\s*\|?\s*:?-{3,}/.test(text);
@@ -24401,7 +24589,7 @@ function qwHasRichSyntax(value){
 function qwPrintFieldHTML(value){
  return qwHasRichSyntax(value)?qwRichMarkdownHTML(value):qwContentHTML(value);
 }
-function qwRichMarkdownHTML(value,onBlock){
+function qwRichMarkdownHTML(value,onBlock,depth=0){
  const lines=String(value??'').replace(/\r\n?/g,'\n').split('\n');
  const result=[];
  const bullet=line=>/^\s{0,3}[-*+]\s+/.test(line);
@@ -24409,17 +24597,23 @@ function qwRichMarkdownHTML(value,onBlock){
  const heading=line=>/^\s{0,3}#{1,4}\s+/.test(line);
  const alignment=line=>line.match(/^\s{0,3}::(left|center|right|justify)[ \t]+(.+)$/);
  const quote=line=>/^\s{0,3}>\s?/.test(line);
+ const formatted=line=>line.match(/^::format ([^\n]{1,180})$/);
  const fence=line=>/^\s{0,3}```/.test(line);
  const ruler=line=>/^\s{0,3}(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line);
  const cells=line=>line.trim().replace(/^\|/,'').replace(/\|$/,'').split(/(?<!\\)\|/).map(x=>x.trim());
  const tableSep=line=>/^\s*\|?[\s:|-]+\|?\s*$/.test(line)&&line.includes('-')&&line.includes('|');
- const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
- let i=0,blockStart=0;
- const emit=html=>{result.push(html);if(onBlock)onBlock(lines.slice(blockStart,i).join('\n'));};
+ const startBlock=line=>bullet(line)||numbered(line)||heading(line)||alignment(line)||quote(line)||fence(line)||ruler(line)||formatted(line)||/^\s*(?:\$\$|\\\[)\s*$/.test(line);
+ let i=0,blockStart=0,pending=null;
+ const emit=html=>{
+  result.push(pending?'<div class="qw-format-block qw-local-format"'+qwTextStyleAttrs(pending.style)+'>'+html+'</div>':html);
+  if(onBlock)onBlock(lines.slice(pending?.start??blockStart,i).join('\n'));pending=null;
+ };
  while(i<lines.length){
   const line=lines[i];
   if(!line.trim()){i++;continue;}
   blockStart=i;
+  const format=formatted(line),style=format&&qwReadTextStyle(format[1]);
+  if(style&&!pending&&lines[i+1]?.trim()){pending={start:i++,style};continue;}
   if(fence(line)){
    const lang=line.trim().slice(3).trim().slice(0,30);
    i++;const code=[];
@@ -24447,7 +24641,16 @@ function qwRichMarkdownHTML(value,onBlock){
   if(quote(line)){
    const chunk=[];
    while(i<lines.length&&quote(lines[i]))chunk.push(lines[i++].replace(/^\s{0,3}>\s?/,''));
-   emit('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');continue;
+   const callout=depth<4&&chunk[0].match(/^\[!([a-z]+)(?: ([^\]]{1,180}))?\](?:[ \t]+(.*))?$/);
+   const options=callout&&qwCalloutOptions(callout[1],callout[2]);
+   if(options){
+    const type=callout[1],look=qwCalloutLook(type,options);
+    emit('<aside class="qw-callout" data-qw-callout="'+type+'" data-qw-callout-options="'+qwCalloutOptionSource(options)+'" style="'+look.css+'">'+
+     '<div class="qw-callout-title">'+(look.icon?'<span class="qw-callout-icon" aria-hidden="true" contenteditable="false">'+look.icon+'</span>':'')+
+     '<span data-qw-callout-title>'+qwRichInline(callout[3]||look.label)+'</span></div><div class="qw-callout-body">'+
+     (qwRichMarkdownHTML(chunk.slice(1).join('\n'),null,depth+1)||'<p><br></p>')+'</div></aside>');
+   }else emit('<blockquote><p>'+chunk.map(qwRichInline).join('<br>')+'</p></blockquote>');
+   continue;
   }
   if(bullet(line)||numbered(line)){
    const ordered=numbered(line),items=[],regex=ordered?/^\s{0,3}\d{1,3}[.)]\s+/:/^\s{0,3}[-*+]\s+/;
@@ -24914,7 +25117,7 @@ function qwLiveHTML(source) {
 
 function qwLiveEscape(text) {
  return text.replace(/\u00a0/g,' ').replace(/[\\*_~^+\x60$|#>[\]]/g,'\\$&')
-  .replace(/(^|\n)([ \t]*)(::(?:left|center|right|justify)[ \t]+|-{3,}(?=[ \t]*(?:\n|$))|- |\d{1,3}[.)] )/g,(_,line,space,marker)=>
+  .replace(/(^|\n)([ \t]*)(::(?:left|center|right|justify|format)[ \t]+|-{3,}(?=[ \t]*(?:\n|$))|- |\d{1,3}[.)] )/g,(_,line,space,marker)=>
    line+space+marker.replace(/[:.()-]/,'\\$&'));
 }
 
@@ -24929,6 +25132,7 @@ function qwLiveAtomSource(node) {
 }
 
 function qwLiveInline(node) {
+ if(!node)return '';
  if(node.nodeType===Node.TEXT_NODE)return qwLiveEscape(node.data);
  if(node.nodeType!==Node.ELEMENT_NODE)return '';
  if(node.hasAttribute('data-qw-live-atom'))return qwLiveAtomSource(node);
@@ -24940,15 +25144,29 @@ function qwLiveInline(node) {
  if(tag==='B'||tag==='STRONG'||/^(?:bold|[6-9]00)$/.test(style.fontWeight))value='__'+value+'__';
  if(tag==='I'||tag==='EM'||style.fontStyle==='italic')value='*'+value+'*';
  if(tag==='U'||style.textDecorationLine?.includes('underline'))value='++'+value+'++';
- if(tag==='DEL'||tag==='S')value='~~'+value+'~~';
+ if(tag==='DEL'||tag==='S'||tag==='STRIKE'||style.textDecorationLine?.includes('line-through'))value='~~'+value+'~~';
  if(tag==='SUP'||style.verticalAlign==='super')value='^{'+value+'}';
  if(tag==='SUB'||style.verticalAlign==='sub')value='~{'+value+'}';
+ const format=node.dataset.qwTextStyle;
+ if(format&&node.getAttribute('style'))value='[[style '+format+']]'+value+'[[/style]]';
  return value;
 }
 
-function qwLiveBlock(node) {
+function qwLiveBlock(node,withStyle=true) {
  if(node.nodeType!==Node.ELEMENT_NODE)return qwLiveInline(node);
  if(node.hasAttribute('data-qw-live-atom'))return qwLiveAtomSource(node);
+ const format=withStyle&&node.dataset.qwTextStyle;
+ if(format){
+  const body=node.classList.contains('qw-format-block')?[...node.children].map(child=>qwLiveBlock(child)).filter(Boolean):[qwLiveBlock(node,false)].filter(Boolean);
+  return body.map(block=>'::format '+format+'\n'+block).join('\n\n');
+ }
+ if(node.hasAttribute('data-qw-callout')){
+  const options=node.dataset.qwCalloutOptions,title=node.querySelector(':scope>.qw-callout-title [data-qw-callout-title]');
+  const content=node.querySelector(':scope>.qw-callout-body');
+  const body=content?qwLiveSource(content):'';
+  return '> [!'+node.dataset.qwCallout+(options?' '+options:'')+'] '+qwLiveInline(title).trim().replace(/\s*\n\s*/g,' ')+'\n'+
+   body.split('\n').map(line=>line?'> '+line:'>').join('\n');
+ }
  const tag=node.tagName;
  if(node.matches('.qw-rich-equation')&&node.firstElementChild?.hasAttribute('data-qw-live-atom'))
   return qwLiveAtomSource(node.firstElementChild);
@@ -24968,9 +25186,9 @@ function qwLiveBlock(node) {
   rows.splice(1,0,rows[0].map(()=> '---'));
   return rows.map(row=>'| '+row.join(' | ')+' |').join('\n');
  }
- if(tag==='DIV'&&[...node.children].some(child=>child.matches('p,div,ul,ol,h3,h4,h5,h6,blockquote,table')))
+ if(tag==='DIV'&&[...node.children].some(child=>child.matches('p,div,ul,ol,h3,h4,h5,h6,blockquote,aside,table')))
   return qwLiveSource(node);
- const text=qwLiveInline(node).replace(/\n$/,'');
+ const text=(node.dataset.qwTextStyle?[...node.childNodes].map(qwLiveInline).join(''):qwLiveInline(node)).replace(/\n$/,'');
  if(!text.trim())return '';
  if(/^H[1-6]$/.test(tag))return '#'.repeat(Math.max(1,Number(tag[1])-2))+' '+text;
  if(tag==='BLOCKQUOTE')return text.split('\n').map(line=>'> '+line).join('\n');
@@ -24985,7 +25203,7 @@ function qwLiveSource(surface) {
  let inline='';
  for(const node of surface.childNodes){
   const known=surface.qwSourceBlocks?.get(node);
-  if(node.nodeType===Node.ELEMENT_NODE&&node.matches('p,div,section,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table,pre,hr')){
+  if(node.nodeType===Node.ELEMENT_NODE&&node.matches('p,div,section,aside,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,table,pre,hr')){
    if(inline.trim())parts.push(inline);inline='';
    const block=known?.html===node.outerHTML?known.source:qwLiveBlock(node);
    if(block?.trim())parts.push(block);
@@ -25035,6 +25253,76 @@ function qwLiveRestore(surface,bookmark) {
  }
  const selection=window.getSelection();
  selection.removeAllRanges();selection.addRange(range);
+}
+
+
+// Writer and the education editor share Range-based paragraph targeting.
+function qwLiveApplyStyle(node,format,defaults=false){
+ const value=qwStyleSource(format);
+ for(const rule of Object.values(QW_TEXT_RULES))node.style.removeProperty(rule.property);
+ if(defaults){
+  for(const key of ['before','after'])node.style.removeProperty('--qw-default-'+key);
+  const spacing=qwDefaultSpacing(format);
+  if(spacing)node.dataset.qwDefaultSpacing=spacing;else delete node.dataset.qwDefaultSpacing;
+ }
+ if(value){
+  node.dataset.qwTextStyle=value;
+  node.style.cssText+=qwTextStyleCSS(format,defaults);
+ }else delete node.dataset.qwTextStyle;
+}
+function qwLiveTextSelection(surface,range,key,value){
+ if(!range||range.collapsed)return false;
+ const walker=document.createTreeWalker(surface,NodeFilter.SHOW_TEXT);
+ const selected=[];
+ while(walker.nextNode()){
+  const node=walker.currentNode;
+  if(node.parentElement.closest('[contenteditable=false]')||!range.intersectsNode(node))continue;
+  const start=node===range.startContainer?range.startOffset:0;
+  const end=node===range.endContainer?range.endOffset:node.length;
+  if(end>start)selected.push({node,start,end});
+ }
+ let first,last;
+ for(const {node,start,end} of selected){
+  const parent=node.parentElement;
+  if(end<node.length)node.splitText(end);
+  const text=start?node.splitText(start):node;
+  const current=parent.dataset.qwTextStyle&&parent.childNodes.length===1?parent:null;
+  const format=qwTextStyle({...((current&&qwReadTextStyle(current.dataset.qwTextStyle))||{version:1}),[key]:value});
+  const span=current||document.createElement('span');
+  if(!current){text.replaceWith(span);span.append(text);}
+  qwLiveApplyStyle(span,format);first??=text;last=text;
+ }
+ if(!first)return false;
+ range.setStart(first,0);range.setEnd(last,last.length);
+ const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ return true;
+}
+function qwLiveParagraphStyle(surface,range,key,value){
+ const selector='.qw-format-block,p,h3,h4,h5,h6,ul,ol,blockquote,.qw-rich-equation';
+ const nodes=qoParagraphsInRange(surface,range,selector);
+ const blocks=new Set(nodes.map(node=>node.closest('.qw-format-block')||node));
+ for(const block of blocks){
+  const current=qwReadTextStyle(block.dataset.qwTextStyle||'');
+  qwLiveApplyStyle(block,qwTextStyle({...current,version:1,[key]:value}));
+ }
+ return blocks.size>0;
+}
+function qwLiveInsertBlock(surface,html){
+ const range=qwLiveRange(surface);
+ if(!range)return null;
+ const origin=range.startContainer.nodeType===Node.ELEMENT_NODE?range.startContainer:range.startContainer.parentElement;
+ const host=origin.closest('.qw-callout-body')||surface;
+ let anchor=origin;
+ while(anchor!==host&&anchor.parentElement!==host)anchor=anchor.parentElement;
+ const template=document.createElement('template');template.innerHTML=html;
+ const block=template.content.firstElementChild;
+ if(!block)return null;
+ range.deleteContents();
+ if(anchor===host||!anchor.isConnected)host.append(block);else anchor.after(block);
+ const editable=block.querySelector('.qw-callout-body p')||block;
+ range.selectNodeContents(editable);range.collapse(false);
+ const selection=window.getSelection();selection.removeAllRanges();selection.addRange(range);
+ return block;
 }
 
 
@@ -25327,7 +25615,7 @@ const QW_RADICAL_CSS=`
  }
 }
 `;
-const QW_PUBLISH_CSS=QW_RADICAL_CSS+`
+const QW_PUBLISH_CSS=QW_EDUCATION_TEXT_CSS+QW_RADICAL_CSS+`
 :root{--qw-math-family:"QO Math","DejaVu Math TeX Gyre","Cambria Math",serif;--qw-task-marker:7mm;--qw-task-indent:2mm;--qw-task-text-leading:1.27;--qw-task-heading-gap:.8mm;--qw-task-paragraph-gap:.9mm}
 .qw-paper-task.qw-standard-task{display:grid;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);row-gap:0;align-items:start}
 .qw-paper-task.qw-standard-task>.qw-task-heading{display:grid;grid-column:1/-1;grid-row:1;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);align-items:center;margin:0 0 var(--qw-task-heading-gap);padding:0;width:auto;height:auto;border:0;min-width:0}
@@ -25824,11 +26112,57 @@ async function qwPreparePrintDocument(){
   copy.querySelectorAll('.qw-teacher-notes').forEach(e=>e.remove());return copy;
  }
  function bodyOf(section){return section.querySelector('.qw-exam-body')||section.querySelector('.qw-paper-task');}
- function tokens(element){return [...element.childNodes].flatMap(node=>node.nodeType===3?(node.textContent.match(/\S+\s*|\s+/g)||[]).map(s=>document.createTextNode(s)):[node.cloneNode(true)]);}
- function replaceTokens(element,items,start,end){element.replaceChildren(...items.slice(start,end).map(n=>n.cloneNode(true)));}
+ function tokens(element){
+  const items=[];
+  function append(node,path){
+   if(node.nodeType===3){
+    for(const word of node.textContent.match(/\S+\s*|\s+/g)||[])items.push({node:document.createTextNode(word),path});
+    return;
+   }
+   const callout=node.nodeType===1&&node.matches('.qw-callout');
+   const container=node.nodeType===1&&(node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub'));
+   if(callout||container){
+    const body=callout?node.querySelector(':scope>.qw-callout-body'):node;
+    const first=items.length,trail=[...path,{source:node,body,first,callout}];
+    for(const child of body.childNodes)append(child,trail);
+    if(items.length>first)return;
+   }
+   items.push({node:node.cloneNode(true),path});
+  }
+  for(const node of element.childNodes)append(node,[]);
+  return items;
+ }
+ function replaceTokens(element,items,start,end){
+  const output=document.createDocumentFragment();
+  let active=[];
+  for(let i=start;i<end;i++){
+   const {node,path}=items[i];
+   let depth=0;
+   while(depth<active.length&&active[depth].part===path[depth])depth++;
+   active.length=depth;
+   let group=active.at(-1)?.container||output;
+   for(const part of path.slice(depth)){
+    const block=part.source.cloneNode(false);
+    if(part.source.tagName==='OL'){
+     const firstItem=path[active.length+1]?.source;
+     const offset=[...part.source.children].indexOf(firstItem);
+     if(offset>0)block.start=part.source.start+offset;
+    }
+    group.append(block);let container=block;
+    if(part.callout){
+     const title=part.source.querySelector(':scope>.qw-callout-title').cloneNode(true);
+     if(i>part.first){title.querySelector('[data-qw-callout-title]').append(' (продолжение)');block.dataset.qwCalloutContinuation='true';}
+     container=part.body.cloneNode(false);block.append(title,container);
+    }
+    active.push({part,container});group=container;
+   }
+   group.append(node.cloneNode(true));
+  }
+  element.replaceChildren(output);
+ }
  function boundary(items,start,end){
   const minimum=start+Math.floor((end-start)*.75);
-  for(let i=end;i>minimum;i--)if(items[i-1].nodeName==='BR'||/[.!?;:]\s*$/.test(items[i-1].textContent))return i;
+  for(let i=end;i>minimum;i--)if(items[i-1].node.nodeName==='BR'||/[.!?;:]\s*$/.test(items[i-1].node.textContent))return i;
   return end;
  }
  function fitTextChunk(section,element,items,start,after){
@@ -25837,7 +26171,11 @@ async function qwPreparePrintDocument(){
    if(fits(current)){best=mid;lo=mid+1;}else hi=mid-1;
   }
   after?.remove();
-  if(best===start){section.remove();current=newPage();current.content.append(section);replaceTokens(element,items,start,start+1);if(!fits(current))throw Error('Блок не помещается на страницу; уменьшите иллюстрацию или разделите формулу.');return fitTextChunk(section,element,items,start,after);}
+  if(best===start){
+   section.remove();
+   if(!current.content.querySelector('.qw-print-section,.qw-print-header:not(:empty)'))throw Error('Блок не помещается на страницу; уменьшите иллюстрацию или разделите формулу.');
+   current=newPage();return fitTextChunk(section,element,items,start,after);
+  }
   let end=best===items.length?best:boundary(items,start,best);
   if(items.length-end<12&&end<items.length&&end-start>24)end=items.length-12;
   replaceTokens(element,items,start,end);if(end===items.length&&after)bodyOf(section).append(after);
@@ -25851,6 +26189,15 @@ async function qwPreparePrintDocument(){
   const paragraphs=block.classList.contains('qw-teacher-notes')?[...block.children]:[];
   next.remove();if(!paragraphs.length)throw Error('Поле решения превышает страницу.');
   let result=last;
+  if(block.querySelector('.qw-callout,.qw-format-block')){
+   const items=tokens(block);let start=0;
+   while(start<items.length){
+    const fragment=continuation(original),notes=block.cloneNode(false);
+    bodyOf(fragment).append(notes);start=fitTextChunk(fragment,notes,items,start);
+    fragments.push(fragment);result=fragment;if(start<items.length)current=newPage();
+   }
+   return result;
+  }
   for(const paragraph of paragraphs){let start=0,items=tokens(paragraph);
    while(start<items.length){const fragment=continuation(original),notes=block.cloneNode(false),p=paragraph.cloneNode(false);notes.append(p);bodyOf(fragment).append(notes);
     start=fitTextChunk(fragment,p,items,start);fragments.push(fragment);result=fragment;if(start<items.length)current=newPage();
@@ -25905,7 +26252,10 @@ async function qwPreparePrintDocument(){
   section.remove();if(section.dataset.explicitBreak==='true'&&current.content.querySelector('.qw-print-section'))current=newPage();
   current.content.append(section);
   if(fits(current)){fragments.push(section);continue;}
+  const capacity=current.content.getBoundingClientRect().height;
+  const splitInPlace=section.querySelector('.qw-callout')&&section.getBoundingClientRect().height>capacity;
   section.remove();
+  if(splitInPlace&&capacity-used(current)>38*MM){splitLong(section);continue;}
   if(current.content.querySelector('.qw-print-section'))current=newPage();
   current.content.append(section);if(fits(current)){fragments.push(section);continue;}
   section.remove();splitLong(section);
@@ -26891,7 +27241,24 @@ function qwField(key,label,value,type='text',extra=''){return '<label>'+label+'<
 function qwSelect(key,label,values,value){return '<label>'+label+'<select data-qw-field="'+key+'">'+qwOptions(values,value)+'</select></label>';}
 function qwCheck(key,label,on){return '<label class="qw-check"><input type="checkbox" data-qw-field="'+key+'" '+(on?'checked':'')+'>'+label+'</label>';}
 function qwQuickButtons(){return '<div class="qw-quick-add" aria-label="Добавить задание">'+[['short','Краткий ответ','line'],['extended','Развёрнутый ответ','text'],['test','Тест','rect'],['diagram','Рисунок / схема','triangle'],['graph','График','quadratic'],['text','Текстовое задание','text']].map(([type,title,icon])=>qwButton('quick-add',qwVisualIcon(icon)+'<span>'+title+'</span>','data-type="'+type+'"')).join('')+'</div>';}
-function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3 data-task-part="'+qwEsc(t.part)+'" data-task-gap="'+i+'">'+qwEsc(t.part||'Без части')+'</h3>':'')+'<div class="qw-nav-row" data-task-row="'+i+'" data-task-id="'+qwEsc(t.id)+'"><button type="button" draggable="true" class="qw-task-drag" data-drag-id="'+qwEsc(t.id)+'" aria-label="Перетащить задание '+(i+1)+'" title="Перетащите для изменения порядка"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4h0m4 0h0M4 10h0m4 0h0M4 16h0m4 0h0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button><button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(t.prompt)+'"><b>'+(i+1)+'</b><span>'+qwEsc(t.title||t.prompt||(!t.answerVisible&&t.type==='short'?'Текстовое задание':QW_TYPES[t.type]))+'</span></button></div>').join('');}
+function qwTaskSummary(value){
+ return String(value||'').slice(0,1600)
+  .replace(/^\s{0,3}(?:>[ \t]?)+/gm,'')
+  .replace(/^[ \t]*::format [^\r\n]*(?:\r?\n|$)/gm,'')
+  .replace(/^[ \t]*\[\![a-z]+(?: [^\]\r\n]*)?\][ \t]*/gm,'')
+  .replace(/\[\[(?:style [^\]\r\n]{1,180}|\/style)\]\]/g,'')
+  .replace(/^[ \t]*(?:#{1,4}|::(?:left|center|right|justify))\s+/gm,'')
+  .replace(/\\\((.*?)\\\)|\$([^$\n]{1,600})\$/g,(_,explicit,dollar)=>{
+   const formula=explicit??dollar;return /[\\{}]/.test(formula)?'…':formula;
+  })
+  .replace(/(\*\*|__|~~|\+\+|\x60)([^\n]+?)\1/g,'$2')
+  .replace(/(^|[\s(])([*_])([^*_\n]+)\2/g,'$1$3')
+  .replace(/\s+/g,' ').trim().slice(0,185);
+}
+function qwTaskLabel(task){
+ return task.title||qwTaskSummary(task.prompt)||(!task.answerVisible&&task.type==='short'?'Текстовое задание':QW_TYPES[task.type]);
+}
+function qwTaskNavigation(){return qwDoc.tasks.map((t,i)=>((!i||qwDoc.tasks[i-1].part!==t.part)?'<h3 data-task-part="'+qwEsc(t.part)+'" data-task-gap="'+i+'">'+qwEsc(t.part||'Без части')+'</h3>':'')+'<div class="qw-nav-row" data-task-row="'+i+'" data-task-id="'+qwEsc(t.id)+'"><button type="button" draggable="true" class="qw-task-drag" data-drag-id="'+qwEsc(t.id)+'" aria-label="Перетащить задание '+(i+1)+'" title="Перетащите для изменения порядка"><svg viewBox="0 0 12 20" aria-hidden="true"><path d="M4 4h0m4 0h0M4 10h0m4 0h0M4 16h0m4 0h0" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"/></svg></button><button type="button" class="qw-nav-task" data-qw-action="select" data-id="'+qwEsc(t.id)+'" aria-current="'+(t.id===qwSelected)+'" title="'+qwEsc(qwTaskLabel(t))+'"><b>'+(i+1)+'</b><span>'+qwEsc(qwTaskLabel(t))+'</span></button></div>').join('');}
 function qwToolbar(){
  const tool=(action,title,icon)=>qoWorkButton(action,title,icon,'','qw-ribbon-icon');
  const group=buttons=>'<div class="qw-ribbon-group">'+buttons.join('')+'</div>';
@@ -27057,10 +27424,12 @@ function qwStudyFigureHTML(q,printing=false){
 }
 function qwPublishedFieldHTML(q,field,renderer=qwPrintFieldHTML){
  const html=renderer(q[field]||''),settings=q.publishing?.tables?.[field];
- if(!settings?.length)return html;
+ const style=qwTextStyleAttrs(q.publishing?.text,true);
+ const decorate=markup=>style?'<div class="qw-format-block"'+style+'>'+markup+'</div>':markup;
+ if(!settings?.length)return decorate(html);
  const template=document.createElement('template');template.innerHTML=html;
  qwStylePublishedTables(template.content,settings);
- return template.innerHTML;
+ return decorate(template.innerHTML);
 }
 function qwStylePublishedTables(scope,settings){
  if(!settings?.length)return;
@@ -27138,7 +27507,7 @@ function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=
  const standardClass=standardized?' qw-standard-task':'';
  if(layout==='compact'||layout==='practice')return '<article class="qw-paper-task qw-compact-entry'+standardClass+'">'+(heading||'<header><b class="qw-task-number qw-print-number">'+(index+1)+'.</b></header>')+flow+'</article>';
  if(layout==='exam')return standardized?'<article class="qw-paper-task qw-exam-task qw-standard-task">'+heading+flow+'</article>':'<article class="qw-paper-task qw-exam-task"><div class="qw-exam-grid"><b class="qw-exam-number qw-print-number">'+(index+1)+'.</b><div class="qw-exam-body">'+flow+'</div></div></article>';
- return '<article class="qw-paper-task qw-worksheet-task'+standardClass+'">'+(heading||'<header><b class="qw-print-number">Задание '+(index+1)+'</b></header>')+flow+
+ return '<article class="qw-paper-task qw-worksheet-task'+standardClass+'">'+(heading||'<header><b class="qw-print-number">'+(preferences?.numbering==='continuous'?(index+1)+'.':'Задание '+(index+1))+'</b></header>')+flow+
   (q.answerVisible?'<div class="qw-answer-preview">Ответ: '+(q.answerStyle==='boxes'?Array.from({length:q.boxes},()=>'<i></i>').join(''):q.answerStyle==='box'?'<i class="qw-answer-box"></i>':'<span></span>')+'</div>':'')+
   (q.solutionVisible?'<div class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
@@ -27181,7 +27550,7 @@ function qwRefreshLiveGraphText(scope){
  if(!scope)return;
  for(const svg of scope.querySelectorAll('svg:has(.qw-axis-title[data-axis-tip-x])'))if(svg.getCTM())qwAlignSVGText(svg);
 }
-function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){const open=p.querySelector('.qw-bank-solution')?.open;p.innerHTML=qwConstructorStudyTask(q,qwDoc.tasks.indexOf(q));const solution=p.querySelector('.qw-bank-solution');if(solution)solution.open=!!open;qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){t.textContent=q.title||q.prompt||QW_TYPES[q.type];t.parentElement.title=q.title||q.prompt;}}
+function qwPreviewSelected(){const p=document.getElementById('qw-task-preview'),q=qwCurrent();if(p&&q){const open=p.querySelector('.qw-bank-solution')?.open;p.innerHTML=qwConstructorStudyTask(q,qwDoc.tasks.indexOf(q));const solution=p.querySelector('.qw-bank-solution');if(solution)solution.open=!!open;qwRefreshLiveGraphText(p);}const t=document.querySelector('.qw-nav-task[aria-current="true"] span');if(t&&q){const label=qwTaskLabel(q);t.textContent=label;t.parentElement.title=label;}}
 function qwDialog(title,body,footer='',inline=false){const old=document.getElementById('qw-dialog');qwReleaseMode(old);old?.remove();const d=document.createElement('dialog');d.id='qw-dialog';d.className='qw-dialog';d.innerHTML='<header><strong>'+title+'</strong><button type="button" data-qw-close aria-label="Закрыть">'+qoWorkIcon('x')+'</button></header><div class="qw-dialog-body">'+body+'</div>'+(footer?'<footer>'+footer+'</footer>':'');d.addEventListener('close',()=>d.remove());d.querySelector('[data-qw-close]').onclick=()=>d.close();if(typeof inline==='string'){qwOpenMode(d,inline);}else if(inline){const host=document.getElementById('qo-bank-root');if(!host)throw Error('Bank workspace unavailable');d.classList.add('qw-bank-inline');host.append(d);d.show();d.querySelector('[data-qw-close]').onclick=()=>route(qoBankReturnPage);}else{document.body.append(d);d.showModal();}return d;}
 function qwFormatOptions(current){return qwOptions([['booklet','Экзаменационный сборник'],['compact','Компактный сборник'],['practice','Лист для решения'],['worksheet','Обычная контрольная работа'],...(current==='exam'?[['exam','Прежний компактный макет (без проверки ФИПИ)']]:[])],current);}
 function qwPracticeControls(settings={},attribute='data-practice'){
@@ -27190,8 +27559,20 @@ function qwPracticeControls(settings={},attribute='data-practice'){
 function qwSettings(){
  const d=qwDialog('Параметры работы','<div class="qw-settings">'+['title','grade','topic','variant'].map((k,i)=>'<label>'+['Название','Класс','Тема','Вариант №'][i]+'<input data-meta="'+k+'" value="'+qwEsc(qwDoc[k])+'" maxlength="160"></label>').join('')+'<label>Предмет<select data-meta="subject">'+qwOptions(Object.entries(QW_SUBJECTS),qwDoc.subject)+'</select></label><label>Формат PDF<select data-meta="layout">'+qwFormatOptions(qwDoc.layout)+'</select></label><div class="qw-settings-wide qw-row" data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div><label class="qw-settings-wide">Инструкция для обычной контрольной<textarea data-meta="instructions" rows="4" maxlength="4000">'+qwEsc(qwDoc.instructions)+'</textarea></label></div>',qwButton('meta-apply','Применить','class="qw-primary"'));
  const format=d.querySelector('[data-meta="layout"]'),toggle=()=>d.querySelector('[data-practice-controls]').hidden=format.value!=='practice';format.onchange=toggle;toggle();
+ const existing=qwDoc.printSettings||{};
+ const profileField=document.createElement('label');profileField.textContent='Профиль оформления';
+ const profile=document.createElement('select');profile.dataset.workProfile='';
+ profile.innerHTML=qwOptions([['','Текущие настройки'],...Object.entries(QW_PUBLISH_PROFILES).map(([key,[title]])=>[key,title])],existing.profile||'');
+ profileField.append(profile);format.closest('label').before(profileField);
+ profile.onchange=()=>{if(profile.value){format.value=QW_PUBLISH_PROFILES[profile.value][1];toggle();}};
  d.querySelector('[data-qw-action="meta-apply"]').onclick=()=>{qwChange(()=>{
   for(const e of d.querySelectorAll('[data-meta]'))qwDoc[e.dataset.meta]=qwText(e.value,e.dataset.meta==='instructions'?4000:160);
+  if(profile.value!==(existing.profile||'')){
+   const settings={...existing};
+   if(profile.value){settings.profile=profile.value;settings.monochrome=profile.value==='exam';delete settings.numbering;}
+   else delete settings.profile;
+   qwDoc.printSettings=qwPrintSettings(settings);
+  }
   if(format.value==='practice')qwDoc.practice={perPage:Number(d.querySelector('[data-practice="perPage"]').value),grid:d.querySelector('[data-practice="grid"]').value};
   qwDoc.title=qwDoc.title.trim()||'Новая работа';
  });d.close();};
@@ -27246,12 +27627,14 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  if(!['worksheet','exam','compact','practice','answers','booklet'].includes(format))throw Error('Неизвестный формат PDF');
  if(!d.tasks.length)throw Error('Добавьте задания в работу');
  const p=qwPrintSettings(d.printSettings||{}),showTitle=p.showTitle??(d.title!=='Новая работа'),showMeta=p.showMeta??format!=='booklet',showVariant=p.showVariant!==false;
+ if(p.text)for(const task of d.tasks)task.publishing={...task.publishing,text:{...p.text,...task.publishing?.text}};
+ const numbering=p.numbering||(p.profile==='notes'?'none':'auto');
  const heading=p.titleText===undefined?d.title:p.titleText;
  const sectionTitle=q=>q.part&&!/^Часть \d+$/.test(q.part)?q.part:q.topic||q.part;
  let previousTopic='';const topics=new Set(d.tasks.map(sectionTitle).filter(Boolean));
  const tasks=format==='answers'?qwAnswerSections(d,options):d.tasks.map((q,i)=>{
   if(!q.prompt.trim())throw Error('Заполните условие задания '+(i+1));
-  const topic=sectionTitle(q),showTopic=format==='compact'&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
+  const topic=sectionTitle(q),showTopic=(format==='compact'||p.profile==='practice')&&p.topicHeadings&&topic!==previousTopic&&(topics.size>1||topic&&!/^Часть \d+$/.test(topic));previousTopic=topic;
   const partHeading=format==='booklet'&&p.partHeadings&&q.part&&q.part!==d.tasks[i-1]?.part?q.part:'';
   const heading=partHeading||(showTopic?topic:'');
   return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(heading?'<h2 class="qw-topic-title">'+qwEsc(heading)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings)+'</section>';
@@ -27269,8 +27652,8 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
  return '<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>'+qwEsc(d.title)+
   '</title>'+(qoNativeDesktop?'<link rel="stylesheet" href="'+qwEsc(new URL('print-'+(p.orientation??'portrait')+'.css',location.href).href)+'">':'<style>'+styles+'</style>')+'</head><body style="'+css+'" data-qw-font="'+(p.bodyFont??(['booklet','answers'].includes(format)?'serif':'sans'))+'" data-qw-title-custom="'+(['titlePt','titleFont','titleColor','titleAlign'].some(k=>p[k]!==undefined))+'" data-qw-math-custom="'+(p.bodyFont!==undefined)+'" data-qw-title-font="'+(p.titleFont??'sans')+
   '" data-qw-show-pages="'+(p.showPageNumbers!==false)+'" data-qw-orientation="'+(p.orientation??'portrait')+'" data-qw-landscape-layout="spread" '+(printTheme.id?'data-qw-theme="'+printTheme.id+'" ':'')+'data-qw-monochrome="'+printTheme.monochrome+
-  '" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
-  '"><main class="qw-print-document"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"><\/script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});<\/script>')+'</body></html>';
+  '" data-qw-profile="'+(p.profile||'')+'" data-qw-format="'+format+'" data-practice-count="'+(d.practice?.perPage||2)+'" data-practice-grid="'+(d.practice?.grid||'fine')+'" class="'+(exam?'qw-print-exam':'qw-print-worksheet')+
+  '"><main class="qw-print-document" data-qw-numbering="'+(format==='answers'?'auto':numbering)+'"><div class="qw-print-source"><header class="qw-print-header">'+header+'</header>'+tasks+'</div></main>'+(qoNativeDesktop?'<script src="'+qwEsc(new URL('print.js',location.href).href)+'"><\/script>':'<script>'+qwAlignSVGText.toString()+';'+qwMeasureSVGInk.toString()+';'+qwPreparePrintDocument.toString()+';window.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});<\/script>')+'</body></html>';
 }
 function qwPrintTextPDF(teacher=false,options){
  let html;try{html=qwPrintDocumentHTML(qwDoc,teacher,options);}catch(e){status('PDF: '+e.message,true);return;}
@@ -27315,6 +27698,7 @@ async function qwPreview(output='tasks'){
   selected('showMeta',prefs.showMeta??qwDoc.layout!=='booklet')+
   selected('showVariant',prefs.showVariant!==false)+selected('showPageNumbers',prefs.showPageNumbers!==false)+
   selected('topicHeadings',prefs.topicHeadings)+
+  (!key?label('Нумерация заданий','<select data-print-setting="numbering">'+opt([['auto','По формату'],['none','Без номера'],['continuous','Порядковый номер']],prefs.numbering??(prefs.profile==='notes'?'none':'auto'))+'</select>'):'')+
   (!key&&qwDoc.layout==='booklet'&&new Set(qwDoc.tasks.map(q=>q.part).filter(Boolean)).size>1?selected('partHeadings',prefs.partHeadings===true):'')+
   '<div data-practice-controls>'+qwPracticeControls(qwDoc.practice)+'</div>'+
   (key?'':qwFigureLayoutControls())+qwPublishInspector()+'<h3>Оформление QX</h3>'+
@@ -27511,6 +27895,7 @@ function qwBankMarkup(source,start,end,kind,argument=''){
  const selected=source.slice(start,end);
  const inline={
   bold:['**','**','текст'],italic:['*','*','текст'],underline:['++','++','текст'],
+  strike:['~~','~~','текст'],
   sup:['^{','}','2'],sub:['~{','}','0'],math:['\\(','\\)','F=ma'],
   fraction:['\\(\\frac{','}{b}\\)','a'],root:['\\(\\sqrt{','}\\)','x'],
   power:['\\(','^{2}\\)','x']
@@ -27537,6 +27922,7 @@ function qwBankMarkup(source,start,end,kind,argument=''){
  }
  if(kind==='symbol')return {start,end,text:argument};
  if(kind==='blank')return {start,end,text:'[[blank:4]]'};
+ if(kind==='clear')return {start,end,text:selected.replace(/\[\[(?:style [^\]\n]+|\/style)\]\]|^::format [^\n]+\n|(\*\*|__|~~|\+\+)([^\n]+?)\1/gm,(_,marker,text)=>text||'')};
  if(['heading','align','list','numbered','quote'].includes(kind)){
   const first=start?source.lastIndexOf('\n',start-1)+1:0;
   const last=source.indexOf('\n',Math.max(start,end-1));
@@ -27550,6 +27936,8 @@ function qwBankMarkup(source,start,end,kind,argument=''){
   return {start:first,end:stop,text,select:[0,text.length]};
  }
  const snippets={
+  rule:'---',
+  callout:Object.hasOwn(QW_CALLOUTS,argument)?'> [!'+argument+'] '+QW_CALLOUTS[argument][0]+'\n'+(selected?selected.split('\n').map(line=>'> '+line).join('\n'):'>'):'',
   table:'| Величина | Значение |\n| --- | --- |\n| '+(selected.trim()||'Название').replace(/[\n|]/g,' ')+' | Значение |',
   cases:'$$\n\\begin{cases}\nx+y=5 \\\\\nx-y=1\n\\end{cases}\n$$',
   ege:'### Физическая модель и обоснование\n[Объясните применимость физических законов.]\n\n### Решение\n1. [Запишите законы и формулы.]\n2. [Выполните преобразования.]\n3. [Подставьте значения с единицами.]',
@@ -27562,6 +27950,37 @@ function qwBankMarkup(source,start,end,kind,argument=''){
 }
 function qwBankTextState(input){
  return {value:input.value,start:input.selectionStart,end:input.selectionEnd};
+}
+function qwEditorTextTools(){
+ const fontChoices=Object.entries(QW_TEXT_FONTS).map(([id,[title]])=>[id,title]);
+ const sizes=[8,9,10,11,12,14,16,18,20,24,28,32,36,48];
+ const picker=(key,caption,options)=>'<label>'+caption+' <select data-editor-style="'+key+'"><option value="">—</option>'+qwOptions(options,'')+'</select></label>';
+ const color=(key,caption,style='editor-style',value='#16202a')=>'<label title="'+caption+'"><span>'+caption+'</span><input type="color" aria-label="'+caption+'" data-'+style+'="'+key+'" value="'+value+'"></label>';
+ return '<div class="qw-editor-text-tools" role="group" aria-label="Шрифт и абзац">'+
+  picker('font','Шрифт',fontChoices)+picker('size','Размер',sizes.map(n=>[n,n+' пт']))+
+  color('color','Текст')+color('highlight','Маркер','editor-style','#ffe396')+
+  '<label>Применить к <select data-editor-scope>'+qwOptions([['selection','Выделению'],['document','Всему документу']],'selection')+'</select></label>'+
+  '<details class="qw-editor-popover"><summary>Абзац</summary><div>'+
+  picker('line','Интервал строки',[1,1.15,1.3,1.5,1.75,2,2.5,3].map(n=>[n,n]))+
+  ['before','after'].map((key,i)=>'<label>'+['До абзаца','После абзаца'][i]+' <input data-editor-style="'+key+'" type="number" min="0" max="48" step=".5" aria-label="'+['До абзаца, пт','После абзаца, пт'][i]+'"></label>').join('')+
+  '</div></details>'+
+  qwBankFormatSelect('callout','Блок',Object.entries(QW_CALLOUTS).map(([key,[title]])=>[key,title]))+
+  '<details class="qw-editor-popover" data-editor-callout hidden><summary>Свойства блока</summary><div>'+
+  '<label>Тип <select data-callout-setting="type">'+qwOptions(Object.entries(QW_CALLOUTS).map(([key,[title]])=>[key,title]),'info')+'</select></label>'+
+  '<label>Схема <select data-callout-setting="tone">'+qwOptions([['','По типу'],['blue','Синяя'],['green','Зелёная'],['purple','Фиолетовая'],['amber','Янтарная'],['red','Красная'],['gray','Серая']],'')+'</select></label>'+
+  '<label><input type="checkbox" data-callout-setting="icon" checked> Иконка</label>'+
+  '<label><input type="checkbox" data-callout-setting="borderVisible" checked> Граница</label>'+
+  color('color','Акцент','callout-setting')+color('background','Фон','callout-setting','#edf5fc')+color('border','Цвет границы','callout-setting','#1d4f91')+
+  '<label>Внутренний отступ <input type="number" data-callout-setting="pad" min="2" max="24" value="9"></label>'+
+  '</div></details></div>';
+}
+function qwEditorContextTools(){
+ const tools=[['bold','<b>Ж</b>','Жирный'],['italic','<i>К</i>','Курсив'],
+  ['strike','<s>З</s>','Зачёркивание'],['underline','<u>Ч</u>','Подчёркивание'],
+  ['highlight','▨','Выделить маркером'],['sup','x²','Верхний индекс'],['sub','x₀','Нижний индекс'],
+  ['math','∑','Формула'],['quote','❝','Цитата']];
+ return '<div class="qw-editor-context" role="toolbar" aria-label="Форматирование выделения" hidden>'+
+  tools.map(([id,icon,title])=>'<button type="button" data-editor-context="'+id+'" title="'+title+'" aria-label="'+title+'">'+icon+'</button>').join('')+'</div>';
 }
 /* TASK156: transactional editing of a bank item, independent of the open QWORK. */
 async function qwBankEdit(id,draft=null,returnFilters={},transaction=null){
@@ -27607,6 +28026,9 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   qwBankFormatSelect('formula','Формула',[['math','Выражение'],['fraction','Дробь'],['power','Степень'],['root','Корень'],['cases','Система уравнений']])+
   qwBankFormatSelect('symbol','Символы',['α','β','γ','Δ','θ','λ','μ','π','ρ','σ','φ','ω','Ω','±','×','·','÷','≤','≥','≠','≈','∞','→','∠','°','√','∑','∫'].map(symbol=>[symbol,symbol]))+
   qwBankFormatButton(...formatButtons[7])+qwBankFormatButton('quote','❝','Цитата')+
+  qwBankFormatButton('strike','<s>З</s>','Зачёркивание')+
+  qwBankFormatButton('rule','—','Горизонтальный разделитель')+
+  qwBankFormatButton('clear',qoWorkIcon('eraser'),'Очистить форматирование')+
   qwBankFormatButton('blank','Поле','Вставить поле для записи')+
   '<span data-bank-template="comment" hidden>'+qwBankFormatButton('ege','Шаблон решения')+'</span>'+
   '<span data-bank-template="criteria" hidden>'+qwBankFormatButton('rubric','Шаблон критериев')+'</span>'+
@@ -27661,8 +28083,8 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    '<button type="button" data-bank-source aria-pressed="false">Исходный текст</button>'+
    qwPublishZoomControls()+'</div>'+
    '<div class="qw-bank-edit-layout">'+
-   '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+'</div>'+equationBox+
-   '<div class="qw-edit-scroll">'+fields+'</div>'+publishing+'</section>'+
+   '<section class="qw-bank-edit-main"><div class="qw-bank-edit-commandbar">'+textTools+visualTools+qwEditorTextTools()+'</div>'+equationBox+
+   '<div class="qw-edit-scroll">'+fields+'</div>'+publishing+qwEditorContextTools()+'</section>'+
    '<aside class="qw-bank-edit-side" aria-label="'+(work?'Свойства задания':'Метаданные задания')+'">'+(work?qwButton('close-panels','Закрыть','class="qw-drawer-close"'):'')+category+
    (work?'<details class="qw-work-publishing"><summary>Рисунки и таблицы</summary>'+inspector+'</details>':'')+'</aside>'+
    '</div><p id="qw-bank-edit-error" role="alert" class="qw-error" hidden></p>';
@@ -27691,7 +28113,8 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const publishToggle=top.querySelector('[data-bank-publish-toggle]'),orientation=publishingPane.querySelector('[data-bank-publish-orientation]');
  const moveTitle=d.querySelector('[data-bank-move-title]');
  const catalogName=d.querySelector('[data-bank-task-field="title"]'),tags=d.querySelector('[data-bank-tags]');
- const bookmarks=new WeakMap();
+ const bookmarks=new WeakMap(),contextBar=d.querySelector('.qw-editor-context'),calloutPanel=d.querySelector('[data-editor-callout]');
+ let currentCallout=null;
  let formula=null,composing=false;
  let publishRevision=0,publishTimer=0,rezoom=()=>{};
  function refreshPublishing(){
@@ -27726,9 +28149,119 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  });
  function mountLive(surface,input){
   qwLiveMount(surface,input.value);
+  styleSurface(surface);
   qwStylePublishedTables(surface,task.publishing?.tables?.[surface.dataset.bankLive]);
   for(const node of surface.children){const source=surface.qwSourceBlocks.get(node);if(source)source.html=node.outerHTML;}
   surface.qwRenderedSource=input.value;
+ }
+ function authorStyle(){return {...(work?qwDoc.printSettings?.text:null),...task.publishing?.text};}
+ function styleSurface(surface){
+  const style=authorStyle();
+  qwLiveApplyStyle(surface,style,true);
+ }
+ function syncTextControls(){
+  const defaults=authorStyle();
+  const scope=d.querySelector('[data-editor-scope]').value;
+  const surface=live(transaction.view.tab),range=qwLiveRange(surface);
+  const node=range?.startContainer.nodeType===1?range.startContainer:range?.startContainer.parentElement;
+  const styled=node?.closest('[data-qw-text-style]'),local=styled&&styled!==surface?qwReadTextStyle(styled.dataset.qwTextStyle):null;
+  const selected=scope==='document'?defaults:{...defaults,...local};
+  for(const control of d.querySelectorAll('[data-editor-style]')){
+   if(control===document.activeElement)continue;
+   const key=control.dataset.editorStyle,value=selected[key];
+   if(control.type==='color'){if(value)control.value=value;}else control.value=value??'';
+  }
+ }
+ function changeDocText(key,value){
+  const current=work?qwDoc.printSettings?.text:task.publishing?.text;
+  const requested=key?{...current,version:1}:{version:1};
+  if(key){if(value===undefined)delete requested[key];else requested[key]=value;}
+  const format=qwTextStyle(requested);
+  const next=qwStyleSource(format)?format:null;
+  if(work){
+   const settings={...qwDoc.printSettings};
+   if(next)settings.text=next;else delete settings.text;
+   qwRemember();qwDoc.printSettings=qwPrintSettings(settings);qwPersist();
+  }else{
+   const settings={...task.publishing};
+   if(next)settings.text=next;else delete settings.text;
+   qwUsePublishing(task,settings);
+  }
+  for(const [section] of QW_BANK_SECTIONS)styleSurface(live(section));
+  syncTextControls();refreshPublishing();
+ }
+ function changeTextStyle(key,argument,scope){
+  const value=QW_TEXT_RULES[key].min===undefined?argument:Number(argument);
+  try{qwTextStyle({version:1,[key]:value});}catch(error){showError(error.message);return;}
+  if(scope==='document'){changeDocText(key,value);return;}
+  const input=fieldInput(transaction.view.tab),surface=live(transaction.view.tab);
+  if(transaction.view.mode==='source'){
+   const before=qwBankTextState(input),{start,end}=before, spec=key+'='+value;
+   if(QW_PARAGRAPH_STYLES.has(key)){
+    const first=start?input.value.lastIndexOf('\n',start-1)+1:0;
+    const previous=first?input.value.lastIndexOf('\n',first-2)+1:0;
+    const prior=input.value.slice(previous,first).match(/^::format ([^\n]+)\n$/);
+    const existing=prior&&qwReadTextStyle(prior[1]);
+    const next=qwStyleSource({...existing,version:1,[key]:value});
+    input.setRangeText('::format '+next+'\n',existing?previous:first,first,'preserve');
+   }else if(start!==end)input.setRangeText('[[style '+spec+']]'+input.value.slice(start,end)+'[[/style]]',start,end,'select');
+   recordText(input,before);return;
+  }
+  qwLiveRestore(surface,qwLiveBookmark(surface)||bookmarks.get(surface));
+  const before=currentSnapshot(input,surface),range=qwLiveRange(surface);
+  const changed=QW_PARAGRAPH_STYLES.has(key)?qwLiveParagraphStyle(surface,range,key,value):
+   qwLiveTextSelection(surface,range,key,value);
+  if(changed){historyFor(input).before=before;commitLive(surface);showError('');}
+ }
+ function syncCallout(block){
+  if(block===currentCallout)return;
+  currentCallout=block;
+  calloutPanel.hidden=!block;
+  if(!block){calloutPanel.open=false;return;}
+  const type=block.dataset.qwCallout,options=qwCalloutOptions(type,block.dataset.qwCalloutOptions)||{};
+  const look=qwCalloutLook(type,options),[ink,paper]=QW_CALLOUT_TONES[look.tone];
+  const values={type,tone:options.tone||'',icon:options.icon!=='0',borderVisible:options.border!=='none',color:options.color||ink,
+   background:options.background||paper,border:options.border&&options.border!=='none'?options.border:ink,pad:options.pad||9};
+  for(const control of calloutPanel.querySelectorAll('[data-callout-setting]')){
+   const value=values[control.dataset.calloutSetting];
+   if(control.type==='checkbox')control.checked=value;else control.value=value;
+  }
+ }
+ function changeCallout(control){
+  if(!currentCallout?.isConnected)return;
+  const block=currentCallout,type=block.dataset.qwCallout,key=control.dataset.calloutSetting;
+  const input=fieldInput(transaction.view.tab),surface=live(transaction.view.tab);
+  const options=qwCalloutOptions(type,block.dataset.qwCalloutOptions)||{};
+  const nextType=key==='type'?control.value:type;
+  if(key==='icon')options.icon=control.checked?'1':'0';
+  else if(key==='borderVisible'){if(control.checked)delete options.border;else options.border='none';}
+  else if(key==='tone'&&!control.value)delete options.tone;
+  else if(key!=='type')options[key]=control.value;
+  const spec=qwCalloutOptionSource(options),valid=qwCalloutOptions(nextType,spec);
+  if(!valid){showError('Проверьте настройки блока');return;}
+  const before=currentSnapshot(input,surface),look=qwCalloutLook(nextType,valid);
+  block.dataset.qwCallout=nextType;block.dataset.qwCalloutOptions=spec;block.style.cssText=look.css;
+  const heading=block.querySelector('.qw-callout-title');
+  heading.querySelector('.qw-callout-icon')?.remove();
+  if(look.icon){const icon=document.createElement('span');icon.className='qw-callout-icon';icon.contentEditable='false';
+   icon.setAttribute('aria-hidden','true');icon.textContent=look.icon;heading.prepend(icon);}
+  historyFor(input).before=before;commitLive(surface);currentCallout=null;syncCallout(block);
+ }
+ function updateEducationSelection(){
+  if(transaction.view.mode!=='visual'||formula||d.closest('[inert]')){contextBar.hidden=true;syncCallout(null);return;}
+  const surface=live(transaction.view.tab),range=qwLiveRange(surface);
+  const anchor=range?.startContainer.nodeType===1?range.startContainer:range?.startContainer.parentElement;
+  if(!calloutPanel.open&&range&&surface.contains(document.activeElement))syncCallout(anchor?.closest('[data-qw-callout]')||null);
+  syncTextControls();
+  if(!range||range.collapsed||!range.toString().trim()){contextBar.hidden=true;return;}
+  const selected=range.getBoundingClientRect(),viewport=surface.closest('.qw-edit-scroll').getBoundingClientRect();
+  if(selected.top<viewport.top||selected.bottom>viewport.bottom){contextBar.hidden=true;return;}
+  contextBar.hidden=false;
+  const area=contextBar.getBoundingClientRect(),above=selected.top-8-area.height;
+  const top=above>=viewport.top?above:selected.bottom+8;
+  if(top+area.height>viewport.bottom){contextBar.hidden=true;return;}
+  contextBar.style.left=Math.max(viewport.left+6,Math.min(viewport.right-area.width-6,(selected.left+selected.right-area.width)/2))+'px';
+  contextBar.style.top=top+'px';
  }
  function currentSnapshot(input,surface){
   const state=qwBankTextState(input);
@@ -27905,7 +28438,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    updateFigurePlacement(live(tab));
    graphic.innerHTML=qwStudyFigureHTML(task);qwRefreshLiveGraphText(graphic);
   }
-  updateHistoryButtons();preview();
+  updateHistoryButtons();preview();updateEducationSelection();
   if(work||publish)syncPublishing();
   rezoom();
   if(publish){if(transaction.view.orientation)orientation.value=transaction.view.orientation;refreshPublishing();}
@@ -27927,7 +28460,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   const history=historyFor(input);
   qwLiveRestore(surface,qwLiveBookmark(surface)||bookmarks.get(surface));
   if(kind==='undo'||kind==='redo'){historyStep(input,kind==='redo',surface);return;}
-  const commands={bold:'bold',italic:'italic',underline:'underline',sup:'superscript',sub:'subscript',
+  const commands={bold:'bold',italic:'italic',underline:'underline',strike:'strikeThrough',clear:'removeFormat',sup:'superscript',sub:'subscript',
    list:'insertUnorderedList',numbered:'insertOrderedList'};
   const align={left:'justifyLeft',center:'justifyCenter',right:'justifyRight',justify:'justifyFull'};
   const templates={math:'F=ma',fraction:'\\frac{a}{b}',power:'x^{2}',root:'\\sqrt{x}',cases:'\\begin{cases}\nx+y=5 \\\\\nx-y=1\n\\end{cases}'};
@@ -27937,9 +28470,15 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   }
   const originalHTML=surface.innerHTML;
   history.before=currentSnapshot(input,surface);
+  if(kind==='clear'&&d.querySelector('[data-editor-scope]').value==='document'){changeDocText('');history.before=null;return;}
   if(commands[kind])document.execCommand(commands[kind],false,null);
   else if(kind==='align'&&align[argument])document.execCommand(align[argument],false,null);
   else if(kind==='heading'||kind==='quote')document.execCommand('formatBlock',false,kind==='quote'?'blockquote':'h'+(2+Number(argument)));
+  else if(kind==='callout'||kind==='rule'){
+   const range=qwLiveRange(surface),selected=range&&!range.collapsed?qwLiveSource(range.cloneContents()):'';
+   const snippet=qwBankMarkup(selected,0,selected.length,kind,argument);
+   if(snippet)qwLiveInsertBlock(surface,qwLiveHTML(snippet.text));
+  }
   else if(kind==='symbol'||kind==='blank'){
    const range=qwLiveRange(surface);
    if(range){
@@ -27960,6 +28499,19 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  function format(kind,argument){
   const input=fieldInput(transaction.view.tab);
   if(formula||transaction.view.mode==='preview'||saving)return;
+  if(d.querySelector('[data-editor-scope]').value==='document'){
+   if(kind==='clear'){changeDocText('');return;}
+   const defaults=work?qwDoc.printSettings?.text:task.publishing?.text;
+   if(kind==='align'){changeDocText('align',argument);return;}
+   if(kind==='bold'||kind==='italic'){
+    const key=kind==='bold'?'weight':'slant';changeDocText(key,defaults?.[key]?undefined:kind);return;
+   }
+   if(kind==='underline'||kind==='strike'){
+    const line=kind==='underline'?'underline':'line-through',existing=defaults?.decoration||'';
+    const active=['underline','line-through'].filter(decoration=>existing.includes(decoration)!==(decoration===line));
+    changeDocText('decoration',active.length?active.join('-'):undefined);return;
+   }
+  }
   if(transaction.view.mode==='visual'){visualFormat(kind,argument);return;}
   if(kind==='undo'||kind==='redo'){historyStep(input,kind==='redo');return;}
   const before=qwBankTextState(input);
@@ -28040,6 +28592,12 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   if(input.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices],[data-bank-tags]')){collect();preview();}
  });
  d.addEventListener('change',event=>{
+  if(event.target.matches('[data-editor-scope]')){syncTextControls();return;}
+  if(event.target.matches('[data-editor-style]')){
+   if(event.target.value!=='')changeTextStyle(event.target.dataset.editorStyle,event.target.value,d.querySelector('[data-editor-scope]').value);
+   return;
+  }
+  if(event.target.matches('[data-callout-setting]')){changeCallout(event.target);return;}
   const select=event.target.closest('[data-bank-format-select]');
   if(select&&select.value){
    format(select.dataset.bankFormatSelect==='formula'?select.value:select.dataset.bankFormatSelect,select.value);
@@ -28054,6 +28612,13 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   if(event.target.matches('[data-bank-edit-field],[data-bank-task-field],[data-bank-choices]')){collect();preview();}
  });
  d.addEventListener('click',event=>{
+  const context=event.target.closest('[data-editor-context]');
+  if(context){
+   const key=context.dataset.editorContext;
+   if(key==='highlight')changeTextStyle(key,d.querySelector('[data-editor-style=highlight]').value,'selection');
+   else format(key);
+   return;
+  }
   const tab=event.target.closest('[data-bank-tab]');
   if(tab){if(formula)equationSource.focus();else{if(transaction.view.mode==='publish')transaction.view.mode=transaction.view.beforePublishing;selectSection(tab.dataset.bankTab);}return;}
   if(event.target.closest('[data-bank-publish-toggle]')){
@@ -28131,6 +28696,14 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   scroll.style.setProperty('--qw-editor-width',width+'px');
   return {view:scroll,width:width+32,height:Math.max(360,editors.find(surface=>!surface.hidden)?.offsetHeight||0)+32};
  },scale=>{scroll.style.setProperty('--qw-edit-scale',scale);publishFrame.style.zoom=scale;});
+ contextBar.addEventListener('pointerdown',event=>event.preventDefault());
+ const caretEvents=new AbortController();
+ document.addEventListener('selectionchange',updateEducationSelection,{signal:caretEvents.signal});
+ scroll.addEventListener('scroll',updateEducationSelection,{signal:caretEvents.signal});
+ const detach=new MutationObserver(()=>{
+  if(!d.isConnected){caretEvents.abort();detach.disconnect();}
+ });
+ detach.observe(document.getElementById('app'),{childList:true,subtree:true});
  scroll.addEventListener('click',event=>{
   if(!event.target.matches('[data-bank-rich]')||transaction.view.mode!=='visual')return;
   const input=live(transaction.view.tab);
@@ -28295,14 +28868,7 @@ async function qwBank(previousFilters={}){
    control.innerHTML=qwOptions([['all','Все'],...sorted.map(name=>[name,name])],value);
   }
  }
- const summary=value=>String(value||'').slice(0,700)
-  .replace(/^[ \t]*(?:#{1,4}|::(?:left|center|right|justify))\s+/gm,'')
-  .replace(/\\\((.*?)\\\)|\$([^$\n]{1,600})\$/g,(_,explicit,dollar)=>{
-   const formula=explicit??dollar;return /[\\{}]/.test(formula)?'…':formula;
-  })
-  .replace(/(\*\*|__|~~|\+\+|\x60)([^\n]+?)\1/g,'$2')
-  .replace(/(^|[\s(])([*_])([^*_\n]+)\2/g,'$1$3')
-  .replace(/\s+/g,' ').trim().slice(0,185);
+ const summary=qwTaskSummary;
  const readFilters=()=>Object.fromEntries(filterKeys.map(key=>[key,pick(key)]));
  const viewState=()=>({...readFilters(),search:pick('search'),__view:activeId,__offset:pageOffset,
   __scroll:list.scrollTop,__navScroll:get('filters').scrollTop,__selected:[...selected.keys()],

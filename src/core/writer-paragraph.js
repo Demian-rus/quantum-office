@@ -17,11 +17,14 @@ function qoWriterParagraphTargets(){
  const selected=window.getSelection();
  let range=qoWriterSelectionRange;
  if(selected?.rangeCount&&editor.contains(selected.anchorNode))range=selected.getRangeAt(0);
+ return qoParagraphsInRange(editor,range,'p,h1,h2,h3,blockquote,li');
+}
+function qoParagraphsInRange(editor,range,selector){
  if(!range||!editor.contains(range.commonAncestorContainer))return [];
- const blocks=[...editor.querySelectorAll('p,h1,h2,h3,blockquote,li')];
+ const blocks=[...editor.querySelectorAll(selector)];
  if(range.collapsed){
   const node=range.startContainer,nodeElement=node.nodeType===1?node:node.parentElement;
-  const one=nodeElement?.closest?.('p,h1,h2,h3,blockquote,li');
+  const one=nodeElement?.closest?.(selector);
   return one&&editor.contains(one)?[one]:[];
  }
  return blocks.filter(block=>{

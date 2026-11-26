@@ -1,5 +1,6 @@
 import {QW_PRINT_FONT_CSS} from './work-print-fonts.js';
 import {qwPrintThemeStyles} from './work-print-theme.js';
+import {QW_EDUCATION_TEXT_CSS} from './work-text-style.js';
 /* Print-only layout. Fonts and SVG ink are measured before any pagination.
    QWORK and editor geometry are never mutated by this document. */
 /* Measure in the destination SVG coordinate system. Browser text metrics can
@@ -68,7 +69,7 @@ const QW_RADICAL_CSS=`
  }
 }
 `;
-const QW_PUBLISH_CSS=QW_RADICAL_CSS+`
+const QW_PUBLISH_CSS=QW_EDUCATION_TEXT_CSS+QW_RADICAL_CSS+`
 :root{--qw-math-family:"QO Math","DejaVu Math TeX Gyre","Cambria Math",serif;--qw-task-marker:7mm;--qw-task-indent:2mm;--qw-task-text-leading:1.27;--qw-task-heading-gap:.8mm;--qw-task-paragraph-gap:.9mm}
 .qw-paper-task.qw-standard-task{display:grid;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);row-gap:0;align-items:start}
 .qw-paper-task.qw-standard-task>.qw-task-heading{display:grid;grid-column:1/-1;grid-row:1;grid-template-columns:var(--qw-task-marker) minmax(0,1fr);column-gap:var(--qw-task-indent);align-items:center;margin:0 0 var(--qw-task-heading-gap);padding:0;width:auto;height:auto;border:0;min-width:0}
@@ -565,11 +566,57 @@ async function qwPreparePrintDocument(){
   copy.querySelectorAll('.qw-teacher-notes').forEach(e=>e.remove());return copy;
  }
  function bodyOf(section){return section.querySelector('.qw-exam-body')||section.querySelector('.qw-paper-task');}
- function tokens(element){return [...element.childNodes].flatMap(node=>node.nodeType===3?(node.textContent.match(/\S+\s*|\s+/g)||[]).map(s=>document.createTextNode(s)):[node.cloneNode(true)]);}
- function replaceTokens(element,items,start,end){element.replaceChildren(...items.slice(start,end).map(n=>n.cloneNode(true)));}
+ function tokens(element){
+  const items=[];
+  function append(node,path){
+   if(node.nodeType===3){
+    for(const word of node.textContent.match(/\S+\s*|\s+/g)||[])items.push({node:document.createTextNode(word),path});
+    return;
+   }
+   const callout=node.nodeType===1&&node.matches('.qw-callout');
+   const container=node.nodeType===1&&(node.matches('.qw-format-block')||path.length&&node.matches('p,h3,h4,h5,h6,ul,ol,li,blockquote,strong,b,em,i,s,u,span,sup,sub'));
+   if(callout||container){
+    const body=callout?node.querySelector(':scope>.qw-callout-body'):node;
+    const first=items.length,trail=[...path,{source:node,body,first,callout}];
+    for(const child of body.childNodes)append(child,trail);
+    if(items.length>first)return;
+   }
+   items.push({node:node.cloneNode(true),path});
+  }
+  for(const node of element.childNodes)append(node,[]);
+  return items;
+ }
+ function replaceTokens(element,items,start,end){
+  const output=document.createDocumentFragment();
+  let active=[];
+  for(let i=start;i<end;i++){
+   const {node,path}=items[i];
+   let depth=0;
+   while(depth<active.length&&active[depth].part===path[depth])depth++;
+   active.length=depth;
+   let group=active.at(-1)?.container||output;
+   for(const part of path.slice(depth)){
+    const block=part.source.cloneNode(false);
+    if(part.source.tagName==='OL'){
+     const firstItem=path[active.length+1]?.source;
+     const offset=[...part.source.children].indexOf(firstItem);
+     if(offset>0)block.start=part.source.start+offset;
+    }
+    group.append(block);let container=block;
+    if(part.callout){
+     const title=part.source.querySelector(':scope>.qw-callout-title').cloneNode(true);
+     if(i>part.first){title.querySelector('[data-qw-callout-title]').append(' (продолжение)');block.dataset.qwCalloutContinuation='true';}
+     container=part.body.cloneNode(false);block.append(title,container);
+    }
+    active.push({part,container});group=container;
+   }
+   group.append(node.cloneNode(true));
+  }
+  element.replaceChildren(output);
+ }
  function boundary(items,start,end){
   const minimum=start+Math.floor((end-start)*.75);
-  for(let i=end;i>minimum;i--)if(items[i-1].nodeName==='BR'||/[.!?;:]\s*$/.test(items[i-1].textContent))return i;
+  for(let i=end;i>minimum;i--)if(items[i-1].node.nodeName==='BR'||/[.!?;:]\s*$/.test(items[i-1].node.textContent))return i;
   return end;
  }
  function fitTextChunk(section,element,items,start,after){
@@ -578,7 +625,11 @@ async function qwPreparePrintDocument(){
    if(fits(current)){best=mid;lo=mid+1;}else hi=mid-1;
   }
   after?.remove();
-  if(best===start){section.remove();current=newPage();current.content.append(section);replaceTokens(element,items,start,start+1);if(!fits(current))throw Error('Блок не помещается на страницу; уменьшите иллюстрацию или разделите формулу.');return fitTextChunk(section,element,items,start,after);}
+  if(best===start){
+   section.remove();
+   if(!current.content.querySelector('.qw-print-section,.qw-print-header:not(:empty)'))throw Error('Блок не помещается на страницу; уменьшите иллюстрацию или разделите формулу.');
+   current=newPage();return fitTextChunk(section,element,items,start,after);
+  }
   let end=best===items.length?best:boundary(items,start,best);
   if(items.length-end<12&&end<items.length&&end-start>24)end=items.length-12;
   replaceTokens(element,items,start,end);if(end===items.length&&after)bodyOf(section).append(after);
@@ -592,6 +643,15 @@ async function qwPreparePrintDocument(){
   const paragraphs=block.classList.contains('qw-teacher-notes')?[...block.children]:[];
   next.remove();if(!paragraphs.length)throw Error('Поле решения превышает страницу.');
   let result=last;
+  if(block.querySelector('.qw-callout,.qw-format-block')){
+   const items=tokens(block);let start=0;
+   while(start<items.length){
+    const fragment=continuation(original),notes=block.cloneNode(false);
+    bodyOf(fragment).append(notes);start=fitTextChunk(fragment,notes,items,start);
+    fragments.push(fragment);result=fragment;if(start<items.length)current=newPage();
+   }
+   return result;
+  }
   for(const paragraph of paragraphs){let start=0,items=tokens(paragraph);
    while(start<items.length){const fragment=continuation(original),notes=block.cloneNode(false),p=paragraph.cloneNode(false);notes.append(p);bodyOf(fragment).append(notes);
     start=fitTextChunk(fragment,p,items,start);fragments.push(fragment);result=fragment;if(start<items.length)current=newPage();
@@ -646,7 +706,10 @@ async function qwPreparePrintDocument(){
   section.remove();if(section.dataset.explicitBreak==='true'&&current.content.querySelector('.qw-print-section'))current=newPage();
   current.content.append(section);
   if(fits(current)){fragments.push(section);continue;}
+  const capacity=current.content.getBoundingClientRect().height;
+  const splitInPlace=section.querySelector('.qw-callout')&&section.getBoundingClientRect().height>capacity;
   section.remove();
+  if(splitInPlace&&capacity-used(current)>38*MM){splitLong(section);continue;}
   if(current.content.querySelector('.qw-print-section'))current=newPage();
   current.content.append(section);if(fits(current)){fragments.push(section);continue;}
   section.remove();splitLong(section);

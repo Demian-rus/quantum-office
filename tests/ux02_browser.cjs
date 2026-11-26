@@ -7,7 +7,7 @@ const source=require('../content/physics-ege-2019-variant-1.cjs');
 async function main(){
  const release=pathToFileURL(path.join(root,'Quantum-Office.html')).href;
  const shots=path.join(evidence,'screenshots');fs.mkdirSync(shots,{recursive:true});
- const browser=await chromium.launch(),errors=[];
+ const browser=await chromium.launch({ignoreDefaultArgs:['--hide-scrollbars']}),errors=[];
  try{
   const page=await browser.newPage({offline:true,viewport:{width:1920,height:1080}});
   page.on('pageerror',error=>errors.push(error.message));
@@ -56,6 +56,13 @@ async function main(){
   await page.mouse.move(paperArea.x+paperArea.width/2,paperArea.y+paperArea.height/2);
   await page.mouse.wheel(0,520);
   await page.waitForFunction(()=>document.querySelector('.qw-edit-scroll').scrollTop>80);
+  await scroll.evaluate(el=>{el.scrollTop=0;});
+  const gripX=paperArea.x+paperArea.width-5;
+  await page.mouse.move(gripX,paperArea.y+36);
+  await page.mouse.down();
+  await page.mouse.move(gripX,paperArea.y+180,{steps:8});
+  await page.mouse.up();
+  assert.ok(await scroll.evaluate(el=>el.scrollTop>25),'the resize divider must leave the scrollbar draggable');
   await page.setViewportSize({width:1920,height:1080});
   await editor.locator('[data-bank-source]').click();
   assert.equal(await scale.inputValue(),'200');
