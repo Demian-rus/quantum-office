@@ -35,7 +35,7 @@ const root=path.resolve(__dirname,'..'),before=process.argv.includes('--before')
     if(!name.endsWith('-Answers'))assert.ok(measurement.headers.slice(1).every(h=>h.box===null),'student header occurs on first physical page only');
     assert.ok(Math.abs(measurement.bodyPt-10)<.001);assert.deepEqual(measurement.english,[]);assert.equal(measurement.brandIcons,0);
     if(project.topic)assert.equal(measurement.topicColor,'rgb(0, 0, 0)');
-    for(const b of measurement.brands){assert.equal(b.position,'absolute');assert.ok(b.box.y>=0&&b.box.y+b.box.h<10&&Math.abs(b.box.x+b.box.w-201)<.3,'QX handwritten signature must stay at top-right of A4');}
+    for(const b of measurement.brands){assert.equal(b.position,'absolute');assert.ok(b.box.y>=0&&b.box.y+b.box.h<10&&Math.abs(210-b.box.x-b.box.w-4.27)<.2&&Math.abs(b.box.y-3.82)<.2,'QX handwritten signature must stay at top-right of A4');}
     assert.ok(measurement.math.every(m=>m.size>=measurement.bodyPt&&m.fraction.every(s=>s>=measurement.bodyPt-.01)),'full-size main fraction operands');
     assert.equal(measurement.brands.length,measurement.layout.sheets);
     assert.ok(measurement.brands.every(b=>b.text==='QX / Квант Икс'));

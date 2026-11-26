@@ -8,7 +8,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
  const p=await browser.newPage({viewport:{width:1440,height:900},acceptDownloads:true}),errors=[];
  p.on('pageerror',e=>errors.push(e.message));p.on('dialog',d=>d.accept('A'));
  try{
-  const action=k=>p.locator('[data-qw-action="'+k+'"]'),stage=p.locator('#qw-visual-stage svg');
+  const action=k=>p.locator(['diagram','graph'].includes(k)?'[data-bank-visual="'+k+'"]':['save','preview'].includes(k)?'[data-action="work-'+k+'"]':'[data-qw-action="'+k+'"]'),stage=p.locator('#qw-visual-stage svg');
   const change=async(sel,v)=>{await p.locator(sel).fill(String(v));await p.locator(sel).dispatchEvent('change');};
   const at=async(x,y)=>{const b=await stage.boundingBox();return {x:b.x+b.width*x/520,y:b.y+b.height*y/320};};
   const click=async(x,y)=>{const a=await at(x,y);await p.mouse.click(a.x,a.y);};
@@ -18,7 +18,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   const mDrag=async(x,y,x2,y2)=>{const a=math(x,y),b=math(x2,y2);await drag(a.x,a.y,b.x,b.y);};
   const tool=async key=>p.locator('[data-tool="'+key+'"]').click();
   const color=async hex=>p.locator('[data-style-key="stroke"][data-style-color="'+hex+'"]').click();
-  const newTask=async(kind,prompt)=>{await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();await p.locator('#qw-prompt').fill(prompt);await action(kind).click();};
+  const newTask=async(kind,prompt)=>{await p.locator('[data-qw-action="quick-add"][data-type="'+kind+'"]').click();await p.locator('[data-bank-source]').click();await p.locator('#qw-prompt').fill(prompt);await action(kind).click();};
   await p.addInitScript(()=>{window.print=()=>{window.top.__qwPrintCalled=true;};});
   await p.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await p.evaluate(()=>route('writer'));await p.locator('.global-bar [data-target="work"]').click();
   const untouched=await p.evaluate(()=>({writer:qoWriter.html,diagnostic:JSON.stringify(qdWorkingDoc())}));
@@ -101,7 +101,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
    await page.goto(pathToFileURL(path.join(root,'Quantum-Office.html')).href);await page.evaluate(theme=>{qoThemePreference=theme;qoApplyAppearance();route('writer');},theme);await page.locator('.global-bar [data-target="work"]').click();
    await page.locator('#qw-file').setInputFiles(file);await page.waitForFunction(()=>qwDoc.tasks.length===4);
    for(const [index,kind] of [[0,'diagram'],[3,'graph']]){
-    if(width<1200)await page.locator('[data-qw-action="left"]').click();await page.locator('.qw-nav-task').nth(index).click();await page.locator('[data-qw-action="'+kind+'"]').click();
+    if(width<1200)await page.locator('[data-qw-action="left"]').click();await page.locator('.qw-nav-task').nth(index).click();await page.locator('[data-bank-visual="'+kind+'"]').click();
     const before=await page.locator('#qw-visual-stage svg').boundingBox();
     await page.locator(kind==='diagram'?'[data-object-select="1"]':'[data-graph-object="1"]').click();
     const after=await page.locator('#qw-visual-stage svg').boundingBox();for(const k of ['x','y','width','height'])assert.ok(Math.abs(before[k]-after[k])<1);

@@ -80,7 +80,7 @@ function printMetrics(){
   if(table&&text&&!text.contains(table))overlap.push('table moved out of condition:'+section.dataset.task);
  }
  return {error:window.__qwPrintError||null,ready:doc.body.dataset.qwLayoutReady,orientation:doc.body.dataset.qwOrientation,report,bodyFont:getComputedStyle(doc.body).fontFamily,
-  sectionGaps:sections.map(s=>parseFloat(getComputedStyle(s).marginBottom)/mm),headerGap:(()=>{const h=doc.querySelector('.qw-print-header');const first=sections[0];return h&&first?(box(first).top-box(h).bottom)/mm:null;})(),taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,images:[...doc.images].map(i=>({task:i.closest('[data-task]')?.dataset.task,width:i.naturalWidth,height:i.naturalHeight})),bounds,overlap,
+  examStandard:doc.body.dataset.qwExamStandard==='true',sectionGaps:sections.map(s=>parseFloat(getComputedStyle(s).marginBottom)/mm),headerGap:(()=>{const h=doc.querySelector('.qw-print-header');const first=sections[0];return h&&first?(box(first).top-box(h).bottom)/mm:null;})(),taskIds:sections.map(s=>Number(s.dataset.task)),math:doc.querySelectorAll('math').length,figures:doc.querySelectorAll('figure svg,figure img').length,images:[...doc.images].map(i=>({task:i.closest('[data-task]')?.dataset.task,width:i.naturalWidth,height:i.naturalHeight})),bounds,overlap,
   sheets:sheets.map(s=>{
    const b=box(s),brand=s.querySelector('.qw-qx-lettering'),c=brand&&box(brand),footer=s.querySelector('.qw-page-footer'),f=footer&&box(footer);
    return {w:b.width/mm,h:b.height/mm,columns:s.matches('.qw-print-sheet')?s.querySelectorAll(':scope>.qw-print-page').length:1,
@@ -93,7 +93,7 @@ function printMetrics(){
 function checkPrint(m,orientation,fixture){
  assert.equal(m.error,null);assert.equal(m.ready,'true');assert.equal(m.orientation,orientation);
  assert.match(m.bodyFont,/QO Print/);assert.deepEqual([...new Set(m.taskIds)],Array.from({length:fixture.tasks.length},(_,i)=>i+1));assert.equal(m.figures,fixture.tasks.filter(t=>t.figure!=='none').length);assert.equal(m.images.length,fixture.tasks.filter(t=>t.figure==='image').length);assert.ok(m.images.every(i=>i.width>0&&i.height>0));assert.deepEqual(m.images.map(i=>Number(i.task)),fixture.tasks.flatMap((t,i)=>t.figure==='image'?[i+1]:[]));if(fixture.id!=='qx-original-physics-2018-01')assert.ok(m.math>=3);
- assert.ok(m.sectionGaps.every(g=>Math.abs(g-5.25)<.03),'task spacing changed');assert.ok(m.headerGap>=4.45&&m.headerGap<5.0,'first heading clearance '+m.headerGap);
+ assert.equal(m.examStandard,true,'booklet fixture uses EXAM-01');assert.ok(m.sectionGaps.every(g=>Math.abs(g-3)<.03),'EXAM-01 task spacing changed');assert.ok(m.headerGap>=4.45&&m.headerGap<5.0,'first heading clearance '+m.headerGap);
  assert.deepEqual(m.bounds,[]);assert.deepEqual(m.overlap,[]);assert.ok(m.sheets.length>=2,'need multiple physical pages');
  for(const [i,s] of m.sheets.entries()){
   assert.ok(Math.abs(s.w-(orientation==='landscape'?297:210))<.5&&Math.abs(s.h-(orientation==='landscape'?210:297))<.5,'not A4');

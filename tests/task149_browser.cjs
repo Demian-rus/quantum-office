@@ -12,7 +12,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await page.evaluate(()=>route('writer'));
   await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
-  await page.locator('[data-qw-action="graph"]').click();
+  await page.locator('[data-bank-visual="graph"]').click();
   assert.equal(await page.locator('.qw-drawing-group [data-tool]').count(),9);
   assert.equal(await page.locator('.qw-graph-range [data-graph-field]').count(),4);
   assert.equal(await page.locator('.qw-graph-flags input').count(),4);
@@ -57,7 +57,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await page.keyboard.press('Control+z');
   assert.equal(await stage.locator('[data-qw-element]').count(),0,'Ctrl+Z works with focus on toolbar button');
   await page.locator('[data-qw-action="visual-apply"]').click();
-  await page.locator('[data-qw-action="diagram"]').click();
+  await page.locator('[data-bank-visual="diagram"]').click();
   const grid=await page.locator('.qw-visual-tools .qw-tool-group:first-of-type>div').evaluate(e=>getComputedStyle(e).gridTemplateColumns);
   assert.equal(grid.trim().split(/\s+/).length,2,'diagram tools use two columns');
   await page.screenshot({path:path.join(out,'diagram-two-columns.png')});

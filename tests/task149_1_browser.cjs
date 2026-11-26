@@ -52,7 +52,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
   await page.evaluate(()=>route('writer'));
   await page.locator('.global-bar [data-target="work"]').click();
   await page.locator('[data-qw-action="quick-add"][data-type="'+'graph'+'"]').click();
-  await page.locator('[data-qw-action="graph"]').click();
+  await page.locator('[data-bank-visual="graph"]').click();
   for(const mode of ['first','positiveX','math']){
    await page.locator('#qw-coordinate-mode').selectOption(mode);await checkAxes('graph-'+mode,1);await shot('graph-'+mode);
   }
@@ -107,7 +107,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(process.env.QW_REGRESSION_
    if(width<1001)await page.locator('[data-visual-panel="properties"]').click();
   }
   await page.setViewportSize({width:1440,height:900});await page.locator('[data-qw-action="visual-apply"]').click();
-  await page.locator('[data-qw-action="diagram"]').click();await page.locator('#qw-diagram-preset').selectOption('incline');await shot('diagram');
+  await page.locator('[data-bank-visual="diagram"]').click();await page.locator('#qw-diagram-preset').selectOption('incline');await shot('diagram');
   await page.locator('[data-object-select="1"]').click();
   await page.locator('[data-style-key="stroke"][data-style-color="#dc2626"]').click();await page.keyboard.press('Control+z');
   assert.equal(await stage.locator('[data-qw-object="1"] rect').getAttribute('stroke'),'#162735','diagram style undo after redraw');

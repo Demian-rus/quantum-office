@@ -21,7 +21,16 @@ for stage,report in reports.items():
     for span in spans:
      x0,y0,x1,y1=span['bbox']
      if span['text'].strip()=='QX / Квант Икс':
-      assert page.rect.width-115<=x0<x1<=page.rect.width-24 and 0<=y0<y1<28,(name,'top-right QX',span)
+      assert 'Caveat' in span['font'] and abs(span['size']-15)<.05 and span['color']==0,(name,span)
+      assert any('Caveat' in font[3] and font[1]!='n/a' for font in page.get_fonts()),(name,'embedded Caveat')
+      clip=fitz.Rect(page.rect.width-130,0,page.rect.width,27)
+      pix=page.get_pixmap(matrix=fitz.Matrix(8,8),clip=clip,colorspace=fitz.csGRAY)
+      dark=[j for j,v in enumerate(pix.samples) if v<105]
+      assert dark,(name,'signature ink missing')
+      top=min(j//pix.width for j in dark)*25.4/576
+      right=(pix.width-1-max(j%pix.width for j in dark))*25.4/576
+      assert abs(top-4)<.22 and abs(right-4)<.22,(name,'QX ink margins',top,right)
+      assert all((fitz.Rect(span['bbox']) & fitz.Rect(other['bbox'])).is_empty for other in spans if other is not span),(name,'QX overlaps text')
      else: assert 25<=x0<x1<=page.rect.width-25 and 20<=y0<y1<=page.rect.height-10,(name,span)
     assert f'{i+1} / {len(doc)}' in page.get_text()
     topics=[s for s in spans if 'Углы, площади и координаты' in s['text']]
