@@ -884,3 +884,27 @@
 .qw-exam-years-editor strong{font-size:12px}.qw-year-entry input{min-width:0;width:74px}.qw-year-entry button{font-size:11px;padding:3px 6px}
 .qw-bank-year-operation:not([hidden]){display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--qo-border)}
 .qw-bank-year-operation label{display:flex;gap:4px;align-items:center;font-size:12px}.qw-bank-year-operation input{width:125px}
+
+/* UX-03: one scroll owner; zoom affects the display, never physical A4 geometry. */
+.qw-print-preview-dialog #qw-pages,.qw-bank-publish-paper{display:block;min-width:0;min-height:0;overflow:auto;scrollbar-gutter:stable both-edges;overscroll-behavior:contain}
+.qw-print-preview-dialog #qw-print-preview-frame,.qw-bank-publish-paper iframe{display:block;box-sizing:content-box;max-width:none;max-height:none;min-height:0;margin-inline:auto;border:0}
+.qw-bank-publish-paper iframe{height:1px}
+.qw-edit-scroll .qw-bank-rich-render{overflow:visible;width:100%;padding:0}
+.qw-editor-exam-heading{font:16px/1.2 'QO Print Serif',Georgia,serif;grid-column:1/-1;grid-row:1;margin:0 0 .8mm;color:var(--qw-bank-ink,#000)}
+.qw-bank-rich-editor:has(>.qw-editor-exam-heading:not([hidden]))>.qw-bank-live:not([hidden]){grid-row:2}
+.qw-bank-rich-editor:has(>.qw-editor-exam-heading:not([hidden]))>.qw-bank-live-figure[data-position=left]:not([data-wide]):not([hidden]){grid-row:2}
+.qw-bank-rich-editor:has(>.qw-editor-exam-heading:not([hidden]))>.qw-bank-live-figure[data-wide]:not([hidden]){grid-row:auto}
+.qw-editor-exam-heading[hidden]{display:none!important}
+#qo-work-root.qw-author-workspace.qw-dock-hide-left{column-gap:0}
+.qw-inline-task-editor .qw-bank-publishing{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+
+/* UX-03 FINAL: screen-only exam study layout follows DOM reading order.
+   Leave the existing wide side-by-side figure and all non-exam styles intact. */
+.qw-study-task.qw-exam-publication:is([data-qw-study-figure=below],[data-qw-study-figure=none]) .qw-study-flow > :is(.qw-study-condition,figure,.qw-study-tables,.qw-study-answer){
+ grid-row:auto;grid-column:1;
+}
+@container qwstudy (max-width:440px){
+ .qw-study-task.qw-exam-publication:is([data-qw-study-figure=right],[data-qw-study-figure=left]) .qw-study-flow > :is(.qw-study-condition,figure,.qw-study-tables,.qw-study-answer){
+  grid-row:auto;grid-column:1;
+ }
+}

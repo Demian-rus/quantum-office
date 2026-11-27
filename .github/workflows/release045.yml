@@ -1,0 +1,161 @@
+name: Quantum Office 0.4.5 hotfix
+on:
+  push:
+    branches: ['fix/ux-03-preview-consistency']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: office-release-045-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  release-windows:
+    needs: [bank03-indexeddb, bank03-sqlite]
+    if: github.ref == 'refs/heads/fix/ux-03-preview-consistency'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: node scripts/native-icon.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc --features tauri/custom-protocol
+      - run: npx playwright install chromium
+      - run: node scripts/content01-export.cjs evidence/ux03/content
+      - run: node tests/ux03_preview.cjs evidence/ux03/content evidence/ux03/browser
+      - name: Build candidate Windows installer 0.4.5
+        run: npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+      - name: Stage candidate for actual upgrade test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-files | Out-Null
+          Copy-Item 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Quantum Office_0.4.5_x64-setup.exe' release-files/
+      - uses: actions/checkout@v4
+        with:
+          ref: c5e2988221d8ab0598a0179248c25d9deff540f1
+          path: release-baseline
+      - name: Build exact installed 0.4.4 baseline
+        shell: pwsh
+        working-directory: release-baseline
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/native-icon.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:CARGO_TARGET_DIR = Join-Path (Split-Path (Get-Location) -Parent) 'src-tauri/target'
+          npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Upgrade installed 0.4.4 to candidate 0.4.5 and verify real interface
+        shell: pwsh
+        run: ./scripts/release045-upgrade.ps1
+      - name: Release manifest after successful upgrade and preview checks
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -ne '${{ github.sha }}') { throw 'Wrong checkout' }
+          $rows = @(Get-ChildItem release-files -File | ForEach-Object { @{file=$_.Name;bytes=$_.Length;sha256=(Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
+          @{version='0.4.5';commit=$commit;files=$rows} | ConvertTo-Json -Depth 5 | Set-Content release-files/manifest.json -Encoding utf8
+          $rows | ForEach-Object { "$($_.sha256)  $($_.file)" } | Set-Content release-files/SHA256SUMS.txt -Encoding ascii
+          Get-Content release-files/manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-0.4.5-Windows-x64-Setup
+          path: |
+            release-files/*setup.exe
+            release-files/manifest.json
+            release-files/SHA256SUMS.txt
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Quantum-Office-0.4.5-acceptance
+          path: |
+            evidence/release045/
+            evidence/ux03/browser/
+            evidence/native/
+          if-no-files-found: warn
+
+  bank03-indexeddb:
+    if: github.ref == 'refs/heads/fix/ux-03-preview-consistency'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build
+        working-directory: bank03-baseline
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/bank03_browser.cjs
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - run: node tests/bank03_scale_browser.cjs
+        if: ${{ !cancelled() }}
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-indexeddb-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn
+
+  bank03-sqlite:
+    if: github.ref == 'refs/heads/fix/ux-03-preview-consistency'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/native-icon.mjs
+      - name: Actual Rust SQLite regression tests (no installer)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence/bank-03.1 | Out-Null
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/rust-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual accepted and current SQLite benchmark and migration
+        shell: pwsh
+        env:
+          QW_BANK03_NATIVE_REPORT: ${{ github.workspace }}/evidence/bank-03.1/native-scale.json
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/tests/bank03_baseline | Out-Null
+          Copy-Item bank03-baseline/src-tauri/src/bank.rs src-tauri/tests/bank03_baseline/bank.rs
+          Copy-Item bank03-baseline/src-tauri/src/schema.sql src-tauri/tests/bank03_baseline/schema.sql
+          Copy-Item tests/bank03_native_benchmark.rs src-tauri/tests/bank03_native_benchmark.rs
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc --test bank03_native_benchmark bank03_native_scale -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/native-scale.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-sqlite-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn
