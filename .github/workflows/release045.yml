@@ -1,0 +1,85 @@
+name: Quantum Office 0.4.5 hotfix
+on:
+  push:
+    branches: ['fix/ux-03-preview-consistency']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: office-release-045-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  release-windows:
+    if: github.ref == 'refs/heads/fix/ux-03-preview-consistency'
+    runs-on: windows-2025
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: node scripts/native-icon.mjs
+      - run: cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc --features tauri/custom-protocol
+      - run: npx playwright install chromium
+      - run: node scripts/content01-export.cjs evidence/ux03/content
+      - run: node tests/ux03_preview.cjs evidence/ux03/content evidence/ux03/browser
+      - name: Build candidate Windows installer 0.4.5
+        run: npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+      - name: Stage candidate for actual upgrade test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force release-files | Out-Null
+          Copy-Item 'src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/Quantum Office_0.4.5_x64-setup.exe' release-files/
+      - uses: actions/checkout@v4
+        with:
+          ref: c5e2988221d8ab0598a0179248c25d9deff540f1
+          path: release-baseline
+      - name: Build exact installed 0.4.4 baseline
+        shell: pwsh
+        working-directory: release-baseline
+        run: |
+          npm ci
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          npm run build
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          node scripts/native-icon.mjs
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:CARGO_TARGET_DIR = Join-Path (Split-Path (Get-Location) -Parent) 'src-tauri/target'
+          npx --yes @tauri-apps/cli@2.11.4 build --target x86_64-pc-windows-msvc --bundles nsis -- --locked
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Upgrade installed 0.4.4 to candidate 0.4.5 and verify real interface
+        shell: pwsh
+        run: ./scripts/release045-upgrade.ps1
+      - name: Release manifest after successful upgrade and preview checks
+        shell: pwsh
+        run: |
+          $commit = (git rev-parse HEAD).Trim()
+          if ($commit -ne '${{ github.sha }}') { throw 'Wrong checkout' }
+          $rows = @(Get-ChildItem release-files -File | ForEach-Object { @{file=$_.Name;bytes=$_.Length;sha256=(Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()} })
+          @{version='0.4.5';commit=$commit;files=$rows} | ConvertTo-Json -Depth 5 | Set-Content release-files/manifest.json -Encoding utf8
+          $rows | ForEach-Object { "$($_.sha256)  $($_.file)" } | Set-Content release-files/SHA256SUMS.txt -Encoding ascii
+          Get-Content release-files/manifest.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Quantum-Office-0.4.5-Windows-x64-Setup
+          path: |
+            release-files/*setup.exe
+            release-files/manifest.json
+            release-files/SHA256SUMS.txt
+          compression-level: 0
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Quantum-Office-0.4.5-acceptance
+          path: |
+            evidence/release045/
+            evidence/ux03/browser/
+            evidence/native/
+          if-no-files-found: warn

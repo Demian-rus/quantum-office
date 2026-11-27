@@ -358,7 +358,7 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace,exam=false)
   answer+'</div>'+(showWritingSpace&&q.solutionVisible?'<div aria-label="Место для решения" class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
 function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false,bankNumber=null,exam=null){
- exam=exam??(!rich&&qwExamPublication(qwDoc,layout));
+ exam=exam??(!printing&&!rich&&qwExamPublication(qwDoc,layout));
  if(!printing)return qwStudyTask(q,index,preferences||(rich?null:qwDoc.printSettings),bankNumber,!exam&&!rich&&layout==='worksheet',exam);
  const figure=qwStudyFigureHTML(q,true);
  const permanent=bankNumber===null?(q.source?.kind==='bank'?qwBankNumber(q.source.number):0):qwBankNumber(bankNumber);
@@ -945,7 +945,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
  const task=draft.task;
  const examContext=()=>work?qwExamPublication(qwDoc):['ege','oge'].includes(draft.exam);
- const taskIndex=()=>work?Math.max(0,qwDoc.tasks.findIndex(q=>q.id===work.id)):Math.max(0,Number(draft.slot||1)-1);
+ const taskIndex=()=>work?Math.max(0,qwDoc.tasks.findIndex(q=>q.id===work.id)):/^[1-9]\d*$/.test(String(draft.slot||''))?Number(draft.slot)-1:0;
  const permanentNumber=()=>work?(task.source?.kind==='bank'?qwBankNumber(task.source.number):0):qwBankNumber(draft.bankNumber);
  const choices='<label data-bank-choices-wrap>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>';
  const fields=QW_BANK_SECTIONS.map(([key,title])=>qwBankRichField(key,title,task[key],key==='prompt'?choices:'',!!work)).join('');
