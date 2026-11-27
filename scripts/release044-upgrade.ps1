@@ -49,5 +49,5 @@ try {
  Install-Office $new '0.4.4'
  Test-Stage 'new'
  Test-Stage 'restart'
- @{status='PASS';old='0.4.3';new='0.4.4';directory=$data;commit=(git rev-parse HEAD).Trim();nativePrintPreview=$true;manualPrintDialog=$false} | ConvertTo-Json | Set-Content evidence/release044/upgrade-report.json
+ @{status='PASS';old='0.4.3';new='0.4.4';directory=$data;commit=(git rev-parse HEAD).Trim();nativePrintPreview=$true;nativeLegacyPdfBytes=$true;manualPrintDialog=$false} | ConvertTo-Json | Set-Content evidence/release044/upgrade-report.json
 } finally { Remove-ItemProperty -Path $policy -Name $name -ErrorAction Stop }

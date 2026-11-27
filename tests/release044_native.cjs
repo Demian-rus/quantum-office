@@ -49,14 +49,14 @@ let connection;
   // Real native print renderer and actual generated PDF bytes via WebView CDP, not OS save dialog.
   const frame=await page.evaluate(async()=>{
    const f=document.createElement('iframe');f.style.cssText='width:830px;height:1160px;position:fixed;inset:0;background:white;z-index:10000';document.body.append(f);
-   const html=qwPrintDocumentHTML(qwDoc,false,{format:'booklet'});await new Promise((resolve,reject)=>{f.onload=()=>{if(f.contentWindow.qwPrintReady)resolve();};f.onerror=reject;f.srcdoc=html;});await f.contentWindow.qwPrintReady;
+   f.srcdoc=qwPrintDocumentHTML(qwDoc,false,{format:'booklet'});const start=performance.now();while(!f.contentWindow.qwPrintReady){if(performance.now()-start>30000)throw Error('Native print script unavailable');await new Promise(r=>setTimeout(r,50));}await f.contentWindow.qwPrintReady;
    if(f.contentWindow.__qwPrintError||f.contentDocument.body.dataset.qwLayoutReady!=='true')throw Error('preview not ready');
    return f.contentDocument.querySelector('.qw-print-title')?.textContent;
   });assert.match(frame,/Вариант 1/);
   await page.screenshot({path:path.join(out,stage+'-preview.png')});
-  // Existing PDF library path (native WebView), verify bytes independently of Windows print dialog.
-  const pdf=await page.evaluate(async()=>{const f=[...document.querySelectorAll('iframe')].at(-1);const text=f.contentDocument.body.innerText;return {text,ready:f.contentDocument.body.dataset.qwLayoutReady};});
-  assert.equal(pdf.ready,'true');assert.ok(pdf.text.includes('Вариант 1'));
+  // Native legacy PDF byte renderer; exam profile checked separately in the actual preview.
+  const pdf=await page.evaluate(async()=>{const f=[...document.querySelectorAll('iframe')].at(-1);const text=f.contentDocument.body.innerText;const ready=f.contentDocument.body.dataset.qwLayoutReady;f.remove();const bytes=await qwPDFBytes({...qwDoc,layout:'worksheet'},false);return {text,ready,bytes:Array.from(bytes)};});
+  assert.equal(pdf.ready,'true');assert.ok(pdf.text.includes('Вариант 1'));const bytes=Buffer.from(pdf.bytes);assert.equal(bytes.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,stage+'-native-pdf.pdf'),bytes);
  }
  fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify(result,null,2));await connection.browser.close();connection=null;
 })().catch(async e=>{console.error(e);process.exitCode=1;if(connection?.browser.isConnected())await connection.browser.close();});
