@@ -29,12 +29,12 @@ class SQLiteBankRepository{
  }
  async getTask(id){return (await this._run('get',{id:String(id)}))??undefined;}
  async snapshotMetadata(){return this._run('metadata');}
- async listTasks(filters={},pagination={}){return this._run('list',{filters,offset:Math.max(0,Math.floor(Number(pagination.offset)||0)),limit:Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30))),includeImages:pagination.includeImages!==false});}
+ async listTasks(filters={},pagination={}){return this._run('list',{filters:{...filters,examYear:bankYearFilter(filters.examYear)},offset:Math.max(0,Math.floor(Number(pagination.offset)||0)),limit:Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30))),includeImages:pagination.includeImages!==false});}
  async listFacets(fields=['topic','subtopic','year']){return this._run('facets',{fields});}
  async createTask(input){return this._run('create',{record:await this._clean({...input,id:input.id||bankIdentity()}),now:new Date().toISOString()});}
  async updateTask(id,input,revision,{confirmExamReset=false}={}){if(!Number.isInteger(revision))throw new BankStorageError('Требуется revision','REVISION_CONFLICT');return this._run('update',{record:await this._clean({...input,id}),revision,confirmExamReset,now:new Date().toISOString()});}
- async listYearTargets(filters={}){return this._run('year_targets',{filters});}
- async updateExamYears(targets,mode,values){return this._run('year_update',{targets,mode,years:bankExamYears(values),now:new Date().toISOString()});}
+ async listYearTargets(filters={}){return this._run('year_targets',{filters:{...filters,examYear:bankYearFilter(filters.examYear)}});}
+ async updateExamYears(targets,mode,values){if(!Array.isArray(values))throw new BankStorageError('Требуется массив годов','INVALID_EXAM_YEARS');return this._run('year_update',{targets,mode,years:bankExamYears(values),now:new Date().toISOString()});}
  async deleteTask(id,revision){return this._run('delete',{id:String(id),revision:revision??null});}
  async importBank(file,{signal}={}){
   const data=typeof file==='string'?JSON.parse(file):file;

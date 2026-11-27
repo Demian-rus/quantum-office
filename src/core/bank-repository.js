@@ -72,13 +72,17 @@ function bankClone(e){return structuredClone(e);}
 function bankPortable(e){
  const x={};for(const k of BANK_RECORD_FIELDS)if(e[k]!==undefined)x[k]=bankClone(e[k]);return x;
 }
+function bankYearFilter(filter){
+ if(filter===undefined||filter===null||filter===''||filter==='all')return 'all';
+ if(filter==='none')return 'none';
+ if(!['number','string'].includes(typeof filter)||!/^\d{4}$/.test(String(filter))||Number(filter)<1900||Number(filter)>2099)throw new BankStorageError('Недопустимый фильтр года','INVALID_EXAM_YEARS');
+ return String(filter);
+}
 function bankYearMatch(e,filter){
- if(filter===undefined||filter===null||filter===''||filter==='all')return true;
+ filter=bankYearFilter(filter);
+ if(filter==='all')return true;
  const years=bankValidateExamYears(e);
- if(filter==='none')return !years.length;
- const year=Number(filter);
- if(!Number.isInteger(year)||year<1900||year>2099)throw new BankStorageError('Недопустимый фильтр года','INVALID_EXAM_YEARS');
- return years.includes(year);
+ return filter==='none'?!years.length:years.includes(Number(filter));
 }
 function bankSearchMatch(e,filters={}){
  if(!bankYearMatch(e,filters.examYear))return false;
@@ -322,6 +326,7 @@ class BankRepository{
   });
  }
  async listTasks(filters={},pagination={}){
+  filters={...filters,examYear:bankYearFilter(filters.examYear)};
   const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30)));
   const offset=Math.max(0,Math.floor(Number(pagination.offset)||0));
   const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
@@ -335,7 +340,7 @@ class BankRepository{
    };
    const read=(request,success)=>{
     request.onerror=()=>fail(request.error||Error('Ошибка поиска по банку'));
-    request.onsuccess=()=>success(request.result);
+    request.onsuccess=()=>{try{success(request.result);}catch(error){fail(error);}};
    };
    const hasSearch=!!String(filters.search||'').trim();
    if(!key&&!hasSearch&&(!filters.examYear||filters.examYear==='all')){
@@ -455,6 +460,7 @@ class BankRepository{
  }
  // A single metadata-only snapshot for page/filter-wide selection.
  async listYearTargets(filters={}){
+  filters={...filters,examYear:bankYearFilter(filters.examYear)};
   return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
    const list=[],req=tx.objectStore('tasks').index('bankNumber').openCursor();
    req.onerror=()=>fail(req.error);req.onsuccess=()=>{try{const c=req.result;if(!c){set(list);return;}
@@ -463,6 +469,7 @@ class BankRepository{
   });
  }
  async updateExamYears(targets,mode,values){
+  if(!Array.isArray(values))throw new BankStorageError('Требуется массив годов','INVALID_EXAM_YEARS');
   const years=bankExamYears(values);
   if(!['add','remove','replace'].includes(mode)||!Array.isArray(targets)||targets.length>20000||new Set(targets.map(t=>t.id)).size!==targets.length)throw new BankStorageError('Некорректная массовая операция','INVALID_EXAM_YEARS');
   return bankTransaction(this._db(),'tasks','readwrite',(tx,set,fail)=>{

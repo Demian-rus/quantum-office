@@ -2121,6 +2121,14 @@ async function qwBank(previousFilters={}){
     await qwImage(image);
     if(!canAdd())return;
    }
+   if(modelYear){
+    const exam=modelExam||found[0].exam;
+    const fresh=new Map((await qwBankRepository.listYearTargets({exam,examYear:String(modelYear)})).map(e=>[e.id,e.revision]));
+    if(!canAdd())return;
+    const stale=found.filter(e=>fresh.get(e.id)!==e.revision).length;
+    if(stale)throw Error('Актуальность или содержание изменились: '+stale+'. Ничего не добавлено.');
+    if(!replace&&qwDoc.tasks.some(t=>t.source?.kind!=='bank'||!fresh.has(t.source.id)))throw Error('В текущей работе есть задания без подтверждения актуальности. Создайте новый вариант.');
+   }
    if(canAdd()){
     if(pick('examYear')!==filterYear||pick('exam')!==filterExam)throw Error('Фильтр изменился. Повторите выбор.');
     addTasks(found,replace,single,modelYear);

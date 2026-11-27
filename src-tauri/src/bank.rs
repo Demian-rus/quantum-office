@@ -187,7 +187,7 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   },
   "year_update"=>{
    let targets=p["targets"].as_array().context("INVALID_REQUEST: targets")?;ensure!(targets.len()<=20000,"LIMIT: targets");
-   let years=exam_years(p.get("years"))?;let mode=s(p,"mode")?;ensure!(matches!(mode,"add"|"remove"|"replace"),"INVALID_REQUEST: mode");
+   ensure!(p.get("years").is_some(),"INVALID_EXAM_YEARS: Массив годов");let years=exam_years(p.get("years"))?;let mode=s(p,"mode")?;ensure!(matches!(mode,"add"|"remove"|"replace"),"INVALID_REQUEST: mode");
    let now=s(p,"now")?;let mut seen=std::collections::HashSet::new();let mut changed=0;
    for target in targets{
     cancel(f)?;let id=s(target,"id")?;ensure!(seen.insert(id),"INVALID_REQUEST: duplicate target");
@@ -243,7 +243,7 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   },
   _=>bail!("INVALID_REQUEST: unknown operation")
  };
- cancel(f)?;if writable{set(c,"generation",&json!(gen(c)?.checked_add(1).context("generation overflow")?))?;}tx.commit()?;Ok(result)
+ cancel(f)?;if writable&&(op!="year_update"||result["changed"]!=0){set(c,"generation",&json!(gen(c)?.checked_add(1).context("generation overflow")?))?;}tx.commit()?;Ok(result)
 }
 #[cfg(test)]mod tests{
  use super::*;
