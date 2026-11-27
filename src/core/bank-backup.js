@@ -10,6 +10,23 @@ const BANK_SHA='SHA-256';
 export class BankBackupError extends Error{
  constructor(message,code='BACKUP_INVALID'){super(message);this.name='BankBackupError';this.code=code;}
 }
+// Missing metadata is intentionally not materialized in old backups.
+export function bankExamYears(value){
+ if(value===undefined)return [];
+ if(!Array.isArray(value)||value.some(y=>!Number.isInteger(y)||y<1900||y>2099))throw new BankBackupError('Годы актуальности: целые числа от 1900 до 2099','INVALID_EXAM_YEARS');
+ return [...new Set(value)].sort((a,b)=>a-b);
+}
+export function bankValidateExamYears(record){
+ const years=bankExamYears(record.examYears);
+ if(years.length&&!['ege','oge'].includes(record.exam))throw new BankBackupError('Выберите тип экзамена для годов актуальности','INVALID_EXAM_YEARS');
+ return years;
+}
+export function bankChangeExamYears(record,mode,years){
+ const old=bankValidateExamYears(record);
+ const result=mode==='add'?bankExamYears([...old,...years]):mode==='remove'?old.filter(y=>!years.includes(y)):mode==='replace'?years:null;
+ if(!result)throw new BankBackupError('Неизвестная операция актуальности','INVALID_EXAM_YEARS');
+ return bankValidateExamYears({...record,examYears:result});
+}
 export function bankStableJSON(value){
  if(value===null)return 'null';
  if(typeof value==='string'||typeof value==='boolean')return JSON.stringify(value);
@@ -72,6 +89,8 @@ export function validateBankBackupStructure(body){
    typeof record.task.prompt!=='string'||!Number.isInteger(record.revision)||record.revision<1||
    typeof record.createdAt!=='string'||typeof record.updatedAt!=='string')
    throw new BankBackupError('Некорректная запись банка','BACKUP_RECORD');
+  const years=bankValidateExamYears(record);
+  if(record.examYears!==undefined&&bankStableJSON(years)!==bankStableJSON(record.examYears))throw new BankBackupError('Неканонические годы актуальности в архиве','INVALID_EXAM_YEARS');
   if(ids.has(record.id))throw new BankBackupError('Повторяется ID записи','BACKUP_DUPLICATE_ID');
   if(numbers.has(record.bankNumber))throw new BankBackupError('Повторяется постоянный номер','BACKUP_DUPLICATE_NUMBER');
   ids.add(record.id);numbers.add(record.bankNumber);max=Math.max(max,record.bankNumber);

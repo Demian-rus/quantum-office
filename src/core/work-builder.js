@@ -682,7 +682,7 @@ function qwBankNormalize(x){
   year:/^(19|20)\d{2}$/.test(String(x.year??''))?String(x.year):'',
   part:['1','2'].includes(String(x.part??''))?String(x.part):'',
   slot:/^([1-9]|[1-3]\d|40)$/.test(String(x.slot??''))?String(x.slot):'',
-  difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',task};
+  difficulty:['basic','advanced','high'].includes(x.difficulty)?x.difficulty:'',...(x.examYears!==undefined?{examYears:bankValidateExamYears({...x,exam:['general','oge','ege'].includes(x.exam)?x.exam:task.exam})}:{}),task};
 }
 const qwBankRepository=createOfficeBankRepository({normalize:qwBankNormalize});
 const qwBankStorageName=qoNativeDesktop?'SQLite':'IndexedDB';
