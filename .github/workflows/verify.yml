@@ -22,6 +22,9 @@ jobs:
             node --check --input-type=commonjs < "$file"
             node -e "new (require('node:vm').Script)(require('node:fs').readFileSync(process.argv[1],'utf8'),{filename:process.argv[1]})" "$file"
           done
+      - name: Execute standalone native print script, not only syntax-check it
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; import vm from 'node:vm'; const context={window:{},document:{body:{}}}; vm.runInNewContext(fs.readFileSync('dist-native/print.js','utf8'),context); if(typeof context.window.qwPrintReady?.then!=='function') throw Error('Native print entry point missing'); await context.window.qwPrintReady"
       - run: node -e "const fs=require('fs');if(!fs.readFileSync('dist/index.html','utf8').includes('grid-scroll'))process.exit(1)"
       # Direct HTML download; unlike the ZIP artifact this requires no extraction.
       - uses: actions/upload-artifact@v7
