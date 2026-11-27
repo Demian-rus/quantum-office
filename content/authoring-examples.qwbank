@@ -1,0 +1,273 @@
+{
+  "format": "quantum-work-bank",
+  "version": 1,
+  "items": [
+    {
+      "id": "qo-authoring-example-velocity",
+      "bankNumber": 0,
+      "subject": "physics",
+      "grade": "9",
+      "exam": "oge",
+      "topic": "Механика",
+      "subtopic": "Кинематика",
+      "origin": "original",
+      "year": "2026",
+      "difficulty": "basic",
+      "task": {
+        "id": "qo-authoring-task-velocity",
+        "title": "Путь по графику скорости",
+        "type": "graph",
+        "grade": "9",
+        "exam": "oge",
+        "topic": "Механика",
+        "subtopic": "Кинематика",
+        "origin": "original",
+        "points": 1,
+        "part": "Часть 1",
+        "answerVisible": true,
+        "solutionVisible": false,
+        "figure": "graph",
+        "prompt": "На графике показана зависимость скорости тележки от времени. Определите путь за первые 6 с. Ответ дайте в метрах.",
+        "answer": "20",
+        "comment": "Путь равен площади под графиком: \\(s=\\frac{2\\cdot4}{2}+4\\cdot4=20\\) м.",
+        "criteria": "1 балл — ответ 20; иначе 0 баллов.",
+        "graph": {
+          "xmin": 0,
+          "xmax": 7,
+          "ymin": 0,
+          "ymax": 5,
+          "step": 1,
+          "xlabel": "t, с",
+          "ylabel": "v, м/с",
+          "grid": true,
+          "connected": true,
+          "points": [
+            {
+              "x": 0,
+              "y": 0
+            },
+            {
+              "x": 2,
+              "y": 4
+            },
+            {
+              "x": 6,
+              "y": 4
+            }
+          ]
+        },
+        "publishing": {
+          "figure": {
+            "width": 43,
+            "maxMm": 75,
+            "position": "below",
+            "align": "center"
+          }
+        }
+      }
+    },
+    {
+      "id": "qo-authoring-example-forces",
+      "bankNumber": 0,
+      "subject": "physics",
+      "grade": "9",
+      "exam": "oge",
+      "topic": "Механика",
+      "subtopic": "Динамика",
+      "origin": "original",
+      "year": "2026",
+      "difficulty": "basic",
+      "task": {
+        "id": "qo-authoring-task-forces",
+        "title": "Ускорение бруска",
+        "type": "diagram",
+        "grade": "9",
+        "exam": "oge",
+        "topic": "Механика",
+        "subtopic": "Динамика",
+        "origin": "original",
+        "points": 1,
+        "part": "Часть 1",
+        "answerVisible": true,
+        "solutionVisible": false,
+        "figure": "diagram",
+        "prompt": "Брусок массой 2 кг движется по горизонтальной поверхности. Сила тяги направлена вправо и равна 10 Н, сила трения — влево и равна 4 Н. Найдите модуль ускорения бруска в м/с².",
+        "answer": "3",
+        "comment": "По второму закону Ньютона \\(ma=F-F_{\\mathrm{тр}}\\). Тогда \\(a=\\frac{10-4}{2}=3\\) м/с².",
+        "criteria": "1 балл — ответ 3; иначе 0 баллов.",
+        "diagram": [
+          {
+            "id": "floor",
+            "kind": "line",
+            "x": 65,
+            "y": 210,
+            "x2": 455,
+            "y2": 210,
+            "label": ""
+          },
+          {
+            "id": "body",
+            "kind": "block",
+            "x": 200,
+            "y": 140,
+            "x2": 320,
+            "y2": 210,
+            "label": ""
+          },
+          {
+            "id": "pull",
+            "kind": "forceVector",
+            "x": 260,
+            "y": 175,
+            "x2": 410,
+            "y2": 175,
+            "label": "F"
+          },
+          {
+            "id": "friction",
+            "kind": "forceVector",
+            "x": 260,
+            "y": 175,
+            "x2": 200,
+            "y2": 175,
+            "label": "F_{тр}"
+          }
+        ],
+        "publishing": {
+          "figure": {
+            "width": 45,
+            "maxMm": 80,
+            "position": "below",
+            "align": "center"
+          }
+        }
+      }
+    },
+    {
+      "id": "qo-authoring-example-quadratic",
+      "bankNumber": 0,
+      "subject": "algebra",
+      "grade": "8",
+      "exam": "general",
+      "topic": "Квадратные уравнения",
+      "subtopic": "Дискриминант",
+      "origin": "original",
+      "year": "2026",
+      "difficulty": "basic",
+      "task": {
+        "id": "qo-authoring-task-quadratic",
+        "title": "Корни квадратного уравнения",
+        "type": "short",
+        "grade": "8",
+        "exam": "general",
+        "topic": "Квадратные уравнения",
+        "subtopic": "Дискриминант",
+        "origin": "original",
+        "points": 2,
+        "part": "Часть 1",
+        "answerVisible": true,
+        "solutionVisible": false,
+        "figure": "none",
+        "prompt": "Решите уравнение \\(2x^2-5x-3=0\\).",
+        "answer": "−0,5; 3",
+        "comment": "\\(D=(-5)^2-4\\cdot2\\cdot(-3)=49\\).\n\\(x_{1,2}=\\frac{5\\pm\\sqrt{49}}{4}\\).\n\\(x_1=-\\frac12\\), \\(x_2=3\\).",
+        "criteria": "2 балла — найдены оба корня с обоснованием; 1 балл — верно найден один корень или правильно вычислен дискриминант с последующей вычислительной ошибкой; 0 баллов — иначе."
+      }
+    },
+    {
+      "id": "qo-authoring-example-triangle",
+      "bankNumber": 0,
+      "subject": "geometry",
+      "grade": "8",
+      "exam": "general",
+      "topic": "Треугольники",
+      "subtopic": "Теорема Пифагора",
+      "origin": "original",
+      "year": "2026",
+      "difficulty": "basic",
+      "task": {
+        "id": "qo-authoring-task-triangle",
+        "title": "Гипотенуза",
+        "type": "diagram",
+        "grade": "8",
+        "exam": "general",
+        "topic": "Треугольники",
+        "subtopic": "Теорема Пифагора",
+        "origin": "original",
+        "points": 1,
+        "part": "Часть 1",
+        "answerVisible": true,
+        "solutionVisible": false,
+        "figure": "diagram",
+        "prompt": "В прямоугольном треугольнике ABC угол C прямой, AC = 6 см, BC = 8 см. Найдите AB.",
+        "answer": "10 см",
+        "comment": "\\(AB=\\sqrt{AC^2+BC^2}=\\sqrt{36+64}=10\\) см.",
+        "criteria": "1 балл — ответ 10 см; иначе 0 баллов.",
+        "diagram": [
+          {
+            "id": "triangle",
+            "kind": "rightTriangle",
+            "x": 100,
+            "y": 50,
+            "x2": 420,
+            "y2": 290,
+            "label": "",
+            "vertices": [
+              {
+                "x": 100,
+                "y": 290,
+                "label": "C"
+              },
+              {
+                "x": 100,
+                "y": 50,
+                "label": "A"
+              },
+              {
+                "x": 420,
+                "y": 290,
+                "label": "B"
+              }
+            ],
+            "edgeLabels": [
+              "6",
+              "",
+              "8"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "qo-authoring-example-heat",
+      "bankNumber": 0,
+      "subject": "physics",
+      "grade": "8",
+      "exam": "general",
+      "topic": "Тепловые явления",
+      "subtopic": "Нагревание",
+      "origin": "original",
+      "year": "2026",
+      "difficulty": "basic",
+      "task": {
+        "id": "qo-authoring-task-heat",
+        "title": "Количество теплоты",
+        "type": "short",
+        "grade": "8",
+        "exam": "general",
+        "topic": "Тепловые явления",
+        "subtopic": "Нагревание",
+        "origin": "original",
+        "points": 1,
+        "part": "Часть 1",
+        "answerVisible": true,
+        "solutionVisible": false,
+        "figure": "none",
+        "prompt": "Воду массой 0,5 кг нагревают на 20 °C. Удельная теплоёмкость воды 4200 Дж/(кг·°C). Определите количество теплоты в джоулях.",
+        "answer": "42000",
+        "comment": "\\(Q=cm\\Delta t=4200\\cdot0{,}5\\cdot20=42000\\) Дж.",
+        "criteria": "1 балл — ответ 42000; иначе 0 баллов."
+      }
+    }
+  ]
+}
