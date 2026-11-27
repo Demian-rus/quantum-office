@@ -248,6 +248,61 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
 #[cfg(test)]mod tests{
  use super::*;
  fn record(id:&str)->Value{json!({"id":id,"bankNumber":0,"subject":"physics","grade":"8","exam":"general","year":"","part":"","slot":"","difficulty":"","type":"short","topic":"Механика","subtopic":"","origin":"original","task":{"id":id,"type":"short","figure":"none","image":"","prompt":"Скорость","answer":"2","comment":"решение","criteria":"1"}})}
+
+ #[test]
+ fn bank03_exam_years_atomic_and_compatible()->Result<()>{
+  let dir=tempfile::tempdir()?;let path=dir.path().join("bank.sqlite3");let other=dir.path().join("other.sqlite3");let f=AtomicBool::new(false);
+  let run_here=|op:&str,p:Value|run(&path,op,&p,&f);
+  run_here("open",json!({}))?;
+  let mut old=record("a");old["exam"]=json!("ege");old["year"]=json!("2019");old["task"]["image"]=json!("data:image/png;base64,YWJj");
+  let a=run_here("create",json!({"record":old,"now":"2026-11-27"}))?;
+  assert!(a.get("examYears").is_none());
+  assert_eq!(run_here("list",json!({"filters":{"examYear":"none"},"offset":0,"limit":30}))?["total"],1);
+  assert_eq!(run_here("list",json!({"filters":{"examYear":"2019"},"offset":0,"limit":30}))?["total"],0);
+  let mut b=record("b");b["exam"]=json!("ege");b["examYears"]=json!([2027,2026,2027]);
+  let b=run_here("create",json!({"record":b,"now":"2026-11-27"}))?;assert_eq!(b["examYears"],json!([2026,2027]));
+  let targets=run_here("year_targets",json!({"filters":{"exam":"ege"}}))?;
+  let before=run_here("snapshot",json!({}))?;
+  let mut stale=targets.clone();stale[1]["revision"]=json!(999);
+  assert!(run_here("year_update",json!({"targets":stale,"mode":"replace","years":[2028],"now":"2026-11-27"})).is_err());
+  assert_eq!(before,run_here("snapshot",json!({}))?);
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"add","years":[2027],"now":"2026-11-27"}))?["changed"],1);
+  let changed=run_here("get",json!({"id":"a"}))?;
+  assert_eq!(changed["examYears"],json!([2027]));assert_eq!(changed["task"],a["task"]);assert_eq!(changed["bankNumber"],a["bankNumber"]);assert_eq!(changed["createdAt"],a["createdAt"]);assert_eq!(changed["year"],"2019");
+  assert_eq!(run_here("import",json!({"records":[a],"now":"2026-11-27"}))?,json!({"imported":0,"skipped":1,"yearConflicts":1}));
+  assert_eq!(run_here("get",json!({"id":"a"}))?,changed);
+  let filtered=run_here("list",json!({"filters":{"subject":"physics","exam":"ege","examYear":"2027","search":"скорость"},"offset":1,"limit":1,"includeImages":false}))?;
+  assert_eq!(filtered["total"],2);assert_eq!(filtered["items"][0]["id"],"b");
+  assert_eq!(run_here("facets",json!({"fields":["examYear"]}))?["examYear"],json!(["2026","2027"]));
+  let targets=run_here("year_targets",json!({"filters":{"examYear":"2027"}}))?;
+  let before=run_here("snapshot",json!({}))?;
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"add","years":[2027],"now":"2026-11-27"}))?["changed"],0);
+  assert_eq!(before,run_here("snapshot",json!({}))?);
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"remove","years":[2027],"now":"2026-11-27"}))?["changed"],2);
+  let after=run_here("get",json!({"id":"a"}))?;assert_eq!(after["examYears"],json!([]));
+  let refs=run_here("year_targets",json!({"filters":{"exam":"ege"}}))?;
+  assert_eq!(run_here("year_update",json!({"targets":refs,"mode":"replace","years":[2028,2027],"now":"2026-11-27"}))?["changed"],2);
+  let snap=run_here("snapshot",json!({}))?;
+  for bad in [json!(null),json!([1899]),json!([2100]),json!([2027.5]),json!(["2027"])]{
+   let mut input=record("invalid");input["exam"]=json!("ege");input["examYears"]=bad;
+   assert!(run_here("create",json!({"record":input,"now":"2026-11-27"})).is_err());
+  }
+  assert_eq!(snap,run_here("snapshot",json!({}))?);
+  let mut input=run_here("get",json!({"id":"a"}))?;let rev=input["revision"].clone();input["exam"]=json!("oge");input["examYears"]=json!([]);
+  assert!(run_here("update",json!({"record":input,"revision":rev,"now":"2026-11-27"})).is_err());
+  let reset=run_here("update",json!({"record":input,"revision":rev,"confirmExamReset":true,"now":"2026-11-27"}))?;
+  assert_eq!(reset["exam"],"oge");assert_eq!(reset["examYears"],json!([]));
+  let snapshot=run_here("snapshot",json!({}))?;
+  run(&other,"open",&json!({}),&f)?;
+  let body=json!({"format":"quantum-work-bank-backup","version":3,"schema":1,"count":2,"records":snapshot["records"],"meta":snapshot["meta"]}).to_string();
+  run(&other,"restore",&json!({"canonical":body,"sha256":sha(body.as_bytes()),"mode":"empty","generation":0}),&f)?;
+  let restored=run(&other,"snapshot",&json!({}),&f)?;
+  assert_eq!(restored["records"],snapshot["records"]);assert_eq!(restored["meta"],snapshot["meta"]);
+  assert_eq!(run_here("get",json!({"id":"b"}))?["examYears"],json!([2027,2028]));
+  assert_eq!(run_here("diagnostics",json!({}))?["references"],1);
+  Ok(())
+ }
+
  #[test]fn persistence_cas_and_rollback()->Result<()>{
   let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let f=AtomicBool::new(false);
   run(&p,"open",&json!({}),&f)?;let a=run(&p,"create",&json!({"record":record("a"),"now":"2026-11-24"}),&f)?;assert_eq!(a["bankNumber"],1);assert_eq!(run(&p,"get",&json!({"id":"a"}),&f)?,a);
