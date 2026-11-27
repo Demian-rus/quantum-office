@@ -1,17 +1,17 @@
-import {createBankBackupV3,verifyBankBackupV3,bankStableJSON} from './bank-backup.js';
+import {createBankBackupV3,verifyBankBackupV3,bankStableJSON,bankExamYears,bankValidateExamYears,bankChangeExamYears} from './bank-backup.js';
 import {BANK_ASSET_STORE,BankAssetError,bankAssetPrepareMany,bankAssetUnpack,bankAssetVerifyMap,bankAssetCollect,bankAssetWriteSet,bankAssetWithoutImage,bankAssetValidate} from './bank-assets.js';
 /* TASK166.1 — one durable bank repository for browser HTML.
    Future native SQLite implements the same asynchronous contract; no mock
    SQLite adapter is shipped with this browser implementation. */
 const BANK_DB_NAME='quantum-office-bank';
-const BANK_DB_VERSION=2;
+const BANK_DB_VERSION=3;
 const BANK_LEGACY_KEY='quantum-office.work-bank.v1';
 const BANK_LEGACY_COUNTER_KEY='quantum-office.work-bank.number-sequence.v1';
 const BANK_NUMBER_LIMIT=99999;
 const BANK_PAGE_LIMIT=80;
 const BANK_FILTER_FIELDS=['subject','grade','exam','year','part','slot','difficulty','type','topic','subtopic','origin'];
 const BANK_INDEX_FIELDS=['bankNumber',...BANK_FILTER_FIELDS,'updatedAt'];
-const BANK_RECORD_FIELDS=['id','bankNumber','subject','grade','exam','topic','subtopic','origin','year','part','slot','difficulty','task'];
+const BANK_RECORD_FIELDS=['id','bankNumber','subject','grade','exam','topic','subtopic','origin','year','part','slot','difficulty','task','examYears'];
 
 class BankStorageError extends Error{
  constructor(message,code='BANK_STORAGE'){super(message);this.name='BankStorageError';this.code=code;}
@@ -56,11 +56,11 @@ function bankSignature(e){
  // All other portable fields (including the complete validated QWORK task)
  // must match before an imported entry may be safely skipped.
  const content=bankPortable(e);
- delete content.id;delete content.bankNumber;
+ delete content.id;delete content.bankNumber;delete content.examYears;
  return bankCanonicalJSON(content);
 }
 function bankStoredSignature(e){
- const content=bankPortable(e);delete content.id;delete content.bankNumber;
+ const content=bankPortable(e);delete content.id;delete content.bankNumber;delete content.examYears;
  if(e.imageAsset)content.imageAsset=e.imageAsset;
  return bankCanonicalJSON(content);
 }
@@ -72,7 +72,20 @@ function bankClone(e){return structuredClone(e);}
 function bankPortable(e){
  const x={};for(const k of BANK_RECORD_FIELDS)if(e[k]!==undefined)x[k]=bankClone(e[k]);return x;
 }
+function bankYearFilter(filter){
+ if(filter===undefined||filter===null||filter===''||filter==='all')return 'all';
+ if(filter==='none')return 'none';
+ if(!['number','string'].includes(typeof filter)||!/^\d{4}$/.test(String(filter))||Number(filter)<1900||Number(filter)>2099)throw new BankStorageError('Недопустимый фильтр года','INVALID_EXAM_YEARS');
+ return String(filter);
+}
+function bankYearMatch(e,filter){
+ filter=bankYearFilter(filter);
+ if(filter==='all')return true;
+ const years=bankValidateExamYears(e);
+ return filter==='none'?!years.length:years.includes(Number(filter));
+}
 function bankSearchMatch(e,filters={}){
+ if(!bankYearMatch(e,filters.examYear))return false;
  for(const k of BANK_FILTER_FIELDS){
   const v=filters[k];if(v===undefined||v===null||v===''||v==='all')continue;
   if(String(k==='type'?e.task?.type:e[k]||'')!==String(v))return false;
@@ -118,6 +131,8 @@ class BankRepository{
      if(!tasks.indexNames.contains(name))
       tasks.createIndex(name,name,{unique:name==='bankNumber'});
     }
+    // Upgrade the index transactionally; existing task records and assets remain untouched.
+    if(!tasks.indexNames.contains('examYears'))tasks.createIndex('examYears','examYears',{multiEntry:true});
     if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});
     if(!db.objectStoreNames.contains(BANK_ASSET_STORE))db.createObjectStore(BANK_ASSET_STORE,{keyPath:'key'});
    };
@@ -138,6 +153,8 @@ class BankRepository{
    typeof normalized.task.prompt!=='string'||typeof normalized.id!=='string'||!normalized.id.trim()||
    normalized.id.length>80)throw new BankStorageError('Некорректная запись банка', 'INVALID_RECORD');
   const record=bankPortable(normalized);
+  if(input.examYears!==undefined)record.examYears=bankValidateExamYears({...record,examYears:input.examYears});
+  else if(record.examYears!==undefined)record.examYears=bankValidateExamYears(record);
   record.id=normalized.id;
   record.bankNumber=Number.isInteger(normalized.bankNumber)&&normalized.bankNumber>0&&normalized.bankNumber<=BANK_NUMBER_LIMIT?normalized.bankNumber:0;
   record.type=record.task.type;
@@ -311,10 +328,11 @@ class BankRepository{
   });
  }
  async listTasks(filters={},pagination={}){
+  filters={...filters,examYear:bankYearFilter(filters.examYear)};
   const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30)));
   const offset=Math.max(0,Math.floor(Number(pagination.offset)||0));
-  const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
-   (filters.type&&filters.type!=='all'?'type':null);
+  const key=!['all','none'].includes(filters.examYear)?'examYears':(BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
+   (filters.type&&filters.type!=='all'?'type':null));
   const data=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),source=key?store.index(key):store.index('bankNumber');
    const done=(items,total)=>{
@@ -324,10 +342,10 @@ class BankRepository{
    };
    const read=(request,success)=>{
     request.onerror=()=>fail(request.error||Error('Ошибка поиска по банку'));
-    request.onsuccess=()=>success(request.result);
+    request.onsuccess=()=>{try{success(request.result);}catch(error){fail(error);}};
    };
    const hasSearch=!!String(filters.search||'').trim();
-   if(!key&&!hasSearch){
+   if(!key&&!hasSearch&&(!filters.examYear||filters.examYear==='all')){
     read(source.count(),total=>{
      if(offset>=total){done([],total);return;}
      if(!offset){read(source.getAll(null,limit),items=>done(items,total));return;}
@@ -342,7 +360,7 @@ class BankRepository{
     return;
    }
    const items=[],matches=[];let total=0;
-   read(source.openCursor(key?IDBKeyRange.only(filters[key]):null),cursor=>{
+   read(source.openCursor(key?IDBKeyRange.only(key==='examYears'?Number(filters.examYear):filters[key]):null),cursor=>{
     if(!cursor){
      if(!key){done(items,total);return;}
      // Equal category keys are traversed by ID. Order by the permanent number
@@ -370,14 +388,14 @@ class BankRepository{
   return {...result,items:await bankHydrateSet({assets,records})};
  }
  async listFacets(fields=['topic','subtopic','year']){
-  const keys=fields.filter(k=>BANK_INDEX_FIELDS.includes(k)&&k!=='bankNumber');
+  const keys=fields.filter(k=>(BANK_INDEX_FIELDS.includes(k)&&k!=='bankNumber')||k==='examYear');
   return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
    const result={};let remaining=keys.length;
    if(!remaining){set(result);return;}
    const done=()=>{if(!--remaining)set(result);};
    for(const key of keys){
     result[key]=[];
-    const req=tx.objectStore('tasks').index(key).openKeyCursor(null,'nextunique');
+    const req=tx.objectStore('tasks').index(key==='examYear'?'examYears':key).openKeyCursor(null,'nextunique');
     req.onerror=()=>fail(req.error||Error('Не удалось прочитать категории'));
     req.onsuccess=()=>{
      const cursor=req.result;
@@ -412,7 +430,7 @@ class BankRepository{
   });
   return bankAssetUnpack(saved,packed.assets);
  }
- async updateTask(id,input,revision){
+ async updateTask(id,input,revision,{confirmExamReset=false}={}){
   const packed=await bankAssetPrepareMany([this._clean({...input,id})]),candidate=packed.records[0];
   const saved=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
    bankAssetWriteSet(tx,packed.assets,fail);
@@ -423,6 +441,10 @@ class BankRepository{
     if(!Number.isInteger(revision)||revision!==old.revision){
      fail(new BankStorageError('Задание изменено в другом окне. Скопируйте текст и откройте запись заново.','REVISION_CONFLICT'));return;
     }
+    if(old.exam===candidate.exam&&candidate.examYears===undefined&&old.examYears!==undefined)candidate.examYears=old.examYears;
+    if(old.exam!==candidate.exam&&bankValidateExamYears(old).length&&!confirmExamReset){
+     fail(new BankStorageError('Подтвердите сброс годов при смене экзамена','EXAM_RESET_REQUIRED'));return;
+    }
     const next={...candidate,id:old.id,bankNumber:old.bankNumber,revision:old.revision+1,
      createdAt:old.createdAt,updatedAt:new Date().toISOString()};
     store.put(next);set(next);
@@ -430,6 +452,32 @@ class BankRepository{
    req.onerror=()=>fail(req.error);
   });
   return bankAssetUnpack(saved,packed.assets);
+ }
+ // A single metadata-only snapshot for page/filter-wide selection.
+ async listYearTargets(filters={}){
+  filters={...filters,examYear:bankYearFilter(filters.examYear)};
+  return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
+   const list=[],specific=!['all','none'].includes(filters.examYear),req=tx.objectStore('tasks').index(specific?'examYears':'bankNumber').openCursor(specific?IDBKeyRange.only(Number(filters.examYear)):null);
+   req.onerror=()=>fail(req.error);req.onsuccess=()=>{try{const c=req.result;if(!c){if(specific)list.sort((a,b)=>a.bankNumber-b.bankNumber);set(list.map(({bankNumber,...target})=>target));return;}
+    const r=c.value;if(bankSearchMatch(r,filters))list.push({id:r.id,revision:r.revision,exam:r.exam,bankNumber:r.bankNumber});c.continue();
+   }catch(e){fail(e);}};
+  });
+ }
+ async updateExamYears(targets,mode,values){
+  if(!Array.isArray(values))throw new BankStorageError('Требуется массив годов','INVALID_EXAM_YEARS');
+  const years=bankExamYears(values);
+  if(!['add','remove','replace'].includes(mode)||!Array.isArray(targets)||targets.length>20000||new Set(targets.map(t=>t.id)).size!==targets.length)throw new BankStorageError('Некорректная массовая операция','INVALID_EXAM_YEARS');
+  return bankTransaction(this._db(),'tasks','readwrite',(tx,set,fail)=>{
+   const store=tx.objectStore('tasks');let remaining=targets.length,changed=0;const now=new Date().toISOString();
+   if(!remaining){set({changed:0});return;}
+   for(const target of targets){const req=store.get(target.id);req.onerror=()=>fail(req.error);
+    req.onsuccess=()=>{try{const old=req.result;if(!old||!Number.isInteger(target.revision)||old.revision!==target.revision)throw new BankStorageError('Банк изменился. Повторите выбор.','REVISION_CONFLICT');
+     const next=bankChangeExamYears(old,mode,years);
+     if(bankCanonicalJSON(next)!==bankCanonicalJSON(bankValidateExamYears(old))){store.put({...old,examYears:next,revision:old.revision+1,updatedAt:now});changed++;}
+     if(!--remaining)set({changed});
+    }catch(e){fail(e);}};
+   }
+  });
  }
  async deleteTask(id,revision){
   return bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readwrite',(tx,set,fail)=>{
@@ -459,7 +507,7 @@ class BankRepository{
    const abort=()=>fail(new BankAssetError('Импорт отменён','ASSET_CANCELLED'));
    if(signal){signal.addEventListener('abort',abort,{once:true});for(const event of ['complete','abort'])tx.addEventListener(event,()=>signal.removeEventListener('abort',abort),{once:true});if(signal.aborted){abort();return;}}
    bankAssetWriteSet(tx,packed.assets,fail);
-   const store=tx.objectStore('tasks'),meta=tx.objectStore('meta'),signatures=new Set(),used=new Set(),ids=new Set();
+   const store=tx.objectStore('tasks'),meta=tx.objectStore('meta'),signatures=new Map(),used=new Set(),ids=new Set();
    let high=0,sequence=0;
    const marker=meta.get('sequence');
    marker.onsuccess=()=>{sequence=Number(marker.result?.value)||0;};
@@ -467,15 +515,15 @@ class BankRepository{
    const cursor=store.openCursor();
    cursor.onerror=()=>fail(cursor.error);
    cursor.onsuccess=()=>{
-    const c=cursor.result;if(c){const e=c.value;signatures.add(bankStoredSignature(e));used.add(e.bankNumber);ids.add(e.id);high=Math.max(high,e.bankNumber);c.continue();return;}
+    const c=cursor.result;if(c){const e=c.value;signatures.set(bankStoredSignature(e),bankValidateExamYears(e));used.add(e.bankNumber);ids.add(e.id);high=Math.max(high,e.bankNumber);c.continue();return;}
     // All existing keys and the sequence are consulted in the same write
     // transaction, so two tabs cannot reserve the same number.
-    let imported=0,skipped=0;let next=Math.max(sequence,high);
+    let imported=0,skipped=0,yearConflicts=0;let next=Math.max(sequence,high);
     const now=new Date().toISOString();
     for(const e of entries){
      const signature=bankStoredSignature(e);
-     if(signatures.has(signature)){skipped++;continue;}
-     signatures.add(signature);
+     if(signatures.has(signature)){skipped++;if(bankCanonicalJSON(signatures.get(signature))!==bankCanonicalJSON(bankValidateExamYears(e)))yearConflicts++;continue;}
+     signatures.set(signature,bankValidateExamYears(e));
      let bankNumber=e.bankNumber;
      if(!bankNumber||used.has(bankNumber)||bankNumber<=next){
       do{next++;}while(used.has(next)&&next<=BANK_NUMBER_LIMIT);
@@ -490,7 +538,7 @@ class BankRepository{
      try{store.add({...e,id,bankNumber,revision:1,createdAt:now,updatedAt:now});imported++;}catch(error){fail(error);return;}
     }
     meta.put({key:'sequence',value:next});
-    set({imported,skipped});
+    set({imported,skipped,...(yearConflicts?{yearConflicts}:{})});
    };
   });
  }

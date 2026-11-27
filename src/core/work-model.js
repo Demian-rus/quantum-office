@@ -121,6 +121,10 @@ function qwValidate(raw){
  const d=qwProject(),ids=new Set();
  for(const key of ['title','grade','topic','variant','instructions'])d[key]=qwText(raw[key],key==='instructions'?4000:key==='title'||key==='topic'?160:24);
  d.title=d.title.trim()||'Новая работа';d.id=qwText(raw.id,80)||qwId();d.subject=Object.hasOwn(QW_SUBJECTS,raw.subject)?raw.subject:'physics';d.identity=raw.identity===true;d.layout=['compact','practice','booklet','exam'].includes(raw.layout)?raw.layout:'worksheet';d.exam=raw.exam==='oge'?'oge':'ege';
+ if(raw.examYear!==undefined){
+  if(!Number.isInteger(raw.examYear)||raw.examYear<1900||raw.examYear>2099)throw Error('Некорректный год экзаменационной модели');
+  d.examYear=raw.examYear;
+ }
  if(raw.practice!==undefined){
   const p=raw.practice;if(!p||typeof p!=='object'||![1,2,3,4].includes(p.perPage)||!['none','fine','normal'].includes(p.grid))throw Error('Некорректные параметры листа для решения');
   d.practice={perPage:p.perPage,grid:p.grid};

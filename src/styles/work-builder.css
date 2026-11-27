@@ -875,3 +875,12 @@
 .qw-paper-task.qw-standard-task.qw-exam-publication>.qw-task-heading{display:block;grid-column:1;grid-row:1;margin:0 0 .8mm;text-align:left}
 .qw-paper-task.qw-standard-task.qw-exam-publication>:not(.qw-task-heading){grid-column:1;grid-row:auto}
 .qw-exam-publication .qw-exam-number-line{display:inline-block;font-family:inherit;font-size:calc(1em + 1pt);font-weight:700;line-height:1.2;text-align:left;border:0;padding:0;width:auto;height:auto;white-space:nowrap}
+
+/* BANK-03.1: compact metadata, never included in the print renderer. */
+.qw-year-tags,.qw-year-entry{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+.qw-year-tag{font-size:11px;line-height:1.3;border:1px solid var(--qo-border);border-radius:4px;padding:1px 5px;color:var(--qo-text);background:transparent}
+.qw-year-empty{font-size:11px;color:var(--qo-muted)}
+.qw-exam-years-editor{display:grid;gap:6px;min-width:0;padding:7px 0;border-top:1px solid var(--qo-border)}
+.qw-exam-years-editor strong{font-size:12px}.qw-year-entry input{min-width:0;width:74px}.qw-year-entry button{font-size:11px;padding:3px 6px}
+.qw-bank-year-operation:not([hidden]){display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--qo-border)}
+.qw-bank-year-operation label{display:flex;gap:4px;align-items:center;font-size:12px}.qw-bank-year-operation input{width:125px}

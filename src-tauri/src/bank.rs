@@ -9,6 +9,31 @@ fn sha(b:&[u8])->String{format!("{:x}",Sha256::digest(b))}
 fn decoder()->GeneralPurpose{GeneralPurpose::new(&base64::alphabet::STANDARD,GeneralPurposeConfig::new().with_decode_allow_trailing_bits(true).with_decode_padding_mode(DecodePaddingMode::Indifferent))}
 fn s<'a>(v:&'a Value,k:&str)->Result<&'a str>{v.get(k).and_then(Value::as_str).ok_or_else(||anyhow!("INVALID_RECORD: {}",k))}
 fn n(v:&Value,k:&str)->Result<i64>{v.get(k).and_then(Value::as_i64).ok_or_else(||anyhow!("INVALID_RECORD: {}",k))}
+fn exam_years(v:Option<&Value>)->Result<Vec<i64>>{
+ let mut years=Vec::new();
+ if let Some(value)=v{
+  for y in value.as_array().context("INVALID_EXAM_YEARS: Массив годов")?{
+   let y=y.as_i64().filter(|y|(1900..=2099).contains(y)).context("INVALID_EXAM_YEARS: 1900–2099")?;years.push(y);
+  }
+ }
+ years.sort_unstable();years.dedup();Ok(years)
+}
+fn record_years(r:&Value)->Result<Vec<i64>>{
+ let years=exam_years(r.get("examYears"))?;
+ ensure!(years.is_empty()||matches!(r["exam"].as_str(),Some("ege"|"oge")),"INVALID_EXAM_YEARS: Тип экзамена");
+ Ok(years)
+}
+fn filter_sql(filters:&serde_json::Map<String,Value>)->Result<(String,Vec<rusqlite::types::Value>)>{
+ let mut clauses=vec!["1=1".to_owned()];let mut args=Vec::new();
+ for k in FILTERS{if let Some(v)=filters.get(k).and_then(Value::as_str){if !v.is_empty()&&v!="all"{clauses.push(format!("json_extract(body,'$.{}')=?",k));args.push(v.to_owned().into());}}}
+ if let Some(value)=filters.get("examYear").and_then(Value::as_str){match value{
+  ""|"all"=>(), "none"=>clauses.push("coalesce(json_array_length(body,'$.examYears'),0)=0".into()),
+  _=>{let year=value.parse::<i64>().ok().filter(|y|(1900..=2099).contains(y)).context("INVALID_EXAM_YEARS: Фильтр")?;
+   clauses.push("EXISTS(SELECT 1 FROM json_each(tasks.body,'$.examYears') WHERE value=?)".into());args.push(year.into());}
+ }}
+ if let Some(term)=filters.get("search").and_then(Value::as_str){if !term.trim().is_empty(){clauses.push("instr(search_text,?)>0".into());args.push(term.trim().to_lowercase().into());}}
+ Ok((clauses.join(" AND "),args))
+}
 fn cancel(f:&AtomicBool)->Result<()>{ensure!(!f.load(Ordering::SeqCst),"CANCELLED: Операция отменена");Ok(())}
 fn meta(c:&Connection,k:&str)->Result<Value>{let x:String=c.query_row("SELECT value FROM meta WHERE key=?1",[k],|r|r.get(0))?;Ok(serde_json::from_str(&x)?)}
 fn set(c:&Connection,k:&str,v:&Value)->Result<()>{c.execute("INSERT INTO meta(key,value) VALUES(?1,?2) ON CONFLICT(key) DO UPDATE SET value=excluded.value",params![k,v.to_string()])?;Ok(())}
@@ -63,6 +88,8 @@ fn pack(mut r:Value)->Result<(Value,Option<Asset>)>{
  for k in ["prompt","answer","comment","criteria","type","figure","image"]{let x=task.get(k).and_then(Value::as_str).context("INVALID_RECORD: field")?;ensure!(x.len()<=if k=="image"{6_000_000}else{64_000},"INVALID_RECORD: length");}
  for k in FILTERS{ensure!(s(&r,k)?.len()<=512,"INVALID_RECORD: metadata");}
  ensure!(r["type"]==r["task"]["type"],"INVALID_RECORD: type");
+ let years=record_years(&r)?;
+ if r.get("examYears").is_some(){r["examYears"]=json!(years);}
  let url=s(&r["task"],"image")?;
  let a=if url.is_empty(){ensure!(r["task"]["figure"]!="image","ASSET_MISSING: Пустое изображение");None}else{
   let (prefix,body)=url.split_once(";base64,").context("ASSET_FORMAT: Base64")?;
@@ -83,7 +110,7 @@ fn pack(mut r:Value)->Result<(Value,Option<Asset>)>{
  };
  r["task"]["image"]=json!("");ensure!(r.to_string().len()<=2_000_000,"INVALID_RECORD: too large");Ok((r,a))
 }
-fn signature(r:&Value,a:Option<&Asset>)->String{let mut v=r.clone();if let Some(o)=v.as_object_mut(){for k in ["id","bankNumber","revision","createdAt","updatedAt"]{o.remove(k);}}sha(json!([v,a.map(|x|(&x.key,&x.suffix))]).to_string().as_bytes())}
+fn signature(r:&Value,a:Option<&Asset>)->String{let mut v=r.clone();if let Some(o)=v.as_object_mut(){for k in ["id","bankNumber","revision","createdAt","updatedAt","examYears"]{o.remove(k);}}sha(json!([v,a.map(|x|(&x.key,&x.suffix))]).to_string().as_bytes())}
 fn store(c:&Connection,a:&Asset)->Result<()>{
  c.execute("INSERT OR IGNORE INTO assets(key,mime,sha256,size,bytes) VALUES(?1,?2,?3,?4,?5)",params![a.key,a.mime,a.hash,a.bytes.len() as i64,a.bytes])?;
  let old:(String,String,i64,Vec<u8>)=c.query_row("SELECT mime,sha256,size,bytes FROM assets WHERE key=?1",[&a.key],|r|Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?)))?;
@@ -136,7 +163,7 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
  if op=="open"{return Ok(json!({"storage":"SQLite"}));}
  if op=="native_backup"{return Ok(json!({"path":backup(&conn,path,false)?}));}
  let protective=if op=="restore"&&p["mode"]=="replace"{ensure!(gen(&conn)?==n(p,"generation")?,"RESTORE_CONFLICT: Банк изменился");Some(backup(&conn,path,true)?)}else{None};
- let writable=matches!(op,"create"|"update"|"delete"|"import"|"restore")||(op=="diagnostics"&&p["clean"]==true);
+ let writable=matches!(op,"create"|"update"|"delete"|"import"|"restore"|"year_update")||(op=="diagnostics"&&p["clean"]==true);
  let tx=conn.transaction_with_behavior(if writable{TransactionBehavior::Immediate}else{TransactionBehavior::Deferred})?;let c=&*tx;
  let result=match op{
   "state"=>json!({"generation":gen(c)?,"count":count(c)?}),
@@ -144,33 +171,54 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   "snapshot"=>snapshot(c,f)?,
   "metadata"=>{ensure!(count(c)?<=500,"LIMIT: metadata");json!(rows(c,"SELECT body FROM tasks ORDER BY number",&[],false,f)?)},
   "get"=>get(c,s(p,"id")?,true)?.unwrap_or(Value::Null),
-  "facets"=>{let mut result=serde_json::Map::new();for k in p["fields"].as_array().context("INVALID_REQUEST: fields")?{let k=k.as_str().context("INVALID_REQUEST: field")?;if !FILTERS.contains(&k){continue;}let sql=format!("SELECT DISTINCT json_extract(body,'$.{}') AS val FROM tasks WHERE val IS NOT NULL AND val!='' ORDER BY val",k);let mut st=c.prepare(&sql)?;let vals=st.query_map([],|r|r.get::<_,String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;result.insert(k.into(),json!(vals));}Value::Object(result)},
+  "facets"=>{let mut result=serde_json::Map::new();for k in p["fields"].as_array().context("INVALID_REQUEST: fields")?{let k=k.as_str().context("INVALID_REQUEST: field")?;if k=="examYear"{let mut st=c.prepare("SELECT DISTINCT value FROM tasks,json_each(tasks.body,'$.examYears') ORDER BY value")?;let vals=st.query_map([],|r|r.get::<_,i64>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;result.insert(k.into(),json!(vals.iter().map(|v|v.to_string()).collect::<Vec<_>>()));continue;}if !FILTERS.contains(&k){continue;}let sql=format!("SELECT DISTINCT json_extract(body,'$.{}') AS val FROM tasks WHERE val IS NOT NULL AND val!='' ORDER BY val",k);let mut st=c.prepare(&sql)?;let vals=st.query_map([],|r|r.get::<_,String>(0))?.collect::<rusqlite::Result<Vec<_>>>()?;result.insert(k.into(),json!(vals));}Value::Object(result)},
   "list"=>{
-   let filters=p["filters"].as_object().context("INVALID_REQUEST: filters")?;let mut clauses=vec!["1=1".to_owned()];let mut args:Vec<rusqlite::types::Value>=Vec::new();
-   for k in FILTERS{if let Some(v)=filters.get(k).and_then(Value::as_str){if !v.is_empty()&&v!="all"{clauses.push(format!("json_extract(body,'$.{}')=?",k));args.push(v.to_owned().into());}}}
-   if let Some(term)=filters.get("search").and_then(Value::as_str){if !term.trim().is_empty(){clauses.push("instr(search_text,?)>0".into());args.push(term.trim().to_lowercase().into());}}
-   let cond=clauses.join(" AND ");let total:i64=c.query_row(&format!("SELECT count(*) FROM tasks WHERE {cond}"),params_from_iter(args.iter()),|r|r.get(0))?;
+   let (cond,mut args)=filter_sql(p["filters"].as_object().context("INVALID_REQUEST: filters")?)?;
+   let total:i64=c.query_row(&format!("SELECT count(*) FROM tasks WHERE {cond}"),params_from_iter(args.iter()),|r|r.get(0))?;
    let offset=n(p,"offset")?.clamp(0,100000);let limit=n(p,"limit")?.clamp(1,80);args.push(limit.into());args.push(offset.into());
    let items=rows(c,&format!("SELECT body FROM tasks WHERE {cond} ORDER BY number LIMIT ? OFFSET ?"),&args,p["includeImages"]!=false,f)?;
    json!({"total":total,"offset":offset,"limit":limit,"hasMore":offset+(items.len() as i64)<total,"items":items})
   },
+  "year_targets"=>{
+   let (cond,args)=filter_sql(p["filters"].as_object().context("INVALID_REQUEST: filters")?)?;
+   let mut st=c.prepare(&format!("SELECT id,revision,json_extract(body,'$.exam') FROM tasks WHERE {cond} ORDER BY number"))?;
+   let items=st.query_map(params_from_iter(args.iter()),|r|Ok(json!({"id":r.get::<_,String>(0)?,"revision":r.get::<_,i64>(1)?,"exam":r.get::<_,String>(2)?})))?.collect::<rusqlite::Result<Vec<_>>>()?;
+   json!(items)
+  },
+  "year_update"=>{
+   let targets=p["targets"].as_array().context("INVALID_REQUEST: targets")?;ensure!(targets.len()<=20000,"LIMIT: targets");
+   ensure!(p.get("years").is_some(),"INVALID_EXAM_YEARS: Массив годов");let years=exam_years(p.get("years"))?;let mode=s(p,"mode")?;ensure!(matches!(mode,"add"|"remove"|"replace"),"INVALID_REQUEST: mode");
+   let now=s(p,"now")?;let mut seen=std::collections::HashSet::new();let mut changed=0;
+   for target in targets{
+    cancel(f)?;let id=s(target,"id")?;ensure!(seen.insert(id),"INVALID_REQUEST: duplicate target");
+    let mut r=get(c,id,false)?.context("REVISION_CONFLICT: Запись удалена")?;
+    let rev=n(&r,"revision")?;ensure!(rev==n(target,"revision")?,"REVISION_CONFLICT: Запись изменена");
+    let old=record_years(&r)?;let mut next=match mode{"add"=>{let mut all=old.clone();all.extend(&years);all},"remove"=>old.iter().copied().filter(|y|!years.contains(y)).collect(),_=>years.clone()};
+    next.sort_unstable();next.dedup();if next==old{continue;}
+    r["examYears"]=json!(next);record_years(&r)?;let rev=rev.checked_add(1).context("revision overflow")?;
+    r["revision"]=json!(rev);r["updatedAt"]=json!(now);
+    c.execute("UPDATE tasks SET revision=?2,updated_at=?3,body=?4 WHERE id=?1",params![id,rev,now,r.to_string()])?;changed+=1;
+   }
+   json!({"changed":changed})
+  },
   "create"|"update"=>{
    let (mut r,a)=pack(p["record"].clone())?;let id=s(&r,"id")?.to_owned();let now=s(p,"now")?;
    if op=="create"{ensure!(get(c,&id,false)?.is_none(),"DUPLICATE_ID: existing");let seq=next(c)?+1;alloc(&mut r,seq,1,now,now);set(c,"sequence",&json!(seq))?;}
-   else{let old=get(c,&id,false)?.context("NOT_FOUND: Запись удалена")?;ensure!(n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Задание изменено");alloc(&mut r,n(&old,"bankNumber")?,n(&old,"revision")?.checked_add(1).context("revision overflow")?,s(&old,"createdAt")?,now);}
+   else{let old=get(c,&id,false)?.context("NOT_FOUND: Запись удалена")?;ensure!(n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Задание изменено");if old["exam"]==r["exam"]&&r.get("examYears").is_none(){if let Some(years)=old.get("examYears"){r["examYears"]=years.clone();}}
+   ensure!(old["exam"]==r["exam"]||record_years(&old)?.is_empty()||p["confirmExamReset"]==true,"EXAM_RESET_REQUIRED: Подтвердите сброс годов");alloc(&mut r,n(&old,"bankNumber")?,n(&old,"revision")?.checked_add(1).context("revision overflow")?,s(&old,"createdAt")?,now);}
    write(c,&r,a.as_ref(),op=="update")?;hydrate(c,r)?
   },
   "delete"=>{let id=s(p,"id")?;let old=get(c,id,true)?.context("NOT_FOUND: Запись удалена")?;ensure!(p["revision"].is_null()||n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Запись изменена");c.execute("DELETE FROM tasks WHERE id=?1",[id])?;old},
   "import"=>{
    let input=p["records"].as_array().context("INVALID_REQUEST: records")?;ensure!(input.len()<=20000,"LIMIT: import");
-   let now=s(p,"now")?;let mut seq=next(c)?;let(mut imported,mut skipped)=(0,0);
+   let now=s(p,"now")?;let mut seq=next(c)?;let(mut imported,mut skipped,mut year_conflicts)=(0,0,0);
    for v in input{cancel(f)?;let(mut r,a)=pack(v.clone())?;let sig=signature(&r,a.as_ref());
-    let found:bool=c.query_row("SELECT EXISTS(SELECT 1 FROM tasks WHERE signature=?1)",[sig],|r|r.get(0))?;if found{skipped+=1;continue;}
+    let found:Option<String>=c.query_row("SELECT body FROM tasks WHERE signature=?1 ORDER BY number LIMIT 1",[sig],|r|r.get(0)).optional()?;if let Some(body)=found{let old:Value=serde_json::from_str(&body)?;if record_years(&old)?!=record_years(&r)?{year_conflicts+=1;}skipped+=1;continue;}
     let requested=r["bankNumber"].as_i64().unwrap_or(0);seq=if requested>seq&&requested<=99999{requested}else{seq+1};ensure!(seq<=99999,"BANK_NUMBERS_EXHAUSTED: limit");
     let id=s(&r,"id")?.to_owned();if get(c,&id,false)?.is_some(){r["id"]=json!(format!("b{}",uuid::Uuid::new_v4()));}
     alloc(&mut r,seq,1,now,now);write(c,&r,a.as_ref(),false)?;imported+=1;
    }
-   set(c,"sequence",&json!(seq))?;json!({"imported":imported,"skipped":skipped})
+   set(c,"sequence",&json!(seq))?;if year_conflicts>0{json!({"imported":imported,"skipped":skipped,"yearConflicts":year_conflicts})}else{json!({"imported":imported,"skipped":skipped})}
   },
   "restore"=>{
    ensure!(gen(c)?==n(p,"generation")?,"RESTORE_CONFLICT: Банк изменился");
@@ -195,11 +243,66 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   },
   _=>bail!("INVALID_REQUEST: unknown operation")
  };
- cancel(f)?;if writable{set(c,"generation",&json!(gen(c)?.checked_add(1).context("generation overflow")?))?;}tx.commit()?;Ok(result)
+ cancel(f)?;if writable&&(op!="year_update"||result["changed"]!=0){set(c,"generation",&json!(gen(c)?.checked_add(1).context("generation overflow")?))?;}tx.commit()?;Ok(result)
 }
 #[cfg(test)]mod tests{
  use super::*;
  fn record(id:&str)->Value{json!({"id":id,"bankNumber":0,"subject":"physics","grade":"8","exam":"general","year":"","part":"","slot":"","difficulty":"","type":"short","topic":"Механика","subtopic":"","origin":"original","task":{"id":id,"type":"short","figure":"none","image":"","prompt":"Скорость","answer":"2","comment":"решение","criteria":"1"}})}
+
+ #[test]
+ fn bank03_exam_years_atomic_and_compatible()->Result<()>{
+  let dir=tempfile::tempdir()?;let path=dir.path().join("bank.sqlite3");let other=dir.path().join("other.sqlite3");let f=AtomicBool::new(false);
+  let run_here=|op:&str,p:Value|run(&path,op,&p,&f);
+  run_here("open",json!({}))?;
+  let mut old=record("a");old["exam"]=json!("ege");old["year"]=json!("2019");old["task"]["image"]=json!("data:image/png;base64,YWJj");
+  let a=run_here("create",json!({"record":old,"now":"2026-11-27"}))?;
+  assert!(a.get("examYears").is_none());
+  assert_eq!(run_here("list",json!({"filters":{"examYear":"none"},"offset":0,"limit":30}))?["total"],1);
+  assert_eq!(run_here("list",json!({"filters":{"examYear":"2019"},"offset":0,"limit":30}))?["total"],0);
+  let mut b=record("b");b["exam"]=json!("ege");b["examYears"]=json!([2027,2026,2027]);
+  let b=run_here("create",json!({"record":b,"now":"2026-11-27"}))?;assert_eq!(b["examYears"],json!([2026,2027]));
+  let targets=run_here("year_targets",json!({"filters":{"exam":"ege"}}))?;
+  let before=run_here("snapshot",json!({}))?;
+  let mut stale=targets.clone();stale[1]["revision"]=json!(999);
+  assert!(run_here("year_update",json!({"targets":stale,"mode":"replace","years":[2028],"now":"2026-11-27"})).is_err());
+  assert_eq!(before,run_here("snapshot",json!({}))?);
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"add","years":[2027],"now":"2026-11-27"}))?["changed"],1);
+  let changed=run_here("get",json!({"id":"a"}))?;
+  assert_eq!(changed["examYears"],json!([2027]));assert_eq!(changed["task"],a["task"]);assert_eq!(changed["bankNumber"],a["bankNumber"]);assert_eq!(changed["createdAt"],a["createdAt"]);assert_eq!(changed["year"],"2019");
+  assert_eq!(run_here("import",json!({"records":[a],"now":"2026-11-27"}))?,json!({"imported":0,"skipped":1,"yearConflicts":1}));
+  assert_eq!(run_here("get",json!({"id":"a"}))?,changed);
+  let filtered=run_here("list",json!({"filters":{"subject":"physics","exam":"ege","examYear":"2027","search":"скорость"},"offset":1,"limit":1,"includeImages":false}))?;
+  assert_eq!(filtered["total"],2);assert_eq!(filtered["items"][0]["id"],"b");
+  assert_eq!(run_here("facets",json!({"fields":["examYear"]}))?["examYear"],json!(["2026","2027"]));
+  let targets=run_here("year_targets",json!({"filters":{"examYear":"2027"}}))?;
+  let before=run_here("snapshot",json!({}))?;
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"add","years":[2027],"now":"2026-11-27"}))?["changed"],0);
+  assert_eq!(before,run_here("snapshot",json!({}))?);
+  assert_eq!(run_here("year_update",json!({"targets":targets,"mode":"remove","years":[2027],"now":"2026-11-27"}))?["changed"],2);
+  let after=run_here("get",json!({"id":"a"}))?;assert_eq!(after["examYears"],json!([]));
+  let refs=run_here("year_targets",json!({"filters":{"exam":"ege"}}))?;
+  assert_eq!(run_here("year_update",json!({"targets":refs,"mode":"replace","years":[2028,2027],"now":"2026-11-27"}))?["changed"],2);
+  let snap=run_here("snapshot",json!({}))?;
+  for bad in [json!(null),json!([1899]),json!([2100]),json!([2027.5]),json!(["2027"])]{
+   let mut input=record("invalid");input["exam"]=json!("ege");input["examYears"]=bad;
+   assert!(run_here("create",json!({"record":input,"now":"2026-11-27"})).is_err());
+  }
+  assert_eq!(snap,run_here("snapshot",json!({}))?);
+  let mut input=run_here("get",json!({"id":"a"}))?;let rev=input["revision"].clone();input["exam"]=json!("oge");input["examYears"]=json!([]);
+  assert!(run_here("update",json!({"record":input,"revision":rev,"now":"2026-11-27"})).is_err());
+  let reset=run_here("update",json!({"record":input,"revision":rev,"confirmExamReset":true,"now":"2026-11-27"}))?;
+  assert_eq!(reset["exam"],"oge");assert_eq!(reset["examYears"],json!([]));
+  let snapshot=run_here("snapshot",json!({}))?;
+  run(&other,"open",&json!({}),&f)?;
+  let body=json!({"format":"quantum-work-bank-backup","version":3,"schema":1,"count":2,"records":snapshot["records"],"meta":snapshot["meta"]}).to_string();
+  run(&other,"restore",&json!({"canonical":body,"sha256":sha(body.as_bytes()),"mode":"empty","generation":0}),&f)?;
+  let restored=run(&other,"snapshot",&json!({}),&f)?;
+  assert_eq!(restored["records"],snapshot["records"]);assert_eq!(restored["meta"],snapshot["meta"]);
+  assert_eq!(run_here("get",json!({"id":"b"}))?["examYears"],json!([2027,2028]));
+  assert_eq!(run_here("diagnostics",json!({}))?["references"],1);
+  Ok(())
+ }
+
  #[test]fn persistence_cas_and_rollback()->Result<()>{
   let d=tempfile::tempdir()?;let p=d.path().join("bank.sqlite3");let f=AtomicBool::new(false);
   run(&p,"open",&json!({}),&f)?;let a=run(&p,"create",&json!({"record":record("a"),"now":"2026-11-24"}),&f)?;assert_eq!(a["bankNumber"],1);assert_eq!(run(&p,"get",&json!({"id":"a"}),&f)?,a);

@@ -1054,3 +1054,78 @@ jobs:
             evidence/task1673/
             Quantum-Office.html
           if-no-files-found: warn
+
+  bank03-indexeddb:
+    if: github.head_ref == 'feat/bank-03-1-exam-year-tags' || github.ref == 'refs/heads/feat/bank-03-1-exam-year-tags'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build
+        working-directory: bank03-baseline
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/bank03_browser.cjs
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - run: node tests/bank03_scale_browser.cjs
+        if: ${{ !cancelled() }}
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-indexeddb-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn
+
+  bank03-sqlite:
+    if: github.head_ref == 'feat/bank-03-1-exam-year-tags' || github.ref == 'refs/heads/feat/bank-03-1-exam-year-tags'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/native-icon.mjs
+      - name: Actual Rust SQLite regression tests (no installer)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence/bank-03.1 | Out-Null
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/rust-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual accepted and current SQLite benchmark and migration
+        shell: pwsh
+        env:
+          QW_BANK03_NATIVE_REPORT: ${{ github.workspace }}/evidence/bank-03.1/native-scale.json
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/tests/bank03_baseline | Out-Null
+          Copy-Item bank03-baseline/src-tauri/src/bank.rs src-tauri/tests/bank03_baseline/bank.rs
+          Copy-Item bank03-baseline/src-tauri/src/schema.sql src-tauri/tests/bank03_baseline/schema.sql
+          Copy-Item tests/bank03_native_benchmark.rs src-tauri/tests/bank03_native_benchmark.rs
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc --test bank03_native_benchmark bank03_native_scale -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/native-scale.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-sqlite-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn
