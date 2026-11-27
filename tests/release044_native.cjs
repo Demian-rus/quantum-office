@@ -36,6 +36,7 @@ let connection;
   const current=await repo.getTask(pack.items[0].id);check(bankStableJSON(current)===bankStableJSON(expected.record),'restart record');check(qwDoc.title==='Release upgrade proof'&&qwDoc.examYear===2027,'restart work');
   return {restart:true,record:current};
  },{stage,pack,expected:stage==='old'?null:JSON.parse(fs.readFileSync(path.join(out,stage==='new'?'old.json':'new.json'),'utf8'))});
+ fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify(result,null,2));
  if(stage!=='old'){
   await page.evaluate(()=>route('home'));
   await page.locator('#qo-about-version').waitFor();
@@ -46,17 +47,20 @@ let connection;
   await page.locator('[data-bank-view="'+pack.items[0].id+'"]').waitFor();
   await page.screenshot({path:path.join(out,stage+'-bank.png')});
   await page.evaluate(()=>{route('work');});
-  // Real native print renderer and actual generated PDF bytes via WebView CDP, not OS save dialog.
-  const frame=await page.evaluate(async()=>{
-   const f=document.createElement('iframe');f.style.cssText='width:830px;height:1160px;position:fixed;inset:0;background:white;z-index:10000';document.body.append(f);
-   f.srcdoc=qwPrintDocumentHTML(qwDoc,false,{format:'booklet'});const start=performance.now();while(!f.contentWindow.qwPrintReady){if(performance.now()-start>30000)throw Error('Native print script unavailable');await new Promise(r=>setTimeout(r,50));}await f.contentWindow.qwPrintReady;
-   if(f.contentWindow.__qwPrintError||f.contentDocument.body.dataset.qwLayoutReady!=='true')throw Error('preview not ready');
-   return f.contentDocument.querySelector('.qw-print-title')?.textContent;
-  });assert.match(frame,/Вариант 1/);
+  // Exercise the real user-facing preview path and wait for its layout revision.
+  const messages=[];page.on('console',m=>{if(['error','warning'].includes(m.type()))messages.push(m.text());});
+  await page.evaluate(()=>qwPreview());
+  await page.locator('#qw-print-preview-frame').waitFor();
+  try{
+   await page.waitForFunction(()=>{const f=document.querySelector('#qw-print-preview-frame');return !!f?.dataset.ready&&f.dataset.ready===f.contentDocument?.documentElement.dataset.qwRender&&!f.contentWindow?.__qwPrintError&&!!f.contentWindow?.__qwPrintLayout;},{},{timeout:30000});
+  }catch(error){fs.writeFileSync(path.join(out,stage+'-print-diagnostic.json'),JSON.stringify({messages,frame:await page.evaluate(()=>{const f=document.querySelector('#qw-print-preview-frame');return {ready:f?.dataset.ready,src:f?.contentDocument?.querySelector('script[src]')?.src,printReady:typeof f?.contentWindow?.qwPrintReady,error:f?.contentWindow?.__qwPrintError,body:f?.contentDocument?.body?.innerText};})},null,2));throw error;}
+  const frame=await page.evaluate(()=>document.querySelector('#qw-print-preview-frame').contentDocument.querySelector('.qw-print-title')?.textContent);
+  assert.match(frame,/Вариант 1/);
   await page.screenshot({path:path.join(out,stage+'-preview.png')});
-  // Native legacy PDF byte renderer; exam profile checked separately in the actual preview.
-  const pdf=await page.evaluate(async()=>{const f=[...document.querySelectorAll('iframe')].at(-1);const text=f.contentDocument.body.innerText;const ready=f.contentDocument.body.dataset.qwLayoutReady;f.remove();const bytes=await qwPDFBytes({...qwDoc,layout:'worksheet'},false);return {text,ready,bytes:Array.from(bytes)};});
-  assert.equal(pdf.ready,'true');assert.ok(pdf.text.includes('Вариант 1'));const bytes=Buffer.from(pdf.bytes);assert.equal(bytes.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,stage+'-native-pdf.pdf'),bytes);
+  const proof=await page.evaluate(()=>{const f=document.querySelector('#qw-print-preview-frame');return {text:f.contentDocument.body.innerText,ready:f.contentDocument.body.dataset.qwLayoutReady,layout:f.contentWindow.__qwPrintLayout};});
+  await page.locator('[data-qw-close]').click();
+  const pdf={...proof,bytes:await page.evaluate(async()=>Array.from(await qwPDFBytes({...qwDoc,layout:'worksheet'},false)))};
+  assert.equal(pdf.ready,'true');assert.ok(pdf.text.includes('Вариант 1'));const bytes=Buffer.from(pdf.bytes);assert.equal(bytes.subarray(0,5).toString(),'%PDF-');fs.writeFileSync(path.join(out,stage+'-native-pdf.pdf'),bytes);fs.writeFileSync(path.join(out,stage+'-print.json'),JSON.stringify({...proof,pdfBytes:bytes.length},null,2));
  }
  fs.writeFileSync(path.join(out,stage+'.json'),JSON.stringify(result,null,2));await connection.browser.close();connection=null;
 })().catch(async e=>{console.error(e);process.exitCode=1;if(connection?.browser.isConnected())await connection.browser.close();});

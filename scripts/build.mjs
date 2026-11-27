@@ -1,5 +1,5 @@
 import '../src/vendor/jszip.min.js';
-import {qwPrintStyles,QW_PUBLISH_CSS} from '../src/core/work-layout.js';
+import {qwPrintStyles,QW_PUBLISH_CSS,qwAlignSVGText,qwMeasureSVGInk,qwPreparePrintDocument} from '../src/core/work-layout.js';
 import {QW_PRINT_FONT_CSS} from '../src/core/work-print-fonts.js';
 import {verifyNativeStorageContract} from './native-storage-contract.mjs';
 import {readFileSync,mkdirSync,writeFileSync,copyFileSync} from 'node:fs';
@@ -41,6 +41,8 @@ mkdirSync(resolve(root,'dist-native'),{recursive:true});writeFileSync(resolve(ro
 writeFileSync(resolve(root,'dist-native/app.css'),styles+'\n'+QW_PRINT_FONT_CSS+'\n'+mathFontCSS);
 for(const orientation of ['portrait','landscape'])writeFileSync(resolve(root,'dist-native/print-'+orientation+'.css'),qwPrintStyles(orientation,'spread',mathFontCSS));
 
-// Standalone print layout executes from a local trusted script in native WebView2.
-const printSource=read('src/core/work-layout.js').replace(/^import .*?;\r?\n/gm,'').replace(/^export \{[^\n]*\};?\r?\n/gm,'');
-writeFileSync(resolve(root,'dist-native/print.js'),printSource+'\nwindow.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});');
+// Standalone print document uses exactly the three functions embedded by the browser renderer.
+// Do not strip imports from the full stylesheet module: top-level CSS dependencies
+// (including QW_EDUCATION_TEXT_CSS) would be unbound in this classic-script scope.
+const printSource=[qwAlignSVGText,qwMeasureSVGInk,qwPreparePrintDocument].map(fn=>fn.toString()).join(';\n');
+writeFileSync(resolve(root,'dist-native/print.js'),printSource+';\nwindow.qwPrintReady=qwPreparePrintDocument().catch(error=>{window.__qwPrintError=error.message;document.body.textContent=error.message;document.body.className="qw-print-error";return null;});');
