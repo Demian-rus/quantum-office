@@ -1054,3 +1054,35 @@ jobs:
             evidence/task1673/
             Quantum-Office.html
           if-no-files-found: warn
+
+  bank03-indexeddb:
+    if: github.head_ref == 'feat/bank-03-1-exam-year-tags' || github.ref == 'refs/heads/feat/bank-03-1-exam-year-tags'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci
+      - run: npm run build
+      - run: npm run build
+        working-directory: bank03-baseline
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/bank03_browser.cjs
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - run: node tests/bank03_scale_browser.cjs
+        if: ${{ !cancelled() }}
+        env:
+          QW_BANK03_BASE_HTML: ${{ github.workspace }}/bank03-baseline/Quantum-Office.html
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-indexeddb-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn

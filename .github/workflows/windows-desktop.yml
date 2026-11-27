@@ -1,7 +1,7 @@
 name: Windows desktop SQLite
 on:
   push:
-    branches: [main, 'feat/task166-4-windows-sqlite', 'feat/task167-1-education-workspaces', 'feat/task167-2-layout-tools', 'feat/task167-3-workspace-ux']
+    branches: [main, 'feat/task166-4-windows-sqlite', 'feat/task167-1-education-workspaces', 'feat/task167-2-layout-tools', 'feat/task167-3-workspace-ux', 'feat/bank-03-1-exam-year-tags']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -9,6 +9,7 @@ permissions:
   contents: read
 jobs:
   windows-x64:
+    if: github.ref != 'refs/heads/feat/bank-03-1-exam-year-tags'
     runs-on: windows-2025
     timeout-minutes: 60
     steps:
@@ -78,3 +79,46 @@ jobs:
           name: windows-x64-evidence
           path: evidence/native/
           if-no-files-found: error
+
+  bank03-sqlite:
+    if: github.ref == 'refs/heads/feat/bank-03-1-exam-year-tags'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: c1a627064a40da66f91c602ffa76149814a4100a
+          path: bank03-baseline
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: npm ci
+      - run: npm run build
+      - run: node scripts/native-icon.mjs
+      - name: Actual Rust SQLite regression tests (no installer)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force evidence/bank-03.1 | Out-Null
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/rust-tests.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Actual accepted and current SQLite benchmark and migration
+        shell: pwsh
+        env:
+          QW_BANK03_NATIVE_REPORT: ${{ github.workspace }}/evidence/bank-03.1/native-scale.json
+        run: |
+          New-Item -ItemType Directory -Force src-tauri/tests/bank03_baseline | Out-Null
+          Copy-Item bank03-baseline/src-tauri/src/bank.rs src-tauri/tests/bank03_baseline/bank.rs
+          Copy-Item bank03-baseline/src-tauri/src/schema.sql src-tauri/tests/bank03_baseline/schema.sql
+          Copy-Item tests/bank03_native_benchmark.rs src-tauri/tests/bank03_native_benchmark.rs
+          cargo test --manifest-path src-tauri/Cargo.toml --locked --target x86_64-pc-windows-msvc --test bank03_native_benchmark bank03_native_scale -- --nocapture 2>&1 | Tee-Object evidence/bank-03.1/native-scale.txt
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bank03-sqlite-evidence
+          path: evidence/bank-03.1/
+          if-no-files-found: warn
