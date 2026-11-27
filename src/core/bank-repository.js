@@ -441,7 +441,8 @@ class BankRepository{
     if(!Number.isInteger(revision)||revision!==old.revision){
      fail(new BankStorageError('Задание изменено в другом окне. Скопируйте текст и откройте запись заново.','REVISION_CONFLICT'));return;
     }
-    if(old.exam!==candidate.exam&&bankValidateExamYears(old).length&&(!confirmExamReset||bankValidateExamYears(candidate).length)){
+    if(old.exam===candidate.exam&&candidate.examYears===undefined&&old.examYears!==undefined)candidate.examYears=old.examYears;
+    if(old.exam!==candidate.exam&&bankValidateExamYears(old).length&&!confirmExamReset){
      fail(new BankStorageError('Подтвердите сброс годов при смене экзамена','EXAM_RESET_REQUIRED'));return;
     }
     const next={...candidate,id:old.id,bankNumber:old.bankNumber,revision:old.revision+1,

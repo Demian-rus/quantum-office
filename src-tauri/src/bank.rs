@@ -204,7 +204,8 @@ pub fn run(path:&Path,op:&str,p:&Value,f:&AtomicBool)->Result<Value>{
   "create"|"update"=>{
    let (mut r,a)=pack(p["record"].clone())?;let id=s(&r,"id")?.to_owned();let now=s(p,"now")?;
    if op=="create"{ensure!(get(c,&id,false)?.is_none(),"DUPLICATE_ID: existing");let seq=next(c)?+1;alloc(&mut r,seq,1,now,now);set(c,"sequence",&json!(seq))?;}
-   else{let old=get(c,&id,false)?.context("NOT_FOUND: Запись удалена")?;ensure!(n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Задание изменено");ensure!(old["exam"]==r["exam"]||record_years(&old)?.is_empty()||(p["confirmExamReset"]==true&&record_years(&r)?.is_empty()),"EXAM_RESET_REQUIRED: Подтвердите сброс годов");alloc(&mut r,n(&old,"bankNumber")?,n(&old,"revision")?.checked_add(1).context("revision overflow")?,s(&old,"createdAt")?,now);}
+   else{let old=get(c,&id,false)?.context("NOT_FOUND: Запись удалена")?;ensure!(n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Задание изменено");if old["exam"]==r["exam"]&&r.get("examYears").is_none(){if let Some(years)=old.get("examYears"){r["examYears"]=years.clone();}}
+   ensure!(old["exam"]==r["exam"]||record_years(&old)?.is_empty()||p["confirmExamReset"]==true,"EXAM_RESET_REQUIRED: Подтвердите сброс годов");alloc(&mut r,n(&old,"bankNumber")?,n(&old,"revision")?.checked_add(1).context("revision overflow")?,s(&old,"createdAt")?,now);}
    write(c,&r,a.as_ref(),op=="update")?;hydrate(c,r)?
   },
   "delete"=>{let id=s(p,"id")?;let old=get(c,id,true)?.context("NOT_FOUND: Запись удалена")?;ensure!(p["revision"].is_null()||n(p,"revision")?==n(&old,"revision")?,"REVISION_CONFLICT: Запись изменена");c.execute("DELETE FROM tasks WHERE id=?1",[id])?;old},
