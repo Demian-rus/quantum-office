@@ -66,6 +66,6 @@ test('TASK145 online PDF is selectable HTML and SVG, without identity prompt',()
  assert.ok(layout.includes('@page{size:A4')||layout.includes("@page{size:${orientation==='landscape'?'A4 landscape':'A4 portrait'}"),'A4 portrait/landscape must be explicitly configured');
  assert.match(builder,/win\.focus\(\);win\.print\(\)/);
  assert.match(builder,/function qwPrintDocumentHTML/);
- assert.match(builder,/qwTaskPreview\(q,i,format,true,d\.printSettings,false,null,examStandard\)/);
+ assert.match(builder,/qwTaskPreview\(q,qwPreviewTaskIndex\(i,options\),format,true,d\.printSettings,false,null,examStandard\)/);
  assert.doesNotMatch(printer,/if\(d\.identity\)\{text\('ФИО/);
 });

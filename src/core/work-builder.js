@@ -603,6 +603,7 @@ async function qwPreview(output='tasks'){
  let renderRevision=0,typingTimer=0;
  const refresh=()=>{
   const revision=++renderRevision;
+  delete preview.dataset.ready;
   printButton.disabled=true;d.querySelector('#qw-pages').setAttribute('aria-busy','true');const effective=d.querySelector('#qw-layout-figure-effective');if(effective)effective.textContent='';
   d.querySelector('#qw-page-count').textContent='Расчёт страниц…';
   const practice=d.querySelector('[data-practice-controls]');if(practice)practice.hidden=qwDoc.layout!=='practice';
@@ -1063,6 +1064,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  function refreshPublishing(){
   if(!d.isConnected||transaction.view.mode!=='publish')return;
   const revision=++publishRevision,notice=publishingPane.querySelector('[data-bank-publish-error]');
+  delete publishFrame.dataset.ready;
   transaction.view.orientation=orientation.value;
   const exam=examContext(),options={orientation:orientation.value,showTitle:false,showVariant:false,showMeta:false,...(exam?{profile:'exam',monochrome:true}:{})};
   const q={...task,...(!work&&permanentNumber()?{source:{kind:'bank',id:draft.id,number:permanentNumber()}}:{})};
@@ -1361,7 +1363,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   renderEditor();
  }
  function updateFigurePlacement(surface){
-  const picture=task.publishing?.figure,position=picture?.position||task.position;
+  const picture=task.publishing?.figure,requested=picture?.position||task.position,position=examContext()&&requested==='left'?'below':requested;
   const wide=position==='below'||position==='auto'&&(picture?picture.width>46:task.figureWidth>300);
   const figure=d.querySelector('[data-bank-live-figure]');
   figure.toggleAttribute('data-wide',wide||!!surface.querySelector('table'));
