@@ -30,6 +30,22 @@ async function runPreview(page,out,project){
   await head.waitFor();assert.equal(await head.textContent(),expected);
   assert.equal(await scope.locator('.qw-task-marker:visible').count(),0);
  };
+ async function studyOrder(scope,label,visual){
+  const task=scope.locator('.qw-study-task.qw-exam-publication').first();
+  await task.locator(visual).waitFor();
+  const g=await task.evaluate((el,visual)=>{
+   const box=n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width};};
+   return {placement:el.dataset.qwStudyFigure,number:box(el.querySelector('.qw-exam-number-line')),condition:box(el.querySelector('.qw-study-condition')),visual:box(el.querySelector(visual)),answer:box(el.querySelector('.qw-study-answer'))};
+  },visual);
+  assert.ok(g.number.bottom<=g.condition.top+1,'Number/condition overlap '+JSON.stringify(g));
+  assert.ok(g.condition.bottom<=g.visual.top+1,'Condition must precede lower visual '+JSON.stringify(g));
+  assert.ok(g.visual.bottom<=g.answer.top+1,'Answer must follow lower visual '+JSON.stringify(g));
+  report.studyOrder??=[];report.studyOrder.push({label,...g});save();
+ }
+ async function allNumbers(selector){
+  const found=await page.locator(selector).evaluate(f=>Array.from(f.contentDocument.querySelectorAll('.qw-print-section:not([data-continuation=true]) .qw-exam-number-line'),n=>n.textContent));
+  assert.deepEqual(found,project.tasks.map((t,i)=>'№ '+(i+1)+' ('+String(t.source.number).padStart(5,'0')+').'));
+ }
  async function measure(selector){
   return page.locator(selector).evaluate(f=>{
    const d=f.contentDocument,w=f.contentWindow,root=d.scrollingElement,v=f.parentElement,s=d.querySelector('.qw-print-document>:is(.qw-print-page,.qw-print-sheet)'),r=f.getBoundingClientRect(),vr=v.getBoundingClientRect();
@@ -88,25 +104,52 @@ async function runPreview(page,out,project){
   await matrix(single,editor,'single-task-a4',editor.locator('[data-bank-publish-orientation]'),await right.isVisible()?right:null);
   await editor.locator('[data-bank-publish-toggle]').click();
   await page.locator('[data-action=work-preview]').click();await ready(full);
-  await number(page.frameLocator(full),expected);assert.ok((await measure(full)).pages>1,'Expected multi-page variant');
+  await number(page.frameLocator(full),expected);await allNumbers(full);assert.ok((await measure(full)).pages>1,'Expected multi-page variant');
   assert.equal(await page.frameLocator(full).locator('.qw-print-title').textContent(),'Вариант 1');
   await matrix(full,page.locator('#qw-dialog'),'full-a4',page.locator('[data-print-setting=orientation]'),page.locator('#qw-dialog [data-qw-dock-toggle=left]'));
   await page.locator('#qw-dialog [data-qw-close]').click();
-  await page.locator('[data-action=work-answers]').click();await ready(full);await number(page.frameLocator(full),expected);await screenshot('brief-key');
-  await page.locator('[data-key-option=includeComments]').check();await ready(full);await number(page.frameLocator(full),expected);await screenshot('solutions');
-  await page.locator('[data-key-option=includePrompt]').check();await ready(full);await number(page.frameLocator(full),expected);await screenshot('conditions-and-solutions');
+  await page.locator('[data-action=work-answers]').click();await ready(full);await number(page.frameLocator(full),expected);await allNumbers(full);await screenshot('brief-key');
+  await page.locator('[data-key-option=includeComments]').check();await ready(full);await number(page.frameLocator(full),expected);await allNumbers(full);await screenshot('solutions');
+  await page.locator('[data-key-option=includePrompt]').check();await ready(full);await number(page.frameLocator(full),expected);await allNumbers(full);await screenshot('conditions-and-solutions');
   await page.locator('#qw-dialog [data-qw-close]').click();
   // Long real condition; no synthetic substitution in the evidence.
   const longest=project.tasks.reduce((a,b)=>a.prompt.length>=b.prompt.length?a:b);
-  await page.locator('.qw-nav-task[data-id="'+longest.id+'"]').click();await editor.locator('[data-bank-publish-toggle]').click();await ready(single);
+  const target=page.locator('.qw-nav-task[data-id="'+longest.id+'"]');
+  const navState=()=>page.evaluate(id=>{
+   const root=document.querySelector('#qo-work-root'),panel=root.querySelector('.qw-left'),item=panel.querySelector('[data-id="'+id+'"]'),mobile=root.querySelector('[data-qw-action=left].qw-mobile'),dock=root.querySelector('[data-qw-dock-toggle=left]');
+   const visible=el=>!!el?.getClientRects().length&&getComputedStyle(el).visibility!=='hidden';
+   return {viewport:{width:innerWidth,height:innerHeight,dpr:devicePixelRatio},compact:matchMedia('(max-width:1199px)').matches,preferences:qwPanelPreference('work'),rootClass:root.className,panelDisplay:getComputedStyle(panel).display,panelVisible:visible(panel),targetVisible:visible(item),mobileVisible:visible(mobile),dockVisible:visible(dock)};
+  },longest.id);
+  report.navigation={before:await navState()};save();
+  if(!await target.isVisible()){
+   const mobile=page.locator('#qo-work-root [data-qw-action=left].qw-mobile'),dock=page.locator('#qo-work-root [data-qw-dock-toggle=left]');
+   if(report.navigation.before.compact){
+    assert.ok(await mobile.isVisible(),'Responsive task drawer control missing');
+    await mobile.click();report.navigation.action='responsive-tasks-button';
+   }else{
+    assert.ok(await dock.isVisible(),'Desktop task panel toggle missing');
+    assert.equal(await dock.getAttribute('aria-expanded'),'false');await dock.click();report.navigation.action='desktop-dock-toggle';
+   }
+  }else report.navigation.action='already-visible';
+  report.navigation.open=await navState();save();assert.ok(report.navigation.open.panelVisible&&report.navigation.open.targetVisible,JSON.stringify(report.navigation));
+  await screenshot('task-navigation-open');await target.click();
+  assert.equal(await page.evaluate(()=>qwSelected),longest.id);report.navigation.selected=await navState();save();
+  await number(editor,'№ '+(project.tasks.indexOf(longest)+1)+' ('+String(longest.source.number).padStart(5,'0')+').');
+  await editor.locator('[data-bank-publish-toggle]').click();await ready(single);
   await editor.locator('[data-publish-zoom]').selectOption('150');await screenshot('long-condition');
   assert.ok((await measure(single)).inner.every(n=>n<=1));await editor.locator('[data-bank-publish-toggle]').click();
   await page.evaluate(()=>route('bank'));await page.locator('.qw-bank-extra-filters summary').click();await page.locator('#qw-bank-slot').selectOption('1');
   await page.locator('[data-bank-view="'+first.source.id+'"]').click();
-  const card=page.locator('#qw-bank-preview');await number(card,expected);await screenshot('bank-card');
-  await card.locator('[data-bank-enlarge]').click();await number(card,expected);await screenshot('bank-expanded');await card.locator('[data-bank-enlarge]').click();
+  const card=page.locator('#qw-bank-preview');await number(card,expected);await studyOrder(card,'bank-card','figure');await screenshot('bank-card');
+  await card.locator('[data-bank-enlarge]').click();await number(card,expected);await studyOrder(card,'bank-expanded','figure');await screenshot('bank-expanded');await card.locator('[data-bank-enlarge]').click();
   await card.locator('[data-bank-edit]').click();const bankEditor=page.locator('#qw-dialog');await number(bankEditor,expected);await screenshot('bank-editor');
   await bankEditor.locator('[data-bank-publish-toggle]').click();await ready(single);await number(page.frameLocator(single),expected);await screenshot('bank-editor-a4');await bankEditor.locator('[data-qw-action=bank-edit-back]').click();
+  // The actual author task 24 contains a table; verify ordering without a synthetic fixture.
+  await page.locator('#qw-bank-slot').selectOption(String(project.tasks.indexOf(longest)+1));
+  await page.locator('[data-bank-view="'+longest.source.id+'"]').click();
+  await number(card,'№ '+(project.tasks.indexOf(longest)+1)+' ('+String(longest.source.number).padStart(5,'0')+').');
+  await studyOrder(card,'bank-table','.qw-study-tables');await screenshot('bank-table');
+  await card.locator('[data-bank-enlarge]').click();await studyOrder(card,'bank-table-expanded','.qw-study-tables');await screenshot('bank-table-expanded');await card.locator('[data-bank-enlarge]').click();
   // Single preview accepts only authenticated bank provenance; no positional ID.
   const fallback=await page.evaluate(()=>{
    const q={...qwTask(),prompt:'Условие',source:{kind:'external-bank',id:'unresolved',number:815}};
@@ -132,6 +175,12 @@ if(require.main===module)(async()=>{
    assert.equal(await p.locator('.qw-task-marker').count(),0);
    await p.pdf({path:path.join(out,name+'.pdf'),preferCSSPageSize:true,printBackground:true});await p.close();
   }
-  console.log('PASS UX-03 Chromium preview matrix and PDF');
+  await page.close();
+  // Reproduce the actual failing WebView2 dimensions without overriding native viewport.
+  const narrow=await browser.newPage({offline:true,colorScheme:'light',viewport:{width:1028,height:749}});
+  await narrow.goto(pathToFileURL(path.resolve('Quantum-Office.html')).href);
+  const narrowProject=await seed(narrow,content);const narrowReport=await runPreview(narrow,path.join(out,'responsive-1028'),narrowProject);
+  assert.equal(narrowReport.navigation.action,'responsive-tasks-button');await narrow.close();
+  console.log('PASS UX-03 Chromium desktop + responsive preview matrix and PDF');
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

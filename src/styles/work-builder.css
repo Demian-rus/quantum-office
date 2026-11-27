@@ -897,3 +897,14 @@
 .qw-editor-exam-heading[hidden]{display:none!important}
 #qo-work-root.qw-author-workspace.qw-dock-hide-left{column-gap:0}
 .qw-inline-task-editor .qw-bank-publishing{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
+
+/* UX-03 FINAL: screen-only exam study layout follows DOM reading order.
+   Leave the existing wide side-by-side figure and all non-exam styles intact. */
+.qw-study-task.qw-exam-publication:is([data-qw-study-figure=below],[data-qw-study-figure=none]) .qw-study-flow > :is(.qw-study-condition,figure,.qw-study-tables,.qw-study-answer){
+ grid-row:auto;grid-column:1;
+}
+@container qwstudy (max-width:440px){
+ .qw-study-task.qw-exam-publication:is([data-qw-study-figure=right],[data-qw-study-figure=left]) .qw-study-flow > :is(.qw-study-condition,figure,.qw-study-tables,.qw-study-answer){
+  grid-row:auto;grid-column:1;
+ }
+}
