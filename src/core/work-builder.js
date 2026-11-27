@@ -247,10 +247,31 @@ function qwBindZoom(control,state,viewports,measure,paint){
 function qwFrameZoomGeometry(frame){
  const doc=frame.contentDocument,sheet=doc?.querySelector('.qw-print-document>:is(.qw-print-sheet,.qw-print-page)');
  if(!sheet)return null;
- const width=sheet.offsetWidth+24, height=sheet.offsetHeight;
- const tail=sheet.parentElement.lastElementChild.getBoundingClientRect().bottom-doc.body.getBoundingClientRect().top;
- frame.style.width=width+'px';frame.style.height=(Math.ceil(tail)+12)+'px';
- return {view:frame.parentElement,width,height};
+ const view=frame.parentElement,root=doc.documentElement;
+ // Measure the physical sheets, not the zoomed viewport. The frame expands to
+ // the entire paginated document; only the outer workspace owns scrolling.
+ const width=Math.ceil(sheet.getBoundingClientRect().width)+26,height=sheet.offsetHeight;
+ frame.style.width=width+'px';
+ const bottom=sheet.parentElement.lastElementChild.getBoundingClientRect().bottom;
+ frame.style.height=(Math.ceil(Math.max(doc.body.getBoundingClientRect().height,bottom+12))+2)+'px';
+ if(root.scrollHeight>root.clientHeight)frame.style.height=(root.scrollHeight+2)+'px';
+ if(root.scrollWidth>root.clientWidth)frame.style.width=(root.scrollWidth+2)+'px';
+ if(frame.qwScrollDocument!==doc){
+  frame.qwScrollDocument=doc;view.tabIndex=0;view.setAttribute('aria-label','Рабочая область предпросмотра A4');
+  // Wheel/trackpad events over the embedded document must scroll the outer workspace.
+  doc.addEventListener('wheel',e=>{
+   if(e.ctrlKey||e.defaultPrevented)return;
+   const unit=e.deltaMode===1?16:e.deltaMode===2?view.clientHeight:1;
+   const x=(e.shiftKey&&!e.deltaX?e.deltaY:e.deltaX)*unit,y=(e.shiftKey&&!e.deltaX?0:e.deltaY)*unit;
+   if((x&&view.scrollWidth>view.clientWidth)||(y&&view.scrollHeight>view.clientHeight)){e.preventDefault();view.scrollBy(x,y);}
+  },{passive:false});
+  doc.addEventListener('keydown',e=>{
+   if(e.defaultPrevented||e.ctrlKey||e.altKey||e.metaKey||e.target.closest?.('input,textarea,select,button,a,[contenteditable]'))return;
+   const delta={ArrowDown:[0,40],ArrowUp:[0,-40],ArrowRight:[40,0],ArrowLeft:[-40,0],PageDown:[0,view.clientHeight],PageUp:[0,-view.clientHeight],' ':[0,(e.shiftKey?-1:1)*view.clientHeight],Home:[0,-view.scrollHeight],End:[0,view.scrollHeight]}[e.key];
+   if(delta){e.preventDefault();view.scrollBy(...delta);}
+  });
+ }
+ return {view,width:frame.offsetWidth,height};
 }
 function qwBindPublishZoom(host,frame){
  return qwBindZoom(host.querySelector('.qw-zoom'),{percent:100,fit:''},[frame.parentElement],
@@ -325,8 +346,8 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace,exam=false)
  const settings=q.publishing?.figure;
  const position=settings?.position||(preferences?.figurePosition&&preferences.figurePosition!=='auto'?preferences.figurePosition:q.position);
  const placement=!figure?'none':position==='below'||position==='left'||tables.length||position==='auto'&&(settings?settings.width>46:q.figureWidth>300)?'below':'right';
- const permanent=bankNumber||(q.source?.kind==='external-bank'||exam&&q.source?.kind!=='bank'?0:q.source?.number);
- const answer=q.answerVisible?'<div class="qw-study-answer">Ответ: '+(q.answerStyle==='boxes'?
+ const permanent=bankNumber===null||bankNumber===undefined?(q.source?.kind==='external-bank'||exam&&q.source?.kind!=='bank'?0:q.source?.number):qwBankNumber(bankNumber);
+ const answer=q.answerVisible?'<div class="qw-study-answer">Ответ: '+(exam?'<span class="qw-study-line"></span>':q.answerStyle==='boxes'?
   '<span class="qw-study-boxes">'+Array.from({length:q.boxes},()=>'<i></i>').join('')+'</span>':
   '<span class="'+(q.answerStyle==='box'?'qw-study-box':'qw-study-line')+'"></span>')+'</div>':'';
  return '<article class="qw-paper-task qw-study-task qw-standard-task'+(exam?' qw-exam-publication':'')+'" data-qw-study-figure="'+placement+'">'+
@@ -336,10 +357,11 @@ function qwStudyTask(q,index,preferences,bankNumber,showWritingSpace,exam=false)
   figure+(tables.length?'<div class="qw-study-tables qw-study-text qw-rich">'+tables.map(table=>table.outerHTML).join('')+'</div>':'')+
   answer+'</div>'+(showWritingSpace&&q.solutionVisible?'<div aria-label="Место для решения" class="qw-solution-preview qw-solution-'+q.solutionStyle+'" style="height:'+q.solutionHeight+'px"></div>':'')+'</article>';
 }
-function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false,bankNumber=null,exam=false){
- if(!printing)return qwStudyTask(q,index,preferences||(rich?null:qwDoc.printSettings),bankNumber,!rich&&layout==='worksheet',!rich&&qwExamPublication(qwDoc,layout));
+function qwTaskPreview(q,index=0,layout=qwDoc.layout,printing=false,preferences=null,rich=false,bankNumber=null,exam=null){
+ exam=exam??(!rich&&qwExamPublication(qwDoc,layout));
+ if(!printing)return qwStudyTask(q,index,preferences||(rich?null:qwDoc.printSettings),bankNumber,!exam&&!rich&&layout==='worksheet',exam);
  const figure=qwStudyFigureHTML(q,true);
- const permanent=q.source?.kind==='bank'?qwBankNumber(q.source.number):0;
+ const permanent=bankNumber===null?(q.source?.kind==='bank'?qwBankNumber(q.source.number):0):qwBankNumber(bankNumber);
  const standardized=exam||layout==='booklet'||!!permanent;
  const richText=rich||qwHasRichSyntax(q.prompt||'');
  const format=richText?qwRichMarkdownHTML:qwContentHTML;
@@ -425,6 +447,9 @@ function qwSettings(){
 /* Online publishing: browser's native print-to-PDF preserves selectable text and vector SVG.
    The older one-click raster PDF exporter remains available as a compatibility fallback. */
 /* Unified high-quality browser PDF. Native font shaping and vector SVG are kept. */
+function qwPreviewTaskIndex(index,options){
+ return options.singleTaskPreview&&Number.isInteger(options.singleTaskIndex)&&options.singleTaskIndex>=0?options.singleTaskIndex+index:index;
+}
 function qwAnswerSections(d,options={},exam=false){
  const mode=options.keyMode,detailed=mode==='detailed'||(!mode&&(options.includeComments===true||options.includeCriteria===true));
  const permanent=q=>(exam||options.includeNumbers!==false)&&q.source?.kind==='bank'?qwBankNumber(q.source.number):0;
@@ -435,7 +460,7 @@ function qwAnswerSections(d,options={},exam=false){
   for(let i=0;i<d.tasks.length;i+=columns){
    const entries=d.tasks.slice(i,i+columns).map((q,j)=>{
     const number=i+j+1;
-    return '<div class="qw-answer-item'+(exam?' qw-exam-brief-item':'')+'" data-answer-number="'+number+'">'+(exam?qwExamNumberHTML(i+j,permanent(q)):'<b class="qw-print-number">'+number+'.</b>')+'<div class="qw-answer-text qw-print-rich">'+(exam?'':qwPrintBankLabel(permanent(q)))+field(q,'answer',answerSource(q)||'—')+'</div></div>';
+    return '<div class="qw-answer-item'+(exam?' qw-exam-brief-item':'')+'" data-answer-number="'+number+'">'+(exam?qwExamNumberHTML(qwPreviewTaskIndex(i+j,options),permanent(q)):'<b class="qw-print-number">'+number+'.</b>')+'<div class="qw-answer-text qw-print-rich">'+(exam?'':qwPrintBankLabel(permanent(q)))+field(q,'answer',answerSource(q)||'—')+'</div></div>';
    }).join('');
    rows.push('<section class="qw-print-section qw-answer-row" data-task="'+(i+1)+'"><article class="qw-paper-task"><div class="qw-task-flow"><div class="qw-task-text qw-answer-columns" style="--qw-answer-columns:'+columns+'">'+entries+'</div></div></article></section>');
   }
@@ -461,15 +486,15 @@ function qwAnswerSections(d,options={},exam=false){
    '<div class="qw-answer-caption"><b>Ответ:</b> '+answer+'</div>'+
    (showCriteria?section(q,'criteria','Критерии оценивания',q.criteria):'');
   if(showPrompt){
-   const condition=qwTaskPreview({...q,answerVisible:false,source:!exam&&options.includeNumbers===false?null:q.source},i,'booklet',true,d.printSettings,false,null,exam)
+   const condition=qwTaskPreview({...q,answerVisible:false,source:!exam&&options.includeNumbers===false?null:q.source},qwPreviewTaskIndex(i,options),'booklet',true,d.printSettings,false,null,exam)
     .replace('</article>','<div class="qw-teacher-notes qw-key-solutions qw-print-rich" data-answer-number="'+number+'">'+body+'</div></article>');
    sections.push('<section class="qw-print-section qw-answer-long" data-qw-key-condition data-task="'+number+'">'+condition+'</section>');
-  }else sections.push('<section class="qw-print-section qw-answer-long" data-task="'+number+'"><article class="qw-paper-task qw-compact-entry qw-standard-task'+(exam?' qw-exam-publication':'')+'">'+qwTaskHeading(i,permanent(q),exam)+'<div class="qw-task-flow"><div class="qw-task-text qw-print-rich" data-answer-number="'+number+'">'+body+'</div></div></article></section>');
+  }else sections.push('<section class="qw-print-section qw-answer-long" data-task="'+number+'"><article class="qw-paper-task qw-compact-entry qw-standard-task'+(exam?' qw-exam-publication':'')+'">'+qwTaskHeading(qwPreviewTaskIndex(i,options),permanent(q),exam)+'<div class="qw-task-flow"><div class="qw-task-text qw-print-rich" data-answer-number="'+number+'">'+body+'</div></div></article></section>');
  });return sections.join('');
 }
 function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteria:true,comments:true}){
  const d=qwValidate(project),requested=options.format||(teacher?'answers':d.layout),
-  examStandard=!options.singleTaskPreview&&qwExamPublication(d,requested),
+  examStandard=options.singleTaskPreview?options.examPublication===true:qwExamPublication(d,requested),
   format=examStandard&&requested==='exam'?'booklet':requested,exam=format==='exam',subject=QW_SUBJECTS[d.subject];
  if(!['worksheet','exam','compact','practice','answers','booklet'].includes(format))throw Error('Неизвестный формат PDF');
  if(!d.tasks.length)throw Error('Добавьте задания в работу');
@@ -487,14 +512,14 @@ function qwPrintDocumentHTML(project,teacher=false,options={answers:true,criteri
    (p.examPartHeadings&&q.part&&q.part!==d.tasks[i-1]?.part?q.part:
     p.examTopicHeadings&&q.topic&&q.topic!==d.tasks[i-1]?.topic?q.topic:''):
    partHeading||(showTopic?topic:'');
-  return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(heading?'<h2 class="qw-topic-title">'+qwEsc(heading)+'</h2>':'')+qwTaskPreview(q,i,format,true,d.printSettings,false,null,examStandard)+'</section>';
+  return '<section class="qw-print-section" data-task="'+(i+1)+'" data-explicit-break="'+(q.pageBreak&&i>0)+'">'+(heading?'<h2 class="qw-topic-title">'+qwEsc(heading)+'</h2>':'')+qwTaskPreview(q,qwPreviewTaskIndex(i,options),format,true,d.printSettings,false,null,examStandard)+'</section>';
  }).join('');
  const printTheme=qwPrintTheme({theme:p.theme??(['booklet','answers'].includes(format)?'academic':''),monochrome:p.monochrome??false,...options}),styles=qwPrintStyles(p.orientation??'portrait','spread');
  const meta=showMeta?(qwEsc(subject)+(d.grade?' · '+qwEsc(d.grade)+' класс':'')+(format!=='booklet'&&showVariant&&d.variant?' · Вариант '+qwEsc(d.variant):'')+(format==='answers'?' · Ключ ответов':'')):'';
  const detailed=options.keyMode==='detailed'||(!options.keyMode&&(options.includeComments===true||options.includeCriteria===true));
  const examTitle='Вариант '+qwExamVariant(d.variant)+(format==='answers'?
   detailed?(options.includePrompt===true?' — условия и решения':' — решения и критерии'):' — ответы':'');
- const header=qwPrintBrand()+(examStandard?'<h1 class="qw-print-title">'+qwEsc(examTitle)+'</h1>':
+ const header=qwPrintBrand()+(examStandard?(options.singleTaskPreview?'':'<h1 class="qw-print-title">'+qwEsc(examTitle)+'</h1>'):
   (showTitle&&heading.trim()?'<h1 class="qw-print-title">'+(format==='answers'?'Ответы — ':'')+qwEsc(heading)+'</h1>':'')+
   (showMeta&&d.topic&&d.topic!==heading?'<p class="qw-print-topic">'+qwEsc(d.topic)+'</p>':'')+
   (format==='booklet'&&showVariant&&d.variant?'<p class="qw-booklet-variant">Вариант №'+qwEsc(d.variant)+'</p>':'')+
@@ -797,6 +822,7 @@ function qwBankFormatSelect(kind,title,options){
 }
 function qwBankRichField(key,title,value,extra='',work=false){
  return '<section id="qw-bank-field-'+key+'" class="qw-bank-rich-editor" role="tabpanel" aria-labelledby="qw-bank-tab-'+key+'" data-bank-rich="'+key+'" hidden>'+
+  (key==='prompt'?'<header class="qw-editor-exam-heading qw-exam-publication" data-editor-exam-heading hidden></header>':'')+
   '<textarea '+(work&&key==='prompt'?'id="qw-prompt" ':'')+'data-bank-task-field="'+key+'" maxlength="'+QW_LIMITS.text+'" spellcheck="true" aria-label="'+title+'">'+qwEsc(value)+'</textarea>'+
   '<div class="qw-bank-live qw-study-text qw-rich" data-bank-live="'+key+'" contenteditable="true" role="textbox" aria-multiline="true" aria-label="'+title+'" spellcheck="true" hidden></div>'+
   (key==='prompt'?'<div class="qw-bank-live-figure" data-bank-live-figure hidden></div>':'')+
@@ -918,6 +944,9 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
  const opts=(k,items)=>'<label>'+(titles[k]||k)+'<select data-bank-edit-field="'+k+'">'+qwOptions(items,draft[k])+'</select></label>';
  const field=(k,title,max=120)=>'<label>'+title+'<input data-bank-edit-field="'+k+'" maxlength="'+max+'" value="'+qwEsc(draft[k]||'')+'"></label>';
  const task=draft.task;
+ const examContext=()=>work?qwExamPublication(qwDoc):['ege','oge'].includes(draft.exam);
+ const taskIndex=()=>work?Math.max(0,qwDoc.tasks.findIndex(q=>q.id===work.id)):Math.max(0,Number(draft.slot||1)-1);
+ const permanentNumber=()=>work?(task.source?.kind==='bank'?qwBankNumber(task.source.number):0):qwBankNumber(draft.bankNumber);
  const choices='<label data-bank-choices-wrap>Варианты ответа, по одному в строке<textarea data-bank-choices rows="4" maxlength="3600">'+qwEsc((task.choices||[]).join('\n'))+'</textarea></label>';
  const fields=QW_BANK_SECTIONS.map(([key,title])=>qwBankRichField(key,title,task[key],key==='prompt'?choices:'',!!work)).join('');
  const tabs='<div class="qw-bank-edit-tabs" role="tablist" aria-label="Содержание задания">'+
@@ -1035,15 +1064,16 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   if(!d.isConnected||transaction.view.mode!=='publish')return;
   const revision=++publishRevision,notice=publishingPane.querySelector('[data-bank-publish-error]');
   transaction.view.orientation=orientation.value;
-  const options={orientation:orientation.value,showTitle:false,showVariant:false,showMeta:false};
-  const q={...task,...(draft.bankNumber?{source:{kind:'bank',id:draft.id,number:draft.bankNumber}}:{})};
+  const exam=examContext(),options={orientation:orientation.value,showTitle:false,showVariant:false,showMeta:false,...(exam?{profile:'exam',monochrome:true}:{})};
+  const q={...task,...(!work&&permanentNumber()?{source:{kind:'bank',id:draft.id,number:permanentNumber()}}:{})};
   const setError=text=>{notice.hidden=!text;notice.textContent=text;};
   setError('');
   publishFrame.style.width=(orientation.value==='landscape'?1150:820)+'px';
   try{
    const teacher=transaction.view.tab!=='prompt';
    const project={...qwProject(),layout:'booklet',tasks:[q],printSettings:options};
-   const html=teacher?qwPrintDocumentHTML(project,true,{format:'answers',keyMode:'detailed',includePrompt:true,includeCriteria:true,singleTaskPreview:true}):qwPrintDocumentHTML(project,false,{singleTaskPreview:true});
+   const previewOptions={singleTaskPreview:true,examPublication:exam,singleTaskIndex:exam?taskIndex():0};
+   const html=teacher?qwPrintDocumentHTML(project,true,{format:'answers',keyMode:'detailed',includePrompt:true,includeCriteria:true,...previewOptions}):qwPrintDocumentHTML(project,false,previewOptions);
    publishFrame.onload=async()=>{
     const win=publishFrame.contentWindow,doc=publishFrame.contentDocument;
     if(doc.documentElement.dataset.qwRender!==String(revision)||!win.qwPrintReady)return;
@@ -1255,6 +1285,11 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   root.querySelector('[data-exam-year-chips]').innerHTML=years.length?years.map(y=>'<button type="button" class="qw-year-tag" data-exam-year-remove="'+y+'" aria-label="Удалить год '+y+'">'+y+' ×</button>').join(''):'<span class="qw-year-empty">Не проверено</span>';
   root.querySelectorAll('input,button').forEach(el=>el.disabled=!enabled);
  }
+ function updateEditorExamHeading(){
+  const heading=d.querySelector('[data-editor-exam-heading]');
+  heading.hidden=!examContext()||transaction?.view.mode==='preview';
+  heading.innerHTML=heading.hidden?'':qwExamNumberHTML(taskIndex(),permanentNumber());
+ }
  function collect(){
   const examControl=d.querySelector('[data-bank-edit-field="exam"]');
   if(examControl&&examControl.value!==draft.exam&&bankExamYears(draft.examYears).length){
@@ -1274,18 +1309,18 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
   const isChoice=task.type==='choice';
   choicesWrap.hidden=!isChoice||transaction?.view.mode==='preview';
   if(isChoice)task.choices=choicesControl.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
-  if(work){saveWorking();return;}
+  if(work){updateEditorExamHeading();saveWorking();return;}
   task.grade=draft.grade;task.exam=draft.exam;task.topic=draft.topic;
   task.subtopic=draft.subtopic;task.origin=draft.origin;
   if(draft.part)task.part='Часть '+draft.part;
-  renderExamYears();
+  updateEditorExamHeading();renderExamYears();
  }
  function preview(){
   if(transaction.view.mode!=='preview')return;
   const key=transaction.view.tab,area=d.querySelector('[data-bank-render="'+key+'"]');
   try{
    area.innerHTML=key==='prompt'?
-    qwTaskPreview(task,draft.slot?Number(draft.slot)-1:null,'worksheet',false,null,true,draft.bankNumber):
+    qwTaskPreview(task,examContext()?taskIndex():draft.slot?Number(draft.slot)-1:null,'worksheet',false,null,true,permanentNumber(),examContext()):
     qwPublishedFieldHTML(task,key);
    if(key==='prompt')qwRefreshLiveGraphText(area);
   }catch(e){area.textContent='Предпросмотр: '+e.message;}
@@ -1365,7 +1400,7 @@ function qwTaskEditor(draft,{id=null,stored,creating=false,active=()=>true,origi
    updateFigurePlacement(live(tab));
    graphic.innerHTML=qwStudyFigureHTML(task);qwRefreshLiveGraphText(graphic);
   }
-  updateHistoryButtons();preview();updateEducationSelection();
+  updateEditorExamHeading();updateHistoryButtons();preview();updateEducationSelection();
   if(work||publish)syncPublishing();
   rezoom();
   if(publish){if(transaction.view.orientation)orientation.value=transaction.view.orientation;refreshPublishing();}
@@ -1869,7 +1904,8 @@ async function qwBank(previousFilters={}){
   const subject=QW_SUBJECTS[entry.subject]||entry.subject;
   const designation=(entry.exam==='ege'?'ЕГЭ':entry.exam==='oge'?'ОГЭ':'Практика')+
    (entry.grade?' · '+entry.grade+' класс':'')+(entry.year?' · '+entry.year:'')+(entry.slot?' · № '+entry.slot:'');
-  const paper=qwTaskPreview(task,entry.slot?Number(entry.slot)-1:pageOffset+Math.max(0,xs.findIndex(item=>item.id===entry.id)),'worksheet',false,null,true,entry.bankNumber);
+  const exam=['ege','oge'].includes(entry.exam);
+  const paper=qwTaskPreview(task,entry.slot?Number(entry.slot)-1:exam?0:pageOffset+Math.max(0,xs.findIndex(item=>item.id===entry.id)),'worksheet',false,null,true,entry.bankNumber,exam);
   preview.innerHTML='<div class="qw-bank-preview-toolbar"><div class="qw-bank-preview-meta">'+
    (task.title?'<strong>'+qwEsc(task.title)+'</strong>':'')+'<span>'+qwEsc(subject+' · '+designation)+'</span>'+
    (entry.topic?'<small>'+qwEsc(entry.topic+(entry.subtopic?' / '+entry.subtopic:''))+'</small>':'')+'<small>Год происхождения: '+qwEsc(entry.year||'—')+'</small>'+qwYearTagHTML(entry)+'</div>'+
