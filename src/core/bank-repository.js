@@ -4,7 +4,7 @@ import {BANK_ASSET_STORE,BankAssetError,bankAssetPrepareMany,bankAssetUnpack,ban
    Future native SQLite implements the same asynchronous contract; no mock
    SQLite adapter is shipped with this browser implementation. */
 const BANK_DB_NAME='quantum-office-bank';
-const BANK_DB_VERSION=2;
+const BANK_DB_VERSION=3;
 const BANK_LEGACY_KEY='quantum-office.work-bank.v1';
 const BANK_LEGACY_COUNTER_KEY='quantum-office.work-bank.number-sequence.v1';
 const BANK_NUMBER_LIMIT=99999;
@@ -131,6 +131,8 @@ class BankRepository{
      if(!tasks.indexNames.contains(name))
       tasks.createIndex(name,name,{unique:name==='bankNumber'});
     }
+    // Upgrade the index transactionally; existing task records and assets remain untouched.
+    if(!tasks.indexNames.contains('examYears'))tasks.createIndex('examYears','examYears',{multiEntry:true});
     if(!db.objectStoreNames.contains('meta'))db.createObjectStore('meta',{keyPath:'key'});
     if(!db.objectStoreNames.contains(BANK_ASSET_STORE))db.createObjectStore(BANK_ASSET_STORE,{keyPath:'key'});
    };
@@ -329,8 +331,8 @@ class BankRepository{
   filters={...filters,examYear:bankYearFilter(filters.examYear)};
   const limit=Math.min(BANK_PAGE_LIMIT,Math.max(1,Math.floor(Number(pagination.limit)||30)));
   const offset=Math.max(0,Math.floor(Number(pagination.offset)||0));
-  const key=BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
-   (filters.type&&filters.type!=='all'?'type':null);
+  const key=!['all','none'].includes(filters.examYear)?'examYears':(BANK_FILTER_FIELDS.find(k=>k!=='type'&&filters[k]&&filters[k]!=='all')||
+   (filters.type&&filters.type!=='all'?'type':null));
   const data=await bankTransaction(this._db(),['tasks',BANK_ASSET_STORE],'readonly',(tx,set,fail)=>{
    const store=tx.objectStore('tasks'),source=key?store.index(key):store.index('bankNumber');
    const done=(items,total)=>{
@@ -358,7 +360,7 @@ class BankRepository{
     return;
    }
    const items=[],matches=[];let total=0;
-   read(source.openCursor(key?IDBKeyRange.only(filters[key]):null),cursor=>{
+   read(source.openCursor(key?IDBKeyRange.only(key==='examYears'?Number(filters.examYear):filters[key]):null),cursor=>{
     if(!cursor){
      if(!key){done(items,total);return;}
      // Equal category keys are traversed by ID. Order by the permanent number
@@ -393,14 +395,7 @@ class BankRepository{
    const done=()=>{if(!--remaining)set(result);};
    for(const key of keys){
     result[key]=[];
-    if(key==='examYear'){
-     const years=new Set(),req=tx.objectStore('tasks').openCursor();
-     req.onerror=()=>fail(req.error);
-     req.onsuccess=()=>{try{const c=req.result;if(!c){result[key]=[...years].sort((a,b)=>a-b).map(String);done();return;}
-      for(const y of bankValidateExamYears(c.value))years.add(y);c.continue();}catch(e){fail(e);}};
-     continue;
-    }
-    const req=tx.objectStore('tasks').index(key).openKeyCursor(null,'nextunique');
+    const req=tx.objectStore('tasks').index(key==='examYear'?'examYears':key).openKeyCursor(null,'nextunique');
     req.onerror=()=>fail(req.error||Error('Не удалось прочитать категории'));
     req.onsuccess=()=>{
      const cursor=req.result;
@@ -462,9 +457,9 @@ class BankRepository{
  async listYearTargets(filters={}){
   filters={...filters,examYear:bankYearFilter(filters.examYear)};
   return bankTransaction(this._db(),'tasks','readonly',(tx,set,fail)=>{
-   const list=[],req=tx.objectStore('tasks').index('bankNumber').openCursor();
-   req.onerror=()=>fail(req.error);req.onsuccess=()=>{try{const c=req.result;if(!c){set(list);return;}
-    const r=c.value;if(bankSearchMatch(r,filters))list.push({id:r.id,revision:r.revision,exam:r.exam});c.continue();
+   const list=[],specific=!['all','none'].includes(filters.examYear),req=tx.objectStore('tasks').index(specific?'examYears':'bankNumber').openCursor(specific?IDBKeyRange.only(Number(filters.examYear)):null);
+   req.onerror=()=>fail(req.error);req.onsuccess=()=>{try{const c=req.result;if(!c){if(specific)list.sort((a,b)=>a.bankNumber-b.bankNumber);set(list.map(({bankNumber,...target})=>target));return;}
+    const r=c.value;if(bankSearchMatch(r,filters))list.push({id:r.id,revision:r.revision,exam:r.exam,bankNumber:r.bankNumber});c.continue();
    }catch(e){fail(e);}};
   });
  }

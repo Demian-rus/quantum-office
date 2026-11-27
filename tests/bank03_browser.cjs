@@ -14,8 +14,8 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/bank-03.1')
    await qwBankOpen();const task=qwTask('short');task.id='old-task';task.prompt='Велосипедист проехал 120 м за 20 с. Найдите скорость.';task.answer='6 м/с';task.comment='v = s/t = 120/20 = 6 м/с.';task.criteria='1 балл за верный ответ.';
    const canvas=document.createElement('canvas');canvas.width=32;canvas.height=32;const g=canvas.getContext('2d');g.fillStyle='#336699';g.fillRect(0,0,32,32);task.image=canvas.toDataURL();task.figure='image';
    const saved=await qwBankRepository.createTask({id:'old-2019',subject:'physics',grade:'11',exam:'ege',year:'2019',topic:'Механика',task});
-   const backup=await qwBankRepository.createVerifiedBackup();const portable=await qwBankRepository.exportBank();
-   await qwBankRepository.close();return {saved,backup,portable};
+   const backup=await qwBankRepository.createVerifiedBackup();const portable=await qwBankRepository.exportBank();const oldVersion=qwBankRepository.db.version;
+   await qwBankRepository.close();return {saved,backup,portable,oldVersion};
   });
   assert.equal(old.saved.year,'2019');assert.ok(!Object.hasOwn(old.saved,'examYears'));
   await fs.copyFile(path.join(root,'Quantum-Office.html'),app);await p.reload();
@@ -25,6 +25,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/bank-03.1')
    const fails=async(fn,code)=>{try{await fn();throw Error('Operation unexpectedly succeeded: '+code);}catch(e){if(e.code!==code)throw e;}};
    const repo=await qwBankOpen(),legacy=await repo.getTask('old-2019');
    check(same(legacy,old.saved),'old DB exact row incl. raster, ID, revision and number');
+   check(old.oldVersion===2&&repo.db.version===3&&repo.db.transaction('tasks').objectStore('tasks').index('examYears').multiEntry,'transactional v2 to v3 multiEntry index upgrade');
    check((await repo.listTasks({examYear:'none'})).total===1,'old row unconfirmed');
    check((await repo.listTasks({examYear:'2019'})).total===0,'origin is not an implicit tag');
    const target=async id=>{const e=await repo.getTask(id);return {id,revision:e.revision};};
@@ -96,7 +97,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/bank-03.1')
    check(same(next.items.map(e=>e.id),expectedIds.slice(3,6)),'stable second page');
    return {oldNumber:legacy.bankNumber,oldVersion:repo.db.version,roundTrips:true,atomicConflict:true,oldBackup:true,origin:legacy.year,combinedTotal:combined.total};
   },old);
-  assert.equal(proof.oldVersion,2);
+  assert.equal(proof.oldVersion,3);
   await p.evaluate(()=>{qoThemePreference='light';qoApplyAppearance();route('work');});
   const open=async()=>{await p.locator('[data-action=work-bank]').click();await p.locator('#qw-bank-count').waitFor();await p.waitForFunction(()=>document.querySelector('#qw-bank-count')?.textContent.startsWith('Найдено:'));};
   const settled=async()=>{await p.waitForFunction(()=>document.querySelector('.qw-bank-catalogue-results')?.getAttribute('aria-busy')==='false');};
@@ -123,6 +124,7 @@ const root=path.resolve(__dirname,'..'),out=path.join(root,'evidence/bank-03.1')
   await p.locator('[data-qw-action=bank-edit-save]').click();await p.locator('#qw-bank-count').waitFor();await settled();
   const edited=await p.evaluate(()=>qwBankRepository.getTask('demo-03'));assert.deepEqual(edited.examYears,[2027,2028]);assert.equal(edited.year,'2019');
   await p.locator('[data-bank-view="demo-03"]').click();await p.locator('[data-bank-edit="demo-03"]').click();
+  await p.locator('[data-exam-year-remove="2028"]').waitFor();
   assert.equal(await p.locator('[data-exam-year-remove="2028"]').count(),1);
   // Real editor exam change confirmation, then cancel the edit without persisting.
   await p.locator('[data-bank-edit-field=exam]').selectOption('oge');
